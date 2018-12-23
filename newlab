@@ -1,0 +1,62 @@
+#!/bin/bash
+name=$1
+if [[ -d $name ]]; then
+    echo "ERROR: $name already exists."
+    exit 1
+else
+    mkdir $name
+fi
+
+if [ $? -ne 0 ]; then
+    echo "Lab $name incomplete. Code 0001"
+    exit 1
+fi
+
+cd $name
+Lab_Path=$(pwd)
+
+# create delrun
+printf "%s\n" \
+    "#!/bin/bash"\
+    "# This script works only under the current directory."\
+    "# It deletes symlinks and their associated data directories."\
+    "# To avoid any catastrophical event, deletable symlinks must begin with Data20, followed by 6 digits, followed by -, followed by 4 digits."\
+    "regex='^Data20[0-9]{6}[-][0-9]{4}$'"\
+    "for i in \"\$@\""\
+    "do"\
+    "    if [[ \$i =~ \$regex && -L \$i ]]; then # -L checks symlink"\
+    "        rm -rf \$( cd \$i && pwd -P )"\
+    "        rm \$i"\
+    "    else"\
+    "        echo \"Ignored deleteion of \$i\""\
+    "    fi"\
+    "done"\
+    > delrun && chmod u+x delrun
+
+if [ $? -ne 0 ]; then
+    echo "Lab $name incomplete. Code 0002"
+    exit 1
+fi
+
+# create default stuff
+mkdir build include lib src
+if [ $? -ne 0 ]; then
+    echo "Lab $name incomplete. Code 0003"
+    exit 1
+fi
+
+printf "%s\n" \
+       "set(LAB_SHADOWS \"\")"\
+       "set(LAB_NAME \"$name\")"\
+       "list(APPEND LAB_SHADOWS \"UserControl.cpp\")"\
+       > src/CMakeLists.txt
+
+cp ../src/UserControl.cpp src/
+
+if [ $? -ne 0 ]; then
+    echo "Lab $name incomplete. Code 0004"
+    exit 1
+fi
+
+echo -e "\e[1mLab $name\e[0m is successfully created."
+echo -e "Add \e[2m-LAB_DIR=$Lab_Path\e[0m in cmake to activate."
