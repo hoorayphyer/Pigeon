@@ -4,6 +4,9 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <unordered_map>
+#include <string>
+#include <any>
 
 namespace mpi {
   void initialize();
@@ -35,16 +38,19 @@ namespace mpi {
 
   struct Comm {
     Handle hdl;
+    std::unordered_map<std::string, std::any> attrs; // this is to replace mpi raw caching mechanism
 
     Comm() = default;
     Comm ( Group group );
 
-    //TODO double check assignment although it seems to work out of the box
+    //TODOL check assignment although it seems to work out of the box
 
     int rank() const;
     int size() const;
 
     std::vector<int> to_world( std::vector<int> ranks ) const;
+
+
 
     //------------------------------------
     void barrier() const;
@@ -96,7 +102,7 @@ namespace mpi {
 
   };
 
-  extern Comm world; // TODO make it const
+  extern Comm world; // TODOL make it const
 
   namespace topo {
     void cartesianize( Comm& comm, std::vector<int> dims, std::vector<bool> periodic );

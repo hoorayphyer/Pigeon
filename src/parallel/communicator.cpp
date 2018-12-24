@@ -33,20 +33,19 @@ namespace parallel {
 
     if ( std::find( members.begin(), members.end(), mpi::world.rank() ) != members.end() ) {
       result.emplace( members );
-      //TODO add label and chief
+      (*result).attrs["label"] = label;
+      (*result).attrs["chief"] = chief;
     }
-
     return result;
   }
 
   namespace ensemble {
-    // TODO
     int chief(mpi::Comm comm) {
-      
+      return std::any_cast<int>(comm.attrs.at("chief"));
     }
 
     int label(mpi::Comm comm) {
-      
+      return std::any_cast<int>(comm.attrs.at("label"));
     }
   }
 }

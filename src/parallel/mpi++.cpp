@@ -51,7 +51,7 @@ namespace mpi {
   Handle NULL_HANDLE;
 
   bool Handle::operator==( Handle other ) const  {
-    return _ptr.get() == other._ptr.get(); // TODO check this
+    return _ptr.get() == other._ptr.get(); // TODOL
   }
 
 
@@ -248,7 +248,7 @@ namespace mpi {
     }
   }
 
-  // TODO consider add error handling for send
+  // TODOL consider add error handling for send
   template <typename T>
   void Comm::send(int dest_rank, const T& send_buf, int tag, SendMode mode ) const {
     auto[ buf, count, datatype ] = decode_buf(send_buf);
