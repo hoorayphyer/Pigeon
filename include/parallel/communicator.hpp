@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <vector>
-#include <optional>
 #include "mpi++.hpp"
 
 namespace parallel {

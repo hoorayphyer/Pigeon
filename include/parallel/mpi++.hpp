@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 
 namespace mpi {
   void initialize();
@@ -30,7 +31,7 @@ namespace mpi {
   Group operator- ( Group a, Group b ); // difference
 
   enum class SendMode : char { STD = 0, BUF, SYN, RDY };
-  enum class ReduceOp : char { SUM = 0, MAX, MAX_LOC};
+  enum class ReduceOp : char { SUM = 0, MAX, MAXLOC};
 
   struct Comm {
     Handle hdl;
@@ -58,16 +59,16 @@ namespace mpi {
     template <typename T_or_Container>
     Request Irecv(int source_rank, T_or_Container& recv_buf, int tag, bool resize_buf_with_probe = false ) const;
 
-    // TODO
-    template < bool In_Place, typename T_or_Container, typename Return_T >
-    Return_T reduce( T_or_Container& buffer, ReduceOp op, int root ) const;
 
-    // template < typename SendType, typename RecvTypePtr >
-    // MPI_Request Ireduce( const SendType* send_buf, RecvTypePtr recv_buf, int count, MPI_Op op, int root ) const;
+    template < typename T >
+    using reduce_return_t = std::optional< typename std::remove_cv<typename std::remove_reference<T>::type>::type >;
+    template < bool In_Place, ReduceOp Op, typename T_or_Container>
+    reduce_return_t<T_or_Container> reduce( T_or_Container& buffer, int root ) const;
+    template < bool In_Place, ReduceOp Op, typename T_or_Container>
+    std::tuple< Request, reduce_return_t<T_or_Container> > Ireduce( T_or_Container& buffer, int root ) const;
 
     template < typename T_or_Container >
     void broadcast( T_or_Container& buffer, int root ) const;
-
     template < typename T_or_Container >
     Request Ibroadcast( T_or_Container& buffer, int root ) const;
 
