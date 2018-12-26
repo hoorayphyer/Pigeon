@@ -35,25 +35,11 @@ namespace mpi {
     }
   };
 
-  inline std::shared_ptr<void>& impl_cast( Handle& hdl ) { return hdl._ptr; }
-  inline const std::shared_ptr<void>& impl_cast( const Handle& hdl ) { return hdl._ptr; }
-
-  template <typename T, typename Handle_t = Handle>
-  inline decltype(auto) as( Handle_t&& hdl ) {
-    return *std::static_pointer_cast<T>( impl_cast( std::forward<Handle_t>(hdl) ) );
-  }
-
 }
 
 // global definitions
 namespace mpi {
   Comm world;
-  Handle NULL_HANDLE;
-
-  bool Handle::operator==( Handle other ) const  {
-    return _ptr.get() == other._ptr.get(); // TODOL
-  }
-
 
   void initialize() {
     int is_initialized = 0;
@@ -63,7 +49,7 @@ namespace mpi {
       MPI_Init(NULL, NULL);
 
     MPI_Comm comm_world = MPI_COMM_WORLD;
-    impl_cast(world.hdl).reset( &comm_world, Raw<MPI_Comm>::free );
+    world.hdl = Handle(&comm_world, Raw<MPI_Comm>::free );
   }
 
   void finalize() {
@@ -104,7 +90,7 @@ namespace mpi {
 
     MPI_Comm comm;
     MPI_Comm_create_group(MPI_COMM_WORLD, grp_this, 0, &comm );
-    impl_cast(hdl).reset( &comm, Raw<MPI_Comm>::free );
+    hdl = Handle( &comm, Raw<MPI_Comm>::free );
 
     MPI_Group_free(&grp_world);
     MPI_Group_free(&grp_this);
@@ -112,13 +98,13 @@ namespace mpi {
 
   int Comm::rank() const {
     int rank;
-    MPI_Comm_rank( as<MPI_Comm>(hdl), &rank );
+    MPI_Comm_rank( hdl, &rank );
     return rank;
   }
 
   int Comm::size() const {
     int size;
-    MPI_Comm_size( as<MPI_Comm>(hdl), &size );
+    MPI_Comm_size( hdl, &size );
     return size;
   }
 
@@ -126,7 +112,7 @@ namespace mpi {
     auto world_ranks {ranks};
     MPI_Group grp_world, grp_this;
     MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
-    MPI_Comm_group(as<MPI_Comm>(hdl), &grp_this);
+    MPI_Comm_group(hdl, &grp_this);
     MPI_Group_translate_ranks( grp_this, ranks.size(), ranks.data(), grp_world, world_ranks.data() );
     MPI_Group_free( &grp_world );
     MPI_Group_free( &grp_this );
@@ -146,18 +132,18 @@ namespace mpi {
         periods[i] = static_cast<int>( periodic[i] );
 
       MPI_Comm comm_cart;
-      MPI_Cart_create( as<MPI_Comm>(comm.hdl), ndims, dims.data(), periods.data(), true, &comm_cart );
-      impl_cast(comm.hdl).reset(&comm_cart);
+      MPI_Cart_create( comm.hdl, ndims, dims.data(), periods.data(), true, &comm_cart );
+      comm.hdl.reset( &comm_cart );
     }
 
     namespace cart {
       std::tuple<std::vector<int>, std::vector<bool>, std::vector<int>> inquire ( const Comm& comm ) {
         int ndims;
-        MPI_Cartdim_get( as<MPI_Comm>(comm.hdl), &ndims );
+        MPI_Cartdim_get( comm.hdl, &ndims );
         std::vector<int> dims(ndims);
         std::vector<int> periods(ndims);
         std::vector<int> coords(ndims);
-        MPI_Cart_get( as<MPI_Comm>(comm.hdl), ndims, dims.data(), periods.data(), coords.data() );
+        MPI_Cart_get( comm.hdl, ndims, dims.data(), periods.data(), coords.data() );
 
         std::vector<bool> periodic( ndims );
         for ( int i = 0; i < ndims; ++i )
@@ -226,7 +212,7 @@ namespace mpi {
 
 
   void Comm::barrier() const {
-    MPI_Barrier( as<MPI_Comm>(hdl) );
+    MPI_Barrier( hdl );
   }
 
 
@@ -252,17 +238,17 @@ namespace mpi {
   template <typename T>
   void Comm::send(int dest_rank, const T& send_buf, int tag, SendMode mode ) const {
     auto[ buf, count, datatype ] = decode_buf(send_buf);
-    *(pick_send<false>(mode)) ( buf, count, datatype, dest_rank, tag, as<MPI_Comm>(hdl) );
+    *(pick_send<false>(mode)) ( buf, count, datatype, dest_rank, tag, hdl );
   }
 
 
   template <typename T>
   Request Comm::Isend( int dest_rank, const T& send_buf, int tag, SendMode mode ) const {
     Request req;
-    impl_cast(req.hdl).reset( new MPI_Request, Raw<MPI_Request>::free );
+    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
 
     auto[ buf, count, datatype ] = decode_buf(send_buf);
-    *(pick_send<true>(mode)) ( buf, count, datatype, dest_rank, tag, as<MPI_Comm>(hdl), &(as<MPI_Request>(req.hdl)) );
+    *(pick_send<true>(mode)) ( buf, count, datatype, dest_rank, tag, hdl, &req.hdl );
 
     return req;
   }
@@ -283,13 +269,13 @@ namespace mpi {
 
     if constexpr ( is_container<T>() ) {
       if ( resize_buf_with_probe ) {
-        count = probe_size( source_rank, tag, as<MPI_Comm>(hdl), datatype );
+        count = probe_size( source_rank, tag, hdl, datatype );
         recv_buf.resize(count);
       }
     }
 
     MPI_Status status;
-    MPI_Recv( buf, count, datatype, source_rank, tag, as<MPI_Comm>(hdl), &status);
+    MPI_Recv( buf, count, datatype, source_rank, tag, hdl, &status);
     MPI_Get_count( &status, datatype, &recv_count );
 
     return recv_count;
@@ -298,18 +284,18 @@ namespace mpi {
   template <typename T>
   Request Comm::Irecv(int source_rank, T& recv_buf, int tag, bool resize_buf_with_probe ) const {
     Request req;
-    impl_cast(req.hdl).reset( new MPI_Request, Raw<MPI_Request>::free );
+    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
 
     auto[ buf, count, datatype ] = decode_buf( recv_buf );
 
     if constexpr ( is_container<T>() ) {
       if ( resize_buf_with_probe ) {
-        count = probe_size( source_rank, tag, as<MPI_Comm>(hdl), datatype );
+        count = probe_size( source_rank, tag, hdl, datatype );
         recv_buf.resize(count);
       }
     }
 
-    MPI_Irecv( recv_buf.data(), recv_buf.size(), mpi_datatype<decltype(recv_buf[0])>(), source_rank, tag, as<MPI_Comm>(hdl), &(as<MPI_Request>(req.hdl)) );
+    MPI_Irecv( recv_buf.data(), recv_buf.size(), mpi_datatype<decltype(recv_buf[0])>(), source_rank, tag, hdl, &req.hdl );
     return req;
   }
 
@@ -347,7 +333,7 @@ namespace mpi {
     auto[ buf, count, datatype ] = decode_buf( std::forward<T>(buffer) );
     auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
 
-    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, as<MPI_Comm>(hdl) );
+    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, hdl );
 
     return result;
   }
@@ -360,9 +346,9 @@ namespace mpi {
     auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
 
     Request req;
-    impl_cast(req.hdl).reset( new MPI_Request, Raw<MPI_Request>::free );
+    req.hdl = Handle ( new MPI_Request, Raw<MPI_Request>::free );
 
-    MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, as<MPI_Comm>(hdl), &(as<MPI_Request>(req.hdl)) );
+    MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, hdl, &req.hdl );
 
     return std::make_tuple( req, result );
   }
@@ -370,17 +356,17 @@ namespace mpi {
   template < typename T >
   void Comm::broadcast( T& buffer, int root ) const {
     auto[ buf, count, datatype ] = decode_buf(buffer);
-    MPI_Bcast( buf, count, datatype, root, as<MPI_Comm>(hdl) );
+    MPI_Bcast( buf, count, datatype, root, hdl );
   }
 
 
   template < typename T >
   Request Comm::Ibroadcast( T& buffer, int root ) const {
     Request req;
-    impl_cast(req.hdl).reset( new MPI_Request, Raw<MPI_Request>::free );
+    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
 
     auto[ buf, count, datatype ] = decode_buf(buffer);
-    MPI_Ibcast( buf, count, datatype, root, as<MPI_Comm>(hdl), &(as<MPI_Request>(req.hdl)) );
+    MPI_Ibcast( buf, count, datatype, root, hdl, &req.hdl );
 
     return req;
   }

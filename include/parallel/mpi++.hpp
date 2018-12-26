@@ -1,7 +1,7 @@
 #ifndef  _MPI_XX_HPP_
 #define  _MPI_XX_HPP_
 
-#include <memory>
+#include "utility/handle.hpp"
 #include <vector>
 #include <optional>
 #include <unordered_map>
@@ -11,18 +11,6 @@
 namespace mpi {
   void initialize();
   void finalize();
-
-  struct Handle {
-  private:
-    std::shared_ptr<void> _ptr {nullptr}; // type erasure
-  public:
-    friend std::shared_ptr<void>& impl_cast( Handle& );
-    friend const std::shared_ptr<void>& impl_cast( const Handle& );
-    bool operator==( Handle other ) const;
-    inline bool operator!=( Handle other ) const { return !operator==(other); }
-  };
-
-  extern Handle NULL_HANDLE;
 
   struct Request {
     Handle hdl;
