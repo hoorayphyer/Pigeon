@@ -1,14 +1,14 @@
 #include "export/data_exporter.hpp"
-#include "parallel/communicator.hpp"
 #include "export/silo++.hpp"
+#include "parallel/communicator.hpp"
 #include "utility/filesys.hpp"
 
-#include "dynamical_variables.hpp"
+#include "dynamic_variables.hpp"
 #include "parameters.hpp"
 
-#include <chrono>
+// #include <chrono>
 
-using namespace std::chrono;
+// using namespace std::chrono;
 
 // namespace {
 //   std::array<int, 3> lowOffset;
@@ -198,18 +198,18 @@ using namespace std::chrono;
 
 // }
 
-template < typename P >
-void CountNumbers( const Particles<P>& particles, ScalarField<unsigned int>& ptcNum ) {
-  ptcNum.assign(0);
-  for ( unsigned int i = 0 ; i < particles.Number(); ++i ) {
-    if ( particles.IsEmpty(i) ) continue;
-    ptcNum.data() [ particles.PtcData()[i].cell ] += 1;
-  }
+// template < typename P >
+// void CountNumbers( const Particles<P>& particles, ScalarField<unsigned int>& ptcNum ) {
+//   ptcNum.assign(0);
+//   for ( unsigned int i = 0 ; i < particles.Number(); ++i ) {
+//     if ( particles.IsEmpty(i) ) continue;
+//     ptcNum.data() [ particles.PtcData()[i].cell ] += 1;
+//   }
 
-}
+// }
 
 
-namespace export {
+namespace io {
 
   // FIXME TODO
   // void ExportImpl( DBfile* dbfile, const AperData& data, const AperParams& params, Domain& domain ) {
@@ -354,7 +354,7 @@ namespace export {
   void export_data( int timestep, const DynamicVars& dvars, const Params& params, const std::optional<mpi::Comm>& primary, const mpi::Comm& ensemble ) {
     constexpr int Padding = 6;
     char str_ts [Padding + 1];
-    sprintf(str_ts, "%06d", timeStep); // TODOL use Padding instead of 6
+    sprintf(str_ts, "%06d", timestep); // TODOL use Padding instead of 6
 
     std::string dirname = filesys::append_slash(params.this_run_dir) + "data/timestep" + str_ts + "/";
     filesys::create_directories(dirname);
@@ -364,7 +364,7 @@ namespace export {
       return;
     }
 
-    auto time = timestep * dt;
+    auto time = timestep * params.dt;
     // DBoptlist* optlist = DBMakeOptlist(8);
     // DBAddOption(optlist, DBOPT_TIME, &time);
     // DBAddOption(optlist, DBOPT_CYCLE, &timeStep);
@@ -377,7 +377,7 @@ namespace export {
     // DBSetFriendlyHDF5Names(1);
     // if (_pane.useCompression) DBSetCompression("METHOD=GZIP");
 
-    auto dbfile = silo::pmpio::open<Mode::Write>( dirname, primary );
+    auto dbfile = silo::pmpio::open<silo::Mode::Write>( dirname, *primary );
 
     // put_mesh(dbfile, grid, optlist);
     // ExportImpl(dbfile, dvars, params, domain);
@@ -390,7 +390,7 @@ namespace export {
     // generate master file
     std::string masterfile = filesys::append_slash(params.this_run_dir) + "data/timestep" + str_ts + ".silo";
 
-    auto dbfile = silo::open<WRITE>( masterfile );
+    dbfile = silo::open<silo::Mode::Write>( masterfile ); // TODOL double check if recycling dbfile is OK
 
     // put_multimesh ( dbfielMaster, timestep );
 

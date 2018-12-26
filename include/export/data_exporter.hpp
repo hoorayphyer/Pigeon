@@ -5,10 +5,10 @@
 
 struct DynamicVars;
 struct Params;
-
 namespace mpi { struct Comm; }
+namespace std { template <class T> class optional; }
 
-namespace export {
+namespace io {
 
   void export_data( std::string this_run_dir, int timestep, const DynamicVars& dvars, const Params& params, const std::optional<mpi::Comm>& primary, const mpi::Comm& ensemble );
 }
