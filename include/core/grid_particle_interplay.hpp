@@ -1,29 +1,28 @@
 #ifndef _GRIDPARTICLEINTERPLAY_HPP_
 #define _GRIDPARTICLEINTERPLAY_HPP_
 
-#include "grid.hpp"
-
-template < int I_Dim >
-struct shape_func {
+struct ShapeFunction {
 private:
+  const Real _delta = 1.0;
 public:
-  static_assert( I_Dim < traits::Dgrid, "dimension overflow");
+  constexpr ShapeFunction ( Real grid_delta ) : _delta(grid_delta) {}
 
-  static constexpr int support() {
+  constexpr int support() const {
     if constexpr ( traits::shape == "Nearest Grid Point" ) return 1;
     else if ( traits::shape == "Cloud In Cell" ) return 2;
     else if ( traits::shape == "Triangular Cloud" ) return 3;
     else if ( traits::shape == "Piecewise Cubic Spline" ) return 4;
-    // TODO add check for unknown type. Note static_assert cannot be used here
+    // TODOL add check for unknown type. Note static_assert cannot be used here
     // else static_assert(false, "Unknown Particle Shape");
   }
 
-  static constexpr Real radius() {
-    return static_cast<Real>( support() ) * grid<I_Dim>::delta * 0.5;
+  constexpr Real radius() const {
+    return support() * _delta * 0.5;
   }
 
-  static constexpr Real weight( const Real delta_q ) {
-    const Real&& absdx = std::abs( std::move(delta_q) / grid<I_Dim>::delta );
+  constexpr Real weight( Real delta_q ) const {
+    // TODOL check correctness Real&&
+    Real&& absdx = std::abs( std::move(delta_q) / _delta );
 
     if constexpr( traits::shape == "Nearest_Grid_Point" ) {
         return static_cast<Real> ( absdx <= 0.5 );

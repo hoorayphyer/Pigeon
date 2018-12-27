@@ -13,6 +13,9 @@ namespace silo :: traits {
   int filetype = DB_HDF5;
 }
 
+// NOTE the raw handle is DBfile* and PMPIO_baton_t*
+// TODOL add is_detected check for raw_handle type, or is_same check
+
 namespace silo {
   DBfile_t::~DBfile_t() {
     file_h.reset(); // file_h goes first
@@ -40,10 +43,15 @@ namespace silo {
     else
       raw_file = DBOpen( filename.c_str(), traits::filetype, DB_APPEND );
 
-    dbfile.file_h = Handle( raw_file, []( DBfile* f ) { if (f) DBClose(f); } );
+    dbfile.file_h = Handle( &raw_file, []( DBfile** f ) { if (f && *f) DBClose(*f); } );
 
     return dbfile;
   }
+
+
+  template DBfile_t open<Mode::Read>( std::string filename );
+  template DBfile_t open<Mode::Write>( std::string filename );
+  template DBfile_t open<Mode::Append>( std::string filename );
 }
 
 namespace silo :: pmpio {
@@ -80,16 +88,20 @@ namespace silo :: pmpio {
 
     constexpr int mpi_tag = 147;
     PMPIO_baton_t* raw_baton = PMPIO_Init( num_files, Mode::Read == mode ? PMPIO_READ : PMPIO_WRITE, comm.hdl, mpi_tag, createCb, openCb, PMPIO_DefaultClose, NULL );
-    dbfile._baton = Handle( raw_baton, []( PMPIO_baton_t* b ) { if (b) PMPIO_Finish( b ); } );
+    dbfile._baton = Handle( &raw_baton, []( PMPIO_baton_t** b ) { if (b && *b) PMPIO_Finish( *b ); } );
 
     auto filename = dirname + std::to_string( PMPIO_GroupRank( dbfile._baton, comm.rank() ) )+".silo";
     auto silo_dname = "proc" + std::to_string( comm.rank() );
 
-    DBfile* raw_dbfile = PMPIO_WaitForBaton( dbfile._baton, filename.c_str(), silo_dname.c_str() );
-    dbfile.file_h = Handle( raw_dbfile, [&baton = dbfile._baton]( DBfile* f) {PMPIO_HandOffBaton(baton, f);} );
+    DBfile* raw_dbfile = (DBfile*) PMPIO_WaitForBaton( dbfile._baton, filename.c_str(), silo_dname.c_str() );
+    dbfile.file_h = Handle( &raw_dbfile, [&baton = dbfile._baton]( DBfile** f) { if ( f && *f && baton != nullhdl ) PMPIO_HandOffBaton(baton, *f);} );
 
     return dbfile;
   }
+
+
+  template DBfile_t open<Mode::Read>(  std::string dirname, const mpi::Comm& comm );
+  template DBfile_t open<Mode::Write>(  std::string dirname, const mpi::Comm& comm );
 
 }
 

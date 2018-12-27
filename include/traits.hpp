@@ -20,10 +20,6 @@ struct traits {
   static constexpr ct_string
   shape {"Cloud In Cell"};
 
-  static constexpr std::array<int, 3>
-  partition { 1, 1, 1 };
-
-
 
 };
 

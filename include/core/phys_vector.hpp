@@ -5,8 +5,6 @@
 #include <tuple>
 #include <utility>
 
-#include "traits.hpp"
-
 // TODOL index_sequence and fold expression may help the generalization to arbitrary Dim
 template < typename T >
 struct Vec3 : public std::tuple<T,T,T> {

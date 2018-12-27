@@ -17,9 +17,9 @@ struct DynamicVars {
 
   }
 
-  Field<Real, 3, 3, true, true, false> E;
-  Field<Real, 3, 3, false, false, true> B;
-  Field<Real, 3, 3, true, true, false> j;
+  Field<Real, 3, 3> E;
+  Field<Real, 3, 3> B;
+  Field<Real, 3, 3> j;
 
   species_map< std::vector<Particle> > particles;
 

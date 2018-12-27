@@ -1,41 +1,39 @@
 #ifndef  _FIELD_HPP_
 #define  _FIELD_HPP_
 
+#include "types.hpp"
 #include "phys_vector.hpp"
-#include "grid.hpp"
 #include <array>
 #include <vector>
 #include <tuple>
 
-// Field indexing convention: ( 0, 0, 0 ) is the origin of the bulk.
-
+// NOTE no concept of guard is needed here. In other words, interpretation of different parts of a field is not Field's responsibility
 // #include <algorithm> // std::for_each, std::transform
 
 // Manifold_Dim is here more for distinction from Field_Dim.
 // TODOL look at fold-expression in C++17, and tuple index_sequences
-template < typename T, int Field_Dim, int Manifold_Dim, bool Midpoint1, bool Midpoint2, bool Midpoint3 >
+template < typename T, int Field_Dim, int Manifold_Dim >
 class Field {
 private:
   std::array< std::vector<T>, Field_Dim > _data;
+  std::array< int, Manifold_Dim > _extent;
+  std::array< Real, Manifold_Dim > _shift; // shift of first cell with field stagger accounted for
 
-  constexpr int linear_index( const int i, const int j, const int k ) const {
-    return i + j * grid_patch<0>::extent_with_guard() + k * grid_patch<0>::extent_with_guard() * grid_patch<1>::extent_with_guard() +
-      grid<0>::guard + grid<1>::guard * grid_patch<0>::extent_with_guard() + grid<2>::guard * grid_patch<0>::extent_with_guard() * grid_patch<1>::extent_with_guard();
+  inline int linear_index( int i, int j, int k ) const {
+    return i + j * _extent[0] + k * _extent[0] * _extent[1];
   }
 
 public:
-  Field( const std::array<int, Manifold_Dim> extent_with_guard ) {
+  Field( std::array<int, Manifold_Dim> extent, std::array<Real, Manifold_Dim> shift ) : _extent(extent), _shift(shift) {
     static_assert( Manifold_Dim == 3, "Sorry, only 3D is implemented for now");
     if constexpr( Manifold_Dim == 3 ) {
-      int size = extent_with_guard[0] * extent_with_guard[1] * extent_with_guard[2];
+      int size = extent[0] * extent[1] * extent[2];
       for ( auto& elm : _data ) {
         elm = std::vector<T>( size, T() );
         elm.shrink_to_fit();
       }
     }
   }
-
-  Field() : Field( { grid_patch<0>::extent_with_guard(), grid_patch<1>::extent_with_guard(), grid_patch<2>::extent_with_guard() } ) {}
 
   Field( const Field& other ) = default;
   Field( Field&& other ) = default;
@@ -57,14 +55,14 @@ public:
     }
   }
 
-  inline auto atlas( int i, int j = 0, int k = 0 ) const {
-    return std::make_tuple(
-                           grid<0>::abscissa<Midpoint1>( grid_patch<0>::origin + i ),
-                           grid<1>::abscissa<Midpoint2>( grid_patch<1>::origin + j ),
-                           grid<2>::abscissa<Midpoint3>( grid_patch<2>::origin + k )
-                           );
+  // inline auto atlas( int i, int j = 0, int k = 0 ) const {
+  //   return std::make_tuple(
+  //                          grid<0>::abscissa<Midpoint1>( grid_patch<0>::origin + i ),
+  //                          grid<1>::abscissa<Midpoint2>( grid_patch<1>::origin + j ),
+  //                          grid<2>::abscissa<Midpoint3>( grid_patch<2>::origin + k )
+  //                          );
 
-  }
+  // }
 
   // TODO fix this when doing field updater
   // void operator*= ( const T value ) {

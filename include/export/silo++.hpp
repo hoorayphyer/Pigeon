@@ -9,21 +9,19 @@ namespace mpi {
   struct Comm;
 }
 
+namespace silo :: traits {
+  extern bool display_guard;
+  extern int create_mode;
+  extern int create_target;
+  extern int filetype;
+}
+
 namespace silo {
-
-  namespace traits {
-    extern bool display_guard;
-    extern int create_mode;
-    extern int create_target;
-    extern int filetype;
-  }
-
   enum class Mode : char { Read = 0, Write, Append };
 
   struct DBfile_t {
     Handle _baton;
     Handle file_h;
-
     ~DBfile_t();
   };
 
@@ -37,13 +35,14 @@ namespace silo {
   // extern std::function<void(DBfile*, int timestep)> put_multimesh;
   // extern std::function<void(DBfile*, int timestep, std::string name_sth, const int type)> put_multivar;
 
-  namespace pmpio {
-    extern int num_files;
 
-    template < Mode mode >
-    DBfile_t open( std::string dirname, const mpi::Comm& comm );
-  }
+}
 
+namespace silo::pmpio {
+  extern int num_files;
+
+  template < Mode mode >
+  DBfile_t open( std::string dirname, const mpi::Comm& comm );
 }
 
 #endif
