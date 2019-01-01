@@ -8,7 +8,7 @@ class Particle {
 private:
   std::array<Real, 7> _internal;
 public:
-  Particle( Real q1, Real q2, Real q3, Real p1, Real p2, Real p3, Real state)
+  constexpr Particle( Real q1, Real q2, Real q3, Real p1, Real p2, Real p3, Real state)
     : _internal{q1, q2, q3, p1, p2, p3, state} {}
 
   constexpr auto q() const {
