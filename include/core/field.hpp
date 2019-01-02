@@ -3,7 +3,6 @@
 
 #include <array>
 #include <vector>
-#include "utility/tuple_manip.hpp"
 
 template < typename T, int DGrid >
 struct FieldComponent {
@@ -32,8 +31,10 @@ struct Field {
 
   const std::array< int, Dim_Grid > anchor;
   const std::array< int, Dim_Grid > stride;
-  std::array < FieldComponent<T, Dim_Grid>, Dim_Field > comp;
+  std::array < FieldComponent<T, Dim_Grid>, Dim_Field > components;
 
+  inline auto& operator[] ( int i_comp ) { return components[i_comp]; }
+  inline const auto& operator[] ( int i_comp ) const { return components[i_comp]; }
 
 };
 

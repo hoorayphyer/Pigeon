@@ -8,13 +8,8 @@
 
 namespace tum {
 
-  template <typename Tuple>
-  constexpr auto tuple_size() {
-    return std::tuple_size<typename std::remove_reference<Tuple>::type>::value;
-  }
-
   template <typename T>
-  using is_tuplelike_t = decltype( std::get<tuple_size<T>() - 1>(std::declval<T>()) );
+  using is_tuplelike_t = decltype( std::get<0>(std::declval<T>()) );
 
   // in practice, only std::tuple and std::array are tuplelike
   template <typename T>
@@ -25,6 +20,11 @@ namespace tum {
   template <typename... T>
   using enable_if_tuple_t = std::enable_if_t< (... && is_tuplelike<T>() ), int>;
   // using enable_if_tuple_t = int;
+
+  template <typename Tuple, class = enable_if_tuple_t<Tuple>>
+  constexpr auto tuple_size() {
+    return std::tuple_size<typename std::remove_reference<Tuple>::type>::value;
+  }
 
 
   template < typename Unary, typename Tuple, std::size_t... I >
@@ -44,7 +44,8 @@ namespace tum {
     if constexpr( sizeof...(rest_tp) == 0 ) {
       return  map_impl_unary( std::forward<Func>(f), std::forward<Tuple>(tp), Indices{} );
     } else {
-      static_assert( (... && (tuple_size<RestTuple>() == tuple_size<Tuple>()) ), "Unmatched size of tuple operands!");
+      // TODO choose the minimum size insteal of forcing all sizes to be equal. Or requiring size of RestTuple be >= size of Tuple. Needed in inner product
+      static_assert( (... && (tuple_size<RestTuple>() >= tuple_size<Tuple>()) ), "Unmatched size of tuple operands!");
       return map_impl( std::forward<Func>(f), std::forward_as_tuple(tp, rest_tp...), Indices{} );
     }
   }

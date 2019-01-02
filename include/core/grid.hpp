@@ -3,10 +3,10 @@
 
 // grid here is the supergrid in one dimension
 struct Grid {
-  const Real lower;
-  const Real upper;
-  const int guard;
-  const Real delta;
+  Real lower;
+  Real upper;
+  int guard;
+  Real delta;
 
   constexpr Grid() : Grid( 0.0, 1.0, 0, 1 ) {}
 
