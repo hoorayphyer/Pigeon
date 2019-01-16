@@ -28,23 +28,23 @@ constexpr bool operator== ( const char* lhs, const ct_string& rhs ) {
 }
 
 
-
-
 struct Species {
   ct_string str {"Unspecified"};
-  Real charge = 0.0; // in terms of unit charge
-  Real mass = 1.0; // in terms of unit mass
+  int charge = 0; // in terms of unit charge
+  int mass = 1; // in terms of unit mass
   bool is_radiative = false;
 
   // implicit conversion
   constexpr operator const char*() const {
     return str.data;
   }
+
+
 };
 
-constexpr Species Electron = { "Electron", -1.0, 1.0, true };
-constexpr Species Positron = { "Positron", 1.0, 1.0, true };
-constexpr Species Photon = { "Photon", 0.0, 0.0, false };
+constexpr Species Electron = { "Electron", -1, 1, true };
+constexpr Species Positron = { "Positron", 1, 1, true };
+constexpr Species Photon = { "Photon", 0, 0, false };
 
 #include <unordered_map>
 template < typename T >

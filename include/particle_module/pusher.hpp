@@ -1,19 +1,16 @@
 #ifndef _PARTICLEPUSHER_HPP_
 #define _PARTICLEPUSHER_HPP_
 
-template <typename T>
-struct VectorField<T>;
-
 // TODO check missing 4pi's maybe
 namespace particle {
 
   // TODOL add species check for correct version of push
-  template < class Coord >
-  void push ( std::vector<Particle>& particles, Real dt, const Params& params,
+  template < class Coord, typename Ptc >
+  void push ( Ptc& ptc, Real dt, const Params& params,
               const VectorField<Real>& EField, const VectorField<Real>& BField );
 
-  template < class Coord >
-  void push ( std::vector<Particle>& particles, Real dt, const Params& params );
+  template < class Coord, typename Ptc >
+  void push ( Ptc& ptc, Real dt, const Params& params );
 }
 
 

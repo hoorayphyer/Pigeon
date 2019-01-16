@@ -1,8 +1,7 @@
 #ifndef  _COORDINATE_HPP_
 #define  _COORDINATE_HPP_
 
-#include "phys_vector.hpp"
-#include <cmath>
+#include "vector.hpp"
 
 enum class CoordSys : int
   {
@@ -29,11 +28,12 @@ struct coord {
 
   static inline Real hhh ( Real x1, Real x2, Real x3 ) { return 1.0; }
 
-  // static inline Vec3<Real> geodesic_move( Vec3<Real&>& x, const Vec3<const Real&>& p, Real dt ) {
-  //   auto dx = p * ( dt / std::sqrt( 1.0 + vecop::abs_sq(p) ) );
-  //   x += dx;
-  //   return dx;
-  // }
+  template < class Vec_x, class Vec_v >
+  static inline auto geodesic_move( Vec_x& x, const Vec_v& v, Real dt ) {
+    auto dx = v * dt;
+    x += dx;
+    return dx;
+  }
 };
 
 template <>
@@ -112,64 +112,63 @@ struct coord < CoordSys::LogSpherical > {
   // }
 
 
-  // static inline Vec3<Real> geodesic_move( Vec3<Real&>& x, const Vec3<Real&>& p, Real dt ) {
-  //   // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
+  template < class Vec_x, class Vec_v >
+  static inline auto geodesic_move( Vec_x& x, Vec_v& v, Real dt ) {
+    // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
-  //   // dx is the return value and meanwhile it serves as a temporary
-  //   auto dx = p * ( dt / std::sqrt( 1.0 + vecop::abs_sq(p) ) );
-  //   auto& dlogr = std::get<0>(dx);
-  //   auto& dtheta = std::get<1>(dx);
-  //   auto& dphi = std::get<2>(dx);
+    // dx is the return value and meanwhile it serves as a temporary
+    auto dx = v * dt;
+    auto& dlogr = std::get<0>(dx);
+    auto& dtheta = std::get<1>(dx);
+    auto& dphi = std::get<2>(dx);
 
-  //   const auto& logr  = std::get<0>(x);
-  //   const auto& theta = std::get<1>(x);
-  //   { // compute dx in this block
-  //     dlogr += std::exp( logr ); // after this step, dx should be ( r0 + v_r * dt, v_theta * dt, v_phi * dt )
+    const auto& logr  = std::get<0>(x);
+    const auto& theta = std::get<1>(x);
+    { // compute dx in this block
+      dlogr += std::exp( logr ); // after this step, dx should be ( r0 + v_r * dt, v_theta * dt, v_phi * dt )
 
-  //     auto r_final = vecop::abs( dx );
+      auto r_final = vec::numeric::abs( dx );
 
-  //     dtheta = std::acos( ( dlogr * std::cos(theta) - dtheta * std::sin(theta) ) / r_final ) - theta;
-  //     dphi = std::atan( dphi / std::abs( dlogr * std::sin(theta) + dtheta * std::cos(theta) ) );
+      dtheta = std::acos( ( dlogr * std::cos(theta) - dtheta * std::sin(theta) ) / r_final ) - theta;
+      dphi = std::atan( dphi / std::abs( dlogr * std::sin(theta) + dtheta * std::cos(theta) ) );
 
-  //     dlogr = std::log(r_final) - logr;
-  //   }
-  //   { // rebase momentum to the new position
-  //     auto cdp = std::cos(dphi);
-  //     auto sdp = std::sin(dphi);
-  //     auto sT = std::sin( 2*theta + dtheta );
-  //     auto cT = std::cos( 2*theta + dtheta );
-  //     auto sdt = std::sin( dtheta );
-  //     auto cdt = std::cos( dtheta );
+      dlogr = std::log(r_final) - logr;
+    }
+    { // rebase velocity to the new position
+      auto cdp = std::cos(dphi);
+      auto sdp = std::sin(dphi);
+      auto sT = std::sin( 2*theta + dtheta );
+      auto cT = std::cos( 2*theta + dtheta );
+      auto sdt = std::sin( dtheta );
+      auto cdt = std::cos( dtheta );
 
-  //     auto p_r = std::get<0>(p);
-  //     auto p_theta = std::get<1>(p);
-  //     auto p_phi = std::get<2>(p);
+      auto[v_r, v_theta, v_phi] = v;
 
-  //     std::get<0>(p) =
-  //       p_r * 0.5 * ( ( 1 - cdp ) * cT + ( 1 + cdp )  * cdt )
-  //       +  p_theta  * 0.5 * ( ( cdp - 1 ) * sT+ ( 1 + cdp ) * sdt )
-  //       + p_phi * std::sin( theta + dtheta ) * sdp;
+      std::get<0>(v) =
+        v_r * 0.5 * ( ( 1 - cdp ) * cT + ( 1 + cdp )  * cdt )
+        +  v_theta  * 0.5 * ( ( cdp - 1 ) * sT+ ( 1 + cdp ) * sdt )
+        + v_phi * std::sin( theta + dtheta ) * sdp;
 
-  //     std::get<1>(p) =
-  //       p_r * 0.5 * ( ( cdp - 1 ) * sT - ( 1 + cdp ) * sdt )
-  //       + p_theta * 0.5 * ( ( cdp - 1 ) * cT + ( 1 + cdp ) * cdt )
-  //       + p_phi * std::cos( theta + dtheta ) * sdp;
+      std::get<1>(v) =
+        v_r * 0.5 * ( ( cdp - 1 ) * sT - ( 1 + cdp ) * sdt )
+        + v_theta * 0.5 * ( ( cdp - 1 ) * cT + ( 1 + cdp ) * cdt )
+        + v_phi * std::cos( theta + dtheta ) * sdp;
 
-  //     std::get<2>(p) =
-  //       - p_r * std::sin(theta) * sdp
-  //       - p_theta * std::cos(theta) * sdp
-  //       + p_phi * cdp;
-  //   }
+      std::get<2>(v) =
+        - v_r * std::sin(theta) * sdp
+        - v_theta * std::cos(theta) * sdp
+        + v_phi * cdp;
+    }
 
-  //   { // in this block we update x
-  //     x += dx;
-  //     // normalize phi
-  //     auto& phi = std::get<2>(x);
-  //     phi -= 2 * PI * std::floor( phi / 2 * PI );
-  //   }
+    { // in this block we update x
+      x += dx;
+      // normalize phi
+      auto& phi = std::get<2>(x);
+      phi -= 2 * PI * std::floor( phi / 2 * PI );
+    }
 
-  //   return dx;
-  // }
+    return dx;
+  }
 };
 
 

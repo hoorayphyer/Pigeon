@@ -24,6 +24,6 @@ struct traits {
 };
 
 
-constexpr Species Ion = { "Ion", 1.0, 5.0, false };
+constexpr Species Ion = { "Ion", 1, 5, false };
 
 #endif

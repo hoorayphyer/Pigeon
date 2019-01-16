@@ -42,7 +42,7 @@ template < std::size_t DGrid, typename T = Real  >
 using Grid = std::array< Gridline<T>, DGrid >;
 
 #include "vector.hpp"
-namespace grid_mem {
+namespace mem {
   template < class Grid_t  >
   vec_def_member_getter( const Grid_t, delta );
 

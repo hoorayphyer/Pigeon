@@ -12,12 +12,12 @@ namespace particle {
     static_assert ( vec::size_v<Vec> >= DGrid );
 
     // turns location to relative
-    location /= grid_mem::delta(grid);
+    location /= mem::delta(grid);
 
     auto interp_comp =
       [ &location, &grid, &anchor=field.anchor, &shape_f ]( const auto& field_comp ) {
         auto loc_comp = location - field_comp.offset
-          - grid_mem::lower(grid) + grid_mem::guard(grid);
+          - mem::lower(grid) + mem::guard(grid);
         // lower bound index of contributing cells
         auto I_b = vec::per_dim::make<DGrid>
           ( [ r = shape_f.radius ]( const auto& loc ) {
