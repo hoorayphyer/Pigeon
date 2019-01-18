@@ -1,56 +1,27 @@
 #ifndef _PARTICLE_HPP_
 #define _PARTICLE_HPP_
 
-#include "types.hpp"
-#include <array>
-#include <vector>
+#include "particle_state_codec.hpp"
 #include "vector.hpp"
 
-template < class PtcArray >
-struct Particle {
-  static constexpr auto Dim = PtcArray::Dptc;
 
-  PtcArray& arr;
-  const int i;
+// Particle is only a proxy
+// TODO this limits user from passing a single particle into a function that only works on particles. Such as template <typename Ptc> void foo( Ptc ), where one cannot use Ptc&. One solution is use Ptc&&. The other is use generic lambda.
+// Or let's put it this way, those functions only work with proxies. When a material particle is passed, a proxy will generated for it.
+// Or, we will use Ptc&, this only disallows passing proxy&&. const Ptc& works for everything.
+
+template < std::size_t Dim_Ptc, typename T, typename state_t >
+struct Particle : private state_codec<state_t> {
+  static_assert( std::is_reference_v<T> == std::is_reference_v<state_t> );
+public:
+  static constexpr bool is_proxy = std::is_reference_v<T>;
+  static constexpr auto Dim = Dim_Ptc;
+  Vec<T, Dim_Ptc> q;
+  Vec<T, Dim_Ptc> p;
+
+  Particle( Vec<T, Dim_Ptc> qq, Vec<T, Dim_Ptc> pp, state_t state ) noexcept
+    : q(std::move(qq)), p(std::move(pp)), state_codec<state_t>(state) {}
 };
 
-template < std::size_t Dim_Ptc >
-struct ParticleArray {
-  std::array<std::vector<T>, Dim_Ptc> q;
-  std::array<std::vector<T>, Dim_Ptc> p;
-  std::vector<encoded_bits_t> state;
-
-  static constexpr auto DPtc = Dim_Ptc;
-
-  inline auto operator[] ( int i ) noexcept {
-    return Particle<ParticleArray>{ *this, i };
-  }
-
-  inline auto operator[] ( int i ) const noexcept {
-    return Particle<const ParticleArray>{ *this, i };
-  }
-};
-
-namespace mem {
-
-  template <typename Ptc >
-  inline auto q( Ptc& ptc ) noexcept {
-    return vec::per_dim::tie<Ptc::Dim>
-      ( [i=ptc.i]( auto&& x ) { return x[i]; }, ptc.arr.q );
-  }
-
-  template <typename Ptc >
-  inline auto p( Ptc& ptc ) noexcept {
-    return vec::per_dim::tie<Ptc::Dim>
-      ( [i=ptc.i]( auto&& x ) { return x[i]; }, ptc.arr.p );
-  }
-
-  template < std::size_t D, typename Ptc >
-  inline auto q( Ptc& ptc ) noexcept {
-    static_assert( D <= Ptc::Dim );
-    return vec::per_dim::tie<D>
-      ( [i=ptc.i]( auto&& x ) { return x[i]; }, ptc.arr.q );
-  }
-}
 
 #endif

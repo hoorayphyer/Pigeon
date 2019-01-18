@@ -96,16 +96,14 @@ namespace particle {
   template < typename Ptc, typename Vector >
   Vec<Real,Ptc::Dim> update_p( Ptc& ptc, const Species& sp, Real dt, const Vector& E, const Vector& B ) {
     Vec<Real, Ptc::Dim> dp;
-    const auto p = mem::p(ptc);
-    const auto q = mem::q(ptc); // TODO is q really const ref?
 
     // Apply Lorentz force
-    if ( _pane.lorentz_On && ( !check_bit( ptc.flag, ParticleFlag::ignore_em ) ) ) {
-      dp += force::lorentz( dt/sp.mass, p, E, B );
+    if ( _pane.lorentz_On && ( !ptc.is<flag::ignore_em>() ) ) {
+      dp += force::lorentz( dt/sp.mass, ptc.p, E, B );
     }
 
     if ( _pane.gravity_On )
-      dp += _pane.gravity( q ) * dt; // TODO gravity interface
+      dp += _pane.gravity( ptc.q ) * dt; // TODO gravity interface
 
     // TODO put Rc in a separate container
     // // FIXME don't use a uniform number for Rc
@@ -113,7 +111,7 @@ namespace particle {
     // ptc.Rc = 1.0;
 
     // FIXME add control in dashboard for rad_cooling
-    // if ( particles.Attributes().isRadiate ) {
+    // if ( sp.is_radiative ) {
     //   rad_cooling(p, BVector, EVector, 2e-9, dt);
     // }
 
@@ -122,26 +120,24 @@ namespace particle {
     // TODO should this go before p += dp
     if ( _pane.landau0_On && sp.is_radiative ) {
       if ( vn::abs_sq(B) > _pane.B_landau0 * _pane.B_landau0 ) {
-        dp += force::landau0( p, E, B );
+        dp += force::landau0( ptc.p, E, B );
       }
     }
 
-    mem::p(ptc) += dp;
+    ptc.p += dp;
 
     return dp;
   }
 
   template < typename Ptc, CoordSys CS >
   Vec<Real,Ptc::Dim> update_q( Ptc& ptc, const Species& sp, Real dt ) {
-    auto p = mem::p(ptc);
-    auto q = mem::q(ptc);
-    Real gamma = std::sqrt( (sp.mass > 0) + vn::abs_sq(p) );
+    Real gamma = std::sqrt( (sp.mass > 0) + vn::abs_sq(ptc.p) );
 
     if constexpr ( CS == CoordSys::Cartesian ) {
-      return coord<CS>::geodesic_move( q, p, dt / gamma );
+      return coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );
     } else {
-      auto dq = coord<CS>::geodesic_move( q, (p /= gamma), dt );
-      p *= gamma;
+      auto dq = coord<CS>::geodesic_move( ptc.q, (ptc.p /= gamma), dt );
+      ptc.p *= gamma;
       return dq;
     }
 

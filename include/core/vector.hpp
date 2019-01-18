@@ -41,8 +41,9 @@ struct Vec<T&, N> : public homogeneous_tuple<T&,N> {
   constexpr Vec( homogeneous_tuple<T&,N> x ) noexcept
     : homogeneous_tuple<T&,N>( std::move(x) ) {}
 
-  Vec( const Vec& other ) = delete;
-  Vec( Vec&& other ) noexcept = delete;
+  // TODO double check the semantics of these
+  Vec( const Vec& other ) = default;
+  Vec( Vec&& other ) noexcept = default;
 };
 
 template < typename OStream, typename T, std::size_t N, std::size_t I=0 >
