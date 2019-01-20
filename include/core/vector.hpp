@@ -264,4 +264,32 @@ namespace vec::numeric {
   }
 }
 
+namespace vec {
+  namespace impl {
+    template < typename From, typename To >
+    struct copy_ref {
+      using type = std::conditional_t< std::is_reference_v<From>, To&, To >;
+    };
+
+    template < typename From, typename To >
+    struct copy_const {
+      using type = std::conditional_t< std::is_const_v<From>, const To, To >;
+    };
+
+  }
+
+  template < typename From, typename To >
+  using copy_ref_t = typename copy_ref<From,To>::type;
+
+  template < typename From, typename To >
+  using copy_const_t = typename copy_const<From,To>::type;
+
+  template < typename From, typename To >
+  using copy_constref_t = typename copy_const_t<From, copy_ref_t<From, To>>;
+
+  // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20
+  template < typename T >
+  using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+}
+
 #endif

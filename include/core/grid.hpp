@@ -1,7 +1,6 @@
 #ifndef  _GRID_HPP_
 #define  _GRID_HPP_
 
-#include "types.hpp"
 #include <array>
 
 template < typename T >
@@ -38,7 +37,7 @@ struct Gridline {
 };
 
 // Grid is designed to represent the supergrid
-template < std::size_t DGrid, typename T = Real  >
+template < std::size_t DGrid, typename T >
 using Grid = std::array< Gridline<T>, DGrid >;
 
 #include "vector.hpp"

@@ -103,7 +103,7 @@ namespace particle {
 
 
   public:
-    explicit state_codec( T& state ) noexcept : _state(state) {}
+    explicit state_codec( T state ) noexcept : _state(state) {}
 
 
   };

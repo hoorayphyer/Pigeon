@@ -1,40 +1,10 @@
 #include "particle_module/pusher.hpp"
 #include "core/particle.hpp"
-#include "core/field.hpp"
 #include "core/coordinate.hpp"
 
 namespace vn = vec::numerical;
 
 namespace particle :: force {
-  // void rad_cooling(Vec3<double>& p, const Vec3<double>& B, const Vec3<double>& E, double re, double dt) {
-  //   double gamma = sqrt(1.0 + p.dot(p));
-  //   auto beta = p / gamma;
-  //   // std::cout << "beta is " << beta << std::endl;
-  //   auto tmp = E + beta.cross(B);
-  //   // std::cout << "tmp is " << tmp << std::endl;
-  //   auto dp = tmp.cross(B) + E * beta.dot(E);
-  //   // std::cout << "-------" << std::endl;
-  //   // std::cout << "first term is " << dp << std::endl;
-  //   double bE = beta.dot(E);
-  //   auto sec = beta * (gamma * gamma * (tmp.dot(tmp) - bE * bE));
-  //   // std::cout << "second term is " << sec << std::endl;
-  //   dp -= sec;
-  //   dp *= (2.0 * re / 3.0) * dt;
-  //   // std::cout << "dp is " << dp << std::endl;
-  //   p += dp;
-  // }
-
-  // void sync_cooling(Vec3<double>& p, const Vec3<double>& B, const Vec3<double>& E, double re, double dt) {
-  //   // double gamma = sqrt(1.0 + p.dot(p));
-  //   double B2 = B.dot(B);
-  //   auto p_perp = p - B * (p.dot(B)) / B2;
-  //   double pp = sqrt(p_perp.dot(p_perp));
-  //   // auto dp
-  //   // std::cout << "dp is " << dp << std::endl;
-  //   p -= p_perp * (2.0 * re * dt * pp * B2 / 3.0);
-  //   // p = B * (p.dot(B)) / B2;
-  // }
-
   auto landau0 =
     [](const auto& p, const auto& E, const auto& B) {
       Real EB2 = vn::E.dot(B);
@@ -70,36 +40,19 @@ namespace particle :: force {
       return p_vay - p;
     };
 
-  // float CalculateRc( Scalar dt, const Vec3<Real> &p, const Vec3<Real> &dp ) {
-  //   // find momentum at half time step
-  //   Vec3<MOM_TYPE> phalf( p + dp * 0.5 );
-  //   Vec3<MOM_TYPE> v( phalf / std::sqrt( 1.0 + phalf.dot(phalf) ) );
-  //   Scalar vv = v.dot( v );
-  //   Vec3<MOM_TYPE> a( dp / dt ); // a is for now force, will be converted to dv/dt
-  //   // convert a to dv/dt
-  //   a = ( a - v * ( v.dot(a) ) ) * std::sqrt( 1.0 - vv );
-  //   Scalar va = v.dot( a ); // get the real v dot a
-  //   return vv / std::max( std::sqrt( a.dot(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
-  // }
-
-  // float GetDipolarRc( const Scalar &r_sph, const Scalar &cos_th, const Scalar &phi) {
-  //   Scalar sin_th = std::sqrt( 1.0 - cos_th * cos_th );
-  //   Scalar tmp1 = 1.0 + cos_th * cos_th;
-  //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
-  //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
-  // }
-
 }
 
 // TODO move check of forces on_off to somewhere else
 namespace particle {
-  template < typename Ptc, typename Vector >
-  Vec<Real,Ptc::Dim> update_p( Ptc& ptc, const Species& sp, Real dt, const Vector& E, const Vector& B ) {
-    Vec<Real, Ptc::Dim> dp;
+  template < typename Tvt, std::size_t DPtc, std::size_t DField,
+             typename Trl = vec::remove_cvref_t<Tvt> >
+  Vec<Trl,DPtc> update_p( Particle<Tvt,DPtc>& ptc, const Species& sp, Trl dt,
+                          const Vec<Trl, DField>& E, const Vec<Trl, DField>& B ) {
+    Vec<Trl, DPtc> dp;
 
     // Apply Lorentz force
-    if ( _pane.lorentz_On && ( !ptc.is<flag::ignore_em>() ) ) {
-      dp += force::lorentz( dt/sp.mass, ptc.p, E, B );
+    if ( _pane.lorentz_On  ) {
+      dp += force::lorentz( dt / sp.mass, ptc.p, E, B );
     }
 
     if ( _pane.gravity_On )
@@ -129,13 +82,15 @@ namespace particle {
     return dp;
   }
 
-  template < typename Ptc, CoordSys CS >
-  Vec<Real,Ptc::Dim> update_q( Ptc& ptc, const Species& sp, Real dt ) {
+
+  template < CoordSys CS, typename Tvt, std::size_t DPtc,
+             typename Trl = vec::remove_cvref_t<Tvt> >
+  Vec<Trl,DPtc> update_q( Particle<Tvt, DPtc>& ptc, const Species& sp, Trl dt ) {
     Real gamma = std::sqrt( (sp.mass > 0) + vn::abs_sq(ptc.p) );
 
     if constexpr ( CS == CoordSys::Cartesian ) {
-      return coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );
-    } else {
+        return coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );
+      } else {
       auto dq = coord<CS>::geodesic_move( ptc.q, (ptc.p /= gamma), dt );
       ptc.p *= gamma;
       return dq;
@@ -143,50 +98,5 @@ namespace particle {
 
   }
 
-
-}
-
-
-namespace particle {
-  // template < class Coord >
-  // void push ( std::vector<Particle>& particles, Real dt, const Params& params,
-  //             const VectorField<Real>& EField, const VectorField<Real>& BField ) {
-  //   const auto& grid = params.grid;
-  //   for ( auto& ptc : particles ) {
-  //     if( ptc.IsEmpty() ) continue;
-
-  //     // update q
-  //     ptc.q() += dq;
-
-  //     // TODO
-  //     // handle_boundary( ptc is_at_boundary, is_axis );
-
-  //     if ( !check_bit( ptc.flag, ParticleFlag::ignore_force ) ) {
-  //       // TODO get E B
-  //       // TODO different forces may need different filtering
-  //       update_p( ptc, dt, E, B );
-  //     }
-  //     auto dx = Coord::geodesic_move( ptc.q(), ptc.p(), dt );
-
-  //   }
-  // }
-
-  // template < class Coord >
-  // void push ( std::vector<Particle>& particles, Real dt, const Params& params ) {
-  //   const auto& grid = params.grid;
-  //   for ( auto& ptc : particles ) {
-  //     if ( ptc.IsEmpty() ) continue;
-
-  //     // need species
-  //     auto dq = Coord::geodesic_move( ptc.q(), ptc.p(), dt );
-  //     ptc.q() += dq;
-
-  //     // TODO move this to pairProducer
-  //     // ptc.path_left -= dt;
-
-  //     // TODO
-  //     // handle_boundary( ptc is_at_boundary, is_axis );
-  //   }
-  // }
 
 }

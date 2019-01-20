@@ -6,7 +6,7 @@
 #include <iterator>
 
 namespace particle {
-  template < std::size_t Dim_Ptc, typename vector_t, typename... Ts  >
+  template < std::size_t Dim_Ptc, typename vector_t, typename T  >
   class iterator {
   private:
     vector_t& _vector;
@@ -15,11 +15,8 @@ namespace particle {
   public:
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
-    // using value_type = Particle< Dim_Ptc, Ts... >;
     using value_type = void;
-    using reference = Particle< Dim_Ptc, std::conditional_t<
-                                           std::is_const_v<vector_t>,
-                                           const Ts&..., Ts&...> >;
+    using reference = Particle< vec::copy_const_t<vector_t, T&>,  Dim_Ptc>;
     using pointer = void;
 
     iterator( vector_t& vec, int i ) noexcept : _vector(vec), _index(i) {}
@@ -45,10 +42,9 @@ namespace particle {
 
   };
 
-  template < std::size_t Dim_Ptc, typename T >
+  template < typename T, std::size_t Dim_Ptc >
   struct vector {
   private:
-    using encoded_bits_t = unsigned long long; // need at least 64 bits
     std::array<std::vector<T>, Dim_Ptc> q;
     std::array<std::vector<T>, Dim_Ptc> p;
     std::vector<encoded_bits_t> state;
