@@ -15,6 +15,11 @@ namespace sf {
     return static_cast<int>(S);
   }
 
+  template < typename T >
+  constexpr T radius( shape s ) noexcept {
+    return support(s) / 2.0;
+  }
+
   template < shape S >
   struct ShapeFunction {
     template < typename T >

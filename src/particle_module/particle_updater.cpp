@@ -18,6 +18,7 @@ namespace particle {
 
 
 
+  template < sf::shape S >
   void update( ) {
     auto& WJ;
     WJ.zero_out();
@@ -57,7 +58,8 @@ namespace particle {
 
           auto&& dq = update_q(); // NOTE q is updated
           // pusher handle boundary condition
-          depositWJ(std::move(dq));
+
+          depositWJ<S>( WJ, ptc, std::move(dq), grid );
 
         } else if ( sp == photon ) {
           update_q(); // NOTE q is updated

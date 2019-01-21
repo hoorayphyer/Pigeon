@@ -150,6 +150,19 @@ namespace vec :: per_dim {
 
 }
 
+namespace vec {
+  // NOTE foreach has no return type as opposed to those in vec::per_dim
+  template < std::size_t Begin, std::size_t End, typename Func, typename... Vectors >
+  constexpr void foreach( const Func& f, Vectors&&... vecs  ) noexcept {
+    static_assert( Begin <= End );
+    if constexpr ( Begin == End ) return;
+    else {
+      f( std::get<Begin>(std::forward<Vectors>(vecs))... );
+      return foreach<Begin+1, End>( f, std::forward<Vectors>(vecs) );
+    }
+  }
+}
+
 
 namespace vec::functional {
   template < typename Vector, typename Vec_or_Num, typename BinaryOp >
