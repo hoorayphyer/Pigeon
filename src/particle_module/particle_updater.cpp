@@ -5,7 +5,6 @@
 namespace particle {
   namespace todo {
     auto find_Rc( auto dp ) {
-    
     }
 
     // NOTE WJ can be in long double, but J only needs to be in double
@@ -44,6 +43,7 @@ namespace particle {
 
         if( ptc.is<flag::empty>() ) continue;
 
+        // NOTE interpolate field
         if constexpr ( sp.is_charged ) {
           auto&& dp = update_p();
 

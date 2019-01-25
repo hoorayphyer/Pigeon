@@ -284,9 +284,10 @@ namespace vec {
       using type = std::conditional_t< std::is_reference_v<From>, To&, To >;
     };
 
+    // TODO std::is_const_v<T> is false if T is a reference
     template < typename From, typename To >
     struct copy_const {
-      using type = std::conditional_t< std::is_const_v<From>, const To, To >;
+      using type = std::conditional_t< std::is_const_v< std::remove_reference_t<From> >, const To, To >;
     };
 
   }
@@ -303,6 +304,15 @@ namespace vec {
   // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20
   template < typename T >
   using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+}
+
+#include <algorithm> // for std::swap
+namespace vec {
+  template < typename T, std::size_t N >
+  void swap( Vec<T,N>& a, Vec<T,N>& b ) noexcept {
+    foreach<0,N>
+      ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
+  }
 }
 
 #endif

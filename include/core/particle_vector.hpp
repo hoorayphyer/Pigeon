@@ -2,11 +2,10 @@
 #define _PARTICLE_VECTOR_HPP_
 
 #include "core/particle.hpp"
-#include <vector>
 #include <iterator>
 
 namespace particle {
-  template < std::size_t Dim_Ptc, typename vector_t, typename T  >
+  template < std::size_t Dim_Ptc, typename vector_t, typename T, typename state_t >
   class iterator {
   private:
     vector_t& _vector;
@@ -16,9 +15,8 @@ namespace particle {
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
     using value_type = void;
-    using reference = Particle< vec::copy_const_t<vector_t, T&>,  Dim_Ptc>;
+    using reference = Particle< vec::copy_const_t<vector_t, T&>,  Dim_Ptc, vec::copy_const_t<state_t, T&> >;
     using pointer = void;
-
     iterator( vector_t& vec, int i ) noexcept : _vector(vec), _index(i) {}
 
     // TODO check _array is the same?
@@ -29,49 +27,74 @@ namespace particle {
       return !(*this == it); }
 
     // prefix ++ // TODO check bounds
-    iterator& operator++ () { ++_index; return *this; }
+    iterator& operator++ () noexcept { ++_index; return *this; }
 
-    iterator& operator+= ( int n ) { _index += n; return *this; }
+    iterator& operator+= ( int n ) noexcept { _index += n; return *this; }
 
-    inline reference operator* () const {
+    inline reference operator* () const noexcept {
       return reference {
-        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector.q ),
-        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector.p ),
-        _vector.state[_index] };
+        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._q ),
+        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._p ),
+        _vector._state[_index] };
     }
 
   };
 
-  template < typename T, std::size_t Dim_Ptc >
+
+  template < typename T, std::size_t Dim_Ptc, typename state_t,
+             // ensure only non_cvref qualified types are allowed
+             class = std::enable_if_t<
+               ( std::is_same_t< T, vec::remove_cvref_t<T> > &&
+                 std::is_same_t< state_t, vec::remove_cvref_t<state_t> >
+                 ), int> >
   struct vector {
   private:
-    std::array<std::vector<T>, Dim_Ptc> q;
-    std::array<std::vector<T>, Dim_Ptc> p;
-    std::vector<encoded_bits_t> state;
+    std::size_t _capacity = 0;
+    std::size_t _size = 0;
+
+    std::array<T*, Dim_Ptc> _q;
+    std::array<T*, Dim_Ptc> _p;
+    state_t* _state;
 
   public:
     static constexpr auto DPtc = Dim_Ptc;
     // TODO double this type. Note the & in the end
-    using iterator_t = iterator<Dim_Ptc, vector, T&, encoded_bits_t&>;
-    using const_iterator_t = iterator<Dim_Ptc, vector, const T&, const encoded_bits_t&>;
+    using iterator_t = iterator<Dim_Ptc, vector, T&, state_t&>;
+    using const_iterator_t = iterator<Dim_Ptc, vector, const T&, const state_t&>;
 
-    inline auto size() const noexcept { return state.size(); }
+    vector(std::size_t capacity);
+    ~vector();
 
-    iterator_t begin() { return iterator_t( *this, 0 ); }
-    const_iterator_t begin() const { return const_iterator_t( *this, 0 ); }
+    inline auto size() const noexcept { return _size; }
 
-    iterator_t end() { return iterator_t( *this, size() ); }
-    const_iterator_t end() const { return const_iterator_t( *this, size() ); }
+    iterator_t begin() noexcept { return iterator_t( *this, 0 ); }
+    const_iterator_t begin() const noexcept { return const_iterator_t( *this, 0 ); }
 
-    auto operator[] ( int i ) {
-      return *( iterator_t( *this, i ) );
-    }
+    iterator_t end() noexcept { return iterator_t( *this, size() ); }
+    const_iterator_t end() const noexcept { return const_iterator_t( *this, size() ); }
 
-    auto operator[] ( int i ) const {
-      return *( const_iterator_t( *this, i ) );
-    }
+    // TODO check performance
+    auto operator[] ( int i ) noexcept { return *( iterator_t( *this, i ) ); }
+    auto operator[] ( int i ) const noexcept { return *( const_iterator_t( *this, i ) ); }
+
+    // real particle
+    void push_back( const Particle<T, Dim_Ptc, state_t>& ptc );
+    void push_back( Particle<T, Dim_Ptc, state_t>&& ptc );
+
+    // virtual particle
+    void push_back( const Particle< const T&, Dim_Ptc, const state_t& >& ptc );
 
   };
+
+
+
 }
+
+namespace vec {
+  template < typename T, std::size_t DPtc, typename state_t,
+             typename PtcRef = vector<T, DPtc, state_t >::interator_t::reference >
+  void swap( PtcRef a, PtcRef b ) noexcept;
+}
+
 
 #endif

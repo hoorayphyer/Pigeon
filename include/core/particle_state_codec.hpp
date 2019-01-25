@@ -99,11 +99,12 @@ namespace particle {
   private:
     using bitset_t = std::bitset<NBits>;
 
-    T _state; // NOTE use T here so when T is nonref, _state will hold the data
+  protected:
+    T state; // NOTE use T here so when T is nonref, _state will hold the data
 
 
   public:
-    explicit state_codec( T state ) noexcept : _state(state) {}
+    explicit state_codec( T my_state ) noexcept : state(my_state) {}
 
 
   };

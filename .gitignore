@@ -26,6 +26,8 @@
 
 !src/
 !src/**/*.cpp
+!src/core/
+!src/core/*.cpp
 !src/utility/
 !src/utility/*.cpp
 !src/export/
