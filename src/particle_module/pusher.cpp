@@ -2,7 +2,7 @@
 #include "core/particle.hpp"
 #include "core/coordinate.hpp"
 
-namespace vn = vec::numerical;
+namespace vn = apt::numerical;
 
 namespace particle :: force {
   auto landau0 =
@@ -45,7 +45,7 @@ namespace particle :: force {
 // TODO move check of forces on_off to somewhere else
 namespace particle {
   template < typename Tvt, std::size_t DPtc, std::size_t DField,
-             typename Trl = vec::remove_cvref_t<Tvt> >
+             typename Trl = apt::remove_cvref_t<Tvt> >
   Vec<Trl,DPtc> update_p( Particle<Tvt,DPtc>& ptc, const Species& sp, Trl dt,
                           const Vec<Trl, DField>& E, const Vec<Trl, DField>& B ) {
     Vec<Trl, DPtc> dp;
@@ -84,7 +84,7 @@ namespace particle {
 
 
   template < CoordSys CS, typename Tvt, std::size_t DPtc,
-             typename Trl = vec::remove_cvref_t<Tvt> >
+             typename Trl = apt::remove_cvref_t<Tvt> >
   Vec<Trl,DPtc> update_q( Particle<Tvt, DPtc>& ptc, const Species& sp, Trl dt ) {
     Real gamma = std::sqrt( (sp.mass > 0) + vn::abs_sq(ptc.p) );
 

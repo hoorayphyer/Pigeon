@@ -1,25 +1,49 @@
 #include "particle_module/migration.hpp"
+#include "parallel/mpi++.hpp"
 
 namespace particle :: impl {
-  template < std::size_t I, typename T, std::size_t DPtc >
-  auto migsort( particle::vector<T,DPtc>& buffer, const std::array<T, 2>& bd ) noexcept {
-    
+
+  // NOTE Assume there is no empty particles.
+  template < typename T, std::size_t DPtc, typename F_LCR >
+  auto lcr_sort( particle::vector<T,DPtc>& buffer, const F_LCR& lcr ) noexcept {
+    constexpr int L = 0;
+    constexpr int C = 1;
+    constexpr int R = 2;
+
+    // ec points to end of ccc.., el points to end of lll..., and er points to the reverse end of ...rrr.
+    // the upshot: ccc.. will be [0, ic), lll... will be [ic, ilr+1), rrr... will be [ilr+1, buffer.size()), edge case safe
+    int ec = 0, el = 0, er = buffer.size() - 1;
+    while ( el <= er ) {
+      switch ( lcr( buffer[el] ) ) {
+      case L : el++; break;
+      case C :
+        if ( ec != el ) apt::swap( buffer[el], buffer[ec] );
+        ec++; el++ break;
+      case R :
+        while ( el <= er && lcr( buffer[er] ) != R ) er--;
+        if ( er != el ) apt::swap( buffer[el], buffer[er] );
+        er--;
+        break;
+      }
+    }
+
+    return std::make_tuple( ec, el, buffer.size() );
   }
 
 
-
-  template < std::size_t I, typename T, std::size_t DPtc >
+  template < typename T, std::size_t DPtc, typename F_LCR >
   void migrate_1dim ( particle::vector<T,DPtc>& buffer,
-                     const std::array<int, 2>& neigh,
-                     const std::array<T, 2>& bound,
-                     auto comm ) {
+                      const std::array<int, 2>& neigh,
+                      const F_LCR& lcr;
+                      const mpi::Comm& comm ) {
     const auto& nL = std::get<0>(neigh);
     const auto& nR = std::get<1>(neigh);
     // sort order is center | left | right | empty. Returned are the delimiters between these catogories
-    auto[begL, begR, begE] = sort<I>( buffer, compare(bound) ); // TODO finish the sort
+    auto[begL, begR, begE] = lcr_sort( buffer, lcr );
     auto* ptr = buffer.data();
     int num_recv = 0;
 
+    // TODO finish the comm code
     // send to left
     comm.send( ptr + begL, begR - begL, nL );
     num_recv += comm.recv( ptr + begE + num_recv, buffer.capacity() - begE - num_recv, nR );
@@ -40,9 +64,9 @@ namespace particle :: impl {
 }
 
 namespace particle {
-  template < typename Tvt, std::size_t DGrid, typename Trl = vec::remove_cvref_t<Tvt> >
+  template < typename Tvt, std::size_t DGrid, typename Trl = apt::remove_cvref_t<Tvt> >
   bool is_migrate( const Vec<Tvt, DGrid>& q, const std::array< std::array<Trl, 2>, DGrid>& bounds ) noexcept {
-    auto&& tmp = vec::per_dim::make<N>
+    auto&& tmp = apt::per_dim::make<N>
       ( []( const auto& x, const auto& bd ) noexcept {
           return x < std::get<0>(bd) || x > std::get<1>(bd);
         }, q, bounds );
@@ -53,8 +77,12 @@ namespace particle {
   void migrate( particle::vector<T,DPtc>& buffer,
                 const std::array< std::array<int,2>, DGrid >& neighbors,
                 const std::array< std::array<T,2>, DGrid>& bounds,
-                auto comm ) {
-    impl::migrate_1dim<I, T, DPtc>( buffer, std::get<I>(neighbors), std::get<I>(bounds), comm );
+                const mpi::Comm& comm ) {
+    auto&& lcr =
+      [&bd=std::get<I>(bounds)]( const auto& ptc ) noexcept {
+        return ( std::get<I>(ptc.q) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q) > std::get<1>(bd) );
+      };
+    impl::migrate_1dim( buffer, std::get<I>(neighbors), std::move(lcr), comm );
     if constexpr ( I > 0 )
       migrate<DGrid, T, DPtc, I-1>( buffer, neighbors, bounds, comm );
   }

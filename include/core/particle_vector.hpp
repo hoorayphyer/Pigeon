@@ -15,7 +15,7 @@ namespace particle {
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
     using value_type = void;
-    using reference = Particle< vec::copy_const_t<vector_t, T&>,  Dim_Ptc, vec::copy_const_t<state_t, T&> >;
+    using reference = Particle< apt::copy_const_t<vector_t, T&>,  Dim_Ptc, apt::copy_const_t<state_t, T&> >;
     using pointer = void;
     iterator( vector_t& vec, int i ) noexcept : _vector(vec), _index(i) {}
 
@@ -33,8 +33,8 @@ namespace particle {
 
     inline reference operator* () const noexcept {
       return reference {
-        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._q ),
-        vec::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._p ),
+        apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._q ),
+        apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._p ),
         _vector._state[_index] };
     }
 
@@ -44,8 +44,8 @@ namespace particle {
   template < typename T, std::size_t Dim_Ptc, typename state_t,
              // ensure only non_cvref qualified types are allowed
              class = std::enable_if_t<
-               ( std::is_same_t< T, vec::remove_cvref_t<T> > &&
-                 std::is_same_t< state_t, vec::remove_cvref_t<state_t> >
+               ( std::is_same_t< T, apt::remove_cvref_t<T> > &&
+                 std::is_same_t< state_t, apt::remove_cvref_t<state_t> >
                  ), int> >
   struct vector {
   private:

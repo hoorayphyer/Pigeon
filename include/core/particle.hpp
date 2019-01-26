@@ -10,14 +10,14 @@
 
 
 template < typename T, std::size_t DPtc, typename state_t >
-struct Particle : private state_codec<vec::copy_constref_t<T, state_t>> {
+struct Particle : private state_codec<apt::copy_constref_t<T, state_t>> {
   static constexpr auto Dim = DPtc;
   Vec<T, Dim_Ptc> q;
   Vec<T, Dim_Ptc> p;
 
   // TODO check constructor
   Particle( Vec<T, DPtc> qq, Vec<T, DPtc> pp,
-            vec::copy_constref_t<T, state_t> state ) noexcept
+            apt::copy_constref_t<T, state_t> state ) noexcept
     : q(std::move(qq)), p(std::move(pp)), state_codec<state_t>(state) {}
 };
 

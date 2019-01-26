@@ -25,7 +25,7 @@ namespace sf :: impl {
     using iterator_category = std::forward_iterator_tag;
 
     ShapeRangeInterator( int I, const Vec<T,DGrid>& location )
-      : _I_b( vec::per_dim::make<DGrid>
+      : _I_b( apt::per_dim::make<DGrid>
               ( []( const auto& loc ) {
                   return int(loc - shape_f.radius) + 1;}, location ) ),
         _sep_b( location - _I_b ) {

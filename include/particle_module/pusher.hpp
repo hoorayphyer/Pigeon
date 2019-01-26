@@ -9,12 +9,12 @@ namespace particle {
   struct Particle;
 
   template < typename Tvt, std::size_t DPtc, std::size_t DField,
-             typename Trl = vec::remove_cvref_t<Tvt> >
+             typename Trl = apt::remove_cvref_t<Tvt> >
   Vec<Trl,DPtc> update_p( Particle<Tvt,DPtc>& ptc, const Species& sp, Trl dt,
                         const Vec<Trl, DField>& E, const Vec<Trl, DField>& B );
 
   template < CoordSys CS, typename Tvt, std::size_t DPtc,
-             typename Trl = vec::remove_cvref_t<Tvt> >
+             typename Trl = apt::remove_cvref_t<Tvt> >
   Vec<Trl,DPtc> update_q( Particle<Tvt, DPtc>& ptc, const Species& sp, Trl dt );
 }
 

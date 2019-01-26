@@ -62,16 +62,16 @@ namespace esirkepov :: impl {
 
         if constexpr ( DGrid >= 2 ) {
           std::get<0>(ijk) = _I % std::get<0>(stride);
-          vec::foreach<0,1>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+          apt::foreach<0,1>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
 
           if ( std::get<0>(ijk) != 0 ) goto CALCW;
           std::get<1>(ijk) = ( _I % std::get<1>(stride) ) / stride[0];
-          vec::foreach<1,2>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+          apt::foreach<1,2>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
 
           if constexpr ( DGrid == 3 ) {
             if ( std::get<1>(ijk) != 0 ) goto CALCW;
             std::get<2>(ijk) = _I / stride[1];
-            vec::foreach<2,3>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+            apt::foreach<2,3>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
           }
 
           CALCW:
@@ -99,7 +99,7 @@ namespace esirkepov :: impl {
       : _dq( dq_rel ) {
       // NOTE offset is 0.5
       auto&& q1 = q1_rel - 0.5 - mem::lower(grid) + mem::guard(grid);
-      vec::foreach<0, DGrid>
+      apt::foreach<0, DGrid>
         ( []( auto& ind_b, auto& sep1_b, auto& stride, const auto& x1, const auto& dx ) noexcept {
             ind_b = int( std::min(x1, x1-dx) - sf::radius(S) ) + 1;
             sep1_b = ind_b - x1;
@@ -139,10 +139,10 @@ namespace esirkepov {
 namespace particle {
 
   template < sf::shape S, typename T_WJ, typename Tvt, std::size_t DPtc, std::size_t DField,
-             std::size_t DGrid, typename Trl = vec::remove_cvref_t<Tvt> >
+             std::size_t DGrid, typename Trl = apt::remove_cvref_t<Tvt> >
   void depositWJ( Field<T_WJ,DField>& WJ, const Particle<Tvt,DPtc>& ptc, const Vec<Trl,DPtc>& dq, const Grid<DGrid, Trl>& grid ) {
     namespace esir = esirkepov;
-    namespace vn = vec::numeric;
+    namespace vn = apt::numeric;
     // NOTE static_assert(WJ is the correct stagger)
 
     for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid) ) {
