@@ -90,10 +90,43 @@ namespace particle {
 
 }
 
-namespace vec {
+namespace apt {
   template < typename T, std::size_t DPtc, typename state_t,
              typename PtcRef = vector<T, DPtc, state_t >::interator_t::reference >
   void swap( PtcRef a, PtcRef b ) noexcept;
+}
+
+namespace std {
+  template < typename T, std::size_t DPtc, typename state_t,
+             class Container = particle::vector<T,DPtc,state_t> >
+  class back_insert_iterator<Container> {
+  private:
+    Container& _c;
+    int _index;
+
+  public:
+    using iterator_category = std::outpuT_iterator_tag;
+    using difference_type = void;
+    using value_type = void;
+    using reference = void;
+    using pointer = void;
+
+    explicit back_insert_iterator( Container& c ) noexcept : _c(c) {}
+
+    template < typename U,
+               class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
+    back_insert_iterator& operator= ( const Particle<U, DPtc, apt::copy_cvref_t< U, state_t> >& ptc );
+
+    template < typename U,
+               class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
+    back_insert_iterator& operator= ( Particle<U, DPtc, apt::copy_cvref_t< U, state_t> >&& ptc );
+
+    inline auto& operator++ () noexcept { return *this; }
+    inline auto& operator++ (int) noexcept { return *this; }
+    inline auto& operator* () noexcept { return *this; }
+
+  };
+
 }
 
 

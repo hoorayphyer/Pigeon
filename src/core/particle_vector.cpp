@@ -70,3 +70,26 @@ namespace particle {
     std::swap( a.state, b.state );
   }
 }
+
+namespace std {
+  template < typename T, std::size_t DPtc, typename state_t,
+             class Container = particle::vector<T,DPtc,state_t> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< T, DPtc, state_t >& ptc ) {
+    _c.push_back(ptc);
+    return *this;
+  }
+
+  template < typename T, std::size_t DPtc, typename state_t,
+             class Container = particle::vector<T,DPtc,state_t> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< const T&, DPtc, const state_t& >& ptc ) {
+    _c.push_back(ptc);
+    return *this;
+  }
+
+  template < typename T, std::size_t DPtc, typename state_t,
+             class Container = particle::vector<T,DPtc,state_t> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( Particle< T, DPtc, state_t >&& ptc ) {
+    _c.push_back(std::move(ptc));
+    return *this;
+  }
+}

@@ -298,8 +298,9 @@ namespace apt {
   template < typename From, typename To >
   using copy_const_t = typename copy_const<From,To>::type;
 
+  // TODO add volatile for completeness
   template < typename From, typename To >
-  using copy_constref_t = typename copy_const_t<From, copy_ref_t<From, To>>;
+  using copy_cvref_t = typename copy_const_t<From, copy_ref_t<From, To>>;
 
   // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20
   template < typename T >
