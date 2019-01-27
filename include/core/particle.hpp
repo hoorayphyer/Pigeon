@@ -9,16 +9,16 @@
 // Or, we will use Ptc&, this only disallows passing proxy&&. const Ptc& works for everything.
 
 
-template < typename T, std::size_t DPtc, typename state_t >
-struct Particle : private state_codec<apt::copy_cvref_t<T, state_t>> {
+template < typename T, std::size_t DPtc, typename state_t,
+           class = std::enable_if_t< apt::is_same_cvref_v<T,state_t> , int > >
+struct Particle : private state_codec<state_t> {
   static constexpr auto Dim = DPtc;
-  Vec<T, Dim_Ptc> q;
-  Vec<T, Dim_Ptc> p;
+  Vec<T, DPtc> q;
+  Vec<T, DPtc> p;
 
-  // TODO check constructor
-  Particle( Vec<T, DPtc> qq, Vec<T, DPtc> pp,
-            apt::copy_cvref_t<T, state_t> state ) noexcept
-    : q(std::move(qq)), p(std::move(pp)), state_codec<state_t>(state) {}
+  // TODO check constructor, allow virtual real converson
+  Particle( const Vec<T, DPtc>& q_other, const Vec<T, DPtc>& p_other, const state_t& state_other = 0 ) noexcept
+    : q(q_other), p(p_other), state_codec<state_t>(state_other) {}
 };
 
 

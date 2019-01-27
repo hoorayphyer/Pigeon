@@ -1,19 +1,21 @@
 #ifndef _PAIR_PRODUCER_HPP_
 #define _PAIR_PRODUCER_HPP_
 
-#include "types.hpp"
 class Rng;
 
 namespace particle {
+  template < typename Ptc, typename T >
+  bool is_productive_lepton( const Ptc& ptc, const T& gamma, const T& Rc, Rng& rng ) noexcept;
+  template < typename Ptc, typename T >
+  bool is_productive_photon( const Ptc& photon, const T& B2, Rng& rng ) noexcept;
 
-  template <typename Ptc >
-  void instant_produce_pairs( Real dt, Rng& rng, Ptc& ptc, Ptc& electron, Ptc& positron );
+  template < typename Iter_el, typename Iter_po, typename Ptc, typename T >
+  void instant_produce_pairs( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, T gamma_ptc, T Rc );
 
-  template <typename Ptc >
-  void photon_produce_pairs( Real dt, Ptc& photon, Ptc& electron, Ptc& positron, Rng& rng );
-
-  template <typename Ptc >
-  void produce_photons( Ptc& ptc, Ptc& photon, Rng& rng );
+  template < typename Iter, typename Ptc, typename T >
+  void produce_photons( Iter itr_photon, Ptc& ptc, T gamma_ptc, T Rc );
+  template < typename Iter_el, typename Iter_po, typename Ptc >
+  void photon_produce_pairs( Iter_el itr_e, Iter_po itr_p, Ptc& photon );
 }
 
 #endif

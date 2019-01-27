@@ -302,7 +302,10 @@ namespace apt {
   template < typename From, typename To >
   using copy_cvref_t = typename copy_const_t<From, copy_ref_t<From, To>>;
 
-  // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20
+  template < typename T, typename U >
+  using is_same_cvref_v = std::is_same_v< apt::copy_cvref_t<T, U>, U>;
+
+  // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20 anyway
   template < typename T >
   using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 }
