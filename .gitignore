@@ -11,6 +11,8 @@
 
 !include/
 !include/**/*.hpp
+!include/apt/
+!include/apt/*.hpp
 !include/core/
 !include/core/*.hpp
 !include/utility/

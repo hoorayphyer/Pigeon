@@ -1,4 +1,5 @@
 #include "particle_module/depositer.hpp"
+#include "apt/numeric.hpp"
 
 namespace esirkepov :: impl {
   template < typename T >
@@ -138,11 +139,17 @@ namespace esirkepov {
 
 namespace particle {
 
-  template < sf::shape S, typename T_WJ, typename Tvt, std::size_t DPtc, std::size_t DField,
-             std::size_t DGrid, typename Trl = apt::remove_cvref_t<Tvt> >
-  void depositWJ( Field<T_WJ,DField>& WJ, const Particle<Tvt,DPtc>& ptc, const Vec<Trl,DPtc>& dq, const Grid<DGrid, Trl>& grid ) {
+  template < sf::shape S, typename T_WJ, typename Tvt,
+             std::size_t DPtc, std::size_t DField, std::size_t DGrid,
+             typename Trl = apt::remove_cvref_t<Tvt>,
+             typename T_WJ_Field = Field<T_WJ,DField>,
+             typename Ptc = Particle<Tvt,DPtc>,
+             typename T_dq = Vec<Trl,DPtc>,
+             typename T_Grid = Grid<DGrid, Trl>
+             >
+  void depositWJ<S, T_WJ_Field, Ptc, T_dq, T_Grid>
+  ( T_WJ_Field& WJ, const Ptc& ptc, const T_dq& dq, const T_Grid& grid ) {
     namespace esir = esirkepov;
-    namespace vn = apt::numeric;
     // NOTE static_assert(WJ is the correct stagger)
 
     for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid) ) {
@@ -158,7 +165,7 @@ namespace particle {
       // and accordingly change expressions for calculating shapefunctions.
       // FIXME: But, where is J based? Does one really need rebasing momentum?
       if constexpr ( DGrid == 2 ) {
-          WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + vn::abs_sq(ptc.p) );
+          WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + apt::abs_sq(ptc.p) );
       } else if ( DGrid == 3 ) {
         WJ.c<2>(I) += std::get<2>(W);
       } else {

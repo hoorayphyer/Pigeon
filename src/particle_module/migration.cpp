@@ -1,4 +1,5 @@
 #include "particle_module/migration.hpp"
+#include "particle_vector.hpp"
 #include "parallel/mpi++.hpp"
 
 namespace particle :: impl {
@@ -64,8 +65,12 @@ namespace particle :: impl {
 }
 
 namespace particle {
-  template < typename Tvt, std::size_t DGrid, typename Trl = apt::remove_cvref_t<Tvt> >
-  bool is_migrate( const Vec<Tvt, DGrid>& q, const std::array< std::array<Trl, 2>, DGrid>& bounds ) noexcept {
+  template < typename Tvt, std::size_t DGrid,
+             typename Trl = apt::remove_cvref_t<Tvt>,
+             typename T_q = Vec<Tvt, DGrid>,
+             typename T_bd = std::array< std::array<Trl, 2>, DGrid>
+             >
+  bool is_migrate<T_q, T_bd> ( const T_q& q, const T_bd& bounds ) noexcept {
     auto&& tmp = apt::per_dim::make<N>
       ( []( const auto& x, const auto& bd ) noexcept {
           return x < std::get<0>(bd) || x > std::get<1>(bd);
@@ -73,18 +78,31 @@ namespace particle {
     return std::apply( []( auto... args){ return (... || args); }, std::move(tmp) );
   }
 
-  template < std::size_t DGrid, typename T, std::size_t DPtc, std::size_t I >
-  void migrate( particle::vector<T,DPtc>& buffer,
-                const std::array< std::array<int,2>, DGrid >& neighbors,
-                const std::array< std::array<T,2>, DGrid>& bounds,
-                const mpi::Comm& comm ) {
-    auto&& lcr =
-      [&bd=std::get<I>(bounds)]( const auto& ptc ) noexcept {
-        return ( std::get<I>(ptc.q) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q) > std::get<1>(bd) );
-      };
-    impl::migrate_1dim( buffer, std::get<I>(neighbors), std::move(lcr), comm );
-    if constexpr ( I > 0 )
-      migrate<DGrid, T, DPtc, I-1>( buffer, neighbors, bounds, comm );
+  namespace impl {
+    template < std::size_t DGrid, typename T, std::size_t DPtc, std::size_t I >
+    inline void migrate( particle::vector<T,DPtc>& buffer,
+                  const std::array< std::array<int,2>, DGrid >& neighbors,
+                  const std::array< std::array<T,2>, DGrid>& bounds,
+                  const mpi::Comm& comm ) {
+      auto&& lcr =
+        [&bd=std::get<I>(bounds)]( const auto& ptc ) noexcept {
+          return ( std::get<I>(ptc.q) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q) > std::get<1>(bd) );
+        };
+      impl::migrate_1dim( buffer, std::get<I>(neighbors), std::move(lcr), comm );
+      if constexpr ( I > 0 )
+                     migrate<DGrid, T, DPtc, I-1>( buffer, neighbors, bounds, comm );
+    }
   }
+
+  template < std::size_t DGrid, typename T, std::size_t DPtc,
+             typename PtcVector = particle::vector<T,DPtc>,
+             typename T_neigh = std::array< std::array<int,2>, DGrid >,
+             typename T_bd = std::array< std::array<T,2>, DGrid>,
+             typename Comm = mpi::Comm
+             >
+  inline void migrate<PtcVector, T_neigh, T_bd, Comm>( PtcVector& buffer, const T_neigh& neighbors, const T_bounds& bounds, const Comm& comm ) {
+    return impl::migrate<DGrid, T, DPtc, DGrid - 1>( buffer, neighbors, bounds, comm );
+  }
+
 
 }

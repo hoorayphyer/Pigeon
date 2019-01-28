@@ -1,21 +1,17 @@
 #ifndef _PARTICLEPUSHER_HPP_
 #define _PARTICLEPUSHER_HPP_
 
-#include "vector.hpp"
+struct Species;
+enum class CoordSys;
+
 
 // TODO check missing 4pi's maybe
 namespace particle {
-  template < typename T, std::size_t DPtc >
-  struct Particle;
+  template < typename Ptc, typename T_field, typename T_dp, typename T >
+  T_dp update_p( Ptc& ptc, const Species& sp, const T& dt, const T_field& E, const T_field& B );
 
-  template < typename Tvt, std::size_t DPtc, std::size_t DField,
-             typename Trl = apt::remove_cvref_t<Tvt> >
-  Vec<Trl,DPtc> update_p( Particle<Tvt,DPtc>& ptc, const Species& sp, Trl dt,
-                        const Vec<Trl, DField>& E, const Vec<Trl, DField>& B );
-
-  template < CoordSys CS, typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt> >
-  Vec<Trl,DPtc> update_q( Particle<Tvt, DPtc>& ptc, const Species& sp, Trl dt );
+  template < CoordSys CS, typename Ptc, typename T_dq, typename T >
+  T_dq update_q( Ptc& ptc, const Species& sp, const T& dt );
 }
 
 

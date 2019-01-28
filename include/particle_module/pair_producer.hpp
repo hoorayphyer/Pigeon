@@ -9,11 +9,14 @@ namespace particle {
   template < typename Ptc, typename T >
   bool is_productive_photon( const Ptc& photon, const T& B2, Rng& rng ) noexcept;
 
+  template < typename T, typename T_p, typename T_dp >
+  T calc_Rc( T dt, const T_p& p, const T_dp& dp ) noexcept;
+
   template < typename Iter_el, typename Iter_po, typename Ptc, typename T >
-  void instant_produce_pairs( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, T gamma_ptc, T Rc );
+  void instant_produce_pairs( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, const T& gamma_ptc, T Rc );
 
   template < typename Iter, typename Ptc, typename T >
-  void produce_photons( Iter itr_photon, Ptc& ptc, T gamma_ptc, T Rc );
+  void produce_photons( Iter itr_photon, Ptc& ptc, const T& gamma_ptc, T Rc );
   template < typename Iter_el, typename Iter_po, typename Ptc >
   void photon_produce_pairs( Iter_el itr_e, Iter_po itr_p, Ptc& photon );
 }

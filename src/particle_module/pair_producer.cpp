@@ -1,6 +1,7 @@
 #include "particle_module/pair_producer.hpp"
 #include "utility/rng.hpp"
 #include "core/particle.hpp"
+#include "apt/numeric.hpp"
 
 namespace particle {
   template < typename Ptc, typename T >
@@ -43,16 +44,48 @@ namespace particle {
 }
 
 namespace particle {
+  template < typename Tvt, std::size_t DPtc,
+             typename Trl = apt::remove_cvref_t<Tvt>,
+             typename T_p = Vec<Tvt, DPtc>,
+             typename T_dp = Vec<Trl, DPtc>
+             >
+  Trl calc_Rc<Trl, T_p, T_dp>( Trl dt, const T_p& p, const T_dp& dp ) noexcept {
+    // TODO don't use a uniform number for Rc
+    return 1.0;
+  }
+
+  // float ParticlePusher::CalculateRc( Scalar dt, const Vec3<MOM_TYPE> &p, const Vec3<MOM_TYPE> &dp) const {
+  //   // find momentum at half time step
+  //   Vec3<MOM_TYPE> phalf( p + dp * 0.5 );
+  //   Vec3<MOM_TYPE> v( phalf / std::sqrt( 1.0 + phalf.dot(phalf) ) );
+  //   Scalar vv = v.dot( v );
+  //   Vec3<MOM_TYPE> a( dp / dt ); // a is for now force, will be converted to dv/dt
+  //   // convert a to dv/dt
+  //   a = ( a - v * ( v.dot(a) ) ) * std::sqrt( 1.0 - vv );
+  //   Scalar va = v.dot( a ); // get the real v dot a
+  //   return vv / std::max( std::sqrt( a.dot(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
+  // }
+
+  // float ParticlePusher::GetDipolarRc(const Scalar &r_sph, const Scalar &cos_th, const Scalar &phi) const {
+  //   Scalar sin_th = std::sqrt( 1.0 - cos_th * cos_th );
+  //   Scalar tmp1 = 1.0 + cos_th * cos_th;
+  //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
+  //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
+  // }
+
+}
+
+namespace particle {
   template < typename T >
   inline T sample_E_ph(const T& gamma, const T& Rc) {
     return std::min(_pane.E_ph, gamma - 1.0);
   }
 
   template < typename Iter_el, typename Iter_po,
-             typename Tvt, std::size_t DPtc, typename state_t,
+             typename Tvt, std::size_t DPtc,
              typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc, state_t> >
-  void instant_produce_pairs<Iter_el, Iter_po, Ptc, Trl> ( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, Trl gamma_i, Trl Rc ) {
+             typename Ptc = Particle<Tvt, DPtc> >
+  void instant_produce_pairs<Iter_el, Iter_po, Ptc, Trl> ( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, const Trl& gamma_i, Trl Rc ) {
     {
       // recycle Rc for E_ph
       Rc = sample_E_ph( gamma_i, Rc );
@@ -62,7 +95,7 @@ namespace particle {
       // recycle Rc for gamma_sec
       Rc /= 2.0;
       // append electron and positron
-      auto&& ptc_sec = Particle< Trl, DPtc, apt::remove_cvref_t<state_t> > ( ptc.q, ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::abs_sq(ptc.p) ) );
+      auto&& ptc_sec = Particle< Trl, DPtc > ( ptc.q, ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::abs_sq(ptc.p) ) );
       ptc_sec.set<particle::flag::secondary>();
       *(itr_e++) = ptc_sec;
       *(itr_p++) = std::move(ptc_sec);
@@ -74,26 +107,26 @@ namespace particle {
 }
 
 namespace particle {
-  template < typename Iter, typename Tvt, std::size_t DPtc, typename state_t,
+  template < typename Iter, typename Tvt, std::size_t DPtc,
              typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc, state_t> >
-  void produce_photons<Iter, Ptc, Trl> ( Iter itr_ph, Ptc& ptc, Trl gamma_i, Trl Rc ) {
+             typename Ptc = Particle<Tvt, DPtc> >
+  void produce_photons<Iter, Ptc, Trl> ( Iter itr_ph, Ptc& ptc, const Trl& gamma_i, Trl Rc ) {
     // recycle Rc for E_ph
     Rc = sample_E_ph( gamma_i, std::move(Rc) );
     // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
     ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_i - 1.0 ) ) * ( 1.0 - Rc / ( gamma_i + 1.0 ) ) );
 
-    *(itr_ph++) = Particle< Trl, DPtc, apt::remove_cvref_t<state_t> >
+    *(itr_ph++) = Particle< Trl, DPtc >
       ( ptc.q, ptc.p * ( Rc / apt::abs(ptc.p) ) );
   }
 
 
   template < typename Iter_el, typename Iter_po,
-             typename Tvt, std::size_t DPtc, typename state_t,
+             typename Tvt, std::size_t DPtc,
              typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc, state_t> >
+             typename Ptc = Particle<Tvt, DPtc> >
   void photon_produce_pairs<Iter_el, Iter_po, Ptc, Trl> ( Iter_el itr_e, Iter_po itr_p, Ptc& photon ) {
-    auto&& ptc_sec = Particle< Trl, DPtc, apt::remove_cvref_t<state_t> >
+    auto&& ptc_sec = Particle< Trl, DPtc >
       ( photon.q,
         photon.p * std::sqrt( 0.25 - 1.0 / apt::abs_sq(photon.p) ) );
     ptc_sec.set<particle::flag::secondary>();
