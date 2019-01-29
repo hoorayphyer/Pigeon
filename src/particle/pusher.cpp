@@ -43,14 +43,15 @@ namespace particle :: force {
 
 // TODO move check of forces on_off to somewhere else
 namespace particle {
-  template < typename Tvt, std::size_t DPtc, std::size_t DField,
+  template < species sp,
+             typename Tvt, std::size_t DPtc, std::size_t DField,
              typename Trl = apt::remove_cvref_t<Tvt>,
              typename Ptc = Particle<Tvt, DPtc>,
              typename T_field = Vec<Trl, DField>,
              typename T_dp = Vec<Trl,DPtc>
              >
-  T_dp update_p< Ptc, T_field, T_dp, Trl > ( Ptc& ptc, const Species& sp, const Trl& dt,
-                                             const T_field& E, const T_field& B ) {
+  T_dp update_p< sp, Ptc, T_field, T_dp, Trl > ( Ptc& ptc, const Trl& dt,
+                                                 const T_field& E, const T_field& B ) {
     T_dp dp;
 
     // Apply Lorentz force
@@ -81,12 +82,13 @@ namespace particle {
   }
 
 
-  template < CoordSys CS, typename Tvt, std::size_t DPtc,
+  template < species sp,
+             CoordSys CS, typename Tvt, std::size_t DPtc,
              typename Trl = apt::remove_cvref_t<Tvt>,
              typename Ptc = Particle<Tvt, DPtc>,
              typename T_dq = Vec<Trl,DPtc>
              >
-  T_dq update_q< CS, Ptc, T_dq, Trl > ( Ptc& ptc, const Species& sp, const Trl& dt ) {
+  T_dq update_q< sp, CS, Ptc, T_dq, Trl > ( Ptc& ptc, const Trl& dt ) {
     auto gamma = std::sqrt( (sp.mass > 0) + apt::abs_sq(ptc.p) );
 
     if constexpr ( CS == CoordSys::Cartesian ) {

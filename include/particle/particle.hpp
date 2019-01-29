@@ -11,15 +11,16 @@ template < typename T >
 using state_t = apt::copy_cvref_t<T, unsigned long long>;
 
 template < typename T, std::size_t DPtc >
-struct Particle : private state_codec<state_t<T>> {
+struct Particle : private state::state<state_t<T>> {
   static constexpr auto Dim = DPtc;
   Vec<T, DPtc> q;
   Vec<T, DPtc> p;
 
   // TODO check constructor, allow virtual real converson
-  Particle( const Vec<T, DPtc>& q_other, const Vec<T, DPtc>& p_other
-            const state_t<T>& state_other = 0 ) noexcept
-    : q(q_other), p(p_other), state_codec<state_t<T>>(state_other) {}
+  template < typename... Attr,
+             class = std::enable_if_t< std::is_same_v<T, apt::remove_cvref_t<T>>, int > >
+  Particle( const Vec<T, DPtc>& q_val, const Vec<T, DPtc>& p_val, const Attr&... attrs ) noexcept
+    : q(q_other), p(p_other), state::state< state_t<T> >( attrs... ) {}
 };
 
 

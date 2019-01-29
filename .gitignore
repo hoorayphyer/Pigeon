@@ -21,10 +21,10 @@
 !include/export/*.hpp
 !include/parallel/
 !include/parallel/*.hpp
-!include/particle_module/
-!include/particle_module/*.hpp
-!include/field_module/
-!include/field_module/*.hpp
+!include/particle/
+!include/particle/*.hpp
+!include/field/
+!include/field/*.hpp
 
 !src/
 !src/**/*.cpp
@@ -36,10 +36,10 @@
 !src/export/*.cpp
 !src/parallel/
 !src/parallel/*.cpp
-!src/particle_module/
-!src/particle_module/*.cpp
-!src/field_module/
-!src/field_module/*.cpp
+!src/particle/
+!src/particle/*.cpp
+!src/field/
+!src/field/*.cpp
 
 !tests/
 !tests/**/*

@@ -95,9 +95,12 @@ namespace particle {
       // recycle Rc for gamma_sec
       Rc /= 2.0;
       // append electron and positron
-      auto&& ptc_sec = Particle< Trl, DPtc > ( ptc.q, ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::abs_sq(ptc.p) ) );
-      ptc_sec.set<particle::flag::secondary>();
+      auto&& ptc_sec = Particle< Trl, DPtc > ( ptc.q,
+                                               ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::abs_sq(ptc.p) ),
+                                               flag::secondary);
+      ptc_sec.set(species::electron);
       *(itr_e++) = ptc_sec;
+      ptc_sec.set(species::positron);
       *(itr_p++) = std::move(ptc_sec);
     }
     // TODO register this pair creation event
@@ -116,8 +119,9 @@ namespace particle {
     // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
     ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_i - 1.0 ) ) * ( 1.0 - Rc / ( gamma_i + 1.0 ) ) );
 
-    *(itr_ph++) = Particle< Trl, DPtc >
-      ( ptc.q, ptc.p * ( Rc / apt::abs(ptc.p) ) );
+    *(itr_ph++) = Particle< Trl, DPtc > ( ptc.q,
+                                          ptc.p * ( Rc / apt::abs(ptc.p) ),
+                                          species::photon );
   }
 
 
@@ -128,15 +132,17 @@ namespace particle {
   void photon_produce_pairs<Iter_el, Iter_po, Ptc, Trl> ( Iter_el itr_e, Iter_po itr_p, Ptc& photon ) {
     auto&& ptc_sec = Particle< Trl, DPtc >
       ( photon.q,
-        photon.p * std::sqrt( 0.25 - 1.0 / apt::abs_sq(photon.p) ) );
-    ptc_sec.set<particle::flag::secondary>();
+        photon.p * std::sqrt( 0.25 - 1.0 / apt::abs_sq(photon.p) ),
+        flag::secondary );
+    ptc_sec.set(species::electron);
     *(itr_e++) = ptc_sec;
+    ptc_sec.set(species::positron);
     *(itr_p++) = std::move(ptc_sec);
 
     // TODO register this pair creation event
     // data.pairCreationEvents.data() [cell] += 1.0;
 
-    // erase this photon
-    photon.set<particle::flag::empty>();
+    // void this photon
+    photon.set(flag::empty);
   }
 }
