@@ -1,7 +1,7 @@
 #ifndef _PARTICLE_HPP_
 #define _PARTICLE_HPP_
 
-#include "particle_state_codec.hpp"
+#include "state_codec.hpp"
 #include "vector.hpp"
 
 // TODO this limits user from passing a single particle into a function that only works on particles. Such as template <typename Ptc> void foo( Ptc ), where one cannot use Ptc&. One solution is use Ptc&&. The other is use generic lambda.
