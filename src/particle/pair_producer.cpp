@@ -1,6 +1,6 @@
-#include "particle_module/pair_producer.hpp"
+#include "particle/pair_producer.hpp"
 #include "utility/rng.hpp"
-#include "core/particle.hpp"
+#include "particle/particle.hpp"
 #include "apt/numeric.hpp"
 
 namespace particle {

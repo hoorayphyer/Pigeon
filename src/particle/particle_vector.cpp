@@ -1,10 +1,10 @@
-#include "core/particle_vector.hpp"
+#include "particle/particle_vector.hpp"
 #include <stdexcept>
 #include <algorithm>
 
 namespace particle {
-  template < typename T, std::size_t DPtc, typename state_t >
-  vector<T, DPtc, state_t>::vector( std::size_t capacity )
+  template < typename T, std::size_t DPtc >
+  vector<T, DPtc >::vector( std::size_t capacity )
     : _capacity(capacity), _size(0) {
     auto f =
       []( auto*& p, std::size_t n ) {
@@ -15,16 +15,16 @@ namespace particle {
     f( _state, capacity );
   }
 
-  template < typename T, std::size_t DPtc, typename state_t >
-  vector<T, DPtc, state_t>::~vector() {
+  template < typename T, std::size_t DPtc >
+  vector<T, DPtc>::~vector() {
     for ( auto*& ptr : _q ) delete [] ptr;
     for ( auto*& ptr : _p ) delete [] ptr;
     delete [] _state;
   }
 
   // real particles
-  template < typename T, std::size_t DPtc, typename state_t >
-  void vector<T, DPtc, state_t>::push_back( const Particle<T, DPtc, state_t>& ptc ) {
+  template < typename T, std::size_t DPtc >
+  void vector<T, DPtc>::push_back( const Particle<T, DPtc>& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     vec::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
@@ -35,8 +35,8 @@ namespace particle {
     ++_size;
   }
 
-  template < typename T, std::size_t DPtc, typename state_t >
-  void vector<T, DPtc, state_t>::push_back( Particle<T, DPtc, state_t>&& ptc ) {
+  template < typename T, std::size_t DPtc >
+  void vector<T, DPtc>::push_back( Particle<T, DPtc>&& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     vec::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, auto&& q_ptc, auto&& p_ptc ) {
@@ -49,8 +49,8 @@ namespace particle {
   }
 
   // virtual particles
-  template < typename T, std::size_t DPtc, typename state_t >
-  void vector<T, DPtc, state_t>::push_back( const Particle< const T&, DPtc, const state_t& >& ptc ) {
+  template < typename T, std::size_t DPtc >
+  void vector<T, DPtc>::push_back( const Particle< const T&, DPtc >& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     vec::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
@@ -62,8 +62,8 @@ namespace particle {
   }
 
 
-  template < typename T, std::size_t DPtc, typename state_t,
-             typename PtcRef = vector<T, DPtc, state_t >::interator_t::reference >
+  template < typename T, std::size_t DPtc,
+             typename PtcRef = vector<T, DPtc >::interator_t::reference >
   void swap( PtcRef a, PtcRef b ) noexcept {
     vec::swap( a.q, b.q );
     vec::swap( a.p, b.p );
@@ -72,23 +72,23 @@ namespace particle {
 }
 
 namespace std {
-  template < typename T, std::size_t DPtc, typename state_t,
-             class Container = particle::vector<T,DPtc,state_t> >
-  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< T, DPtc, state_t >& ptc ) {
+  template < typename T, std::size_t DPtc,
+             class Container = particle::vector<T,DPtc> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< T, DPtc >& ptc ) {
     _c.push_back(ptc);
     return *this;
   }
 
-  template < typename T, std::size_t DPtc, typename state_t,
-             class Container = particle::vector<T,DPtc,state_t> >
-  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< const T&, DPtc, const state_t& >& ptc ) {
+  template < typename T, std::size_t DPtc,
+             class Container = particle::vector<T,DPtc> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( const Particle< const T&, DPtc >& ptc ) {
     _c.push_back(ptc);
     return *this;
   }
 
-  template < typename T, std::size_t DPtc, typename state_t,
-             class Container = particle::vector<T,DPtc,state_t> >
-  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( Particle< T, DPtc, state_t >&& ptc ) {
+  template < typename T, std::size_t DPtc,
+             class Container = particle::vector<T,DPtc> >
+  back_insert_iterator<Container>& back_insert_iterator<Container>::operator= ( Particle< T, DPtc >&& ptc ) {
     _c.push_back(std::move(ptc));
     return *this;
   }

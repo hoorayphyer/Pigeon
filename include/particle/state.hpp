@@ -1,10 +1,11 @@
-#ifndef _STATE_CODEC_HPP_
-#define _STATE_CODEC_HPP_
+#ifndef _PARTICLE_STATE_HPP_
+#define _PARTICLE_STATE_HPP_
 
+#include "particle/traits.hpp"
 #include <type_traits>
 #include <tuple>
-namespace particle {
 
+namespace particle {
   namespace trace {
     struct birthplace {
     private:

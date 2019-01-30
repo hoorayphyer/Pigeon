@@ -1,23 +1,20 @@
-#include "particle_module/particle_updater.hpp"
-#inlcude "particle_module/pusher.hpp"
-#include "particle_module/depositer.hpp"
-#include "particle_module/pair_producer.hpp"
-#include "particle_module/migration.hpp"
+#include "particle/particle_updater.hpp"
+#include "particle/pusher.hpp"
+#include "particle/depositer.hpp"
+#include "particle/pair_producer.hpp"
+#include "particle/migration.hpp"
 
 namespace particle {
   namespace todo {
-    auto find_Rc( auto dp ) {
-    }
-
     // NOTE WJ can be in long double, but J only needs to be in double
     void getJ_from_WJ( auto& J, const auto& WJ ) {
       ensemble.reduce(WJ, root);
       if ( is_root ) copy(J, WJ);
-      // do the rest of J communication and stuff
+      //TODO do the rest of J communication and stuff
     }
   }
 
-  template < sf::shape S, pair_scheme PS, CoordSys CS >
+  template < sf::shape S, PairScheme pair_scheme, CoordSys CS >
   void update( ) {
     auto dt;
     auto& rng;
@@ -44,53 +41,52 @@ namespace particle {
     static_for ( auto[sp, particles] : particles_map ) {
 
       for ( auto& ptc : particles ) {
-        if( ptc.is<flag::empty>() ) continue;
+        if( ptc.is(flag::empty) ) continue;
 
-        if constexpr ( sp.is_charged ) {
+        if constexpr ( is_charged<sp> ) {
           auto E, B; // TODO interpolate field
-          auto&& dp = update_p( ptc, sp, dt, E, B );
+          auto&& dp = update_p<sp>( ptc, sp, dt, E, B );
 
           // TODO make sure the newly added particles will not participate in the loop
-          if constexpr ( PS != DISABLED && sp.is_radiative ) {
+          if constexpr ( pair_scheme != PairScheme::Disabled && is_radiative<sp> ) {
             auto Rc = calc_Rc( dt, ptc.p, std::move(dp) );
             auto gamma = std::sqrt( (sp.mass > 0) + apt::abs_sq(ptc.p) );
             if ( !is_productive_lepton( ptc, gamma, Rc, rng ) )
               goto end_of_pair_produce;
 
-            if constexpr ( PS == PHOTON ) {
-              produce_photons( std::back_inserter( std::get<Photon>(data) ),
+            if constexpr ( pair_scheme == PairScheme::Photon ) {
+              produce_photons( std::back_inserter( data[species::photon] ),
                                ptc, gamma, Rc );
-            } else if ( PS == INSTANT ) {
-              instant_produce_pairs( std::back_inserter( std::get<Electron>(data) ),
-                                     std::back_inserter( std::get<Positron>(data) ),
+            } else if ( pair_scheme == PairScheme::Instant ) {
+              instant_produce_pairs( std::back_inserter( data[species::electron] ),
+                                     std::back_inserter( data[species::positron] ),
                                      ptc, gamma, Rc );
             }
           }
           end_of_pair_produce:
 
-        } else if ( sp == photon && PS == PHOTON ) {
-          photon_produce_pairs( std::back_inserter( std::get<Electron>(data) ),
-                                std::back_inserter( std::get<Positron>(data) ),
+        } else if ( sp == species::photon && pair_scheme == PairScheme::Photon ) {
+          photon_produce_pairs( std::back_inserter( data[species::electron] ),
+                                std::back_inserter( data[species::positron] ),
                                 ptc );
         }
 
         // NOTE q is updated, starting from here, particles may be in the guard cells.
-        auto&& dq = update_q<CS>( ptc, sp, dt );
+        auto&& dq = update_q<sp,CS>( ptc, sp, dt );
         // pusher handle boundary condition
-        if constexpr ( sp.is_charged ) depositWJ<S>( WJ, ptc, std::move(dq), grid );
+        if constexpr ( is_charged<sp> ) depositWJ<S>( WJ, ptc, std::move(dq), grid );
 
         if ( is_migrate( ptc.q, bounds ) ) {
-          //TODO need to encode species into ptc state, otherwise this information is lost
-          migrate_buffer.push_back(ptc);
-          ptc.set<particle::flag::empty>();
+          // TODO make sure after move, the moved from ptc is set to flag::empty
+          migrate_buffer.push_back(std::move(ptc));
+          // ptc.set(flag::empty);
         }
 
       }
 
 
-
-      if constexpr ( sp.is_charged ) {
-        WJ *= charge * -grid.delta / dt;
+      if constexpr ( is_charged<sp> ) {
+        WJ *= charge<sp> * -grid.delta / dt;
 
         // check here if needs to output species J
         if ( is_dataexport ) {
@@ -104,7 +100,10 @@ namespace particle {
     }
 
     migrate( migrate_buffer, neighbors, bounds, comm );
-    // TODO load particles back in
+    for ( auto&& ptc : migrate_buffer ) {
+      particles[ptc.get<species>()].push_back( std::move(ptc) );
+    }
+    migrate_buffer.resize();
 
     // do this before J is actually used
     auto& J;

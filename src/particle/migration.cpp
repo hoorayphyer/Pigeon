@@ -1,5 +1,5 @@
-#include "particle_module/migration.hpp"
-#include "particle_vector.hpp"
+#include "particle/migration.hpp"
+#include "particle/particle_vector.hpp"
 #include "parallel/mpi++.hpp"
 
 namespace particle :: impl {

@@ -1,11 +1,11 @@
 #ifndef _PARTICLE_VECTOR_HPP_
 #define _PARTICLE_VECTOR_HPP_
 
-#include "core/particle.hpp"
+#include "particle/particle.hpp"
 #include <iterator>
 
 namespace particle {
-  template < std::size_t Dim_Ptc, typename vector_t, typename T, typename state_t >
+  template < std::size_t Dim_Ptc, typename vector_t, typename T >
   class iterator {
   private:
     vector_t& _vector;
@@ -15,7 +15,7 @@ namespace particle {
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
     using value_type = void;
-    using reference = Particle< apt::copy_const_t<vector_t, T&>,  Dim_Ptc, apt::copy_const_t<state_t, T&> >;
+    using reference = Particle< apt::copy_const_t<vector_t, T&>,  Dim_Ptc >;
     using pointer = void;
     iterator( vector_t& vec, int i ) noexcept : _vector(vec), _index(i) {}
 
@@ -41,12 +41,9 @@ namespace particle {
   };
 
 
-  template < typename T, std::size_t Dim_Ptc, typename state_t,
+  template < typename T, std::size_t Dim_Ptc,
              // ensure only non_cvref qualified types are allowed
-             class = std::enable_if_t<
-               ( std::is_same_t< T, apt::remove_cvref_t<T> > &&
-                 std::is_same_t< state_t, apt::remove_cvref_t<state_t> >
-                 ), int> >
+             class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<T> >, int> >
   struct vector {
   private:
     std::size_t _capacity = 0;
@@ -54,13 +51,13 @@ namespace particle {
 
     std::array<T*, Dim_Ptc> _q;
     std::array<T*, Dim_Ptc> _p;
-    state_t* _state;
+    state_t<T>* _state;
 
   public:
     static constexpr auto DPtc = Dim_Ptc;
     // TODO double this type. Note the & in the end
-    using iterator_t = iterator<Dim_Ptc, vector, T&, state_t&>;
-    using const_iterator_t = iterator<Dim_Ptc, vector, const T&, const state_t&>;
+    using iterator_t = iterator<Dim_Ptc, vector, T& >;
+    using const_iterator_t = iterator<Dim_Ptc, vector, const T&>;
 
     vector(std::size_t capacity);
     ~vector();
@@ -78,11 +75,11 @@ namespace particle {
     auto operator[] ( int i ) const noexcept { return *( const_iterator_t( *this, i ) ); }
 
     // real particle
-    void push_back( const Particle<T, Dim_Ptc, state_t>& ptc );
-    void push_back( Particle<T, Dim_Ptc, state_t>&& ptc );
+    void push_back( const Particle<T, Dim_Ptc>& ptc );
+    void push_back( Particle<T, Dim_Ptc>&& ptc );
 
     // virtual particle
-    void push_back( const Particle< const T&, Dim_Ptc, const state_t& >& ptc );
+    void push_back( const Particle< const T&, Dim_Ptc >& ptc );
 
   };
 
@@ -91,14 +88,14 @@ namespace particle {
 }
 
 namespace apt {
-  template < typename T, std::size_t DPtc, typename state_t,
-             typename PtcRef = vector<T, DPtc, state_t >::interator_t::reference >
+  template < typename T, std::size_t DPtc,
+             typename PtcRef = vector<T, DPtc >::interator_t::reference >
   void swap( PtcRef a, PtcRef b ) noexcept;
 }
 
 namespace std {
-  template < typename T, std::size_t DPtc, typename state_t,
-             class Container = particle::vector<T,DPtc,state_t> >
+  template < typename T, std::size_t DPtc,
+             class Container = particle::vector<T,DPtc> >
   class back_insert_iterator<Container> {
   private:
     Container& _c;
@@ -115,11 +112,11 @@ namespace std {
 
     template < typename U,
                class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
-    back_insert_iterator& operator= ( const Particle<U, DPtc, apt::copy_cvref_t< U, state_t> >& ptc );
+    back_insert_iterator& operator= ( const Particle<U, DPtc >& ptc );
 
     template < typename U,
                class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
-    back_insert_iterator& operator= ( Particle<U, DPtc, apt::copy_cvref_t< U, state_t> >&& ptc );
+    back_insert_iterator& operator= ( Particle<U, DPtc >&& ptc );
 
     inline auto& operator++ () noexcept { return *this; }
     inline auto& operator++ (int) noexcept { return *this; }

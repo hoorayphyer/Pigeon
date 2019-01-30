@@ -1,4 +1,4 @@
-#include "particle_module/depositer.hpp"
+#include "particle/depositer.hpp"
 #include "apt/numeric.hpp"
 
 namespace esirkepov :: impl {

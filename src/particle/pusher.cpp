@@ -1,6 +1,6 @@
-#include "particle_module/pusher.hpp"
+#include "particle/pusher.hpp"
+#include "particle/particle.hpp"
 #include "apt/numeric.hpp"
-#include "core/particle.hpp"
 #include "core/coordinate.hpp"
 
 namespace particle :: force {
@@ -56,21 +56,21 @@ namespace particle {
 
     // Apply Lorentz force
     if ( _pane.lorentz_On  ) {
-      dp += force::lorentz( dt / sp.mass, ptc.p, E, B );
+      dp += force::lorentz( dt / mass<sp>, ptc.p, E, B );
     }
 
     if ( _pane.gravity_On )
       dp += _pane.gravity( ptc.q ) * dt; // TODO gravity interface
 
     // FIXME add control in dashboard for rad_cooling
-    // if ( sp.is_radiative ) {
+    // if ( is_radiative<sp> ) {
     //   rad_cooling(p, BVector, EVector, 2e-9, dt);
     // }
 
     // when B is strong enough, damp the perpendicular component of momentum
     // FIXME ions should also be affected right?
     // TODO should this go before p += dp
-    if ( _pane.landau0_On && sp.is_radiative ) {
+    if ( _pane.landau0_On && is_radiative<sp> ) {
       if ( apt::abs_sq(B) > _pane.B_landau0 * _pane.B_landau0 ) {
         dp += force::landau0( ptc.p, E, B );
       }
@@ -89,7 +89,7 @@ namespace particle {
              typename T_dq = Vec<Trl,DPtc>
              >
   T_dq update_q< sp, CS, Ptc, T_dq, Trl > ( Ptc& ptc, const Trl& dt ) {
-    auto gamma = std::sqrt( (sp.mass > 0) + apt::abs_sq(ptc.p) );
+    auto gamma = std::sqrt( (mass<sp> > 0) + apt::abs_sq(ptc.p) );
 
     if constexpr ( CS == CoordSys::Cartesian ) {
       return coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );

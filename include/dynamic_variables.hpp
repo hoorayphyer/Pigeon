@@ -1,31 +1,35 @@
 #ifndef  _DYNAMIC_VARIABLES_HPP_
 #define  _DYNAMIC_VARIABLES_HPP_
 
-#include "core/field.hpp"
-#include "core/particle.hpp"
+#include "field/field.hpp"
+#include "particle/particle.hpp"
 
+template< typename T, std::size_t DGrid, std::size_t DPtc >
 struct DynamicVars {
-  // void init ( const DBPane_Particles& pane, PairProductionScheme pairScheme) {
-  void init ( ) {
-    // for ( auto[sp, num_max] : pane.capacity ) {
-    //   particles[sp].resize(num_max);
-    //   particles[sp].shrink_to_fit();
-    // }
+  Field<T, 3, DPtc> E;
+  Field<T, 3, DPtc> B;
+  Field<T, 3, DPtc> j;
 
-    // if (PairProductionScheme::DISABLED != pairScheme)
-    //   pairCreationEvents.resize(grid);
-
-  }
-
-  Field<Real, 3, 3> E;
-  Field<Real, 3, 3> B;
-  Field<Real, 3, 3> j;
-
-  species_map< std::vector<Particle> > particles;
+  using particle::species;
+  template < species sp >
+  particle::vector<T, DPtc> particles;
 
   // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
   // PairCreationTracker pairCreationTracker;
 
 };
+
+namespace particle {
+  constexpr auto fetch =
+    []( species sp, auto& dynavars ) noexcept {
+      switch ( sp ) {
+      case species::electron : return dynavars.particles<species::electron>;
+      case species::positron : return dynavars.particles<species::positron>;
+      case species::ion : return dynavars.particles<species::ion>;
+      case species::photon : return dynavars.particles<species::photon>;
+      }
+    };
+}
+
 
 #endif
