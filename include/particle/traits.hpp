@@ -13,36 +13,39 @@ namespace particle {
 
 namespace particle {
   template < species sp >
-  constexpr unsigned int mass; // in terms of unit mass
+  constexpr unsigned int mass_x; // in terms of unit mass
 
   template < species sp >
-  constexpr int charge; // in terms of unit charge
+  constexpr int charge_x; // in terms of unit charge
 
   template < species sp >
   constexpr bool is_radiative = ( sp == species::electron || sp == species::positron );
 
   template < species sp >
-  constexpr bool is_charged = (charge<sp> != 0);
+  constexpr bool is_charged = (charge_x<sp> != 0);
+
+  template < species sp >
+  constexpr bool is_massive = (mass_x<sp> != 0);
 }
 
 namespace particle {
   template <> constexpr unsigned int
-  mass<species::electron> = 1;
+  mass_x<species::electron> = 1;
   template <> constexpr unsigned int
-  mass<species::positron> = 1;
+  mass_x<species::positron> = 1;
   template <> constexpr unsigned int
-  mass<species::ion> = 5; // TODO move it somewhere else
+  mass_x<species::ion> = 5; // TODO move it somewhere else
   template <> constexpr unsigned int
-  mass<species::photon> = 0;
+  mass_x<species::photon> = 0;
 
   template <> constexpr unsigned int
-  charge<species::electron> = -1;
+  charge_x<species::electron> = -1;
   template <> constexpr unsigned int
-  charge<species::positron> = 1;
+  charge_x<species::positron> = 1;
   template <> constexpr unsigned int
-  charge<species::ion> = 1;
+  charge_x<species::ion> = 1;
   template <> constexpr unsigned int
-  charge<species::photon> = 0;
+  charge_x<species::photon> = 0;
 }
 
 #endif

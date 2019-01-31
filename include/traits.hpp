@@ -2,6 +2,9 @@
 #define  _TRAITS_HPP_
 
 #include "types.hpp"
+#include <experimental/array>
+
+using std::experimental::make_array;
 
 
 struct traits {
@@ -20,10 +23,12 @@ struct traits {
   static constexpr ct_string
   shape {"Cloud In Cell"};
 
+  static constexpr auto
+  active_species = std::make_array
+    { "electron", "positron", "photon" };
 
 };
 
-
-constexpr Species Ion = { "Ion", 1, 5, false };
+// TODO ion charge set elsewhere
 
 #endif

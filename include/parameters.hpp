@@ -1,19 +1,18 @@
 #ifndef  _PARAMETERS_H_
 #define  _PARAMETERS_H_
 
-#include "types.hpp"
+#include <array>
+#include <string>
 
 // TODOL traits and params are basically the same thing. Just compile time known or not
+template < typename Real_t, std::size_t DGrid >
 struct Params {
-  Real dt;
+  Real_t dt;
   int total_timesteps;
 
-  Real e; // electric charge
-  Real ion_mass_ratio;
-  Real ion_charge_ratio;
+  Real_t e; // electric charge
 
   std::string this_run_dir;
-  // WeightType weightType;
 
   // Grid grid; // local simulation grid
   // Grid dataGrid; // local data export grid
@@ -21,14 +20,16 @@ struct Params {
   // std::array<bool, 3> is_periodic; // only needed in sendcellsleftright
 
   // the following are ensemble specs, which will be stored on primary and be passed on to all replicas
-  // struct EnsembleSpecs {
-  //   int label;
-  //   std::array<int, 3> coordinate;
-  //   std::array<bool, 6> is_at_boundary;
-  //   std::array<bool, 6> is_axis;
-  //   std::array<int, 3> neighbor_left;
-  //   std::array<int, 3> neighbor_right;
-  // } ens_specs;
+  struct Locale {
+    int label;
+    std::array< std::array<int, 2>, DGrid > grid_anchors;
+    std::array< std::array<Real_t, 2>, DGrid > grid_anchors;
+
+    std::array< int, DGrid > coordinate;
+    std::array< std::array<bool, 2>, DGrid > is_at_boundary;
+    std::array< std::array<bool, 2>, DGrid > is_axis;
+    std::array< std::array<int, 2>, DGrid > neighbors;
+  } locale;
 
   // void Init(const Dashboard& db, const MPICommunicator& comm);
 

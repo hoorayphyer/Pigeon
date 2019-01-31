@@ -4,15 +4,14 @@
 #include "field/field.hpp"
 #include "particle/particle.hpp"
 
-template< typename T, std::size_t DGrid, std::size_t DPtc >
+template< typename Real_t, std::size_t DGrid, std::size_t DPtc >
 struct DynamicVars {
-  Field<T, 3, DPtc> E;
-  Field<T, 3, DPtc> B;
-  Field<T, 3, DPtc> j;
+  field::Field<Real_t, 3, DPtc> E;
+  field::Field<Real_t, 3, DPtc> B;
+  field::Field<Real_t, 3, DPtc> j;
 
-  using particle::species;
-  template < species sp >
-  particle::vector<T, DPtc> particles;
+  template < particle::species sp >
+  particle::vector<Real_t, DPtc> particles;
 
   // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
   // PairCreationTracker pairCreationTracker;

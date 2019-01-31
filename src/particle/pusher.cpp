@@ -20,7 +20,7 @@ namespace particle :: force {
       return p_new - p;
     }
 
-  auto lorentz = // lambda = dt / mass * e/m NOTE this is actually rescaling Lorentz force
+  auto lorentz = // lambda = dt / mass_x * e/m NOTE this is actually rescaling Lorentz force
     []( auto lambda, const auto& p, const auto& E, const auto& B ) noexcept {
       // TODO optimize use of intermediate variables
       lambda /= 2.0;
@@ -56,7 +56,7 @@ namespace particle {
 
     // Apply Lorentz force
     if ( _pane.lorentz_On  ) {
-      dp += force::lorentz( dt / mass<sp>, ptc.p, E, B );
+      dp += force::lorentz( dt / mass_x<sp>, ptc.p, E, B );
     }
 
     if ( _pane.gravity_On )
@@ -89,7 +89,7 @@ namespace particle {
              typename T_dq = Vec<Trl,DPtc>
              >
   T_dq update_q< sp, CS, Ptc, T_dq, Trl > ( Ptc& ptc, const Trl& dt ) {
-    auto gamma = std::sqrt( (mass<sp> > 0) + apt::abs_sq(ptc.p) );
+    auto gamma = std::sqrt( is_massive<sp> + apt::abs_sq(ptc.p) );
 
     if constexpr ( CS == CoordSys::Cartesian ) {
       return coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );

@@ -26,27 +26,4 @@ constexpr bool operator== ( const char* lhs, const ct_string& rhs ) {
   return strings_equal(lhs, rhs.data);
 }
 
-struct Species {
-  ct_string str {"Unspecified"};
-  int charge = 0; // in terms of unit charge
-  int mass = 1; // in terms of unit mass
-  bool is_radiative = false;
-
-  // implicit conversion
-  constexpr operator const char*() const {
-    return str.data;
-  }
-
-};
-
-
-constexpr Species Electron = { "Electron", -1, 1, true };
-constexpr Species Positron = { "Positron", 1, 1, true };
-constexpr Species Photon = { "Photon", 0, 0, false };
-
-#include <unordered_map>
-template < typename T >
-using species_map = std::unordered_map<Species, T, std::hash<const char*>, std::equal_to<const char*>  >;
-
-
 #endif
