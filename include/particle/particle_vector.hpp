@@ -42,10 +42,9 @@ namespace particle {
   };
 
 
-  template < typename T, std::size_t Dim_Ptc,
-             // ensure only non_cvref qualified types are allowed
-             class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<T> >, int> >
+  template < typename T, std::size_t Dim_Ptc >
   struct vector {
+    static_assert( std::is_same_v< T, apt::remove_cvref_t<T> >, "only non_cvref qualified types are allowed" );
   private:
     std::size_t _capacity = 0;
     std::size_t _size = 0;
@@ -76,11 +75,11 @@ namespace particle {
     auto operator[] ( int i ) const noexcept { return *( const_iterator_t( *this, i ) ); }
 
     // real particle
-    void push_back( const Particle<T, Dim_Ptc>& ptc );
-    void push_back( Particle<T, Dim_Ptc>&& ptc );
+    void push_back( const Particle<T, DPtc>& ptc ); // NOTE cannot use Dim_Ptc here!!!
+    void push_back( Particle<T, DPtc>&& ptc );
 
-    // virtual particle
-    void push_back( const Particle< const T&, Dim_Ptc >& ptc );
+    // virtual particle TODO move virtual particle??
+    void push_back( const Particle< const T&, DPtc >& ptc );
 
   };
 
@@ -110,13 +109,9 @@ namespace std {
 
     explicit back_insert_iterator( particle::vector<T,DPtc>& c ) noexcept : _c(c) {}
 
-    template < typename U,
-               class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<U> >, int> >
-    back_insert_iterator& operator= ( const Particle<U, DPtc >& ptc );
-
-    template < typename U,
-               class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<U> >, int> >
-    back_insert_iterator& operator= ( Particle<U, DPtc >&& ptc );
+    auto& operator= ( const Particle<T, DPtc>& ptc ) { _c.push_back(ptc); return *this; }
+    auto& operator= ( const Particle< const T&, DPtc >& ptc ) { _c.push_back(ptc); return *this; }
+    auto& operator= ( Particle<T, DPtc >&& ptc ) { _c.push_back( std::move(ptc) ); return *this; }
 
     inline auto& operator++ () noexcept { return *this; }
     inline auto& operator++ (int) noexcept { return *this; }
