@@ -32,10 +32,11 @@ namespace particle {
     iterator& operator+= ( int n ) noexcept { _index += n; return *this; }
 
     inline reference operator* () const noexcept {
-      return reference {
-        apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._q ),
-        apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._p ),
-        _vector._state[_index] };
+      // TODO expression template
+      // return reference {
+        // apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._q ),
+        // apt::per_dim::tie<Dim_Ptc> ( [i=_index] ( auto&& x ) { return x[i]; }, _vector._p ),
+        // _vector._state[_index] };
     }
 
   };
@@ -88,34 +89,33 @@ namespace particle {
 }
 
 namespace apt {
-  template < typename T, std::size_t DPtc,
-             typename PtcRef = vector<T, DPtc >::interator_t::reference >
-  void swap( PtcRef a, PtcRef b ) noexcept;
+  template < typename T, std::size_t DPtc >
+  void swap( typename particle::vector<T, DPtc >::interator_t::reference a,
+             typename particle::vector<T, DPtc >::interator_t::reference b ) noexcept;
 }
 
 namespace std {
-  template < typename T, std::size_t DPtc,
-             class Container = particle::vector<T,DPtc> >
-  class back_insert_iterator<Container> {
+  template < typename T, std::size_t DPtc >
+  class back_insert_iterator<particle::vector<T,DPtc>> {
   private:
-    Container& _c;
+    particle::vector<T,DPtc>& _c;
     int _index;
 
   public:
-    using iterator_category = std::outpuT_iterator_tag;
+    using iterator_category = std::output_iterator_tag;
     using difference_type = void;
     using value_type = void;
     using reference = void;
     using pointer = void;
 
-    explicit back_insert_iterator( Container& c ) noexcept : _c(c) {}
+    explicit back_insert_iterator( particle::vector<T,DPtc>& c ) noexcept : _c(c) {}
 
     template < typename U,
-               class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
+               class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<U> >, int> >
     back_insert_iterator& operator= ( const Particle<U, DPtc >& ptc );
 
     template < typename U,
-               class = std::enable_if_t< std::is_same_t< T, apt::remove_cvref_t<U> >, int> >
+               class = std::enable_if_t< std::is_same_v< T, apt::remove_cvref_t<U> >, int> >
     back_insert_iterator& operator= ( Particle<U, DPtc >&& ptc );
 
     inline auto& operator++ () noexcept { return *this; }

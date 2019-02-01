@@ -19,7 +19,7 @@ namespace particle :: impl {
       case L : el++; break;
       case C :
         if ( ec != el ) apt::swap( buffer[el], buffer[ec] );
-        ec++; el++ break;
+        ec++; el++; break;
       case R :
         while ( el <= er && lcr( buffer[er] ) != R ) er--;
         if ( er != el ) apt::swap( buffer[el], buffer[er] );
@@ -35,7 +35,7 @@ namespace particle :: impl {
   template < typename T, std::size_t DPtc, typename F_LCR >
   void migrate_1dim ( particle::vector<T,DPtc>& buffer,
                       const std::array<int, 2>& neigh,
-                      const F_LCR& lcr;
+                      const F_LCR& lcr,
                       const mpi::Comm& comm ) {
     const auto& nL = std::get<0>(neigh);
     const auto& nR = std::get<1>(neigh);
@@ -46,14 +46,14 @@ namespace particle :: impl {
 
     // TODO finish the comm code
     // send to left
-    comm.send( ptr + begL, begR - begL, nL );
-    num_recv += comm.recv( ptr + begE + num_recv, buffer.capacity() - begE - num_recv, nR );
-    comm.wait();
+    // comm.send( ptr + begL, begR - begL, nL );
+    // num_recv += comm.recv( ptr + begE + num_recv, buffer.capacity() - begE - num_recv, nR );
+    // comm.wait();
 
-    // send to right
-    comm.send( ptr + begR, begE - begR, nR );
-    num_recv += comm.recv( ptr + begE + num_recv, buffer.capacity() - begE - num_recv, nL );
-    comm.wait();
+    // // send to right
+    // comm.send( ptr + begR, begE - begR, nR );
+    // num_recv += comm.recv( ptr + begE + num_recv, buffer.capacity() - begE - num_recv, nL );
+    // comm.wait();
 
     // erase sent particles by shifting
     for ( int i = 0; i < num_recv; ++i )
@@ -64,17 +64,21 @@ namespace particle :: impl {
   }
 }
 
+#include "apt/algorithm.hpp"
 namespace particle {
-  template < typename Tvt, std::size_t DGrid,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename T_q = Vec<Tvt, DGrid>,
-             typename T_bd = std::array< std::array<Trl, 2>, DGrid>
-             >
-  bool is_migrate<T_q, T_bd> ( const T_q& q, const T_bd& bounds ) noexcept {
-    auto&& tmp = apt::per_dim::make<N>
+  // TODO instantiate using the following
+  // template < typename Tvt, std::size_t DGrid,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename T_q = Vec<Tvt, DGrid>,
+  //            typename T_bd = std::array< std::array<Trl, 2>, DGrid>
+  //            >
+  template < typename q_t, typename borders_t >
+  bool is_migrate ( const q_t& q, const borders_t& borders ) noexcept {
+    // TODO use expression template
+    auto&& tmp = apt::per_dim::make<std::tuple_size_v<borders_t>>
       ( []( const auto& x, const auto& bd ) noexcept {
           return x < std::get<0>(bd) || x > std::get<1>(bd);
-        }, q, bounds );
+        }, q, borders );
     return std::apply( []( auto... args){ return (... || args); }, std::move(tmp) );
   }
 
@@ -94,15 +98,17 @@ namespace particle {
     }
   }
 
-  template < std::size_t DGrid, typename T, std::size_t DPtc,
-             typename PtcVector = particle::vector<T,DPtc>,
-             typename T_neigh = std::array< std::array<int,2>, DGrid >,
-             typename T_bd = std::array< std::array<T,2>, DGrid>,
-             typename Comm = mpi::Comm
-             >
-  inline void migrate<PtcVector, T_neigh, T_bd, Comm>( PtcVector& buffer, const T_neigh& neighbors, const T_bounds& bounds, const Comm& comm ) {
-    return impl::migrate<DGrid, T, DPtc, DGrid - 1>( buffer, neighbors, bounds, comm );
-  }
+  template < std::size_t DGrid, typename T, std::size_t DPtc >
+  struct migrate_t< particle::vector<T,DPtc>,
+                    std::array< std::array<int,2>, DGrid >,
+                    std::array< std::array<T,2>, DGrid>,
+                    mpi::Comm > {
+    void operator() ( particle::vector<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
+                      const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm ) {
+    return impl::migrate<DGrid, T, DPtc, DGrid - 1>( buffer, neighbors, borders, comm );
+    }
+
+  };
 
 
 }
