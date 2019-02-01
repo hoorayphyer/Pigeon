@@ -4,7 +4,9 @@
 #include "types.hpp"
 #include <experimental/array>
 
-using std::experimental::make_array;
+namespace std {
+  using experimental::make_array;
+}
 
 
 struct traits {
@@ -25,7 +27,7 @@ struct traits {
 
   static constexpr auto
   active_species = std::make_array
-    { "electron", "positron", "photon" };
+    ( "electron", "positron", "photon" );
 
 };
 
