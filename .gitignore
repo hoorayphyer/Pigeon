@@ -13,8 +13,8 @@
 !include/**/*.hpp
 !include/apt/
 !include/apt/*.hpp
-!include/core/
-!include/core/*.hpp
+!include/kernel/
+!include/kernel/*.hpp
 !include/utility/
 !include/utility/*.hpp
 !include/export/
@@ -28,8 +28,6 @@
 
 !src/
 !src/**/*.cpp
-!src/core/
-!src/core/*.cpp
 !src/utility/
 !src/utility/*.cpp
 !src/export/

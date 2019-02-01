@@ -1,6 +1,9 @@
 #ifndef  _APT_NUMERIC_HPP_
 #define  _APT_NUMERIC_HPP_
-#include "apt/vec.hpp"
+
+
+#include "apt/algorithm.hpp"
+#include "apt/type_traits.hpp"
 
 // TODO use expression template to optimize
 namespace apt::functional {
@@ -53,12 +56,11 @@ namespace apt::functional {
 
 namespace {
 // NOTE somehow generic lambda works here!
-#define vec_def_binary_op( _OP_, _MODE_ )                                   \
+#define vec_def_binary_op( _OP_, _MODE_ )                               \
   template < typename T, std::size_t N, typename U >                    \
-  constexpr auto operator _OP_ ( const Vec<T,N>& v1, const U& v2 ) {    \
-    return apt::functional::adapt_binary_##_MODE_<Vec<T,N>, U>          \
-      ([]( auto&& a, auto&& b ) { return a _OP_ b; }) ( v1, v2 );       \
-  }                                                                     \
+  constexpr auto operator _OP_ ( const apt::Vec<T,N>& v1, const U& v2 ) {} \
+  // return apt::functional::adapt_binary_##_MODE_<apt::Vec<T,N>, U>       \
+  // ([]( auto&& a, auto&& b ) { return a _OP_ b; }) ( v1, v2 );           \
 
   vec_def_binary_op( + , by_make );
   vec_def_binary_op( - , by_make );
@@ -72,18 +74,13 @@ namespace {
 
   template < typename T, std::size_t N, typename U,
              class = std::enable_if_t< std::is_arithmetic_v<U>, int > >
-  constexpr auto operator* ( U val, const Vec<T,N>& v ) {
+  constexpr auto operator* ( U val, const apt::Vec<T,N>& v ) {
     return v * val;
   }
 #undef vec_def_binary_op
-
-#define vec_def_member_getter( _CLASS_, _MEM_)        \
-  constexpr auto _MEM_( _CLASS_& obj ) noexcept {     \
-    return apt::per_dim::tie<apt::size_v<_CLASS_>>    \
-      ( []( auto&& elm ){ return elm._MEM_;}, obj );  \
-  }
 }
 
+#include <cmath>
 namespace apt {
   template < typename T1, typename T2, std::size_t N >
   constexpr auto dot ( const Vec<T1,N>& v1, const Vec<T2,N>& v2 ) {
@@ -93,16 +90,17 @@ namespace apt {
                        }, std::move(tmp) );
   }
 
-  template < typename T, std::size_t N >
-  constexpr auto abs_sq ( const Vec<T,N>& v ) {
-    static_assert( N < 4, "not implemented" );
-    if constexpr ( N == 1 ) return std::abs( std::get<0>(v) );
-    else return std::apply( std::hypot, v );
+  template < typename T, std::size_t N, std::size_t I = 0 >
+  constexpr auto sqabs ( const Vec<T,N>& v ) {
+    static_assert( N < 4 );
+    if constexpr ( I == N ) return 0;
+    else return std::get<I>(v) * std::get<I>(v) + sqabs<T,N,I+1>(v);
   }
 
   template < typename T, std::size_t N >
   constexpr auto abs ( const Vec<T,N>& v ) {
-    return std::sqrt( abs_sq(v) );
+    if constexpr ( N == 1 ) return std::abs( std::get<0>(v) );
+    else return std::sqrt( sqabs(v) );
   }
 
   template < typename T1, typename T2, std::size_t N >

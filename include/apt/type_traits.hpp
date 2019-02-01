@@ -40,17 +40,17 @@ namespace apt {
   }
 
   template < typename From, typename To >
-  using copy_ref_t = typename copy_ref<From,To>::type;
+  using copy_ref_t = typename impl::copy_ref<From,To>::type;
 
   template < typename From, typename To >
-  using copy_const_t = typename copy_const<From,To>::type;
+  using copy_const_t = typename impl::copy_const<From,To>::type;
 
   // TODO add volatile for completeness
   template < typename From, typename To >
-  using copy_cvref_t = typename copy_const_t<From, copy_ref_t<From, To>>;
+  using copy_cvref_t = copy_const_t<From, copy_ref_t<From, To>>;
 
   template < typename T, typename U >
-  using is_same_cvref_v = std::is_same_v< apt::copy_cvref_t<T, U>, U>;
+  inline constexpr auto is_same_cvref_v = std::is_same_v< apt::copy_cvref_t<T, U>, U >;
 
   // NOTE: somehow I don't want to use std::decay. This template will be provided in std in C++20 anyway
   template < typename T >

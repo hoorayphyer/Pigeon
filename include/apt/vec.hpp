@@ -33,8 +33,8 @@ namespace apt {
 
   template < typename Trl, std::size_t N >
   struct Vec<Trl&, N> : public homogeneous_tuple<Trl&,N> {
-    constexpr Vec( homogeneous_tuple<T&,N> x ) noexcept
-      : homogeneous_tuple<T&,N>( std::move(x) ) {}
+    constexpr Vec( homogeneous_tuple<Trl&,N> x ) noexcept
+      : homogeneous_tuple<Trl&,N>( std::move(x) ) {}
 
     // TODO double check the semantics of these
     Vec( const Vec& other ) = default;

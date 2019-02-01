@@ -1,5 +1,5 @@
-#ifndef  _PARTICLEUPDATER_HPP_
-#define  _PARTICLEUPDATER_HPP_
+#ifndef  _PARTICLE_UPDATER_HPP_
+#define  _PARTICLE_UPDATER_HPP_
 
 namespace particle {
   enum class PairScheme
@@ -14,6 +14,8 @@ namespace particle {
 
 #include "dynamic_variables.hpp"
 #include "parameters.hpp"
+#include "field/interpolation.hpp"
+#include <algorithm>
 
 namespace todo {
   // NOTE WJ can be in long double, but J only needs to be in double
@@ -25,6 +27,7 @@ namespace todo {
 }
 
 namespace particle {
+  // TODO this is supposed to be used in iterate_species
   constexpr auto present_species;
 
   template < typename Real_t, std::size_t DGrid, std::size_t DPtc,
@@ -41,14 +44,13 @@ namespace particle {
     template < species sp, typename Dynvar_t, typename Params_t, typename Grid >
     inline void update_species( Dynvar_t& dvars, const Params_t& params, const Grid& grid ) {
       auto dt = params.dt;
-      const auto& Efield = dvars.E;
-      const auto& Bfield = dvars.B;
 
       for ( auto& ptc : dvars.particles<sp> ) {
         if( ptc.is(flag::empty) ) continue;
 
         if constexpr ( is_charged<sp> ) {
-          auto E, B; // TODO interpolate field
+          auto E = field::interpolate(dvars.E, grid, ptc.q);
+          auto B = field::interpolate(dvars.E, grid, ptc.q);
           auto&& dp = update_p<sp>( ptc, dt, E, B );
 
           // TODO make sure the newly added particles will not participate in the loop
@@ -89,8 +91,19 @@ namespace particle {
       }
 
       if constexpr ( is_charged<sp> ) {
-// TODO check if 2D is properly dealt with by grid.delta
-        _WJ *= charge_x<sp> * params.e * (-grid.delta) / dt;
+        auto tmp = -1 * charge_x<sp> * params.e * grid[0].delta / dt;
+        for ( auto& elm : _WJ[0] ) elm *= tmp;
+
+        tmp *= (grid[1].delta / grid[0].delta);
+        for ( auto& elm : _WJ[1] ) elm *= tmp;
+
+        if constexpr ( DGrid == 2 ) {
+          tmp = charge_x<sp> * params.e;
+        } else if ( DGrid == 3 ) {
+          tmp *= (grid[2].delta / grid[1].delta);
+        } static_assert(DGrid < 4);
+
+        for ( auto& elm : _WJ[2] ) elm *= tmp;
 
         // // TODO check here if needs to output species J
         // if ( is_dataexport ) {
@@ -114,12 +127,11 @@ namespace particle {
     void operator() ( DynamicVars<Real_t, DGrid, DPtc>& dvars,
                       const Params<Real_t, DGrid>& params,
                       const Grid<DGrid>& grid, auto& comm ) {
-      const auto& borders;
+      const auto& borders; // TODO
       const auto& neighbors = params.neighbors;
 
-      // TODO
-      _WJ.zero_out();
-      EnsBroadcastFields( Efield, Bfield );
+      for ( auto& comp : _WJ ) for ( auto& elm : comp ) elm = 0.0;
+      EnsBroadcastFields( dvars.E, dvars.B ); // TODO
 
       //-------------------------------
       inject( fetch( species::electron, dvars ), fetch( posion, dvars ) );
@@ -133,7 +145,7 @@ namespace particle {
 
       migrate( _migrators, params.neighbors, borders, comm );
       for ( auto&& ptc : _migrators ) {
-        particles[ptc.get<species>()].push_back( std::move(ptc) );
+        fetch(ptc.get<species>(), dvars).push_back( std::move(ptc) );
       }
       _migrators.resize(0);
 

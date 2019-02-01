@@ -1,15 +1,15 @@
-#ifndef _GRID_SHAPE_INTERPLAY_HPP_
-#define _GRID_SHAPE_INTERPLAY_HPP_
+#ifndef _KNL_GRID_SHAPE_INTERPLAY_HPP_
+#define _KNL_GRID_SHAPE_INTERPLAY_HPP_
 
-#include "core/shapefunction.hpp"
-#include "core/grid.hpp"
-#include "core/vector.hpp"
+#include "kernel/shape.hpp"
+#include "kernel/grid.hpp"
+#include "apt/vec.hpp"
 
-namespace sf :: impl {
-  template < std::size_t DGrid, sf::shape S, typename T >
+namespace knl :: impl {
+  template < shape S, typename T, std::size_t DGrid >
   class ShapeRangeInterator {
   private:
-    static constexpr sf::ShapeFunction<S,T> shape_f;
+    static constexpr shapef_t<S,T> shape_f;
 
     int _I = 0;
 
@@ -55,30 +55,30 @@ namespace sf :: impl {
 
   };
 
-  template < std::size_t DGrid, sf::shape S, typename T >
+  template < shape S, typename T, std::size_t DGrid >
   class ShapeRange {
   private:
     Vec<T,DGrid> _loc;
   public:
-    ShapeRange( const Vec<T,DGrid>& loc_rel, const Grid<DGrid>& grid, const Vec<T,DGrid>& offset )
+    ShapeRange( const Vec<T,DGrid>& loc_rel, const grid_t<DGrid>& grid, const Vec<T,DGrid>& offset )
       : _loc ( loc_rel - offset - mem::lower(grid) + mem::guard(grid) ) {}
 
     auto begin() const && {
-                           return ShapeRangeInterator<DGrid, S, T>( 0, std::move(_loc) );
+                           return ShapeRangeInterator<S, T, DGrid >( 0, std::move(_loc) );
     }
 
   };
 
   // TODO double check this function simply returns constexpr. We omitted the argument name
-  template < std::size_t DGrid, sf::shape S, typename T >
-  constexpr std::end( const ShapeRange<DGrid, S, T> & ) noexcept {
+  template < shape S, typename T, std::size_t DGrid >
+  constexpr std::end( const ShapeRange< S, T, DGrid > & ) noexcept {
     return DGrid * sf::support(S);
   }
 }
 
-namespace sf {
-  template < std::size_t DGrid, sf::shape S, typename T >
-  inline auto make_shape_range( const Vec<T, DGrid>& loc_rel, const Grid<DGrid>& grid, const Vec<T,DGrid>& offset ) {
+namespace knl {
+  template < shape S, typename T, std::size_t DGrid >
+  inline auto make_shape_range( const Vec<T, DGrid>& loc_rel, const grid_t<DGrid>& grid, const Vec<T,DGrid>& offset ) {
     return ShapeRange<DGrid, S, T>( loc_rel, grid, offset );
   }
 }

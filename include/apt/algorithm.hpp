@@ -48,7 +48,7 @@ namespace apt {
     if constexpr ( Begin == End ) return;
     else {
       f( std::get<Begin>(std::forward<Vectors>(vecs))... );
-      return foreach<Begin+1, End>( f, std::forward<Vectors>(vecs) );
+      return foreach<Begin+1, End>( f, std::forward<Vectors>(vecs)... );
     }
   }
 }

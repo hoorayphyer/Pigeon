@@ -1,27 +1,26 @@
-#ifndef _SHAPEFUNCTION_HPP_
-#define _SHAPEFUNCTION_HPP_
+#ifndef _KNL_SHAPE_HPP_
+#define _KNL_SHAPE_HPP_
 
 
-namespace sf {
+namespace knl {
   // value here denotes length of support
-  enum class shape : char {
+  enum class shape : unsigned int {
     Nearest_Grid_Point = 1,
     Cloud_In_Cell = 2,
     Triangular_Cloud = 3,
     Piecewise_Cubic_Spline = 4
   };
 
-  constexpr int support( shape s ) noexcept {
-    return static_cast<int>(S);
+  constexpr auto support( shape s ) noexcept {
+    return static_cast<unsigned int>(s);
   }
 
-  template < typename T >
-  constexpr T radius( shape s ) noexcept {
+  constexpr auto radius( shape s ) noexcept {
     return support(s) / 2.0;
   }
 
   template < shape S >
-  struct ShapeFunction {
+  struct shapef_t {
     template < typename T >
     constexpr T operator() ( T dx ) noexcept {
       dx = std::abs(dx);
