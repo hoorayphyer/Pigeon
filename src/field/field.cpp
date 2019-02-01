@@ -1,4 +1,4 @@
-#include "core/field.hpp"
+#include "field/field.hpp"
 
 namespace field {
   template < typename T, int DField, int DGrid >

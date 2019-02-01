@@ -1,12 +1,12 @@
 #include "particle/migration.hpp"
-#include "particle/particle_vector.hpp"
+#include "particle/array.hpp"
 #include "parallel/mpi++.hpp"
 
 namespace particle :: impl {
 
   // NOTE Assume there is no empty particles.
   template < typename T, std::size_t DPtc, typename F_LCR >
-  auto lcr_sort( particle::vector<T,DPtc>& buffer, const F_LCR& lcr ) noexcept {
+  auto lcr_sort( particle::array<T,DPtc>& buffer, const F_LCR& lcr ) noexcept {
     constexpr int L = 0;
     constexpr int C = 1;
     constexpr int R = 2;
@@ -33,7 +33,7 @@ namespace particle :: impl {
 
 
   template < typename T, std::size_t DPtc, typename F_LCR >
-  void migrate_1dim ( particle::vector<T,DPtc>& buffer,
+  void migrate_1dim ( particle::array<T,DPtc>& buffer,
                       const std::array<int, 2>& neigh,
                       const F_LCR& lcr,
                       const mpi::Comm& comm ) {
@@ -84,7 +84,7 @@ namespace particle {
 
   namespace impl {
     template < std::size_t DGrid, typename T, std::size_t DPtc, std::size_t I >
-    inline void migrate( particle::vector<T,DPtc>& buffer,
+    inline void migrate( particle::array<T,DPtc>& buffer,
                   const std::array< std::array<int,2>, DGrid >& neighbors,
                   const std::array< std::array<T,2>, DGrid>& bounds,
                   const mpi::Comm& comm ) {
@@ -99,11 +99,11 @@ namespace particle {
   }
 
   template < std::size_t DGrid, typename T, std::size_t DPtc >
-  struct migrate_t< particle::vector<T,DPtc>,
+  struct migrate_t< particle::array<T,DPtc>,
                     std::array< std::array<int,2>, DGrid >,
                     std::array< std::array<T,2>, DGrid>,
                     mpi::Comm > {
-    void operator() ( particle::vector<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
+    void operator() ( particle::array<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
                       const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm ) {
     return impl::migrate<DGrid, T, DPtc, DGrid - 1>( buffer, neighbors, borders, comm );
     }

@@ -20,7 +20,7 @@ include_directories( ${MPI_INCLUDE_PATH} ${Silo_INCLUDE_DIR} ../include )
 #   message("${Yellow}No lab is invoked.${ColorReset}")
 # endif()
 add_library(field_lib STATIC "field/field.cpp")
-add_library(ptc_lib STATIC "particle/depositer.cpp" "particle/migration.cpp" "particle/pair_producer.cpp" "particle/particle_vector.cpp" "particle/pusher.cpp")
+add_library(ptc_lib STATIC "particle/depositer.cpp" "particle/migration.cpp" "particle/pair_producer.cpp" "particle/array.cpp" "particle/pusher.cpp")
 
 
 # TODO now src are scattered

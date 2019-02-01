@@ -1,7 +1,7 @@
 #ifndef  _INTERPOLATION_HPP_
 #define  _INTERPOLATION_HPP_
 
-#include "core/grid_shape_interplay.hpp"
+#include "kernel/grid_shape_interplay.hpp"
 #include "field/field.hpp"
 
 namespace field {

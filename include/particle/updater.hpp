@@ -6,7 +6,6 @@ namespace particle {
     { Disabled, Instant, Photon };
 }
 
-#include "particle/particle_updater.hpp"
 #include "particle/pusher.hpp"
 #include "particle/depositer.hpp"
 #include "particle/pair_producer.hpp"

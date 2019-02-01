@@ -1,10 +1,10 @@
-#include "particle/particle_vector.hpp"
+#include "particle/array.hpp"
 #include <stdexcept>
 #include "apt/algorithm.hpp"
 
 namespace particle {
   template < typename T, std::size_t DPtc >
-  vector<T, DPtc >::vector( std::size_t capacity )
+  array<T, DPtc >::array( std::size_t capacity )
     : _capacity(capacity), _size(0) {
     auto f =
       []( auto*& p, std::size_t n ) {
@@ -16,7 +16,7 @@ namespace particle {
   }
 
   template < typename T, std::size_t DPtc >
-  vector<T, DPtc>::~vector() {
+  array<T, DPtc>::~array() {
     for ( auto*& ptr : _q ) delete [] ptr;
     for ( auto*& ptr : _p ) delete [] ptr;
     delete [] _state;
@@ -24,7 +24,7 @@ namespace particle {
 
   // real particles
   template < typename T, std::size_t DPtc >
-  void vector<T, DPtc>::push_back( const Particle<T, DPtc>& ptc ) {
+  void array<T, DPtc>::push_back( const Particle<T, DPtc>& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     apt::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
@@ -36,7 +36,7 @@ namespace particle {
   }
 
   template < typename T, std::size_t DPtc >
-  void vector<T, DPtc>::push_back( Particle<T, DPtc>&& ptc ) {
+  void array<T, DPtc>::push_back( Particle<T, DPtc>&& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     apt::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, auto&& q_ptc, auto&& p_ptc ) {
@@ -50,7 +50,7 @@ namespace particle {
 
   // virtual particles
   template < typename T, std::size_t DPtc >
-  void vector<T, DPtc>::push_back( const Particle< const T&, DPtc >& ptc ) {
+  void array<T, DPtc>::push_back( const Particle< const T&, DPtc >& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     apt::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
@@ -63,7 +63,7 @@ namespace particle {
 
 
   template < typename T, std::size_t DPtc,
-             typename PtcRef = typename vector<T, DPtc >::interator_t::reference >
+             typename PtcRef = typename array<T, DPtc >::interator_t::reference >
   void swap( PtcRef a, PtcRef b ) noexcept {
     apt::swap( a.q, b.q );
     apt::swap( a.p, b.p );

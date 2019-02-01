@@ -2,7 +2,7 @@
 #define  _DYNAMIC_VARIABLES_HPP_
 
 #include "field/field.hpp"
-#include "particle/particle.hpp"
+#include "particle/array.hpp"
 
 template< typename Real_t, std::size_t DGrid, std::size_t DPtc >
 struct DynamicVars {
@@ -11,7 +11,7 @@ struct DynamicVars {
   field::Field<Real_t, 3, DPtc> j;
 
   template < particle::species sp >
-  particle::vector<Real_t, DPtc> particles;
+  particle::array<Real_t, DPtc> particles;
 
   // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
   // PairCreationTracker pairCreationTracker;

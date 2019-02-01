@@ -3,7 +3,7 @@
 
 #include "dynamic_variables.hpp"
 #include "parameters.hpp"
-#include "core/grid.hpp"
+#include "kernel/grid.hpp"
 
 template< typename Real_t, std::size_t DGrid, std::size_t DPtc >
 class Aperture {
