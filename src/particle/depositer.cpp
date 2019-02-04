@@ -3,8 +3,6 @@
 #include "kernel/grid.hpp"
 #include "kernel/shape.hpp"
 
-#include "field/field.hpp"
-#include "particle/particle.hpp"
 
 namespace esirkepov :: impl {
   template < typename T >
@@ -17,7 +15,7 @@ namespace esirkepov :: impl {
     return (sx1 - sx0) * calcW_2D(sy0, sy1, sz0, sz1);
   }
 
-  template < std::size_t DGrid, knl::shape S, typename T, std::size_t DField,
+  template < int DGrid, knl::shape S, typename T, int DField,
              class ShapeRange >
   class ShapeRangeInterator {
     static_assert( DField == 3 );
@@ -92,7 +90,7 @@ namespace esirkepov :: impl {
   };
 
 
-  template < std::size_t DGrid, knl::shape S, typename T, std::size_t DField >
+  template < int DGrid, knl::shape S, typename T, int DField >
   class ShapeRange {
   private:
     const apt::Vec<T,DGrid>& dq;
@@ -139,48 +137,54 @@ namespace esirkepov :: impl {
 }
 
 namespace esirkepov {
-  template < std::size_t DGrid, knl::shape S, typename T, std::size_t DField >
+  template < int DGrid, knl::shape S, typename T, int DField >
   inline auto make_shape_range( const apt::Vec<T, DGrid>& q1_rel, const apt::Vec<T, DGrid>& dq_rel, const knl::grid_t<DGrid,T>& grid ) {
     return impl::ShapeRange<DGrid, S, T, DField>( q1_rel, dq_rel, grid );
   }
 }
 
 namespace particle {
-  template < knl::shape S, typename T_WJ, typename Tvt,
-             std::size_t DPtc, std::size_t DField, std::size_t DGrid
-             >
-  struct depositWJ_t<S,
-                     field::Field<T_WJ,DField,DGrid>,
-                     Particle<Tvt,DPtc>,
-                     apt::Vec<apt::remove_cvref_t<Tvt>,DPtc>,
-                     knl::grid_t<DGrid, apt::remove_cvref_t<Tvt>> > {
-    void operator() ( field::Field<T_WJ,DField,DGrid>& WJ, const Particle<Tvt,DPtc>& ptc,
-                      const apt::Vec<apt::remove_cvref_t<Tvt>,DPtc>& dq, const knl::grid_t<DGrid, apt::remove_cvref_t<Tvt>>& grid ) {
-      namespace esir = esirkepov;
-      // NOTE static_assert(WJ is the correct stagger)
 
-      for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid) ) {
-        // TODO optimize indices use. The problem is that I_b + ijk is global, hence when passed to the interface of f( global index ), the same subtraction I_b - anchor will happen many times.
-        WJ.c<0>(I) += std::get<0>(W);
-        WJ.c<1>(I) += std::get<1>(W);
+  template < knl::shape S, typename Field, typename Ptc, typename Vec, typename Grid >
+  void depositWJ ( Field& WJ, const Ptc& ptc, const Vec& dq, const Grid& grid ) {
+    namespace esir = esirkepov;
+    constexpr auto DGrid = Field::DGrid;
+    // NOTE static_assert(WJ is the correct stagger)
 
-        // FIXME fix the following in DGrid == 2
-        // Calling deposition after pusher.calculateDisplacement implies
-        // that p_tmp, which is at n+0.5 time step, is based with respect
-        // to x^(n+1). However, the x used here is actually x^(n). One way
-        // to improve this is obviously calling updatePos before deposition
-        // and accordingly change expressions for calculating shapefunctions.
-        // FIXME: But, where is J based? Does one really need rebasing momentum?
-        if constexpr ( DGrid == 2 ) {
-            WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + apt::sqabs(ptc.p) );
-          } else if ( DGrid == 3 ) {
-          WJ.c<2>(I) += std::get<2>(W);
-        }
-        static_assert( DGrid > 1 && DGrid < 4 );
+    for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid) ) {
+      // TODO optimize indices use. The problem is that I_b + ijk is global, hence when passed to the interface of f( global index ), the same subtraction I_b - anchor will happen many times.
+      WJ.c<0>(I) += std::get<0>(W);
+      WJ.c<1>(I) += std::get<1>(W);
+
+      // FIXME fix the following in DGrid == 2
+      // Calling deposition after pusher.calculateDisplacement implies
+      // that p_tmp, which is at n+0.5 time step, is based with respect
+      // to x^(n+1). However, the x used here is actually x^(n). One way
+      // to improve this is obviously calling updatePos before deposition
+      // and accordingly change expressions for calculating shapefunctions.
+      // FIXME: But, where is J based? Does one really need rebasing momentum?
+      if constexpr ( DGrid == 2 ) {
+          WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + apt::sqabs(ptc.p) );
+        } else if ( DGrid == 3 ) {
+        WJ.c<2>(I) += std::get<2>(W);
       }
-
-      return;
+      static_assert( DGrid > 1 && DGrid < 4 );
     }
-  };
 
+    return;
+  }
+
+}
+
+#include "field/field.hpp"
+#include "particle/particle.hpp"
+namespace particle {
+  // TODO instantiate
+  // template < knl::shape S, typename T_WJ, typename Tvt,
+  //            int DPtc, int DField, int DGrid
+  //            typename Trl = apt::remove_cvref_t<Tvt> >
+  // void depositWJ ( field::Field<T_WJ,DField,DGrid>& WJ,
+  //                  const particle::Particle<Tvt,DPtc>& ptc,
+  //                  const apt::Vec<Trl,DPtc>& dq,
+  //                  const knl::grid_t<DGrid, Trl>& grid );
 }

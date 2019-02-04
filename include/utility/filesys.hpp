@@ -1,9 +1,9 @@
-#ifndef  _FILESYS_HPP_
-#define  _FILESYS_HPP_
+#ifndef  _UTIL_FILESYS_HPP_
+#define  _UTIL_FILESYS_HPP_
 
 #include <string>
 
-namespace filesys {
+namespace util::filesys {
   std::string append_slash( std::string dir );
 
   void create_directories(std::string dir);

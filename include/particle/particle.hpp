@@ -7,7 +7,7 @@
 // TODO this limits user from passing a single particle into a function that only works on particles. Such as template <typename Ptc> void foo( Ptc ), where one cannot use Ptc&. One solution is use Ptc&&. The other is use generic lambda.
 // Or let's put it this way, those functions only work with proxies. When a material particle is passed, a proxy will generated for it.
 // Or, we will use Ptc&, this only disallows passing proxy&&. const Ptc& works for everything.
-namespace {
+namespace particle {
   template < typename T, std::size_t DPtc >
   struct Particle : private particle::state_t<apt::copy_cvref_t<T, particle::state_underlying_t >> {
     static constexpr auto Dim = DPtc;

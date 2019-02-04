@@ -1,15 +1,12 @@
-#ifndef  _LOGGER_HPP_
-#define  _LOGGER_HPP_
+#ifndef  _UTIL_LOGGER_HPP_
+#define  _UTIL_LOGGER_HPP_
 
 #include <iostream>
 #include <fstream>
 #include <string>
 
 
-
-
-
-namespace Logger {
+namespace util::log {
   extern std::ofstream debug;
   extern bool isDebugActiveRank; // true if one wants the rank to output debug
   extern std::string debugLogFile;

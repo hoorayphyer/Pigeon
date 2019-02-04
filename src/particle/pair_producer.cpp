@@ -5,7 +5,8 @@
 
 namespace particle {
   template < typename Ptc, typename T >
-  bool is_productive_lepton( const Ptc& ptc, const T& gamma, const T& Rc, Rng& rng ) noexcept {
+  bool is_productive_lepton( const Ptc& ptc, const T& gamma,
+                             const T& Rc, util::rng_t<T>& rng ) noexcept {
     // TODO pane
     // return
     //   _pane.in_productive_zone( ptc.q ) &&
@@ -40,19 +41,15 @@ namespace particle {
     }
   }
 
-  template < typename ptc_t, typename T >
-  bool is_productive_photon( const ptc_t& photon, const T& B2, Rng& rng ) noexcept {
+  template < typename Ptc, typename T >
+  bool is_productive_photon( const Ptc& photon, const T& B2, util::rng_t<T>& rng ) noexcept {
     return opacity::mag_conv(B2, rng.uniform() ) || opacity::ph_ph( rng.uniform() );
   }
 }
 
 namespace particle {
-  template < typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename T_p = apt::Vec<Tvt, DPtc>,
-             typename T_dp = apt::Vec<Trl, DPtc>
-             >
-  Trl calc_Rc( Trl dt, const T_p& p, const T_dp& dp ) noexcept {
+  template < typename T, typename Vec_p_t, typename Vec_dp_t >
+  T calc_Rc( T dt, const Vec_p_t& p, const Vec_dp_t& dp ) noexcept {
     // TODO don't use a uniform number for Rc
     return 1.0;
   }
@@ -85,23 +82,20 @@ namespace particle {
     // return std::min(_pane.E_ph, gamma - 1.0);
   }
 
-  template < typename Iter_el, typename Iter_po,
-             typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc> >
-  void instant_produce_pairs ( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, const Trl& gamma_i, Trl Rc ) {
+  template < typename Iter, typename Ptc, typename T >
+  void instant_produce_pairs( Iter itr_e, Iter itr_p, Ptc& ptc, const T& gamma_ptc, T Rc ) {
     {
       // recycle Rc for E_ph
-      Rc = sample_E_ph( gamma_i, Rc );
+      Rc = sample_E_ph( gamma_ptc, Rc );
       // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
-      ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_i - 1.0 ) ) * ( 1.0 - Rc / ( gamma_i + 1.0 ) ) );
+      ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
     } {
       // recycle Rc for gamma_sec
       Rc /= 2.0;
       // append electron and positron
-      auto&& ptc_sec = Particle< Trl, DPtc > ( ptc.q,
-                                               ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::sqabs(ptc.p) ),
-                                               flag::secondary);
+      auto&& ptc_sec = Particle ( ptc.q,
+                                  ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::sqabs(ptc.p) ),
+                                  flag::secondary);
       ptc_sec.set(species::electron);
       *(itr_e++) = ptc_sec;
       ptc_sec.set(species::positron);
@@ -114,30 +108,24 @@ namespace particle {
 }
 
 namespace particle {
-  template < typename Iter, typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc> >
-  void produce_photons( Iter itr_ph, Ptc& ptc, const Trl& gamma_i, Trl Rc ) {
+  template < typename Iter, typename Ptc, typename T >
+  void produce_photons( Iter itr_photon, Ptc& ptc, const T& gamma_ptc, T Rc ) {
     // recycle Rc for E_ph
-    Rc = sample_E_ph( gamma_i, std::move(Rc) );
+    Rc = sample_E_ph( gamma_ptc, std::move(Rc) );
     // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
-    ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_i - 1.0 ) ) * ( 1.0 - Rc / ( gamma_i + 1.0 ) ) );
+    ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
 
-    *(itr_ph++) = Particle< Trl, DPtc > ( ptc.q,
-                                          ptc.p * ( Rc / apt::abs(ptc.p) ),
-                                          species::photon );
+    *(itr_photon++) = Particle ( ptc.q,
+                                 ptc.p * ( Rc / apt::abs(ptc.p) ),
+                                 species::photon );
   }
 
 
-  template < typename Iter_el, typename Iter_po,
-             typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc> >
-  void photon_produce_pairs ( Iter_el itr_e, Iter_po itr_p, Ptc& photon ) {
-    auto&& ptc_sec = Particle< Trl, DPtc >
-      ( photon.q,
-        photon.p * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p) ),
-        flag::secondary );
+  template < typename Iter, typename Ptc >
+  void photon_produce_pairs( Iter itr_e, Iter itr_p, Ptc& photon ) {
+    auto&& ptc_sec = Particle ( photon.q,
+                                photon.p * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p) ),
+                                flag::secondary );
     ptc_sec.set(species::electron);
     *(itr_e++) = ptc_sec;
     ptc_sec.set(species::positron);
@@ -149,4 +137,31 @@ namespace particle {
     // void this photon
     photon.set(flag::empty);
   }
+}
+
+namespace particle {
+  // TODO instantiate
+  // template < typename Tvt, int DPtc, typename Trl > bool is_productive_lepton( const Particle<Tvt,DPtc>& ptc, const Trl& gamma,
+  //                            const Trl& Rc, util::rng_t<Trl>& rng ) noexcept;
+  // template < typename Tvt, int DPtc, typename Trl >
+  // bool is_productive_photon( const Particle<Tvt,DPtc>& photon,
+  //                            const Trl& B2, util::rng_t<Trl>& rng ) noexcept;
+  // template < typename Tvt, int DPtc,
+  //            typename Trl = apt::remove_cvref_t<Tvt>  >
+  // Trl calc_Rc( Trl dt, const apt::Vec<Tvt, DPtc>& p, const apt::Vec<Trl, DPtc>& dp ) noexcept;
+  // template < typename Iter_el, typename Iter_po,
+  //            typename Tvt, int DPtc,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename Ptc = Particle<Tvt, DPtc> >
+  // void instant_produce_pairs ( Iter_el itr_e, Iter_po itr_p, Ptc& ptc, const Trl& gamma_i, Trl Rc );
+
+  // template < typename Iter, typename Tvt, int DPtc,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename Ptc = Particle<Tvt, DPtc> >
+  // void produce_photons( Iter itr_ph, Ptc& ptc, const Trl& gamma_i, Trl Rc );
+  // template < typename Iter_el, typename Iter_po,
+  //            typename Tvt, int DPtc,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename Ptc = Particle<Tvt, DPtc> >
+  // void photon_produce_pairs ( Iter_el itr_e, Iter_po itr_p, Ptc& photon );
 }

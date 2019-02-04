@@ -5,7 +5,7 @@
 namespace particle :: impl {
 
   // NOTE Assume there is no empty particles.
-  template < typename T, std::size_t DPtc, typename F_LCR >
+  template < typename T, int DPtc, typename F_LCR >
   auto lcr_sort( particle::array<T,DPtc>& buffer, const F_LCR& lcr ) noexcept {
     constexpr int L = 0;
     constexpr int C = 1;
@@ -32,7 +32,7 @@ namespace particle :: impl {
   }
 
 
-  template < typename T, std::size_t DPtc, typename F_LCR >
+  template < typename T, int DPtc, typename F_LCR >
   void migrate_1dim ( particle::array<T,DPtc>& buffer,
                       const std::array<int, 2>& neigh,
                       const F_LCR& lcr,
@@ -66,16 +66,10 @@ namespace particle :: impl {
 
 #include "apt/algorithm.hpp"
 namespace particle {
-  // TODO instantiate using the following
-  // template < typename Tvt, std::size_t DGrid,
-  //            typename Trl = apt::remove_cvref_t<Tvt>,
-  //            typename T_q = Vec<Tvt, DGrid>,
-  //            typename T_bd = std::array< std::array<Trl, 2>, DGrid>
-  //            >
-  template < typename q_t, typename borders_t >
-  bool is_migrate ( const q_t& q, const borders_t& borders ) noexcept {
+  template < typename Vec, int DGrid, typename T >
+  bool is_migrate( const Vec& q, const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {
     // TODO use expression template
-    auto&& tmp = apt::per_dim::make<std::tuple_size_v<borders_t>>
+    auto&& tmp = apt::per_dim::make<DGrid>
       ( []( const auto& x, const auto& bd ) noexcept {
           return x < std::get<0>(bd) || x > std::get<1>(bd);
         }, q, borders );
@@ -83,8 +77,8 @@ namespace particle {
   }
 
   namespace impl {
-    template < std::size_t DGrid, typename T, std::size_t DPtc, std::size_t I >
-    inline void migrate( particle::array<T,DPtc>& buffer,
+    template < int I, int DGrid, typename PtcArray, typename T >
+    inline void migrate( PtcArray& buffer,
                   const std::array< std::array<int,2>, DGrid >& neighbors,
                   const std::array< std::array<T,2>, DGrid>& bounds,
                   const mpi::Comm& comm ) {
@@ -94,21 +88,26 @@ namespace particle {
         };
       impl::migrate_1dim( buffer, std::get<I>(neighbors), std::move(lcr), comm );
       if constexpr ( I > 0 )
-                     migrate<DGrid, T, DPtc, I-1>( buffer, neighbors, bounds, comm );
+                     migrate<I-1>( buffer, neighbors, bounds, comm );
     }
   }
 
-  template < std::size_t DGrid, typename T, std::size_t DPtc >
-  struct migrate_t< particle::array<T,DPtc>,
-                    std::array< std::array<int,2>, DGrid >,
-                    std::array< std::array<T,2>, DGrid>,
-                    mpi::Comm > {
-    void operator() ( particle::array<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
-                      const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm ) {
-    return impl::migrate<DGrid, T, DPtc, DGrid - 1>( buffer, neighbors, borders, comm );
+  template < typename PtcArray, int DGrid, typename T >
+  void migrate ( PtcArray& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
+                 const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm ) {
+    return impl::migrate<DGrid - 1>( buffer, neighbors, borders, comm );
     }
 
-  };
+}
 
+namespace particle {
+  // TODO instantiate
+  // template < typename Tvt, int DGrid,
+  //            typename Trl = apt::remove_cvref_t<Tvt> >
+  // template < typename q_t, typename borders_t >
+  // bool is_migrate( const apt::Vec<Tvt, DGrid>& q, const std::array< std::array<Trl, 2>, DGrid>& bounds ) noexcept;
 
+  // template < int DGrid, typename T, int DPtc >
+  // void migrate ( array<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
+  //                const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm );
 }

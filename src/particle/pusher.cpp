@@ -43,15 +43,9 @@ namespace particle :: force {
 
 // TODO move check of forces on_off to somewhere else
 namespace particle {
-  template < species sp,
-             typename Tvt, std::size_t DPtc, std::size_t DField,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc>,
-             typename T_field = apt::Vec<Trl, DField>,
-             typename T_dp = apt::Vec<Trl,DPtc>
-             >
-  T_dp update_p ( Ptc& ptc, const Trl& dt, const T_field& E, const T_field& B ) {
-    T_dp dp;
+  template < species sp, typename Ptc, typename Field, typename Vec, typename T >
+  Vec update_p( Ptc& ptc, const T& dt, const Field& E, const Field& B ) {
+    Vec dp;
 
     // TODO pane
     // Apply Lorentz force
@@ -82,13 +76,8 @@ namespace particle {
   }
 
 
-  template < species sp,
-             knl::coordsys_t CS, typename Tvt, std::size_t DPtc,
-             typename Trl = apt::remove_cvref_t<Tvt>,
-             typename Ptc = Particle<Tvt, DPtc>,
-             typename T_dq = apt::Vec<Trl,DPtc>
-             >
-  T_dq update_q ( Ptc& ptc, const Trl& dt ) {
+  template < species sp, knl::coordsys_t CS, typename Ptc, typename Vec, typename T >
+  Vec update_q( Ptc& ptc, const T& dt ) {
     auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p) );
 
     if constexpr ( CS == knl::coordsys_t::Cartesian ) {
@@ -102,4 +91,24 @@ namespace particle {
   }
 
 
+}
+
+namespace particle {
+  // TODO instantiate
+  // template < species sp,
+  //            typename Tvt, std::size_t DPtc, std::size_t DField,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename Ptc = Particle<Tvt, DPtc>,
+  //            typename T_field = apt::Vec<Trl, DField>,
+  //            typename T_dp = apt::Vec<Trl,DPtc>
+  //            >
+  // T_dp update_p ( Ptc& ptc, const Trl& dt, const T_field& E, const T_field& B );
+
+  // template < species sp,
+  //            knl::coordsys_t CS, typename Tvt, std::size_t DPtc,
+  //            typename Trl = apt::remove_cvref_t<Tvt>,
+  //            typename Ptc = Particle<Tvt, DPtc>,
+  //            typename T_dq = apt::Vec<Trl,DPtc>
+  //            >
+  // T_dq update_q ( Ptc& ptc, const Trl& dt );
 }

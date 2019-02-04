@@ -109,9 +109,9 @@ namespace std {
 
     explicit back_insert_iterator( particle::array<T,DPtc>& c ) noexcept : _c(c) {}
 
-    auto& operator= ( const Particle<T, DPtc>& ptc ) { _c.push_back(ptc); return *this; }
-    auto& operator= ( const Particle< const T&, DPtc >& ptc ) { _c.push_back(ptc); return *this; }
-    auto& operator= ( Particle<T, DPtc >&& ptc ) { _c.push_back( std::move(ptc) ); return *this; }
+    auto& operator= ( const particle::Particle<T, DPtc>& ptc ) { _c.push_back(ptc); return *this; }
+    auto& operator= ( const particle::Particle< const T&, DPtc >& ptc ) { _c.push_back(ptc); return *this; }
+    auto& operator= ( particle::Particle<T, DPtc >&& ptc ) { _c.push_back( std::move(ptc) ); return *this; }
 
     inline auto& operator++ () noexcept { return *this; }
     inline auto& operator++ (int) noexcept { return *this; }

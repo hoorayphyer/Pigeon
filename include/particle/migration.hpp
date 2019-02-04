@@ -1,16 +1,20 @@
 #ifndef  _MIGRATION_HPP_
 #define  _MIGRATION_HPP_
 
+#include <array>
+
+namespace mpi { struct Comm; }
+
+
 // TODO may use intercommunicator
 
 namespace particle {
-  template < typename q_t, typename borders_t >
-  bool is_migrate( const q_t& q, const borders_t& bounds ) noexcept;
+  template < typename Vec, int DGrid, typename T >
+  bool is_migrate( const Vec& q, const std::array< std::array<T, 2>, DGrid>& borders ) noexcept;
 
-  template < typename ptc_array_t, typename neigh_t, typename borders_t, typename comm_t >
-  struct migrate_t {
-    void operator() ( ptc_array_t& buffer, const neigh_t& neighbors, const borders_t& bounds, const comm_t& comm );
-  };
+  template < typename PtcArray, int DGrid, typename T >
+  void migrate ( PtcArray& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
+                 const std::array< std::array<T,2>, DGrid>& borders, const mpi::Comm& comm );
 }
 
 #endif

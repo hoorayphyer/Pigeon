@@ -5,7 +5,7 @@
 namespace filesystem = std::filesystem;
 using std::error_code;
 
-namespace filesys {
+namespace util::filesys {
   std::string append_slash( std::string dir ) {
     if ( dir != "" && dir.back() != '/' )
       dir.append("/");

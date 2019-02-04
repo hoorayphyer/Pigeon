@@ -38,29 +38,29 @@ namespace knl {
   };
 
   // Grid is designed to represent the supergrid
-  template < std::size_t DGrid, typename T >
-  using grid_t = std::array< gridline_t<T>, DGrid >;
+  template < int DGrid, typename T >
+  struct grid_t : public std::array< gridline_t<T>, DGrid >{};
 }
 
 
 // TODO replace this with expression template interface
 namespace mem {
-  template < std::size_t DGrid, typename T >
+  template < int DGrid, typename T >
   auto delta( const knl::grid_t<DGrid,T>& grid ) {
     return std::array<T,DGrid>();
   }
 
-  template < std::size_t DGrid, typename T >
+  template < int DGrid, typename T >
   auto lower( const knl::grid_t<DGrid,T>& grid ) {
     return std::array<T,DGrid>();
   }
 
-  template < std::size_t DGrid, typename T >
+  template < int DGrid, typename T >
   auto upper( const knl::grid_t<DGrid,T>& grid ) {
     return std::array<T,DGrid>();
   }
 
-  template < std::size_t DGrid, typename T >
+  template < int DGrid, typename T >
   auto guard( const knl::grid_t<DGrid,T>& grid ) {
     return std::array<T,DGrid>();
   }
