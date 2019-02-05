@@ -6,7 +6,7 @@
 // TODO use template ?
 namespace util {
   template < typename T>
-  class rng_t {
+  class Rng {
   private:
     std::default_random_engine _engine;
     std::uniform_real_distribution<T> _uniform_dist;

@@ -1,7 +1,7 @@
 #include "aperture.hpp"
 
 int main() {
-  Aperture aperture;
+  Aperture<double,2,3> aperture; // TODO
   aperture.launch();
   return 0;
 }

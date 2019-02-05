@@ -4,14 +4,15 @@
 #include "dynamic_variables.hpp"
 #include "parameters.hpp"
 #include "kernel/grid.hpp"
+#include "parallel/mpi++.hpp"
 
-template< typename Real_t, std::size_t DGrid, std::size_t DPtc >
+template< typename Real, std::size_t DGrid, std::size_t DPtc >
 class Aperture {
 private:
-  DynamicVars<Real_t, DGrid, DPtc> _dvars;
-  Params<Real_t, DGrid> _params;
-  Grid<DGrid, Real_t> _grid;
-  auto _comm;
+  DynamicVars<Real, DGrid, DPtc> _dvars;
+  Params<Real, DGrid> _params;
+  knl::Grid<DGrid, Real> _grid;
+  mpi::Comm _comm;
   // data export
 
   int _timestep_begin;

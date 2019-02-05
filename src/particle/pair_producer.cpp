@@ -6,7 +6,7 @@
 namespace particle {
   template < typename Ptc, typename T >
   bool is_productive_lepton( const Ptc& ptc, const T& gamma,
-                             const T& Rc, util::rng_t<T>& rng ) noexcept {
+                             const T& Rc, util::Rng<T>& rng ) noexcept {
     // TODO pane
     // return
     //   _pane.in_productive_zone( ptc.q ) &&
@@ -42,7 +42,7 @@ namespace particle {
   }
 
   template < typename Ptc, typename T >
-  bool is_productive_photon( const Ptc& photon, const T& B2, util::rng_t<T>& rng ) noexcept {
+  bool is_productive_photon( const Ptc& photon, const T& B2, util::Rng<T>& rng ) noexcept {
     return opacity::mag_conv(B2, rng.uniform() ) || opacity::ph_ph( rng.uniform() );
   }
 }
@@ -142,10 +142,10 @@ namespace particle {
 namespace particle {
   // TODO instantiate
   // template < typename Tvt, int DPtc, typename Trl > bool is_productive_lepton( const Particle<Tvt,DPtc>& ptc, const Trl& gamma,
-  //                            const Trl& Rc, util::rng_t<Trl>& rng ) noexcept;
+  //                            const Trl& Rc, util::Rng<Trl>& rng ) noexcept;
   // template < typename Tvt, int DPtc, typename Trl >
   // bool is_productive_photon( const Particle<Tvt,DPtc>& photon,
-  //                            const Trl& B2, util::rng_t<Trl>& rng ) noexcept;
+  //                            const Trl& B2, util::Rng<Trl>& rng ) noexcept;
   // template < typename Tvt, int DPtc,
   //            typename Trl = apt::remove_cvref_t<Tvt>  >
   // Trl calc_Rc( Trl dt, const apt::Vec<Tvt, DPtc>& p, const apt::Vec<Trl, DPtc>& dp ) noexcept;

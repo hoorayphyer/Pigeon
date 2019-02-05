@@ -6,9 +6,11 @@
 
 namespace field {
 
-  template < sf::shape S, typename T, int DField, std::size_t DGrid, class Vec >
-  auto interpolate ( const Field<T,DField,DGrid>& field, const Grid<DGrid>& grid, const Vec& location ) {
+  template < typename T, int DField, std::size_t DGrid, class Vec, typename ShapeF >
+  auto interpolate ( const Field<T,DField,DGrid>& field, const Vec& location,
+                     const knl::Grid<DGrid, T>& grid, const ShapeF& shapef ) {
     // only need first DGrid elements of location even if location is of higher dim than DGrid
+    // TODO expression template
     auto loc_rel = apt::per_dim::make<DGrid>
       ( []( const auto& l, const auto& delta ) {
           return l / delta;
@@ -17,7 +19,7 @@ namespace field {
     auto interp_comp =
       [ &loc_rel, &grid, &anchor=field.anchor ] ( const auto& f_comp ) {
         T res = 0;
-        for ( auto[ I, wgt ] : sf::make_shape_range( loc_rel, grid, f_comp.offset ) )
+        for ( auto[ I, wgt ] : knl::make_shape_range( loc_rel, grid, f_comp.offset ) )
           res += field_comp( I ) * wgt;
         return res;
       };

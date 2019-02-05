@@ -4,31 +4,41 @@
 #include "field/field.hpp"
 #include "particle/array.hpp"
 
-template< typename Real_t, std::size_t DGrid, std::size_t DPtc >
+template< typename Real, std::size_t DGrid, std::size_t DPtc >
 struct DynamicVars {
-  field::Field<Real_t, 3, DPtc> E;
-  field::Field<Real_t, 3, DPtc> B;
-  field::Field<Real_t, 3, DPtc> j;
+  field::Field<Real, 3, DPtc> E;
+  field::Field<Real, 3, DPtc> B;
+  field::Field<Real, 3, DPtc> J;
 
-  template < particle::species sp >
-  particle::array<Real_t, DPtc> particles;
+  particle::array<Real, DPtc> electrons;
+  particle::array<Real, DPtc> positrons;
+  particle::array<Real, DPtc> ions;
+  particle::array<Real, DPtc> photons;
+
+  constexpr auto& operator[] ( particle::species sp ) noexcept {
+    using particle::species;
+    switch ( sp ) {
+    case species::electron : return electrons;
+    case species::positron : return positrons;
+    case species::ion : return ions;
+    case species::photon : return photons;
+    }
+  }
+
+  constexpr const auto& operator[] ( particle::species sp ) const noexcept {
+    using particle::species;
+    switch ( sp ) {
+    case species::electron : return electrons;
+    case species::positron : return positrons;
+    case species::ion : return ions;
+    case species::photon : return photons;
+    }
+  }
 
   // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
   // PairCreationTracker pairCreationTracker;
 
 };
-
-namespace particle {
-  constexpr auto fetch =
-    []( species sp, auto& dynavars ) noexcept {
-      switch ( sp ) {
-      case species::electron : return dynavars.particles<species::electron>;
-      case species::positron : return dynavars.particles<species::positron>;
-      case species::ion : return dynavars.particles<species::ion>;
-      case species::photon : return dynavars.particles<species::photon>;
-      }
-    };
-}
 
 
 #endif

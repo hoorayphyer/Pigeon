@@ -4,23 +4,17 @@
 
 namespace knl {
   // value here denotes length of support
-  enum class shape : unsigned int {
+  enum class shape : int {
     Nearest_Grid_Point = 1,
     Cloud_In_Cell = 2,
     Triangular_Cloud = 3,
     Piecewise_Cubic_Spline = 4
   };
 
-  constexpr auto support( shape s ) noexcept {
-    return static_cast<unsigned int>(s);
-  }
-
-  constexpr auto radius( shape s ) noexcept {
-    return support(s) / 2.0;
-  }
-
   template < shape S >
   struct shapef_t {
+    const int support = static_cast<int>(S);
+
     template < typename T >
     constexpr T operator() ( T dx ) noexcept {
       dx = std::abs(dx);

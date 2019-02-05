@@ -1,7 +1,6 @@
 #include "particle/depositer.hpp"
 #include "apt/numeric.hpp"
 #include "kernel/grid.hpp"
-#include "kernel/shape.hpp"
 
 
 namespace esirkepov :: impl {
@@ -15,8 +14,7 @@ namespace esirkepov :: impl {
     return (sx1 - sx0) * calcW_2D(sy0, sy1, sz0, sz1);
   }
 
-  template < int DGrid, knl::shape S, typename T, int DField,
-             class ShapeRange >
+  template < int DGrid, typename T, int DField, class ShapeRange >
   class ShapeRangeInterator {
     static_assert( DField == 3 );
   private:
@@ -90,28 +88,28 @@ namespace esirkepov :: impl {
   };
 
 
-  template < int DGrid, knl::shape S, typename T, int DField >
+  template < int DGrid, typename T, int DField, typename ShapeF >
   class ShapeRange {
   private:
     const apt::Vec<T,DGrid>& dq;
-    const knl::shapef_t<S>& shapef;
+    const ShapeF& shapef;
     std::array<int, DGrid> _I_b;
     std::array<T, DGrid> _sep1_b;
     std::array<int, DGrid> _stride;
 
   public:
-    friend class ShapeRangeInterator<DGrid, S, T, DField, ShapeRange>;
+    friend class ShapeRangeInterator<DGrid, T, DField, ShapeRange>;
 
-    ShapeRange( const apt::Vec<T,DGrid>& q1_rel, const apt::Vec<T,DGrid>& dq_rel, const knl::grid_t<DGrid,T>& grid, const knl::shapef_t<S>& shapefunc )
+    ShapeRange( const apt::Vec<T,DGrid>& q1_rel, const apt::Vec<T,DGrid>& dq_rel, const knl::Grid<DGrid,T>& grid, const ShapeF& shapefunc )
       : dq( dq_rel ), shapef(shapefunc) {
       // NOTE offset is 0.5
       // TODO expr template on grid
       auto&& q1 = q1_rel - 0.5 - mem::lower(grid) + mem::guard(grid);
       apt::foreach<0, DGrid>
-        ( []( auto& ind_b, auto& sep1_b, auto& stride, const auto& x1, const auto& dx ) noexcept {
-            ind_b = int( std::min(x1, x1-dx) - knl::radius(S) ) + 1;
+        ( [&sf=shapefunc]( auto& ind_b, auto& sep1_b, auto& stride, const auto& x1, const auto& dx ) noexcept {
+            ind_b = int( std::min(x1, x1-dx) - sf.support / 2.0 ) + 1;
             sep1_b = ind_b - x1;
-            stride = int( std::max(x1, x1-dx) - knl::radius(S) ) + 1 + knl::support(S) - ind_b;
+            stride = int( std::max(x1, x1-dx) - sf.support / 2.0 ) + 1 + sf.support - ind_b;
           }, _I_b, _sep1_b, _stride, std::move(q1), dq );
 
       if constexpr ( DGrid == 2 ) {
@@ -125,11 +123,11 @@ namespace esirkepov :: impl {
     }
 
     auto begin() const {
-      return ShapeRangeInterator<DGrid, S, T, DField, ShapeRange>( 0, *this );
+      return ShapeRangeInterator<DGrid, T, DField, ShapeRange>( 0, *this );
     }
 
     auto end() const {
-      return ShapeRangeInterator<DGrid, S, T, DField, ShapeRange>( std::get<DGrid-1>(_stride), *this );
+      return ShapeRangeInterator<DGrid, T, DField, ShapeRange>( std::get<DGrid-1>(_stride), *this );
     }
 
   };
@@ -137,21 +135,21 @@ namespace esirkepov :: impl {
 }
 
 namespace esirkepov {
-  template < int DGrid, knl::shape S, typename T, int DField >
-  inline auto make_shape_range( const apt::Vec<T, DGrid>& q1_rel, const apt::Vec<T, DGrid>& dq_rel, const knl::grid_t<DGrid,T>& grid ) {
-    return impl::ShapeRange<DGrid, S, T, DField>( q1_rel, dq_rel, grid );
+  template < int DGrid, typename T, int DField, typename ShapeF >
+  inline auto make_shape_range( const apt::Vec<T, DGrid>& q1_rel, const apt::Vec<T, DGrid>& dq_rel, const knl::Grid<DGrid,T>& grid, const ShapeF& shapef ) {
+    return impl::ShapeRange<DGrid, T, DField, ShapeF>( q1_rel, dq_rel, grid, shapef );
   }
 }
 
 namespace particle {
 
-  template < knl::shape S, typename Field, typename Ptc, typename Vec, typename Grid >
-  void depositWJ ( Field& WJ, const Ptc& ptc, const Vec& dq, const Grid& grid ) {
+  template < typename Field, typename Ptc, typename Vec, typename Grid, typename ShapeF >
+  void depositWJ ( Field& WJ, const Ptc& ptc, const Vec& dq, const Grid& grid, const ShapeF& shapef ) {
     namespace esir = esirkepov;
     constexpr auto DGrid = Field::DGrid;
     // NOTE static_assert(WJ is the correct stagger)
 
-    for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid) ) {
+    for ( auto[ I, W ] : esir::make_shape_range(ptc.q, dq, grid, shapef) ) {
       // TODO optimize indices use. The problem is that I_b + ijk is global, hence when passed to the interface of f( global index ), the same subtraction I_b - anchor will happen many times.
       WJ.c<0>(I) += std::get<0>(W);
       WJ.c<1>(I) += std::get<1>(W);
@@ -164,8 +162,8 @@ namespace particle {
       // and accordingly change expressions for calculating shapefunctions.
       // FIXME: But, where is J based? Does one really need rebasing momentum?
       if constexpr ( DGrid == 2 ) {
-          WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + apt::sqabs(ptc.p) );
-        } else if ( DGrid == 3 ) {
+        WJ.c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p) / std::sqrt( 1.0 + apt::sqabs(ptc.p) );
+      } else if ( DGrid == 3 ) {
         WJ.c<2>(I) += std::get<2>(W);
       }
       static_assert( DGrid > 1 && DGrid < 4 );
@@ -176,6 +174,7 @@ namespace particle {
 
 }
 
+#include "kernel/shape.hpp"
 #include "field/field.hpp"
 #include "particle/particle.hpp"
 namespace particle {
@@ -186,5 +185,5 @@ namespace particle {
   // void depositWJ ( field::Field<T_WJ,DField,DGrid>& WJ,
   //                  const particle::Particle<Tvt,DPtc>& ptc,
   //                  const apt::Vec<Trl,DPtc>& dq,
-  //                  const knl::grid_t<DGrid, Trl>& grid );
+  //                  const knl::Grid<DGrid, Trl>& grid );
 }

@@ -6,16 +6,17 @@
 #include "apt/vec.hpp"
 
 namespace knl :: impl {
-  template < shape S, typename T, std::size_t DGrid >
+  template < typename T, std::size_t DGrid, typename ShapeF >
   class ShapeRangeInterator {
   private:
-    static constexpr shapef_t<S,T> shape_f;
+    const ShapeF& _sf;
 
     int _I = 0;
 
-    std::array<T, DGrid - 1> _wgt;
-    const Vec<int, DGrid> _I_b;
-    const Vec<T, DGrid> _sep_b;
+    std::array<int, DGrid> _ijk;
+    std::array<T, DGrid> _wgt;
+    const apt::Vec<int, DGrid> _I_b;
+    const apt::Vec<T, DGrid> _sep_b;
 
   public:
     using difference_type = int;
@@ -24,12 +25,12 @@ namespace knl :: impl {
     using pointer = void;
     using iterator_category = std::forward_iterator_tag;
 
-    ShapeRangeInterator( int I, const Vec<T,DGrid>& location )
-      : _I_b( apt::per_dim::make<DGrid>
-              ( []( const auto& loc ) {
-                  return int(loc - shape_f.radius) + 1;}, location ) ),
-        _sep_b( location - _I_b ) {
-    }
+    ShapeRangeInterator( int I, const apt::Vec<T,DGrid>& location, const ShapeF& shapef )
+      : _sf(shapef),
+        _I_b( apt::per_dim::make<DGrid>
+              ( [&sf=shapef]( const auto& loc ) {
+                  return int(loc - sf.support / 2.0) + 1;}, location ) ),
+        _sep_b( _I_b - location ) {}
 
     inline bool operator!= ( int I_end ) const {
       return _I != I_end;
@@ -39,47 +40,58 @@ namespace knl :: impl {
 
     // TODO make sure ShapeF can be passed in as constexpr. This may be used to optimize the ever-checking away.
     reference operator*() const {
-      constexpr auto supp = sf::support(S);
-      int i = _I % supp;
-      int j = i / supp;
-      int k = i / (supp * supp);
-      if ( 0 == i ) {
-        wj = shape_f( std::get<1>(sep_b) - j );
-        if ( 0 == j ) {
-          wk = shape_f( std::get<2>(sep_b) - k );
-        }
+      std::get<0>(_ijk) = _I % _sf.support;
+      std::get<0>(_wgt) = _sf( std::get<0>(_ijk) + std::get<0>(_sep_b) );
+
+      if constexpr ( DGrid >= 2 ) {
+          if( std::get<0>(_ijk) != 0 ) goto W1; // NOTE label should be unique inside a function scope
+          std::get<1>(_ijk) = ( _I % ( _sf.support * _sf.support ) ) / _sf.support;
+          std::get<1>(_wgt) = _sf( std::get<1>(_ijk) + std::get<1>(_sep_b) );
+        W1:
+          std::get<0>(_wgt) *= std::get<1>(_wgt);
+          goto FINISH;
       }
-      return std::make_tuple(_I_b + {i,j,k},
-                             shape_f( std::get<0>(sep_b) - i ) * wj * wk );
+
+      if constexpr ( DGrid == 3 ) {
+          if( std::get<1>(_ijk) != 0 ) goto W2;
+          std::get<2>(_ijk) = _I / ( _sf.support * _sf.support );
+          std::get<2>(_wgt) = _sf( std::get<2>(_ijk) + std::get<2>(_sep_b) );
+        W2:
+          std::get<0>(_wgt) *= std::get<2>(_wgt);
+          goto FINISH;
+      }
+
+    FINISH:
+      return std::make_tuple( _I_b + _ijk, std::get<0>(_wgt) );
     }
 
   };
 
-  template < shape S, typename T, std::size_t DGrid >
+  template < typename T, std::size_t DGrid, typename ShapeF >
   class ShapeRange {
   private:
-    Vec<T,DGrid> _loc;
+    apt::Vec<T,DGrid> _loc;
+    const ShapeF& _sf;
+
   public:
-    ShapeRange( const Vec<T,DGrid>& loc_rel, const grid_t<DGrid>& grid, const Vec<T,DGrid>& offset )
-      : _loc ( loc_rel - offset - mem::lower(grid) + mem::guard(grid) ) {}
+    ShapeRange( const apt::Vec<T,DGrid>& loc_rel, const Grid<DGrid, T>& grid,
+                const apt::Vec<T,DGrid>& offset, const ShapeF& shapef )
+      : _loc ( loc_rel - offset - mem::lower(grid) + mem::guard(grid) ), _sf(shapef) {}
 
     auto begin() const && {
-                           return ShapeRangeInterator<S, T, DGrid >( 0, std::move(_loc) );
+                           return ShapeRangeInterator<T, DGrid, ShapeF>( 0, std::move(_loc), _sf );
     }
 
+    auto end() const && noexcept { return DGrid * _sf.support; }
   };
 
-  // TODO double check this function simply returns constexpr. We omitted the argument name
-  template < shape S, typename T, std::size_t DGrid >
-  constexpr std::end( const ShapeRange< S, T, DGrid > & ) noexcept {
-    return DGrid * sf::support(S);
-  }
 }
 
 namespace knl {
-  template < shape S, typename T, std::size_t DGrid >
-  inline auto make_shape_range( const Vec<T, DGrid>& loc_rel, const grid_t<DGrid>& grid, const Vec<T,DGrid>& offset ) {
-    return ShapeRange<DGrid, S, T>( loc_rel, grid, offset );
+  template < typename T, std::size_t DGrid, typename ShapeF >
+  inline auto make_shape_range( const apt::Vec<T, DGrid>& loc_rel, const Grid<DGrid, T>& grid,
+                                const apt::Vec<T,DGrid>& offset, const ShapeF& shapef ) {
+    return impl::ShapeRange<T, DGrid, ShapeF>( loc_rel, grid, offset, shapef );
   }
 }
 
