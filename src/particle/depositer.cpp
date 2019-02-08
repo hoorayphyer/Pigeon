@@ -1,7 +1,9 @@
 #include "particle/depositer.hpp"
+#include "apt/vec.hpp"
 #include "apt/numeric.hpp"
 #include "kernel/grid.hpp"
 
+#include <tuple>
 
 namespace esirkepov :: impl {
   template < typename T >
@@ -104,7 +106,7 @@ namespace esirkepov :: impl {
       : dq( dq_rel ), shapef(shapefunc) {
       // NOTE offset is 0.5
       // TODO expr template on grid
-      auto&& q1 = q1_rel - 0.5 - mem::lower(grid) + mem::guard(grid);
+      auto&& q1 = q1_rel - 0.5 - grid.lower + grid.guard;
       apt::foreach<0, DGrid>
         ( [&sf=shapefunc]( auto& ind_b, auto& sep1_b, auto& stride, const auto& x1, const auto& dx ) noexcept {
             ind_b = int( std::min(x1, x1-dx) - sf.support / 2.0 ) + 1;

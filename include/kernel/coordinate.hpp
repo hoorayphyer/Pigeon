@@ -8,7 +8,6 @@ inline constexpr T PI (3.1415926535897932384626433832795028841971693993751058209
 
 namespace knl {
 
-
   enum class coordsys_t : unsigned char
     {
      Cartesian = 0,

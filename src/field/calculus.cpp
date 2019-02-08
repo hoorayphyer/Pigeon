@@ -1,19 +1,81 @@
 #include "field/calculus.hpp"
 
 namespace field {
-  template < typename Real, int Order >
-  constexpr Real diff (Real f[], Real delta) noexcept {
-    if constexpr ( Order == 2 ) return (f[1] - f[0]) / delta;
+  // NOTE i is the linear index of the resultant field
+  template < int Order, int IGrid, typename T, int DGrid >
+  constexpr T D ( const Component<T,DGrid>& f, int i, int s ) noexcept {
+    if constexpr ( IGrid >= DGrid ) return 0.0;
+    const bool o = !std::get<IGrid>(f.offset); // offset of resultant field
+    else if ( Order == 2 ) {
+      return f[i + o * s ] - f[i - !o * s ];
+        }
     static_assert( Order == 2 );
   }
 }
 
 namespace field {
+  namespace impl {
+    template < typename Grid, typename Extent >
+    struct inbulk_t {
+      const Grid& grid;
+      const Extent& ext;
+
+      template < int I >
+      inline bool in_bulk( int i ) noexcept {
+        return ( std::get<I>(grid).guard - 1 < i ) &&
+          ( i < std::get<I>(ext) - std::get<I>(grid).guard );
+      }
+    };
+  }
+
+
+  // TODO this version has not treated boundary issues
+  template < typename T, int DGrid, int Order >
+  struct calc<knl::coordsys_t::Cartesian, T, int DGrid> {
+    void curl( Field<T,3,DGrid>& output, const Field<T,3,DGrid>& input ) {
+      const auto& stride = output.stride;
+      auto f = inbulk_t{_grid, output.extent};
+      int ijk[DGrid];
+      for ( int I = 0; I < stride.back();  ) {
+        ijk[0] = I % stride[1];
+        if ( !f.in_bulk<0>(ijk[0]) ) { ++I; continue; }
+
+        if constexpr ( DGrid >= 2 ) {
+            if ( ijk[0] != grid[0].guard ) goto CURL;
+            ijk[1] = ( I % stride[2] ) / stride[1];
+            if ( !f.in_bulk<1>(ijk[1]) ) { I+=stride[1]; continue; }
+          }
+
+        if constexpr ( DGrid == 3 ) {
+            if ( ijk[1] != grid[1].guard ) goto CURL;
+            ijk[2] = I / stride[2];
+            if ( !f.in_bulk<2>(ijk[2]) ) { I+=stride[2]; continue; }
+          } static_assert( DGrid < 4 );
+
+      CURL:
+        output.c<0>[I] = D<DGrid>(1,field<2>) - drv<DGrid>(2,field<1>);
+
+
+      }
+    }
+
+    void div( Field<T,1,DGrid>& output, const Field<T,3,DGrid>& input ) {
+      
+    }
+
+    void lapl( Field<T,3,DGrid>& output, const Field<T,3,DGrid>& input );
+  };
+
+
+
+
+
+
+
+
   void curl( const vector_field& input, vector_field& output,
              FieldType type, const bool isBoundary[],
              const Index& start, const Extent& ext ) {
-  auto time_start = high_resolution_clock::now();
-
   // Compute the 3 components of the result separately
   for (int i = 0; i < VECTOR_DIM; i++) {
     output.data(i).assign(0.0);
@@ -57,6 +119,5 @@ namespace field {
     }
   }
 
-  auto time_end = high_resolution_clock::now();
-}
+  }
 }

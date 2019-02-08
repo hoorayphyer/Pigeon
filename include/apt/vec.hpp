@@ -1,90 +1,129 @@
 #ifndef  _APT_VEC_HPP_
 #define  _APT_VEC_HPP_
 
-#include <array>
-#include <tuple>
+#include "apt/vec_expression.hpp"
 #include <type_traits>
+#include <array>
 
 namespace apt {
-  template < typename T, std::size_t N >
-  struct homogeneous_tuple_gen {
-    using type = decltype( std::tuple_cat( std::declval<std::tuple<T>>(), std::declval<typename homogeneous_tuple_gen<T, N-1>::type>() ) );
+  template < typename T, int N >
+  struct Vec : public VecExpression<Vec<T,N>> {
+  private:
+    std::array<T,N> _v;
+
+  public:
+    static constexpr auto size = N;
+
+    template < typename U >
+    constexpr Vec( U x[N] ) noexcept {
+      foreach<0,N>( [](auto& a, const auto& b){ a = b;}, _v, x);
+    }
+
+    template < typename E >
+    constexpr Vec( const VecExpression<E>& vec ) noexcept {
+      foreach<0,N>( [](auto& a, const auto& b){ a = b;}, _v, vec);
+    }
+
+    template < int I >
+    constexpr double v() const noexcept {
+      return std::get<I>(_v);
+    }
+
+    template < int I >
+    constexpr T& v() noexcept {
+      return std::get<I>(_v);
+    }
+
+  };
+}
+
+
+namespace apt {
+  // NOTE virtual vector, or a vector proxy
+  template < typename T, int N >
+  struct vVec : public VecExpression<vVec<T,N>> {
+  private:
+    T& _head;
+    vVec<T,N-1>& _tail;
+
+  public:
+    static constexpr auto size = N;
+
+    template < typename U, typename... R >
+    constexpr vVec( U& u, R&... r ) noexcept
+      : _head(u), _tail(r...) { static_assert(sizeof...(R) == N - 1); };
+
+    template < int I >
+    constexpr double v() const noexcept {
+      static_assert( I < N );
+      if constexpr ( I == 0 ) return _head;
+      else return _tail.template v<I-1>();
+    }
+
+    template < int I >
+    constexpr T& v() noexcept {
+      static_assert( I < N );
+      if constexpr ( I == 0 ) return _head;
+      else return _tail.template v<I-1>();
+    }
+
+    template <typename E>
+    constexpr vVec( VecExpression<E>& vec ) noexcept
+      : _head( std::get<0>(vec) ),
+        _tail( VecSlice<1, VecExpression<E>::size, VecExpression<E>>(vec) ) {}
   };
 
   template < typename T >
-  struct homogeneous_tuple_gen <T,0> { using type = std::tuple<>; };
+  struct vVec<T,1> : public VecExpression<vVec<T,1>> {
+  private:
+    T& _head;
 
-  template < typename T, std::size_t N >
-  using homogeneous_tuple = typename homogeneous_tuple_gen<T,N>::type;
-
-  // NOTE tuple<void> is allowed but cannot be used to instantiate. Its use is kinda restricted to querying it's type like std::tuple_element_t<0, tuple<void>>
-  // NOTE lambda expression is not allowed in unevaluated context, such as decltype( [](){...} )
-
-  template < typename Trl, std::size_t N >
-  struct Vec : public std::array<Trl,N> {
+  public:
     template < typename U >
-    constexpr Vec( std::array<U,N> x ) noexcept
-      : std::array<Trl,N>( std::move(x) ) {}
+    constexpr vVec( U& u ) noexcept : _head(u) {}
 
-    // conversion from a virtual vector
-    constexpr Vec( const Vec<Trl&,N>& other ) noexcept;
+    template <typename E>
+    constexpr vVec( VecExpression<E>& vec ) noexcept
+      : _head(std::get<0>(vec)) {}
+
+    template < int I >
+    constexpr T v() const noexcept {
+      static_assert( I == 0 );
+      return _head;
+    }
+
+    template < int I >
+    constexpr T& v() noexcept {
+      static_assert( I == 0 );
+      return _head;
+    }
   };
 
 
-  template < typename Trl, std::size_t N >
-  struct Vec<Trl&, N> : public homogeneous_tuple<Trl&,N> {
-    constexpr Vec( homogeneous_tuple<Trl&,N> x ) noexcept
-      : homogeneous_tuple<Trl&,N>( std::move(x) ) {}
-
-    // TODO double check the semantics of these
-    Vec( const Vec& other ) = default;
-    Vec( Vec&& other ) noexcept = default;
-  };
-
-  template < typename Trl, std::size_t N >
-  constexpr Vec<Trl,N>::Vec( const Vec<Trl&,N> & vec ) noexcept {
-    std::get<0>(*this) = std::get<0>(vec);
-    if constexpr ( N > 1 ) std::get<1>(*this) = std::get<1>(vec);
-    if constexpr ( N > 2 ) std::get<2>(*this) = std::get<2>(vec);
-    static_assert( N < 4 );
-  }
 }
 
-namespace std {
-  // this section is to make apt::Vec tuple-like
-  // NOTE when a derived class is used as a template argument, there is just no conversion to its base class ever.
-  template < std::size_t I, typename T, std::size_t N >
-  struct tuple_element < I, apt::Vec<T,N> > {
-    using type = T;
-  };
 
-  template < typename T, std::size_t N >
-  struct tuple_size < apt::Vec<T,N> > {
-    static constexpr auto value = N;
-  };
-}
+// namespace std {
+//   // this section is to make apt::Vec tuple-like
+//   // NOTE when a derived class is used as a template argument, there is just no conversion to its base class ever.
+//   template < std::size_t I, typename T, std::size_t N >
+//   struct tuple_element < I, apt::Vec<T,N> > {
+//     using type = T;
+//   };
 
-#include <experimental/array> // for make_array
+//   template < typename T, std::size_t N >
+//   struct tuple_size < apt::Vec<T,N> > {
+//     static constexpr auto value = N;
+//   };
+// }
+
 namespace apt {
-  template < class Tuple >
-  using element_t = std::tuple_element_t<0, std::remove_reference_t<Tuple> >;
-
-  template < class Tuple >
-  inline constexpr auto size_v = std::tuple_size_v< std::remove_reference_t<Tuple> >;
-
-  template < typename... Args >
-  constexpr auto make( Args&&... args ) noexcept {
-    auto&& tmp = std::experimental::make_array( std::forward<Args>(args)... );
-    return Vec< element_t<decltype(tmp)>, size_v<decltype(tmp)> >( std::move(tmp) );
+  template < typename LVec1, typename LVec2 >
+  std::enable_if_t< (is_lvec_v<LVec1> && is_lvec_v<LVec2>), void >
+  swap( LVec1& a, LVec2& b ) noexcept {
+    foreach<0,LVec1::size>
+      ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
   }
-
-  template < typename... Args >
-  constexpr auto tie( Args&... args ) noexcept {
-    auto&& tmp = std::tie( args... );
-    return Vec< element_t<decltype(tmp)>, size_v<decltype(tmp)> >( std::move(tmp) );
-  }
-
-
 }
 
 #endif

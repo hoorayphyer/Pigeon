@@ -1,7 +1,6 @@
 #ifndef  _KNL_GRID_HPP_
 #define  _KNL_GRID_HPP_
 
-#include <array>
 
 namespace knl {
   template < typename T >
@@ -37,33 +36,21 @@ namespace knl {
     // }
   };
 
-  // Grid is designed to represent the supergrid
-  template < int DGrid, typename T >
-  struct Grid : public std::array< gridline_t<T>, DGrid >{};
 }
 
+#include <array>
+#include "apt/vec_expression.hpp"
 
-// TODO replace this with expression template interface
-namespace mem {
+namespace knl {
+  // Grid is designed to represent the supergrid
   template < int DGrid, typename T >
-  auto delta( const knl::Grid<DGrid,T>& grid ) {
-    return std::array<T,DGrid>();
-  }
+  struct Grid : public std::array< gridline_t<T>, DGrid >{
+    apt::vVec<T,DGrid> delta = apt::make_vff<DGrid>( []( auto& x ) {return x.delta;}, *this);
+    apt::vVec<T,DGrid> lower = apt::make_vff<DGrid>( []( auto& x ) {return x.lower;}, *this);
+    apt::vVec<T,DGrid> upper = apt::make_vff<DGrid>( []( auto& x ) {return x.upper;}, *this);
+    apt::vVec<int,DGrid> guard = apt::make_vff<DGrid>( []( auto& x ) {return x.guard;}, *this);
 
-  template < int DGrid, typename T >
-  auto lower( const knl::Grid<DGrid,T>& grid ) {
-    return std::array<T,DGrid>();
-  }
-
-  template < int DGrid, typename T >
-  auto upper( const knl::Grid<DGrid,T>& grid ) {
-    return std::array<T,DGrid>();
-  }
-
-  template < int DGrid, typename T >
-  auto guard( const knl::Grid<DGrid,T>& grid ) {
-    return std::array<T,DGrid>();
-  }
+  };
 }
 
 

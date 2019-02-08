@@ -64,7 +64,6 @@ namespace particle :: impl {
   }
 }
 
-#include "apt/algorithm.hpp"
 namespace particle {
   template < typename Vec, int DGrid, typename T >
   bool is_migrate( const Vec& q, const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {

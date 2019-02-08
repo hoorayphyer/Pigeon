@@ -5,10 +5,19 @@
 #include <vector>
 
 namespace field {
+  struct offset_t {
+    bool val;
+    constexpr operator bool() noexcept { return val; }
+    template < typename T >
+    constexpr operator T() noexcept { return static_cast<T>( 0.5 * val ); }
+  };
   template < typename T, int DGrid >
   struct Component : std::vector<T> {
-    const std::array< T, DGrid > offset;
+    const std::array< offset_t, DGrid > offset;
   };
+
+  constexpr offset_t INSITU{false};
+  constexpr offset_t MIDWAY{true};
 }
 
 namespace field {
@@ -19,7 +28,8 @@ namespace field {
     static constexpr auto DGrid = Dim_Grid;
 
     const std::array< int, Dim_Grid > anchor;
-    const std::array< int, Dim_Grid > stride;
+    const std::array< int, Dim_Grid > extent;
+    const std::array< int, Dim_Grid + 1 > stride;
 
     // //------ int... inds_local -------
     // // TODO indices
@@ -51,6 +61,17 @@ namespace field {
     inline const decltype(auto) c( const std::array<int,DGrid>& I_global ) const {
       auto&& ind_linear = apt::dot( stride, I_global - anchor );
       return std::get<Comp>(*this)[std::move(ind_linear)];
+    }
+
+    //------ local index
+    template < int Comp >
+    inline decltype(auto) c( int i_local_linear ) {
+      return std::get<Comp>(*this)[i_local_linear];
+    }
+
+    template < int Comp >
+    inline const decltype(auto) c( int i_local_linear ) const {
+      return std::get<Comp>(*this)[i_local_linear];
     }
 
   };

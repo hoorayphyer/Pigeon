@@ -6,12 +6,13 @@ namespace field {
   make_field( std::array< int, DGrid > anchor, std::array< int, DGrid > extent, std::array< std::array< bool, DGrid >, DField > offsets ) {
     Field< T, DField, DGrid > field;
     field.anchor = std::move(anchor);
+    field.extent = std::move(extent);
 
     field.stride[0] = 1;
-    for ( int i = 1; i < DGrid; ++i )
+    for ( int i = 1; i < DGrid + 1; ++i )
       field.stride[i] = field.stride[i-1] * extent[i-1];
 
-    auto size = field.stride.back() * extent.back();
+    const auto& size = field.stride.back();
 
     auto itr = offsets.begin();
     for( auto& comp : field ) {
