@@ -27,7 +27,7 @@ namespace knl :: impl {
 
     ShapeRangeInterator( int I, const apt::Vec<T,DGrid>& location, const ShapeF& shapef )
       : _sf(shapef),
-        _I_b( apt::per_dim::make<DGrid>
+        _I_b( apt::make_vff<DGrid>
               ( [&sf=shapef]( const auto& loc ) {
                   return int(loc - sf.support / 2.0) + 1;}, location ) ),
         _sep_b( _I_b - location ) {}
@@ -76,7 +76,7 @@ namespace knl :: impl {
   public:
     ShapeRange( const apt::Vec<T,DGrid>& loc_rel, const Grid<DGrid, T>& grid,
                 const apt::Vec<T,DGrid>& offset, const ShapeF& shapef )
-      : _loc ( loc_rel - offset - mem::lower(grid) + mem::guard(grid) ), _sf(shapef) {}
+      : _loc ( loc_rel - offset - grid.lower() + grid.guard() ), _sf(shapef) {}
 
     auto begin() const && {
                            return ShapeRangeInterator<T, DGrid, ShapeF>( 0, std::move(_loc), _sf );

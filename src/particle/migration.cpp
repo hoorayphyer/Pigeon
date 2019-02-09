@@ -67,11 +67,11 @@ namespace particle :: impl {
 namespace particle {
   template < typename Vec, int DGrid, typename T >
   bool is_migrate( const Vec& q, const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {
-    // TODO use expression template
-    auto&& tmp = apt::per_dim::make<DGrid>
+    auto&& tmp = apt::make_vff<DGrid>
       ( []( const auto& x, const auto& bd ) noexcept {
           return x < std::get<0>(bd) || x > std::get<1>(bd);
         }, q, borders );
+
     return std::apply( []( auto... args){ return (... || args); }, std::move(tmp) );
   }
 

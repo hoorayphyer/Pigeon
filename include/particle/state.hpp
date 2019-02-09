@@ -66,45 +66,43 @@ namespace particle {
     }
   };
 
-  template < typename T >
-  struct state_t {
-    static_assert( 8 * sizeof( std::remove_reference_t<T> ) >= 64 );
+  template < typename Ptc >
+  struct state_expression : public Ptc {
   private:
+    inline auto& _state() noexcept {
+      return static_cast<Ptc&>(*this).state;
+    }
+    static_assert( 8 * sizeof( std::remove_reference_t<decltype(_state())> ) >= 64 );
 
-  protected:
-    T _state; // NOTE use T here so when T is nonref, _state will hold the data
-
+    using self_t = state_expression<Ptc>;
   public:
-    state_t() noexcept = default;
-
     template < typename Attr, typename... Attrs >
-    state_t( const Attr& attr, const Attrs&... attrs ) noexcept {
+    inline self_t& set( const Attr& attr, const Attrs&... attrs ) noexcept {
       set(attr);
       if constexpr( sizeof...(Attrs) > 0 ) set(attrs...);
     }
 
     template < typename Attr >
-    inline state_t& set( const Attr& a ) noexcept {
-      setbits< layout::begin<Attr>(), layout::size<Attr>() >( _state, static_cast<std::underlying_type_t<Attr>>(a) );
+    inline self_t& set( const Attr& a ) noexcept {
+      setbits< layout::begin<Attr>(), layout::size<Attr>() >( _state(), static_cast<std::underlying_type_t<Attr>>(a) );
       return *this;
     }
 
-    inline state_t& set( const flag& fl ) noexcept {
+    inline self_t& set( const flag& fl ) noexcept {
       using utt = std::underlying_type_t<flag>;
-      _state |= ( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
+      _state() |= ( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
       return *this;
     }
 
-
-    inline state_t& reset( const flag& fl ) noexcept {
+    inline self_t& reset( const flag& fl ) noexcept {
       using utt = std::underlying_type_t<flag>;
-      _state &= ~( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
+      _state() &= ~( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
       return *this;
     }
 
     template < typename Attr >
     inline auto get() const noexcept {
-      return static_cast<Attr>( getbits< layout::begin<Attr>(), layout::size<Attr>() >(_state) );
+      return static_cast<Attr>( getbits< layout::begin<Attr>(), layout::size<Attr>() >(_state()) );
     }
 
     template < typename Attr >
@@ -114,14 +112,13 @@ namespace particle {
 
     inline bool is( const flag& fl ) const noexcept {
       using utt = std::underlying_type_t<flag>;
-      return _state & ( 1 << (static_cast<utt>(fl) + layout::begin<flag>()) );
+      return _state() & ( 1 << (static_cast<utt>(fl) + layout::begin<flag>()) );
     }
 
 
   };
 
 
-  using state_underlying_t = unsigned long long;
 }
 
 #endif

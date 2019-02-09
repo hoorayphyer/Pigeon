@@ -47,7 +47,7 @@ namespace particle {
 
       auto dt = params.dt;
 
-      for ( auto& ptc : dvars[sp] ) {
+      for ( auto&& ptc : dvars[sp] ) {
         if( ptc.is(flag::empty) ) continue;
 
         if constexpr ( is_charged<sp> ) {

@@ -45,10 +45,21 @@ namespace knl {
   // Grid is designed to represent the supergrid
   template < int DGrid, typename T >
   struct Grid : public std::array< gridline_t<T>, DGrid >{
-    apt::vVec<T,DGrid> delta = apt::make_vff<DGrid>( []( auto& x ) {return x.delta;}, *this);
-    apt::vVec<T,DGrid> lower = apt::make_vff<DGrid>( []( auto& x ) {return x.lower;}, *this);
-    apt::vVec<T,DGrid> upper = apt::make_vff<DGrid>( []( auto& x ) {return x.upper;}, *this);
-    apt::vVec<int,DGrid> guard = apt::make_vff<DGrid>( []( auto& x ) {return x.guard;}, *this);
+    constexpr apt::vVec<T,DGrid> delta() noexcept{
+      return apt::make_vff<DGrid>( []( auto& x ) {return x.delta;}, *this);
+    }
+
+    constexpr apt::vVec<T,DGrid> lower() noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) {return x.lower;}, *this);
+    }
+
+    constexpr apt::vVec<T,DGrid> upper() noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) {return x.upper;}, *this);
+    }
+
+    constexpr apt::vVec<int,DGrid> guard() noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) {return x.guard;}, *this);
+    }
 
   };
 }

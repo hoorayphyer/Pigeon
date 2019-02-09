@@ -2,7 +2,6 @@
 #define  _APT_VEC_HPP_
 
 #include "apt/vec_expression.hpp"
-#include <type_traits>
 #include <array>
 
 namespace apt {

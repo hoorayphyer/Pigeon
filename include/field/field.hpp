@@ -2,6 +2,7 @@
 #define  _FIELD_HPP_
 
 #include "apt/numeric.hpp"
+#include <array>
 #include <vector>
 
 namespace field {

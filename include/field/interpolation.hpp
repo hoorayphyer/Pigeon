@@ -11,10 +11,10 @@ namespace field {
                      const knl::Grid<DGrid, T>& grid, const ShapeF& shapef ) {
     // only need first DGrid elements of location even if location is of higher dim than DGrid
     // TODO expression template
-    auto loc_rel = apt::per_dim::make<DGrid>
+    auto loc_rel = apt::make_vff<DGrid>
       ( []( const auto& l, const auto& delta ) {
           return l / delta;
-        }, location, mem::delta(grid) );
+        }, location, grid.delta() );
 
     auto interp_comp =
       [ &loc_rel, &grid, &anchor=field.anchor ] ( const auto& f_comp ) {
@@ -24,7 +24,7 @@ namespace field {
         return res;
       };
 
-    return apt::per_dim::make<DField>( interp_comp, field );
+    return apt::make_vff<DField>( interp_comp, field );
   }
 
 }

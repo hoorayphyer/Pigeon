@@ -2,6 +2,7 @@
 #define _APT_VEC_EXPRESSION_HPP_
 
 #include <experimental/type_traits> // for std::is_detected
+#include <type_traits>
 #include <utility> // for std::forward
 
 namespace apt {
@@ -46,10 +47,43 @@ namespace apt {
 }
 
 namespace apt {
+  template < int N, typename F, typename... Arg >
+  struct VecFromFunction;
+
   template < int N, typename F, typename Arg >
-  struct VecFromFunction : public VecExpression<VecFromFunction<N, F, Arg>> {
+  struct VecFromFunction<N, F, Arg>
+    : public VecExpression<VecFromFunction<N, F, Arg>> {
     static constexpr auto size = N;
-    // TODO add check for is lvec to enable_if_t
+    const F& f;
+    const Arg& arg;
+
+    template < int I >
+    constexpr auto v() const noexcept {
+      return f(std::get<I>(arg));
+    }
+
+  };
+
+  template < int N, typename F, typename Arg1, typename Arg2 >
+  struct VecFromFunction<N, F, Arg1, Arg2>
+    : public VecExpression<VecFromFunction<N, F, Arg1, Arg2>> {
+    static constexpr auto size = N;
+    const F& f;
+    const Arg1& arg1;
+    const Arg2& arg2;
+
+    template < int I >
+    constexpr auto v() const noexcept {
+      return f(std::get<I>(arg1), std::get<I>(arg2));
+    }
+
+  };
+
+
+  template < int N, typename F, typename Arg >
+  struct vVecFromFunction
+    : public VecExpression<VecFromFunction<N, F, Arg>> {
+    static constexpr auto size = N;
     const F& f;
     Arg& arg;
 
@@ -64,9 +98,14 @@ namespace apt {
     }
   };
 
+  template < int N, typename F, typename... Arg >
+  constexpr auto make_vff( const F& f, const Arg&... arg ) noexcept {
+    return VecFromFunction<N, F, Arg...>{f, arg...};
+  }
+
   template < int N, typename F, typename Arg >
-  constexpr auto make_vff( const F& f, Arg&& arg ) noexcept {
-    return VecFromFunction<N, F, Arg&&>{f, std::forward<Arg>(arg)};
+  constexpr auto make_vvff( const F& f, Arg& arg ) noexcept {
+    return vVecFromFunction<N, F, Arg>{f, arg};
   }
 
 }
@@ -75,7 +114,6 @@ namespace apt {
   template < int Begin, int End, typename E >
   struct VecSlice : public VecExpression<VecSlice<Begin, End, E>> {
     static_assert ( 0 <= Begin && Begin < End && End <= E::size  );
-    // TODO add check for is lvec to enable_if_t
     E& e;
 
     static constexpr auto size = End - Begin;
@@ -86,7 +124,8 @@ namespace apt {
     }
 
     template < int I >
-    constexpr auto& v() noexcept {
+    constexpr std::enable_if_t< !std::is_const_v<E>, decltype(e.template v< Begin + I >())&>
+    v() noexcept {
       return e.template v< Begin + I >();
     }
 
