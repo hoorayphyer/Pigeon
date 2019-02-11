@@ -9,7 +9,7 @@ namespace particle {
   private:
     static_assert( 8 * sizeof( std::remove_reference_t<state_t>) >= 64 );
     state_t _state;
-    inline auto& _state() noexcept { return _state; }
+    inline auto& _state_data() noexcept { return _state; }
 
   public:
     static constexpr auto Dim = DPtc;

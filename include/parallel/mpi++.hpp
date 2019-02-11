@@ -1,33 +1,26 @@
 #ifndef  _MPI_XX_HPP_
 #define  _MPI_XX_HPP_
 
-#include "utility/handle.hpp"
-#include "parallel/mpi_p2p.hpp"
-#include "parallel/mpi_collective.hpp"
+#include "parallel/mpi_communication.hpp"
 #include <vector>
-#include <optional>
 #include <array>
 
 namespace mpi {
   void initialize();
   void finalize();
 
-  struct Request {
-    Handle hdl;
-  };
-
   using Group = std::vector<int>;
   Group operator^ ( Group a, Group b ); // intersection
   Group operator+ ( Group a, Group b ); // union
   Group operator- ( Group a, Group b ); // difference
 
-  struct Comm : public P2P_Comm<Comm, Request>,
-                public Collective_Comm<Comm, Request>{
+  struct Comm : public P2P_Comm<Comm>,
+                public Collective_Comm<Comm>{
   private:
     const Comm& _comm() const noexcept { return *this; }
   public:
-    friend class P2P_Comm<Comm, Request>;
-    friend class Collective_Comm<Comm, Request>;
+    friend class P2P_Comm<Comm>;
+    friend class Collective_Comm<Comm>;
     Handle hdl;
 
     Comm() = default;
@@ -64,13 +57,13 @@ namespace mpi {
 }
 
 namespace mpi {
-  struct InterComm : public P2P_Comm<InterComm, Request>,
-                     public Collective_Comm<InterComm, Request> {
+  struct InterComm : public P2P_Comm<InterComm>,
+                     public Collective_Comm<InterComm> {
   private:
     const InterComm& _comm() const noexcept { return *this; }
   public:
-    friend class P2P_Comm<InterComm, Request>;
-    friend class Collective_Comm<InterComm, Request>;
+    friend class P2P_Comm<InterComm>;
+    friend class Collective_Comm<InterComm>;
 
     Handle hdl;
 

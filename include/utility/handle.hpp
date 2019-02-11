@@ -8,15 +8,6 @@ struct Handle {
 private:
   std::shared_ptr<void> _ptr = nullptr; // type erasure
 
-  template< class, class = std::void_t<> >
-  struct convertible : std::false_type {};
-
-  template< class RawHdl >
-  struct convertible<RawHdl,
-                     std::void_t< decltype( std::get_deleter(_ptr)(&std::declval<RawHdl&>()) ) >
-                     > : std::true_type {};
-
-
 public:
   Handle() = default;
 
@@ -29,13 +20,13 @@ public:
 
   template < typename RawHdl >
   operator  RawHdl () const {
-    static_assert( convertible, "unmated conversion to raw handle");
+    // static_assert( convertible, "unmated conversion to raw handle");
     return *std::static_pointer_cast<RawHdl>(_ptr);
   }
 
   template < typename RawHdl >
   operator RawHdl& () {
-    static_assert( convertible, "unmated conversion to raw handle");
+    // static_assert( convertible, "unmated conversion to raw handle");
     return *std::static_pointer_cast<RawHdl>(_ptr);
   }
 
@@ -43,7 +34,7 @@ public:
 
   template < typename RawHdl >
   inline void reset( RawHdl* raw_handle ) {
-    static_assert( convertible, "unmated conversion to raw handle");
+    // static_assert( convertible, "unmated conversion to raw handle");
     _ptr.reset(raw_handle);
   } // TODOL deleter should remain the same
 

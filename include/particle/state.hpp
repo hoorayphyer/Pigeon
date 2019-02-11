@@ -69,8 +69,8 @@ namespace particle {
   template < typename Ptc >
   struct state_expression : public Ptc {
   private:
-    inline auto& _state() noexcept {
-      return static_cast<Ptc&>(*this)._state();
+    inline auto& _state_data() noexcept {
+      return static_cast<Ptc&>(*this)._state_data();
     }
 
     using self_t = state_expression<Ptc>;
@@ -83,25 +83,25 @@ namespace particle {
 
     template < typename Attr >
     inline self_t& set( const Attr& a ) noexcept {
-      setbits< layout::begin<Attr>(), layout::size<Attr>() >( _state(), static_cast<std::underlying_type_t<Attr>>(a) );
+      setbits< layout::begin<Attr>(), layout::size<Attr>() >( _state_data(), static_cast<std::underlying_type_t<Attr>>(a) );
       return *this;
     }
 
     inline self_t& set( const flag& fl ) noexcept {
       using utt = std::underlying_type_t<flag>;
-      _state() |= ( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
+      _state_data() |= ( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
       return *this;
     }
 
     inline self_t& reset( const flag& fl ) noexcept {
       using utt = std::underlying_type_t<flag>;
-      _state() &= ~( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
+      _state_data() &= ~( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
       return *this;
     }
 
     template < typename Attr >
     inline auto get() const noexcept {
-      return static_cast<Attr>( getbits< layout::begin<Attr>(), layout::size<Attr>() >(_state()) );
+      return static_cast<Attr>( getbits< layout::begin<Attr>(), layout::size<Attr>() >(_state_data()) );
     }
 
     template < typename Attr >
@@ -111,7 +111,7 @@ namespace particle {
 
     inline bool is( const flag& fl ) const noexcept {
       using utt = std::underlying_type_t<flag>;
-      return _state() & ( 1 << (static_cast<utt>(fl) + layout::begin<flag>()) );
+      return _state_data() & ( 1 << (static_cast<utt>(fl) + layout::begin<flag>()) );
     }
 
 
