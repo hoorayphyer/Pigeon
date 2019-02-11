@@ -26,7 +26,7 @@ struct Params {
     std::array< int, DGrid > extent;
     std::array< std::array<Real, 2>, DGrid > borders;
 
-    std::array< int, DGrid > coordinate;
+    std::array< int, DGrid > cart_coords;
     std::array< std::array<bool, 2>, DGrid > is_at_boundary;
     std::array< std::array<bool, 2>, DGrid > is_axis;
     std::array< std::array<int, 2>, DGrid > neighbors;

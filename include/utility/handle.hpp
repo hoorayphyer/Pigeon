@@ -1,11 +1,22 @@
 #ifndef  _HANDLE_HPP_
 #define  _HANDLE_HPP_
+
 #include <memory>
 
 // TODOL this struct is not very type safe, i.e. cannot trigger type error at compile time
 struct Handle {
 private:
   std::shared_ptr<void> _ptr = nullptr; // type erasure
+
+  template< class, class = std::void_t<> >
+  struct convertible : std::false_type {};
+
+  template< class RawHdl >
+  struct convertible<RawHdl,
+                     std::void_t< decltype( std::get_deleter(_ptr)(&std::declval<RawHdl&>()) ) >
+                     > : std::true_type {};
+
+
 public:
   Handle() = default;
 
@@ -18,24 +29,29 @@ public:
 
   template < typename RawHdl >
   operator  RawHdl () const {
+    static_assert( convertible, "unmated conversion to raw handle");
     return *std::static_pointer_cast<RawHdl>(_ptr);
   }
 
   template < typename RawHdl >
   operator RawHdl& () {
+    static_assert( convertible, "unmated conversion to raw handle");
     return *std::static_pointer_cast<RawHdl>(_ptr);
   }
 
   inline void reset() { _ptr.reset(); }
 
   template < typename RawHdl >
-  inline void reset( RawHdl* raw_handle ) { _ptr.reset(raw_handle); } // TODOL deleter should remain the same
+  inline void reset( RawHdl* raw_handle ) {
+    static_assert( convertible, "unmated conversion to raw handle");
+    _ptr.reset(raw_handle);
+  } // TODOL deleter should remain the same
 
   bool operator==( Handle other ) const {
     return _ptr.get() == other._ptr.get(); // TODOL check correctness and how to check type equality?
   }
 
-  inline bool operator!=( Handle other ) const { return !operator==(other); }
+  inline bool operator!=( Handle other ) const { return !(*this == other); }
 
 };
 

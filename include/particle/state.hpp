@@ -70,9 +70,8 @@ namespace particle {
   struct state_expression : public Ptc {
   private:
     inline auto& _state() noexcept {
-      return static_cast<Ptc&>(*this).state;
+      return static_cast<Ptc&>(*this)._state();
     }
-    static_assert( 8 * sizeof( std::remove_reference_t<decltype(_state())> ) >= 64 );
 
     using self_t = state_expression<Ptc>;
   public:

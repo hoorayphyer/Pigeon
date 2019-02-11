@@ -1,9 +1,6 @@
 #include "parallel/mpi++.hpp"
 #include <mpi.h>
-#include <algorithm>
 #include <iterator> // back_inserter
-#include <tuple>
-#include <numeric> // std::inner_product
 
 // helpers
 namespace mpi {
@@ -121,65 +118,106 @@ namespace mpi {
 
 }
 
-// mpi::topo
+// mpi cartesian
 namespace mpi {
-  namespace topo {
-    void cartesianize( Comm& comm, std::vector<int> dims, std::vector<bool> periodic ) {
-      const int ndims = dims.size() < periodic.size() ? dims.size() : periodic.size();
+  void cartesianize( Comm& comm, std::vector<int> dims, std::vector<bool> periodic ) {
+    const int ndims = dims.size() < periodic.size() ? dims.size() : periodic.size();
 
-      std::vector<int> periods(ndims);
-      for ( int i = 0; i < ndims; ++i )
-        periods[i] = static_cast<int>( periodic[i] );
+    std::vector<int> periods(ndims);
+    for ( int i = 0; i < ndims; ++i )
+      periods[i] = static_cast<int>( periodic[i] );
 
-      MPI_Comm comm_cart;
-      MPI_Cart_create( comm.hdl, ndims, dims.data(), periods.data(), true, &comm_cart );
-      comm.hdl.reset( &comm_cart );
-    }
-
-    namespace cart {
-      std::tuple<std::vector<int>, std::vector<bool>, std::vector<int>> inquire ( const Comm& comm ) {
-        int ndims;
-        MPI_Cartdim_get( comm.hdl, &ndims );
-        std::vector<int> dims(ndims);
-        std::vector<int> periods(ndims);
-        std::vector<int> coords(ndims);
-        MPI_Cart_get( comm.hdl, ndims, dims.data(), periods.data(), coords.data() );
-
-        std::vector<bool> periodic( ndims );
-        for ( int i = 0; i < ndims; ++i )
-          periodic[i] = static_cast<bool>( periods[i] );
-
-        return std::make_tuple( dims, periodic, coords );
-      }
-
-      std::vector<int> dims ( const Comm& comm ) {
-        return std::get<0>( inquire( comm ) );
-      }
-
-      std::vector<bool> periodic ( const Comm& comm ) {
-        auto periods = std::get<1>( inquire( comm ) );
-        std::vector<bool> result(periods.size()); // convert vector<int> to vector<bool>
-        std::copy( periods.begin(), periods.end(), result.begin() );
-        return result;
-      }
-
-      std::vector<int> coords ( const Comm& comm ) {
-        return std::get<2>( inquire( comm ) );
-      }
-
-      int linear_coord( const Comm& comm ) {
-        auto[strides, to_be_ignored, coords] = inquire(comm);
-        // do exclusive multiplication on stride to get real strides
-        strides.back() = std::accumulate( strides.begin(), strides.end() - 1, 1, [](auto a, auto b){return a*b;} );
-        for ( int i = strides.size() - 2; i >= 0; --i )
-          strides[i] = strides[i+1] / strides[i];
-
-        return std::inner_product( coords.begin(), coords.end(), strides.begin(), 0 );
-      }
-
-
-    }
+    MPI_Comm comm_cart;
+    MPI_Cart_create( comm.hdl, ndims, dims.data(), periods.data(), true, &comm_cart );
+    comm.hdl.reset( &comm_cart );
   }
+
+  namespace cart {
+    std::vector<int> rank2coords ( const Comm& comm, int rank ) {
+      int ndims = 0;
+      MPI_Cartdim_get( comm.hdl, &ndims );
+      std::vector<int> coords(ndims);
+      MPI_Cart_coords( comm.hdl, rank, ndims, coords.data() );
+      return coords;
+    }
+
+    int coords2rank( const Comm& comm, const std::vector<int>& coords ) {
+      int rank = 0;
+      MPI_Cart_rank( comm.hdl, coords.data(), &rank);
+      return rank;
+    }
+
+    int linear_coord( const Comm& comm ) {
+      int result = 0;
+
+      int ndims = 0;
+      MPI_Cartdim_get( comm.hdl, &ndims );
+      auto* strides = new int [ndims+1];
+      strides[0] = 1;
+      auto* periods = new int [ndims];
+      auto* coords = new int [ndims];
+      MPI_Cart_get( comm.hdl, ndims, strides+1, periods, coords );
+
+      for ( int i = 1; i < ndims + 1; ++i )
+        strides[i] *= strides[i-1];
+
+      for ( int i = 0; i < ndims; ++i )
+        result += coords[i] * strides[i];
+
+      delete [] strides;
+      delete [] periods;
+      delete [] coords;
+
+      return result;
+    }
+
+    std::array<std::optional<int>, 2> shift( const Comm& comm, int direction, int disp ) {
+      std::array<std::optional<int>, 2> results;
+      int rank_src = 0, rank_dest = 0;
+      MPI_Cart_shift( comm.hdl, direction, disp, &rank_src, &rank_dest );
+      if ( rank_src != MPI_PROC_NULL ) results[0].emplace(rank_src);
+      if ( rank_dest != MPI_PROC_NULL ) results[1].emplace(rank_dest );
+      return results;
+    }
+
+  }
+}
+
+// intercommunicator
+namespace mpi {
+  InterComm::InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag ) {
+    MPI_Comm comm;
+    auto pc = ( local_comm.rank() == local_leader ) ? (*peer_comm).hdl : MPI_COMM_NULL;
+    MPI_Intercomm_create( local_comm.hdl, local_leader, pc, remote_leader, tag, &comm );
+    hdl = Handle( &comm, Raw<MPI_Comm>::free );
+  }
+
+  int InterComm::remote_size() const {
+    int size = 0;
+    MPI_Comm_remote_size(hdl, &size);
+    return size;
+  }
+
+  Group InterComm::remote_group() const {
+    const int size = remote_size();
+    Group result(size);
+
+    auto* ranks = new int [size];
+    for ( int i = 0; i < size; ++i )
+      ranks[i] = i;
+
+    MPI_Group grp_world, grp_remote;
+    MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
+    MPI_Comm_remote_group(hdl, &grp_remote);
+    MPI_Group_translate_ranks( grp_remote, size, ranks, grp_world, result.data() );
+    MPI_Group_free( &grp_world );
+    MPI_Group_free(&remote);
+
+    delete [] ranks;
+
+    return result;
+  }
+
 }
 
 
