@@ -2,30 +2,41 @@
 #define  _MPI_XX_HPP_
 
 #include "parallel/mpi_communication.hpp"
-#include <vector>
 #include <array>
 
 namespace mpi {
-  struct Group : public std::vector<int> {};
-  Group operator^ ( const Group& a, const Group& b ); // intersection
-  Group operator+ ( const Group& a, const Group& b ); // union
-  Group operator- ( const Group& a, const Group& b ); // difference
+  void group_free( MPI_Group* p ) {
+    if ( p && *p != MPI_GROUP_NULL )
+      MPI_Group_free(p);
+  }
+
+  // TODO so far, no use of Group. make group look like an ordered set
+  struct Group : apt::Handle<MPI_Group, group_free> {
+    // Group operator^ ( const Group& a, const Group& b ); // intersection
+    // Group operator+ ( const Group& a, const Group& b ); // union
+    // Group operator- ( const Group& a, const Group& b ); // difference
+  };
+
 }
 
 namespace mpi {
-  struct Comm : public P2P_Comm<Comm>,
-                public Collective_Comm<Comm>{
+  void comm_free ( MPI_Comm* p ) {
+    if ( p && *p != MPI_COMM_NULL && *p != MPI_COMM_WORLD )
+      MPI_Comm_free(p);
+  }
+
+  struct Comm : public apt::Handle<MPI_Comm, comm_free>,
+                public P2P_Comm<Comm>,
+                public Collective_Comm<Comm> {
   private:
     const Comm& _comm() const noexcept { return *this; }
   public:
     friend class P2P_Comm<Comm>;
     friend class Collective_Comm<Comm>;
-    Handle hdl;
 
     Comm() = default;
+    Comm( MPI_Comm* mpi_comm );
     Comm ( const Group& group );
-
-    //TODOL check assignment although it seems to work out of the box
 
     int rank() const;
     int size() const;

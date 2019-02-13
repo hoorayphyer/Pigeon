@@ -21,7 +21,6 @@ namespace mpi {
 
 }
 namespace mpi {
-  // TODO check request passed as MPI_Request* here
   void wait( Request& request ) {
     // MPI_Status status;
     // MPI_Wait( &request, &status );
@@ -29,20 +28,23 @@ namespace mpi {
     MPI_Wait( request, MPI_STATUS_IGNORE );
   }
 
-  // TODO
-  void waitall( std::vector<MPI_Request>& requests ) {
+  void waitall( std::vector<Request>& requests ) {
+    MPI_Request* p = new MPI_Request [ requests.size() ];
+    for ( int i = 0; i < requests.size(); ++i )
+      p[i] = requests[i];
     // std::vector<MPI_Status> statuses(requests.size());
     // MPI_Waitall( requests.size(), requests.data(), statuses.data() );
     // return statuses;
-    MPI_Waitall( requests.size(), requests.data(), MPI_STATUSES_IGNORE );
+    MPI_Waitall( requests.size(), p, MPI_STATUSES_IGNORE );
+    delete [] p;
   }
 
-  void cancel( MPI_Request& req ) {
-    if ( req != MPI_REQUEST_NULL ) // this is necessary
-      MPI_Cancel(&req);
+  void cancel( Request& req ) {
+    if ( static_cast<MPI_Request>(req) != MPI_REQUEST_NULL ) // this is necessary
+      MPI_Cancel(req);
   }
 
-  void cancelall( std::vector<MPI_Request>& reqs ) {
+  void cancelall( std::vector<Request>& reqs ) {
     for ( auto& req : reqs )
       cancel(req);
   }
@@ -53,7 +55,7 @@ namespace mpi {
   template < typename DataType >
   int P2P_Comm<Comm>::probe( int source_rank, int tag ) const {
     MPI_Status s;
-    MPI_Probe( source_rank, tag, _comm().hdl, &s );
+    MPI_Probe( source_rank, tag, _comm(), &s );
     int count = 0;
     MPI_Get_count( &s, datatype<DataType>(), &count );
     return count;
@@ -81,7 +83,7 @@ namespace mpi {
   template < typename Comm >
   template < typename T >
   void P2P_Comm<Comm>::send(int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
-    *(pick_send<false>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm().hdl );
+    *(pick_send<false>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm() );
   }
 
 
@@ -89,9 +91,7 @@ namespace mpi {
   template < typename T >
   Request P2P_Comm<Comm>::Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
     Request req;
-    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
-
-    *(pick_send<true>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm().hdl, &req.hdl );
+    *(pick_send<true>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm(), req );
 
     return req;
   }
@@ -102,7 +102,7 @@ namespace mpi {
     int recv_count = 0;
 
     MPI_Status status;
-    MPI_Recv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm().hdl, &status);
+    MPI_Recv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm(), &status);
     MPI_Get_count( &status, datatype<T>(), &recv_count );
 
     return recv_count;
@@ -112,9 +112,7 @@ namespace mpi {
   template < typename T >
   Request PCP_Comm<Comm>::Irecv(int source_rank, T* recv_buf, int recv_count, int tag ) const {
     Request req;
-    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
-
-    MPI_Irecv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm().hdl, &req.hdl );
+    MPI_Irecv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm(), req );
     return req;
   }
 
@@ -123,7 +121,7 @@ namespace mpi {
 namespace mpi {
   template < typename Comm >
   void Collective_Comm<Comm>::barrier() const {
-    MPI_Barrier( _comm().hdl );
+    MPI_Barrier( _comm() );
   }
 
   constexpr auto mpi_op( ReduceOp op ) {
@@ -161,7 +159,7 @@ namespace mpi {
     auto[ buf, count, datatype ] = decay_buf( std::forward<T>(buffer) );
     auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
 
-    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm().hdl );
+    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm() );
 
     return result;
   }
@@ -175,9 +173,7 @@ namespace mpi {
     auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
 
     Request req;
-    req.hdl = Handle ( new MPI_Request, Raw<MPI_Request>::free );
-
-    MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm().hdl, &req.hdl );
+    MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm(), req );
 
     return std::make_tuple( req, result );
   }
@@ -186,7 +182,7 @@ namespace mpi {
   template < typename T >
   void Collective_Comm<Comm>::broadcast( T& buffer, int root ) const {
     auto[ buf, count, datatype ] = decay_buf(buffer);
-    MPI_Bcast( buf, count, datatype, root, _comm().hdl );
+    MPI_Bcast( buf, count, datatype, root, _comm() );
   }
 
 
@@ -194,11 +190,8 @@ namespace mpi {
   template < typename T >
   Request Collective_Comm<Comm>::Ibroadcast( T& buffer, int root ) const {
     Request req;
-    req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
-
     auto[ buf, count, datatype ] = decay_buf(buffer);
-    MPI_Ibcast( buf, count, datatype, root, _comm().hdl, &req.hdl );
-
+    MPI_Ibcast( buf, count, datatype, root, _comm(), req );
     return req;
   }
 }

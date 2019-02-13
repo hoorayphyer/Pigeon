@@ -1,13 +1,11 @@
 #ifndef  _MPI_COMMUNICATION_HPP_
 #define  _MPI_COMMUNICATION_HPP_
 
-#include "utility/handle.hpp"
+#include "apt/handle.hpp"
 #include <mpi.h>
 #include <type_traits>
 #include <optional>
 #include <vector>
-
-// TODO just expose all mpis, it's fine. Make handle an expression template
 
 namespace mpi {
   template <typename T_cvref>
@@ -35,21 +33,27 @@ namespace mpi {
 
 
 namespace mpi {
-  struct Request {
-    Handle hdl;
-  };
+  void request_free ( MPI_Request* p ) {
+    if ( p && *p != MPI_REQUEST_NULL )
+      MPI_Request_free(p);
+  }
+
+  using Request = apt::Handle<MPI_Request, request_free >;
+}
+
+namespace std {
+  template < class, class > class vector;
 }
 
 namespace mpi {
 
   enum class SendMode : char { STD = 0, BUF, SYN, RDY };
 
-  void wait( Request& request );
-  void waitall( std::vector<Request>& requests );
+  void wait( Request& req );
+  void waitall( std::vector<Request>& reqs );
 
   void cancel( Request& req );
   void cancelall( std::vector<Request>& reqs );
-
 
 
   template < typename Comm >
