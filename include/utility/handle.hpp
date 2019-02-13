@@ -30,6 +30,12 @@ public:
     return *std::static_pointer_cast<RawHdl>(_ptr);
   }
 
+  // template < typename RawHdl >
+  // operator RawHdl* () {
+  //   // static_assert( convertible, "unmated conversion to raw handle");
+  //   return std::static_pointer_cast<RawHdl>(_ptr).get();
+  // }
+
   inline void reset() { _ptr.reset(); }
 
   template < typename RawHdl >

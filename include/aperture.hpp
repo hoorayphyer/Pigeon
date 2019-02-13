@@ -6,10 +6,10 @@
 #include "kernel/grid.hpp"
 #include "parallel/mpi++.hpp"
 
-template< typename Real, std::size_t DGrid, std::size_t DPtc >
+template< typename Real, std::size_t DGrid, std::size_t DPtc, typename state_t >
 class Aperture {
 private:
-  DynamicVars<Real, DGrid, DPtc> _dvars;
+  DynamicVars<Real, DGrid, DPtc, state_t> _dvars;
   Params<Real, DGrid> _params;
   knl::Grid<DGrid, Real> _grid;
   mpi::Comm _comm;

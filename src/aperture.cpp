@@ -1,12 +1,12 @@
 #include "aperture.hpp"
 #include "particle/updater.hpp"
 
-template< typename Real, std::size_t DGrid, std::size_t DPtc >
-Aperture<Real, DGrid, DPtc>::Aperture() {}
+template< typename Real, std::size_t DGrid, std::size_t DPtc, typename state_t >
+Aperture<Real, DGrid, DPtc, state_t>::Aperture() {}
 
-template< typename Real, std::size_t DGrid, std::size_t DPtc >
-void Aperture<Real, DGrid, DPtc>::launch() {
-  particle::Updater< Real, DGrid, DPtc,
+template< typename Real, std::size_t DGrid, std::size_t DPtc, typename state_t >
+void Aperture<Real, DGrid, DPtc, state_t>::launch() {
+  particle::Updater< Real, DGrid, DPtc, state_t,
                      knl::shape::Cloud_In_Cell,
                      particle::PairScheme::Disabled,
                      knl::coordsys_t::Cartesian,

@@ -23,9 +23,9 @@ namespace apt {
       foreach<0,N>( [](auto& a, const auto& b){ a = b;}, _v, vec);
     }
 
-    template < int I >
-    constexpr double v() const noexcept {
-      return std::get<I>(_v);
+    template < typename E >
+    constexpr Vec( VecExpression<E>&& vec ) noexcept {
+      foreach<0,N>( [](auto& a, auto& b){ std::swap(a,b); }, _v, vec );
     }
 
     template < int I >
@@ -66,12 +66,20 @@ namespace apt {
       else return _tail.template v<I-1>();
     }
 
+    // TODO double check this
+    vVec( vVec&& vec ) noexcept
+     : _head( std::get<0>(vec) ),
+       _tail( VecSlice<1, vVec::size, vVec>(vec) ) {}
+
+    vVec() = delete;
+    vVec( const vVec& ) = delete; // because it breaks copy sematics
     template <typename E>
-    constexpr vVec( VecExpression<E>& vec ) noexcept
-      : _head( std::get<0>(vec) ),
-        _tail( VecSlice<1, VecExpression<E>::size, VecExpression<E>>(vec) ) {}
+    vVec( const VecExpression<E>& ) = delete;
+    template <typename E>
+    vVec( VecExpression<E>&& ) = delete;
   };
 
+  // TODO fix the ctors
   template < typename T >
   struct vVec<T,1> : public VecExpression<vVec<T,1>> {
   private:
@@ -116,13 +124,5 @@ namespace apt {
 //   };
 // }
 
-namespace apt {
-  template < typename LVec1, typename LVec2 >
-  std::enable_if_t< (is_lvec_v<LVec1> && is_lvec_v<LVec2>), void >
-  swap( LVec1& a, LVec2& b ) noexcept {
-    foreach<0,LVec1::size>
-      ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
-  }
-}
 
 #endif

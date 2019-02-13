@@ -2,7 +2,37 @@
 #define  _MPI_COMMUNICATION_HPP_
 
 #include "utility/handle.hpp"
+#include <mpi.h>
+#include <type_traits>
 #include <optional>
+#include <vector>
+
+// TODO just expose all mpis, it's fine. Make handle an expression template
+
+namespace mpi {
+  template <typename T_cvref>
+  constexpr MPI_Datatype datatype() noexcept {
+    using T = std::remove_cv_t< std::remove_reference_t< T_cvref > >;
+    if constexpr ( std::is_same_v<T, char> ) return MPI_CHAR;
+    else if ( std::is_same_v<T, short> ) return MPI_SHORT;
+    else if ( std::is_same_v<T, int> ) return MPI_INT;
+    else if ( std::is_same_v<T, long> ) return MPI_LONG;
+
+    else if ( std::is_same_v<T, unsigned char> ) return MPI_UNSIGNED_CHAR;
+    else if ( std::is_same_v<T, unsigned short> ) return MPI_UNSIGNED_SHORT;
+    else if ( std::is_same_v<T, unsigned int> ) return MPI_UNSIGNED;
+    else if ( std::is_same_v<T, unsigned long> ) return MPI_UNSIGNED_LONG;
+
+    else if ( std::is_same_v<T, float> ) return MPI_FLOAT;
+    else if ( std::is_same_v<T, double> ) return MPI_DOUBLE;
+
+    else if ( std::is_same_v<T, long double> ) return MPI_LONG_DOUBLE;
+    else if ( std::is_same_v<T, bool> ) return MPI_CXX_BOOL;
+    else return MPI_DATATYPE_NULL;
+  }
+
+}
+
 
 namespace mpi {
   struct Request {
@@ -14,21 +44,32 @@ namespace mpi {
 
   enum class SendMode : char { STD = 0, BUF, SYN, RDY };
 
+  void wait( Request& request );
+  void waitall( std::vector<Request>& requests );
+
+  void cancel( Request& req );
+  void cancelall( std::vector<Request>& reqs );
+
+
+
   template < typename Comm >
   struct P2P_Comm {
   private:
     inline const Comm& _comm() const { return static_cast<const Comm&>(*this)._comm(); }
+
   public:
+    template < typename DataType >
+    int probe( int source_rank, int tag ) const; // returns the send count
 
-    template <typename T_or_Container>
-    void send( int dest_rank, const T_or_Container& send_buf, int tag, SendMode mode = SendMode::SYN ) const;
-    template <typename T_or_Container>
-    Request Isend( int dest_rank, const T_or_Container& send_buf, int tag, SendMode mode = SendMode::STD ) const;
+    template <typename T>
+    void send( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::SYN ) const;
+    template <typename T>
+    Request Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::STD ) const;
 
-    template <typename T_or_Container>
-    int recv( int source_rank, T_or_Container& recv_buf, int tag, bool resize_buf_with_probe = false ) const; // return the actual recved number
-    template <typename T_or_Container>
-    Request Irecv(int source_rank, T_or_Container& recv_buf, int tag, bool resize_buf_with_probe = false ) const;
+    template <typename T>
+    int recv( int source_rank, T* recv_buf, int recv_count, int tag ) const; // return the actual recved number
+    template <typename T>
+    Request Irecv(int source_rank, T* recv_buf, int recv_count, int tag ) const;
 
   };
 

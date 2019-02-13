@@ -16,7 +16,7 @@ namespace particle {
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
     using value_type = void;
-    using reference = Particle< typename array_t::value_type, array_t::DPtc, apt::vVec, typename array_t::state_t& >;
+    using reference = vParticle< typename array_t::value_type, array_t::DPtc, typename array_t::state_t >;
     using pointer = void;
     iterator( array_t& arr, int i ) noexcept : _array(arr), _index(i) {}
 
@@ -34,6 +34,7 @@ namespace particle {
 
     inline reference operator* () const noexcept {
       auto f = [i=_index] ( auto&& x ) { return x[i]; };
+      // TODO check sematics of make_vvff
       return reference( apt::make_vvff( f, _array._q ),
                         apt::make_vvff( f, _array._p ),
                         _array._state[_index] );
@@ -41,12 +42,9 @@ namespace particle {
 
   };
 
-
-  template < typename T, int Dim_Ptc >
+  template < typename T, int Dim_Ptc, typename state_t >
   struct array {
   private:
-    using state_t = unsigned long long;
-
     std::size_t _capacity = 0;
     std::size_t _size = 0;
 
@@ -54,10 +52,10 @@ namespace particle {
     std::array<T*, Dim_Ptc> _p;
     state_t* _state;
 
-
-    using value_type = T;
   public:
+    using value_type = T;
     static constexpr auto DPtc = Dim_Ptc;
+    using state_type = state_t;
 
     friend class iterator< array >;
     friend class iterator< const array >;
@@ -78,11 +76,18 @@ namespace particle {
     auto operator[] ( int i ) const noexcept { return *( iterator( *this, i ) ); }
 
     // real particle
-    void push_back( const Particle<T, DPtc, apt::Vec, state_t>& ptc ); // NOTE cannot use Dim_Ptc here!!!
-    void push_back( Particle<T, DPtc, apt::Vec, state_t>&& ptc );
+    // TODO change them to ParticleExpression
+    void push_back( const Particle<T, DPtc, state_type>& ptc ); // NOTE cannot use Dim_Ptc here!!!
+    void push_back( Particle<T, DPtc, state_type>&& ptc );
 
     // // virtual particle TODO move virtual particle??
     // void push_back( const Particle< T, DPtc, apt::vVec >& ptc );
+
+    // NOTE from is inclusive, to is exclusive. from can be larger than to.
+    void erase( int from, int to );
+
+    // TODO
+    void resize(std::size_t size);
 
   };
 
@@ -90,17 +95,11 @@ namespace particle {
 
 }
 
-namespace apt {
-  template < typename T, int DPtc >
-  void swap( typename particle::iterator<particle::array<T, DPtc >>::reference a,
-             typename particle::iterator<particle::array<T, DPtc >>::reference b ) noexcept;
-}
-
 namespace std {
-  template < typename T, int DPtc >
-  class back_insert_iterator<particle::array<T,DPtc>> {
+  template < typename T, int DPtc, typename state_t >
+  class back_insert_iterator<particle::array<T,DPtc, state_t>> {
   private:
-    particle::array<T,DPtc>& _c;
+    particle::array<T,DPtc,state_t>& _c;
     int _index;
 
   public:
@@ -110,11 +109,12 @@ namespace std {
     using reference = void;
     using pointer = void;
 
-    explicit back_insert_iterator( particle::array<T,DPtc>& c ) noexcept : _c(c) {}
+    explicit back_insert_iterator( particle::array<T,DPtc, state_t>& c ) noexcept : _c(c) {}
 
     template < typename Ptc >
     auto& operator= ( Ptc&& ptc ) {
-      _c.push_back(std::forward<Ptc>(ptc));
+      // use emplace to accommodate for PtcExpression
+      _c.emplace_back(std::forward<Ptc>(ptc));
       return *this;
     }
 

@@ -30,7 +30,8 @@ namespace todo {
 }
 
 namespace particle {
-  template < typename Real, int DGrid, int DPtc, knl::shape S, PairScheme pair_scheme,
+  template < typename Real, int DGrid, int DPtc, typename state_t,
+             knl::shape S, PairScheme pair_scheme,
              knl::coordsys_t CS,
              species posion // posion = positron || ion in injection
              >
@@ -38,7 +39,7 @@ namespace particle {
   private:
     using WJ_t = Real;
     field::Field< WJ_t, 3, DGrid > _WJ;
-    array<Real, DPtc> _migrators;
+    std::vector<cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
 
     template < species sp, typename Dynvar_t, typename Params_t, typename Grid >
@@ -86,7 +87,7 @@ namespace particle {
 
         if ( is_migrate( ptc.q, params.borders ) ) {
           // TODO make sure after move, the moved from ptc is set to flag::empty
-          _migrators.push_back(std::move(ptc));
+          _migrators.emplace_back(std::move(ptc));
           // ptc.set(flag::empty);
         }
 
@@ -126,9 +127,9 @@ namespace particle {
 
 
   public:
-    void operator() ( DynamicVars<Real, DGrid, DPtc>& dvars,
+    void operator() ( DynamicVars<Real, DGrid, DPtc, state_t>& dvars,
                       const Params<Real, DGrid>& params,
-                      const knl::Grid<DGrid, Real>& grid, auto& comm ) {
+                      const knl::Grid<DGrid, Real>& grid, auto& comm ) { // TODO fix this auto. need -fconcepts
       const auto& borders = params.borders;
       const auto& neighbors = params.neighbors;
 

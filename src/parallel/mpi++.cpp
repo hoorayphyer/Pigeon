@@ -59,19 +59,19 @@ namespace mpi {
 
 // mpi::Group
 namespace mpi {
-  Group operator^ ( Group a, Group b ) {
+  Group operator^ ( const Group& a, const Group& b ) {
     Group result;
     std::set_intersection( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
     return result;
   }
 
-  Group operator+ ( Group a, Group b ) {
+  Group operator+ ( const Group& a, const Group& b ) {
     Group result;
     std::set_union( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
     return result;
   }
 
-  Group operator- ( Group a, Group b ) {
+  Group operator- ( const Group& a, const Group& b ) {
     Group result;
     std::set_difference( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
     return result;
@@ -80,7 +80,7 @@ namespace mpi {
 
 // mpi::Comm
 namespace mpi {
-  Comm::Comm( Group group ) {
+  Comm::Comm( const Group& group ) {
     MPI_Group grp_world, grp_this;
     MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
     MPI_Group_incl( grp_world, group.size(), group.data(), &grp_this );
@@ -199,12 +199,14 @@ namespace mpi {
   }
 
   Group InterComm::remote_group() const {
+    Group result;
     const int size = remote_size();
-    Group result(size);
 
     auto* ranks = new int [size];
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size; ++i ) {
       ranks[i] = i;
+      result.push_back(0);
+    }
 
     MPI_Group grp_world, grp_remote;
     MPI_Comm_group(MPI_COMM_WORLD, &grp_world);

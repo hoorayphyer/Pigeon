@@ -1,9 +1,9 @@
 #ifndef _APT_VEC_EXPRESSION_HPP_
 #define _APT_VEC_EXPRESSION_HPP_
 
+#include "apt/foreach.hpp"
 #include <experimental/type_traits> // for std::is_detected
 #include <type_traits>
-#include <utility> // for std::forward
 
 namespace apt {
   template <typename E>
@@ -16,17 +16,42 @@ namespace apt {
     constexpr auto v() const noexcept {
       return static_cast<const E&>(*this).template v<I>();
     }
+
   };
 }
 
 namespace std {
+  // define this so as to be used in apt::foreach
   template < int I, typename E >
   constexpr auto get( const apt::VecExpression<E>& vec ) noexcept {
     static_assert( I < E::size );
     return vec.template v<I>();
   }
+
+  // TODO can this work on vVec?
+  template < typename E1, typename E2 >
+  void swap ( apt::VecExpression<E1>& a, apt::VecExpression<E2>& b ) noexcept {
+    apt::foreach<0, E1::size>
+      ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
+  }
 }
 
+// TODO aren't they autogened by compiler
+// // copy assign
+// template < typename E1, typename E2 >
+// E1& operator= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) {
+//   apt::foreach<0,E1::size>( []( auto& a, const auto& b ){ a = b; }, v1, v2 );
+//   return static_cast<E1&>(v1);
+// }
+
+// // move assign
+// template < typename E1, typename E2 >
+// E1& operator= ( apt::VecExpression<E1>& v1, apt::VecExpression<E2>&& v2 ) noexcept {
+//   apt::foreach<0,E1::size>( []( auto& a, auto& b ) noexcept { std::swap(a,b); }, v1, v2 );
+//   return static_cast<E1&>(v1);
+// }
+
+// TODO review this, used in numeric.hpp
 namespace apt {
   template < typename V >
   struct is_lvec { // lvec = lvalued vec
@@ -132,18 +157,5 @@ namespace apt {
   };
 }
 
-
-namespace apt {
-  template < std::size_t Begin, std::size_t End, typename Func, typename... Vectors >
-  constexpr void foreach( const Func& f, Vectors&&... vecs  ) noexcept {
-    static_assert( Begin <= End );
-    if constexpr ( Begin == End ) return;
-    else {
-      f( std::get<Begin>(std::forward<Vectors>(vecs))... );
-      return foreach<Begin+1, End>( f, std::forward<Vectors>(vecs)... );
-    }
-  }
-
-}
 
 #endif

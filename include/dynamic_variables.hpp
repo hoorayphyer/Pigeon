@@ -4,16 +4,16 @@
 #include "field/field.hpp"
 #include "particle/array.hpp"
 
-template< typename Real, std::size_t DGrid, std::size_t DPtc >
+template< typename Real, std::size_t DGrid, std::size_t DPtc, typename state_t >
 struct DynamicVars {
   field::Field<Real, 3, DPtc> E;
   field::Field<Real, 3, DPtc> B;
   field::Field<Real, 3, DPtc> J;
 
-  particle::array<Real, DPtc> electrons;
-  particle::array<Real, DPtc> positrons;
-  particle::array<Real, DPtc> ions;
-  particle::array<Real, DPtc> photons;
+  particle::array<Real, DPtc, state_t> electrons;
+  particle::array<Real, DPtc, state_t> positrons;
+  particle::array<Real, DPtc, state_t> ions;
+  particle::array<Real, DPtc, state_t> photons;
 
   constexpr auto& operator[] ( particle::species sp ) noexcept {
     using particle::species;

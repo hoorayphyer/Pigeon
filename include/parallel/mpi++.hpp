@@ -6,14 +6,13 @@
 #include <array>
 
 namespace mpi {
-  void initialize();
-  void finalize();
+  struct Group : public std::vector<int> {};
+  Group operator^ ( const Group& a, const Group& b ); // intersection
+  Group operator+ ( const Group& a, const Group& b ); // union
+  Group operator- ( const Group& a, const Group& b ); // difference
+}
 
-  using Group = std::vector<int>;
-  Group operator^ ( Group a, Group b ); // intersection
-  Group operator+ ( Group a, Group b ); // union
-  Group operator- ( Group a, Group b ); // difference
-
+namespace mpi {
   struct Comm : public P2P_Comm<Comm>,
                 public Collective_Comm<Comm>{
   private:
@@ -24,7 +23,7 @@ namespace mpi {
     Handle hdl;
 
     Comm() = default;
-    Comm ( Group group );
+    Comm ( const Group& group );
 
     //TODOL check assignment although it seems to work out of the box
 
@@ -35,7 +34,6 @@ namespace mpi {
 
   };
 
-  extern Comm world; // TODOL make it const
 }
 
 namespace mpi {
@@ -57,23 +55,18 @@ namespace mpi {
 }
 
 namespace mpi {
-  struct InterComm : public P2P_Comm<InterComm>,
-                     public Collective_Comm<InterComm> {
-  private:
-    const InterComm& _comm() const noexcept { return *this; }
-  public:
-    friend class P2P_Comm<InterComm>;
-    friend class Collective_Comm<InterComm>;
-
-    Handle hdl;
-
+  struct InterComm : public Comm {
     InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag );
     int remote_size() const;
     Group remote_group() const;
   };
 }
 
-
+namespace mpi {
+  void initialize();
+  void finalize();
+  extern Comm world; // TODOL make it const
+}
 
 
 

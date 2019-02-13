@@ -1,5 +1,4 @@
 #include "parallel/mpi_communication.hpp"
-#include "./mpi_datatype.cpp"
 #include <experimental/type_traits> // for is_detected
 #include <mpi.h>
 
@@ -15,14 +14,51 @@ namespace mpi {
   template <typename T>
   inline auto decay_buf( T&& buf ) {
     if constexpr ( is_container<T>(buf) )
-      return std::make_tuple( buf.data(), buf.size(), mpi_datatype<decltype(buf[0])>() );
+      return std::make_tuple( buf.data(), buf.size(), datatype<decltype(buf[0])>() );
     else
-      return std::make_tuple( &buf, 1, mpi_datatype<decltype(buf)>() );
+      return std::make_tuple( &buf, 1, datatype<decltype(buf)>() );
   }
 
 }
+namespace mpi {
+  // TODO check request passed as MPI_Request* here
+  void wait( Request& request ) {
+    // MPI_Status status;
+    // MPI_Wait( &request, &status );
+    // return status;
+    MPI_Wait( request, MPI_STATUS_IGNORE );
+  }
+
+  // TODO
+  void waitall( std::vector<MPI_Request>& requests ) {
+    // std::vector<MPI_Status> statuses(requests.size());
+    // MPI_Waitall( requests.size(), requests.data(), statuses.data() );
+    // return statuses;
+    MPI_Waitall( requests.size(), requests.data(), MPI_STATUSES_IGNORE );
+  }
+
+  void cancel( MPI_Request& req ) {
+    if ( req != MPI_REQUEST_NULL ) // this is necessary
+      MPI_Cancel(&req);
+  }
+
+  void cancelall( std::vector<MPI_Request>& reqs ) {
+    for ( auto& req : reqs )
+      cancel(req);
+  }
+}
 
 namespace mpi {
+  template < typename Comm >
+  template < typename DataType >
+  int P2P_Comm<Comm>::probe( int source_rank, int tag ) const {
+    MPI_Status s;
+    MPI_Probe( source_rank, tag, _comm().hdl, &s );
+    int count = 0;
+    MPI_Get_count( &s, datatype<DataType>(), &count );
+    return count;
+  }
+
   template < bool nonblocking >
   constexpr auto pick_send ( SendMode mode ) noexcept {
     switch ( mode ) {
@@ -44,69 +80,41 @@ namespace mpi {
   // TODOL consider add error handling for send
   template < typename Comm >
   template < typename T >
-  void P2P_Comm<Comm>::send(int dest_rank, const T& send_buf, int tag, SendMode mode ) const {
-    auto[ buf, count, datatype ] = decay_buf(send_buf);
-    *(pick_send<false>(mode)) ( buf, count, datatype, dest_rank, tag, _comm().hdl );
+  void P2P_Comm<Comm>::send(int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
+    *(pick_send<false>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm().hdl );
   }
 
 
   template < typename Comm >
   template < typename T >
-  Request P2P_Comm<Comm>::Isend( int dest_rank, const T& send_buf, int tag, SendMode mode ) const {
+  Request P2P_Comm<Comm>::Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
     Request req;
     req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
 
-    auto[ buf, count, datatype ] = decay_buf(send_buf);
-    *(pick_send<true>(mode)) ( buf, count, datatype, dest_rank, tag, _comm().hdl, &req.hdl );
+    *(pick_send<true>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm().hdl, &req.hdl );
 
     return req;
   }
 
-  int probe_size( int source_rank, int tag, const MPI_Comm& comm, MPI_Datatype datatype ) {
-    MPI_Status s;
-    MPI_Probe( source_rank, tag, comm, &s );
-    int count = 0;
-    MPI_Get_count( &s, datatype, &count );
-    return count;
-  }
-
   template < typename Comm >
   template < typename T >
-  int P2P_Comm<Comm>::recv( int source_rank, T& recv_buf, int tag, bool resize_buf_with_probe ) const {
+  int P2P_Comm<Comm>::recv( int source_rank, T* recv_buf, int recv_count, int tag ) const {
     int recv_count = 0;
 
-    auto[ buf, count, datatype ] = decay_buf( recv_buf );
-
-    if constexpr ( is_container<T>() ) {
-      if ( resize_buf_with_probe ) {
-        count = probe_size( source_rank, tag, _comm().hdl, datatype );
-        recv_buf.resize(count);
-      }
-    }
-
     MPI_Status status;
-    MPI_Recv( buf, count, datatype, source_rank, tag, _comm().hdl, &status);
-    MPI_Get_count( &status, datatype, &recv_count );
+    MPI_Recv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm().hdl, &status);
+    MPI_Get_count( &status, datatype<T>(), &recv_count );
 
     return recv_count;
   }
 
   template < typename Comm >
   template < typename T >
-  Request PCP_Comm<Comm>::Irecv(int source_rank, T& recv_buf, int tag, bool resize_buf_with_probe ) const {
+  Request PCP_Comm<Comm>::Irecv(int source_rank, T* recv_buf, int recv_count, int tag ) const {
     Request req;
     req.hdl = Handle( new MPI_Request, Raw<MPI_Request>::free );
 
-    auto[ buf, count, datatype ] = decay_buf( recv_buf );
-
-    if constexpr ( is_container<T>() ) {
-      if ( resize_buf_with_probe ) {
-        count = probe_size( source_rank, tag, _comm().hdl, datatype );
-        recv_buf.resize(count);
-      }
-    }
-
-    MPI_Irecv( recv_buf.data(), recv_buf.size(), mpi_datatype<decltype(recv_buf[0])>(), source_rank, tag, _comm().hdl, &req.hdl );
+    MPI_Irecv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm().hdl, &req.hdl );
     return req;
   }
 
