@@ -1,7 +1,8 @@
 #ifndef _PARTICLE_STATE_HPP_
 #define _PARTICLE_STATE_HPP_
 
-#include "particle/traits.hpp"
+#include "particle/species_predef.hpp"
+#include "particle/flags_predef.hpp"
 #include <type_traits>
 #include <tuple>
 

@@ -21,7 +21,7 @@ namespace parallel {
       r_prmy[i] = i;
 
     if ( std::find( r_prmy.begin(), r_prmy.end(), mpi::world.rank() ) != r_prmy.end() ) {
-      result.emplace( r_prmy );
+      result.emplace( mpi::world, r_prmy );
       mpi::cartesianize( *result, dims, periodic );
     }
 
@@ -32,7 +32,7 @@ namespace parallel {
     std::optional<mpi::Comm> result;
 
     if ( std::find( members.begin(), members.end(), mpi::world.rank() ) != members.end() )
-      result.emplace( members );
+      result.emplace( mpi::world, members );
     return result;
   }
 
@@ -44,7 +44,7 @@ namespace parallel {
     std::array<int, 2 + DGrid + 2*DGrid> buf;
     if ( cart ) {
       locale.label = mpi::cart::linear_coord( *cart );
-      locale.chief_cart_rank = *cart.rank();
+      locale.chief_cart_rank = cart->rank();
       locale.cart_coords = mpi::cart::coords( *cart );
       for ( int i = 0; i < DGrid; ++i ) {
         locale.neighbors[i] = mpi::cart::shift( *cart, i, 1 );
@@ -92,7 +92,7 @@ namespace parallel {
 
     // loop over each primary, for each of which loop over DGrid, for each of which loop over left and right.
     // Check first if neighbor is null, then if there is already an intercomm.
-    for ( int i_cart = 0; i_cart < *cart.size(); ++i_cart ) {
+    for ( int i_cart = 0; i_cart < cart->size(); ++i_cart ) {
       for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
         const auto& neighs = locale.neighbors[i_dim];// this is in cartesian ranks
         auto& intercomms = result[i_dim];
@@ -109,4 +109,6 @@ namespace parallel {
     }
 
     return result;
+  }
+
 }

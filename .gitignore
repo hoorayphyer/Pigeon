@@ -28,6 +28,8 @@
 
 !src/
 !src/**/*.cpp
+!src/aperture/
+!src/aperture/*.cpp
 !src/utility/
 !src/utility/*.cpp
 !src/export/

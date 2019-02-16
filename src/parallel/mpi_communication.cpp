@@ -21,6 +21,11 @@ namespace mpi {
 
 }
 namespace mpi {
+  void request_free ( MPI_Request* p ) {
+    if ( p && *p != MPI_REQUEST_NULL )
+      MPI_Request_free(p);
+  }
+
   void wait( Request& request ) {
     // MPI_Status status;
     // MPI_Wait( &request, &status );
@@ -98,11 +103,11 @@ namespace mpi {
 
   template < typename Comm >
   template < typename T >
-  int P2P_Comm<Comm>::recv( int source_rank, T* recv_buf, int recv_count, int tag ) const {
-    int recv_count = 0;
-
+  int P2P_Comm<Comm>::recv( int source_rank, T* recv_buf, int recv_count_max, int tag ) const {
     MPI_Status status;
-    MPI_Recv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm(), &status);
+    MPI_Recv( recv_buf, recv_count_max, datatype<T>(), source_rank, tag, _comm(), &status);
+
+    int recv_count = 0;
     MPI_Get_count( &status, datatype<T>(), &recv_count );
 
     return recv_count;
@@ -110,9 +115,9 @@ namespace mpi {
 
   template < typename Comm >
   template < typename T >
-  Request PCP_Comm<Comm>::Irecv(int source_rank, T* recv_buf, int recv_count, int tag ) const {
+  Request P2P_Comm<Comm>::Irecv(int source_rank, T* recv_buf, int recv_count_max, int tag ) const {
     Request req;
-    MPI_Irecv( recv_buf, recv_count, datatype<T>(), source_rank, tag, _comm(), req );
+    MPI_Irecv( recv_buf, recv_count_max, datatype<T>(), source_rank, tag, _comm(), req );
     return req;
   }
 
@@ -157,7 +162,7 @@ namespace mpi {
     reduce_return_t<T> result;
 
     auto[ buf, count, datatype ] = decay_buf( std::forward<T>(buffer) );
-    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
+    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, _comm().rank() == root );
 
     MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm() );
 
@@ -170,7 +175,7 @@ namespace mpi {
     reduce_return_t<T> result;
 
     auto[ buf, count, datatype ] = decay_buf( std::forward<T>(buffer) );
-    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, rank() == root );
+    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, _comm().rank() == root );
 
     Request req;
     MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm(), req );

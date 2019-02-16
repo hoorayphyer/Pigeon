@@ -1,16 +1,9 @@
-#ifndef _KNL_SHAPE_HPP_
-#define _KNL_SHAPE_HPP_
+#ifndef _KNL_SHAPEF_HPP_
+#define _KNL_SHAPEF_HPP_
 
+#include "kernel/shape_predef.hpp"
 
 namespace knl {
-  // value here denotes length of support
-  enum class shape : int {
-    Nearest_Grid_Point = 1,
-    Cloud_In_Cell = 2,
-    Triangular_Cloud = 3,
-    Piecewise_Cubic_Spline = 4
-  };
-
   template < shape S >
   struct shapef_t {
     const int support = static_cast<int>(S);

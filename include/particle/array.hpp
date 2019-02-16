@@ -3,7 +3,6 @@
 
 #include "particle/particle.hpp"
 #include <iterator>
-#include "apt/vec.hpp"
 
 namespace particle {
   template < typename array_t >
@@ -35,8 +34,8 @@ namespace particle {
     inline reference operator* () const noexcept {
       auto f = [i=_index] ( auto&& x ) { return x[i]; };
       // TODO check sematics of make_vvff
-      return reference( apt::make_vvff( f, _array._q ),
-                        apt::make_vvff( f, _array._p ),
+      return reference( apt::make_vff( f, _array._q ),
+                        apt::make_vff( f, _array._p ),
                         _array._state[_index] );
     }
 

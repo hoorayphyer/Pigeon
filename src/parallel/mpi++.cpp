@@ -2,6 +2,16 @@
 
 // global definitions
 namespace mpi {
+  void group_free( MPI_Group* p ) {
+    if ( p && *p != MPI_GROUP_NULL )
+      MPI_Group_free(p);
+  }
+
+  void comm_free ( MPI_Comm* p ) {
+    if ( p && *p != MPI_COMM_NULL && *p != MPI_COMM_WORLD )
+      MPI_Comm_free(p);
+  }
+
   Comm world;
 
   void initialize() {
@@ -11,8 +21,9 @@ namespace mpi {
     if (!is_initialized)
       MPI_Init(NULL, NULL);
 
+    // TODO check freeing deepcopied MPI_COMM_WORLD
     MPI_Comm comm_world = MPI_COMM_WORLD;
-    world = Comm(&comm_world);
+    world.reset(&comm_world);
   }
 
   void finalize() {
@@ -23,42 +34,83 @@ namespace mpi {
   }
 }
 
-// TODO
 // mpi::Group
-// #include <iterator> // back_inserter
 namespace mpi {
-  // Group operator^ ( const Group& a, const Group& b ) {
-  //   Group result;
-  //   std::set_intersection( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
-  //   return result;
+  Group::Group ( const std::vector<int>& ranks, const Group& source ) {
+    // TODO remove duplicates
+    MPI_Group grp;
+    MPI_Group_incl(source, ranks.size(), ranks.data(), &grp);
+    reset(&grp);
+  }
+
+  Group::Group ( const std::vector<int>& ranks )
+    : Group( ranks, world.group() ) {}
+
+  // Group::operator std::vector<int>() {
+  //   int size;
+  //   MPI_Group_size(*this, &size);
+  //   std::vector<int> ranks
   // }
 
-  // Group operator+ ( const Group& a, const Group& b ) {
-  //   Group result;
-  //   std::set_union( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
-  //   return result;
-  // }
+  Group& Group::operator^= ( const Group& a ) {
+    MPI_Group grp;
+    MPI_Group_intersection(*this, a, &grp);
+    reset(&grp);
+    return *this;
+  }
 
-  // Group operator- ( const Group& a, const Group& b ) {
-  //   Group result;
-  //   std::set_difference( a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(result) );
-  //   return result;
-  // }
+  Group& Group::operator+= ( const Group& a ) {
+    MPI_Group grp;
+    MPI_Group_union(*this, a, &grp);
+    reset(&grp);
+    return *this;
+  }
+
+  Group& Group::operator-= ( const Group& a ) {
+    MPI_Group grp;
+    MPI_Group_difference(*this, a, &grp);
+    reset(&grp);
+    return *this;
+  }
+
+  std::vector<int> Group::translate( const std::vector<int>& ranks, const Group& target ) const {
+    std::vector<int> results( ranks.size() );
+    MPI_Group_translate_ranks( *this, ranks.size(), ranks.data(), target, results.data() );
+    return results;
+  }
+
+  Group operator^ ( const Group& a, const Group& b ) {
+    Group result;
+    MPI_Group grp;
+    MPI_Group_intersection(a, b, &grp);
+    result.reset(&grp);
+    return result;
+  }
+
+  Group operator+ ( const Group& a, const Group& b ) {
+    Group result;
+    MPI_Group grp;
+    MPI_Group_union(a, b, &grp);
+    result.reset(&grp);
+    return result;
+  }
+
+  Group operator- ( const Group& a, const Group& b ) {
+    Group result;
+    MPI_Group grp;
+    MPI_Group_difference(a, b, &grp);
+    result.reset(&grp);
+    return result;
+  }
+
 }
 
 // mpi::Comm
 namespace mpi {
-  Comm::Comm( const Group& group ) {
-    MPI_Group grp_world, grp_this;
-    MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
-    MPI_Group_incl( grp_world, group.size(), group.data(), &grp_this );
-
+  Comm::Comm ( const Comm& super_comm, const Group& sub_group ) {
     MPI_Comm comm;
-    MPI_Comm_create_group(MPI_COMM_WORLD, grp_this, 0, &comm );
+    MPI_Comm_create_group(super_comm, sub_group, 147, &comm );
     reset(&comm);
-
-    MPI_Group_free(&grp_world);
-    MPI_Group_free(&grp_this);
   }
 
   int Comm::rank() const {
@@ -73,16 +125,14 @@ namespace mpi {
     return size;
   }
 
-  std::vector<int> Comm::to_world( std::vector<int> ranks ) const {
-    auto world_ranks {ranks};
-    MPI_Group grp_world, grp_this;
-    MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
-    MPI_Comm_group(*this, &grp_this);
-    MPI_Group_translate_ranks( grp_this, ranks.size(), ranks.data(), grp_world, world_ranks.data() );
-    MPI_Group_free( &grp_world );
-    MPI_Group_free( &grp_this );
-    return world_ranks;
+  Group Comm::group() const {
+    Group result;
+    MPI_Group grp;
+    MPI_Comm_group(*this, &grp);
+    result.reset(&grp);
+    return result;
   }
+
 
 }
 
@@ -168,22 +218,10 @@ namespace mpi {
 
   Group InterComm::remote_group() const {
     Group result;
-    const int size = remote_size();
 
-    auto* ranks = new int [size];
-    for ( int i = 0; i < size; ++i ) {
-      ranks[i] = i;
-      result.push_back(0);
-    }
-
-    MPI_Group grp_world, grp_remote;
-    MPI_Comm_group(MPI_COMM_WORLD, &grp_world);
+    MPI_Group grp_remote;
     MPI_Comm_remote_group(*this, &grp_remote);
-    MPI_Group_translate_ranks( grp_remote, size, ranks, grp_world, result.data() );
-    MPI_Group_free( &grp_world );
-    MPI_Group_free(&remote);
-
-    delete [] ranks;
+    result.reset(&grp_remote);
 
     return result;
   }

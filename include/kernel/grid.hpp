@@ -39,7 +39,8 @@ namespace knl {
 }
 
 #include <array>
-#include "apt/vec_expression.hpp"
+#include "apt/virtual_vec.hpp"
+#include "apt/vec_from_function.hpp"
 
 namespace knl {
   // Grid is designed to represent the supergrid

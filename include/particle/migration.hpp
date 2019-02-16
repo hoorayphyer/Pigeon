@@ -17,7 +17,7 @@ namespace particle {
     state_t _s;
 
   public:
-    static constexpr auto Dim = DPtc;
+    static constexpr int Dim = DPtc;
     // TODO double check this: std::get on C-style array is supported with bound checking. At least, std::begin and std::end do.
     constexpr auto& q() noexcept { return T(&_q)[DPtc]; }
     constexpr const auto& q() const noexcept { return (const T)(&_q)[DPtc]; }

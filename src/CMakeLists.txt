@@ -1,4 +1,4 @@
-include_directories( ${MPI_INCLUDE_PATH} ${Silo_INCLUDE_DIR} ../include )
+include_directories( ${Silo_INCLUDE_DIR} ../include )
 
 # if(LAB_ROOT_DIR)
 #   include("${LAB_ROOT_DIR}/src/CMakeLists.txt")
@@ -19,8 +19,42 @@ include_directories( ${MPI_INCLUDE_PATH} ${Silo_INCLUDE_DIR} ../include )
 # else()
 #   message("${Yellow}No lab is invoked.${ColorReset}")
 # endif()
-add_library(field_lib STATIC "field/field.cpp")
-add_library(ptc_lib STATIC "particle/depositer.cpp" "particle/migration.cpp" "particle/pair_producer.cpp" "particle/array.cpp" "particle/pusher.cpp")
+
+#TODO precede particle/.cpp with lab/.cpp
+macro(module_gen category name)
+  add_library( ${category}_${name}_module STATIC "aperture/${category}_${name}.cpp")
+  target_include_directories(${category}_${name}_module PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  list( APPEND ${category}_modules ${category}_${name}_module )
+endmacro()
+
+function(link_mpi target)
+  target_include_directories(${target} PUBLIC ${MPI_INCLUDE_PATH})
+  target_link_libraries(${target} PRIVATE ${MPI_LIBRARIES})
+  set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+  set_target_properties(${target} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
+endfunction()
+
+set( particle_modules "" )
+
+add_library(parallel_lib STATIC "parallel/locale.cpp" "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
+target_include_directories(parallel_lib PUBLIC ${MPI_INCLUDE_PATH})
+link_mpi(parallel_lib)
+
+
+# add_library(field_lib STATIC "field/field.cpp" )
+
+
+# module_gen(particle migration)
+# link_mpi(particle_migration_module)
+# target_link_libraries(particle_migration_module PRIVATE ${parallel_lib})
+
+# module_gen(particle depositer)
+# module_gen(particle pair_producer)
+module_gen(particle pusher)
+# module_gen(particle array)
+
+# add_library(particle_update_lib STATIC "particle/updater.cpp")
+# target_link_libraries(particle_update_lib PRIVATE ${particle_modules})
 
 
 # TODO now src are scattered
@@ -32,19 +66,6 @@ add_library(ptc_lib STATIC "particle/depositer.cpp" "particle/migration.cpp" "pa
 #   endforeach()
 # endif()
 
-add_library(AperLib STATIC "aperture.cpp" )
-target_link_libraries(AperLib PRIVATE ${field_lib} ${ptc_lib})
-
-# if(MPI_COMPILE_FLAGS)
-#   set_target_properties(AperLib PROPERTIES
-#     COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-# endif()
-
-# if(MPI_LINK_FLAGS)
-#   set_target_properties(AperLib PROPERTIES
-#     LINK_FLAGS "${MPI_LINK_FLAGS}")
-# endif()
-
 # if(LAB_ROOT_DIR AND Lab_User_Control_Found)
 #   set(UserControl_src "${LAB_ROOT_DIR}/src/UserControl.cpp")
 # else()
@@ -53,9 +74,10 @@ target_link_libraries(AperLib PRIVATE ${field_lib} ${ptc_lib})
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
 # add_library(UserControl STATIC ${UserControl_src})
 
-add_executable(aperture "main.cpp")
+# add_executable(aperture "main.cpp" "aperture.cpp")
+# target_link_libraries(aperture PRIVATE ${field_lib} ${particle_update_lib})
+
 # target_link_libraries(aperture AperLib UserControl)
-target_link_libraries(aperture AperLib)
 
 # if(LAB_ROOT_DIR)
 #   set_target_properties(aperture PROPERTIES

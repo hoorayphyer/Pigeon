@@ -1,22 +1,14 @@
-#ifndef  _PARTICLE_TRAITS_HPP_
-#define  _PARTICLE_TRAITS_HPP_
+#ifndef  _PARTICLE_PROPERTIES_HPP_
+#define  _PARTICLE_PROPERTIES_HPP_
 
-namespace particle {
-  enum class species : unsigned char
-    { electron = 0, positron, ion, photon };
-
-  enum class flag : unsigned int
-    { empty = 0, secondary, ignore_force,
-      ignore_deposit, annihilate, ignore_em,
-      delimiter, traced };
-}
+#include "species_predef.hpp"
 
 namespace particle {
   template < species sp >
-  constexpr unsigned int mass_x; // in terms of unit mass
+  constexpr unsigned int mass_x = 0; // in terms of unit mass
 
   template < species sp >
-  constexpr int charge_x; // in terms of unit charge
+  constexpr int charge_x = 0; // in terms of unit charge
 
   template < species sp >
   constexpr bool is_radiative = ( sp == species::electron || sp == species::positron );
@@ -33,10 +25,6 @@ namespace particle {
   mass_x<species::electron> = 1;
   template <> constexpr unsigned int
   mass_x<species::positron> = 1;
-  template <> constexpr unsigned int
-  mass_x<species::ion> = 5; // TODO move it somewhere else
-  template <> constexpr unsigned int
-  mass_x<species::photon> = 0;
 
   template <> constexpr unsigned int
   charge_x<species::electron> = -1;
@@ -44,8 +32,13 @@ namespace particle {
   charge_x<species::positron> = 1;
   template <> constexpr unsigned int
   charge_x<species::ion> = 1;
-  template <> constexpr unsigned int
-  charge_x<species::photon> = 0;
 }
+
+#include "traits.hpp"
+namespace particle {
+  template <> constexpr unsigned int
+  mass_x<species::ion> = traits::ion_mass;
+}
+
 
 #endif

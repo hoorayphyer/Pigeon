@@ -1,7 +1,6 @@
 #ifndef _KNL_GRID_SHAPE_INTERPLAY_HPP_
 #define _KNL_GRID_SHAPE_INTERPLAY_HPP_
 
-#include "kernel/shape.hpp"
 #include "kernel/grid.hpp"
 #include "apt/vec.hpp"
 

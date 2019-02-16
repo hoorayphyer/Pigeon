@@ -33,11 +33,7 @@ namespace mpi {
 
 
 namespace mpi {
-  void request_free ( MPI_Request* p ) {
-    if ( p && *p != MPI_REQUEST_NULL )
-      MPI_Request_free(p);
-  }
-
+  void request_free ( MPI_Request* p );
   using Request = apt::Handle<MPI_Request, request_free >;
 }
 
@@ -71,9 +67,9 @@ namespace mpi {
     Request Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::STD ) const;
 
     template <typename T>
-    int recv( int source_rank, T* recv_buf, int recv_count, int tag ) const; // return the actual recved number
+    int recv( int source_rank, T* recv_buf, int recv_count_max, int tag ) const; // return the actual recved number
     template <typename T>
-    Request Irecv(int source_rank, T* recv_buf, int recv_count, int tag ) const;
+    Request Irecv(int source_rank, T* recv_buf, int recv_count_max, int tag ) const;
 
   };
 

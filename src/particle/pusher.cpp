@@ -1,5 +1,5 @@
 #include "particle/pusher.hpp"
-#include "particle/particle.hpp"
+#include "particle/properties.hpp"
 #include "apt/numeric.hpp"
 #include "kernel/coordinate.hpp"
 
@@ -43,10 +43,12 @@ namespace particle :: force {
 
 // TODO move check of forces on_off to somewhere else
 namespace particle {
-  template < species sp, typename Ptc, typename Field, typename Vec, typename T >
-  Vec update_p( Ptc& ptc, const T& dt, const Field& E, const Field& B ) {
-    Vec dp;
+  template < species sp, typename dp_t, typename Ptc, typename Field, typename T >
+  dp_t update_p( PtcExpression<Ptc>& ptc, const T& dt,
+                 const apt::VecExpression<Field>& E, const apt::VecExpression<Field>& B ) {
+    dp_t dp;
 
+    dp += force::lorentz( dt / mass_x<sp>, ptc.p(), E, B );
     // TODO pane
     // Apply Lorentz force
     // if ( _pane.lorentz_On  ) {
@@ -63,52 +65,33 @@ namespace particle {
 
     // // when B is strong enough, damp the perpendicular component of momentum
     // // FIXME ions should also be affected right?
-    // // TODO should this go before p += dp
+    // // TODO should this go before p += dp?
     // if ( _pane.landau0_On && is_radiative<sp> ) {
     //   if ( apt::sqabs(B) > _pane.B_landau0 * _pane.B_landau0 ) {
     //     dp += force::landau0( ptc.p, E, B );
     //   }
     // }
 
-    ptc.p += dp;
+    ptc.p() += dp;
 
     return dp;
   }
 
 
-  template < species sp, knl::coordsys_t CS, typename Ptc, typename Vec, typename T >
-  Vec update_q( Ptc& ptc, const T& dt ) {
-    auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p) );
+  template < species sp, knl::coordsys CS, typename dq_t, typename Ptc, typename T >
+  dq_t update_q( PtcExpression<Ptc>& ptc, const T& dt ) {
+    auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p()) );
 
-    if constexpr ( CS == knl::coordsys_t::Cartesian ) {
-      return knl::coord<CS>::geodesic_move( ptc.q, ptc.p, dt / gamma );
+    if constexpr ( CS == knl::coordsys::Cartesian ) {
+      // a small optimization for Cartesian
+      return knl::coord<CS>::geodesic_move( ptc.q(), ptc.p(), dt / gamma );
     } else {
-      auto dq = knl::coord<CS>::geodesic_move( ptc.q, (ptc.p /= gamma), dt );
-      ptc.p *= gamma;
+      dq_t dq = knl::coord<CS>::geodesic_move( ptc.q(), (ptc.p() /= gamma), dt );
+      ptc.p() *= gamma;
       return dq;
     }
 
   }
 
 
-}
-
-namespace particle {
-  // TODO instantiate
-  // template < species sp,
-  //            typename Tvt, std::size_t DPtc, std::size_t DField,
-  //            typename Trl = apt::remove_cvref_t<Tvt>,
-  //            typename Ptc = Particle<Tvt, DPtc>,
-  //            typename T_field = apt::Vec<Trl, DField>,
-  //            typename T_dp = apt::Vec<Trl,DPtc>
-  //            >
-  // T_dp update_p ( Ptc& ptc, const Trl& dt, const T_field& E, const T_field& B );
-
-  // template < species sp,
-  //            knl::coordsys_t CS, typename Tvt, std::size_t DPtc,
-  //            typename Trl = apt::remove_cvref_t<Tvt>,
-  //            typename Ptc = Particle<Tvt, DPtc>,
-  //            typename T_dq = apt::Vec<Trl,DPtc>
-  //            >
-  // T_dq update_q ( Ptc& ptc, const Trl& dt );
 }

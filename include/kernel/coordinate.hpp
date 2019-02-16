@@ -1,6 +1,7 @@
 #ifndef  _KNL_COORDINATE_HPP_
 #define  _KNL_COORDINATE_HPP_
 
+#include "kernel/coordsys_predef.hpp"
 #include "apt/numeric.hpp"
 
 template < typename T >
@@ -8,16 +9,7 @@ inline constexpr T PI (3.1415926535897932384626433832795028841971693993751058209
 
 namespace knl {
 
-  enum class coordsys_t : unsigned char
-    {
-     Cartesian = 0,
-     Cylindrical,
-     Spherical,
-     LogSpherical,
-     LogSphericalEV,
-    };
-
-  template < coordsys_t Coord = coordsys_t::Cartesian >
+  template < coordsys Coord = coordsys::Cartesian >
   struct coord {
     template < int N, typename T >
     static inline T h ( T x1, T x2, T x3 ) {
@@ -34,8 +26,8 @@ namespace knl {
     template < typename T >
     static inline T hhh ( T x1, T x2, T x3 ) { return 1.0; }
 
-    template < class Vec_x, class Vec_v, typename T >
-    static inline auto geodesic_move( Vec_x& x, const Vec_v& v, T dt ) {
+    template < class X, class V, typename T >
+    static inline auto geodesic_move( apt::VecExpression<X>& x, const apt::VecExpression<V>& v, const T& dt ) {
       auto dx = v * dt;
       x += dx;
       return dx;
@@ -43,7 +35,7 @@ namespace knl {
   };
 
   template <>
-  struct coord < coordsys_t::LogSpherical > {
+  struct coord < coordsys::LogSpherical > {
     template < int N, typename T >
     static inline T h ( T logr, T theta, T phi ) {
       static_assert( N == 1 || N == 2 || N == 3, "h index out of bounds" );
@@ -95,7 +87,7 @@ namespace knl {
     //                       r * cos_t );
 
     //   // update x_cart
-    //   coord<coordsys_t::Cartesian>::geodesic_move( x_cart, p_cart, dt );
+    //   coord<coordsys::Cartesian>::geodesic_move( x_cart, p_cart, dt );
 
     //   // transform the new position back from cartesian
     //   logr = vecop::abs(x_cart);
@@ -120,8 +112,8 @@ namespace knl {
     // }
 
 
-    template < class Vec_x, class Vec_v, typename T >
-    static inline auto geodesic_move( Vec_x& x, Vec_v& v, T dt ) {
+    template < class X, class V, typename T >
+    static inline auto geodesic_move( apt::VecExpression<X>& x, apt::VecExpression<V>& v, const T& dt ) {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       // dx is the return value and meanwhile it serves as a temporary

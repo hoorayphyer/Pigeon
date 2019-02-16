@@ -12,7 +12,8 @@ private:
   DynamicVars<Real, DGrid, DPtc, state_t> _dvars;
   Params<Real, DGrid> _params;
   knl::Grid<DGrid, Real> _grid;
-  mpi::Comm _comm;
+  std::optional<mpi::Comm> _cartesian;
+  std::optional<mpi::Comm> _ensemble;
   // data export
 
   int _timestep_begin;

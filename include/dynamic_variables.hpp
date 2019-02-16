@@ -4,7 +4,7 @@
 #include "field/field.hpp"
 #include "particle/array.hpp"
 
-template< typename Real, std::size_t DGrid, std::size_t DPtc, typename state_t >
+template< typename Real, int DGrid, int DPtc, typename state_t >
 struct DynamicVars {
   field::Field<Real, 3, DPtc> E;
   field::Field<Real, 3, DPtc> B;

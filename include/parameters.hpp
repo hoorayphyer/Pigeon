@@ -5,7 +5,7 @@
 #include <string>
 
 // TODOL traits and params are basically the same thing. Just compile time known or not
-template < typename Real, std::size_t DGrid >
+template < typename Real, int DGrid >
 struct Params {
   Real dt;
   int total_timesteps;

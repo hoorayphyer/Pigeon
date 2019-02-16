@@ -2,11 +2,11 @@
 #define _PARTICLE_HPP_
 
 #include "particle/particle_expression.hpp"
-#include "apt/vec.hpp"
 
+#include "apt/virtual_vec.hpp"
 namespace particle {
   template < typename T, int DPtc, typename state_t >
-  struct vParticle : public PtcExpression< vParticle<T, DPtc, state_t> > {
+  struct vParticle : public PtcExpression< vParticle<T, DPtc, state_t>, apt::vVec<T,DPtc>, state_t > {
   private:
     static_assert( 8 * sizeof( state_t) >= 64 );
 
@@ -15,7 +15,9 @@ namespace particle {
     state_t& _state;
 
   public:
-    static constexpr auto Dim = DPtc;
+    static constexpr int Dim = DPtc;
+    using vec_type = apt::vVec<T, DPtc>;
+    using state_type = state_t;
 
     constexpr auto& q() noexcept { return _q; }
     constexpr const auto& q() const noexcept { return _q; }
@@ -42,6 +44,7 @@ namespace particle {
 
 }
 
+#include "apt/vec.hpp"
 namespace particle {
 
   template < typename T, int DPtc, typename state_t >
@@ -54,7 +57,7 @@ namespace particle {
     state_t _state;
 
   public:
-    static constexpr auto Dim = DPtc;
+    static constexpr int Dim = DPtc;
 
     constexpr auto& q() noexcept { return _q; }
     constexpr const auto& q() const noexcept { return _q; }

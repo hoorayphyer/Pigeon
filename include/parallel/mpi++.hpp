@@ -5,25 +5,30 @@
 #include <array>
 
 namespace mpi {
-  void group_free( MPI_Group* p ) {
-    if ( p && *p != MPI_GROUP_NULL )
-      MPI_Group_free(p);
-  }
+  void group_free( MPI_Group* p );
 
-  // TODO so far, no use of Group. make group look like an ordered set
+  // NOTE MPI_Group being an ordered set seems to mean that ( group_rank, process ) are stored as elements and ordered by group_rank. The mapping is solely determined by the order of processes user passed in when constructing the group.
   struct Group : apt::Handle<MPI_Group, group_free> {
-    // Group operator^ ( const Group& a, const Group& b ); // intersection
-    // Group operator+ ( const Group& a, const Group& b ); // union
-    // Group operator- ( const Group& a, const Group& b ); // difference
+    Group() = default;
+    Group ( const std::vector<int>& ranks, const Group& source );
+    Group ( const std::vector<int>& ranks ); // using MPI_WORLD_GROUP
+    // operator std::vector<int>();
+
+    Group& operator^= ( const Group& );
+    Group& operator+= ( const Group& );
+    Group& operator-= ( const Group& );
+
+    std::vector<int> translate( const std::vector<int>& ranks, const Group& target ) const;
   };
+
+  Group operator^ ( const Group& a, const Group& b ); // intersection
+  Group operator+ ( const Group& a, const Group& b ); // union
+  Group operator- ( const Group& a, const Group& b ); // difference
 
 }
 
 namespace mpi {
-  void comm_free ( MPI_Comm* p ) {
-    if ( p && *p != MPI_COMM_NULL && *p != MPI_COMM_WORLD )
-      MPI_Comm_free(p);
-  }
+  void comm_free ( MPI_Comm* p );
 
   struct Comm : public apt::Handle<MPI_Comm, comm_free>,
                 public P2P_Comm<Comm>,
@@ -35,14 +40,11 @@ namespace mpi {
     friend class Collective_Comm<Comm>;
 
     Comm() = default;
-    Comm( MPI_Comm* mpi_comm );
-    Comm ( const Group& group );
+    Comm ( const Comm& super_comm, const Group& sub_group );
 
     int rank() const;
     int size() const;
-
-    std::vector<int> to_world( std::vector<int> ranks ) const;
-
+    Group group() const;
   };
 
 }

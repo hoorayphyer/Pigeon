@@ -1,7 +1,8 @@
 #include "aperture.hpp"
+#include "traits.hpp"
 
 int main() {
-  Aperture<double,2,3, unsigned long long> aperture; // TODO
+  Aperture< traits::real_t, traits::DGrid, traits::DPtc, traits::ptc_state_t > aperture;
   aperture.launch();
   return 0;
 }
