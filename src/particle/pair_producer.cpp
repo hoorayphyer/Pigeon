@@ -5,7 +5,7 @@
 
 namespace particle {
   template < typename Ptc, typename T >
-  bool is_productive_lepton( const Ptc& ptc, const T& gamma,
+  bool is_productive_lepton( const PtcExpression<Ptc>& ptc, const T& gamma,
                              const T& Rc, util::Rng<T>& rng ) noexcept {
     // TODO pane
     // return
@@ -42,14 +42,15 @@ namespace particle {
   }
 
   template < typename Ptc, typename T >
-  bool is_productive_photon( const Ptc& photon, const T& B2, util::Rng<T>& rng ) noexcept {
+  bool is_productive_photon( const PtcExpression<Ptc>& photon, const T& B2,
+                             util::Rng<T>& rng ) noexcept {
     return opacity::mag_conv(B2, rng.uniform() ) || opacity::ph_ph( rng.uniform() );
   }
 }
 
 namespace particle {
-  template < typename T, typename Vec_p_t, typename Vec_dp_t >
-  T calc_Rc( T dt, const Vec_p_t& p, const Vec_dp_t& dp ) noexcept {
+  template < typename T, typename p_t, typename dp_t >
+  T calc_Rc( T dt, const apt::VecExpression<p_t>& p, const apt::VecExpression<dp_t>& dp ) noexcept {
     // TODO don't use a uniform number for Rc
     return 1.0;
   }
@@ -82,20 +83,24 @@ namespace particle {
     // return std::min(_pane.E_ph, gamma - 1.0);
   }
 
-  template < typename Iter, typename Ptc, typename T >
-  void instant_produce_pairs( Iter itr_e, Iter itr_p, Ptc& ptc, const T& gamma_ptc, T Rc ) {
+  template < typename BackInsertIter, typename Ptc, typename T >
+  void instant_produce_pairs( BackInsertIter itr_e, BackInsertIter itr_p,
+                              PtcExpression<Ptc>& ptc, const T& gamma_ptc, T Rc ) {
     {
       // recycle Rc for E_ph
       Rc = sample_E_ph( gamma_ptc, Rc );
       // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
-      ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
+      ptc.p() *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
     } {
       // recycle Rc for gamma_sec
       Rc /= 2.0;
       // append electron and positron
-      auto&& ptc_sec = Particle ( ptc.q,
-                                  ptc.p * ( std::sqrt( Rc * Rc - 1.0 ) / apt::sqabs(ptc.p) ),
-                                  flag::secondary);
+      auto&& ptc_sec = Particle<typename Ptc::vec_type::value_type,
+                                Ptc::Dim,
+                                typename Ptc::state_type
+                                > ( ptc.q(),
+                                    ptc.p() * ( std::sqrt( Rc * Rc - 1.0 ) / apt::sqabs(ptc.p()) ),
+                                    flag::secondary );
       ptc_sec.set(species::electron);
       *(itr_e++) = ptc_sec;
       ptc_sec.set(species::positron);
@@ -108,24 +113,31 @@ namespace particle {
 }
 
 namespace particle {
-  template < typename Iter, typename Ptc, typename T >
-  void produce_photons( Iter itr_photon, Ptc& ptc, const T& gamma_ptc, T Rc ) {
+  template < typename BackInsertIter, typename Ptc, typename T >
+  void produce_photons( BackInsertIter itr_photon, PtcExpression<Ptc>& ptc,
+                        const T& gamma_ptc, T Rc ) {
     // recycle Rc for E_ph
     Rc = sample_E_ph( gamma_ptc, std::move(Rc) );
     // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
-    ptc.p *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
+    ptc.p() *= std::sqrt( ( 1.0 - Rc / ( gamma_ptc - 1.0 ) ) * ( 1.0 - Rc / ( gamma_ptc + 1.0 ) ) );
 
-    *(itr_photon++) = Particle ( ptc.q,
-                                 ptc.p * ( Rc / apt::abs(ptc.p) ),
-                                 species::photon );
+    *(itr_photon++) = Particle<typename Ptc::vec_type::value_type,
+                               Ptc::Dim,
+                               typename Ptc::state_type
+                               > ( ptc.q(),
+                                   ptc.p() * ( Rc / apt::abs(ptc.p()) ),
+                                   species::photon );
   }
 
 
-  template < typename Iter, typename Ptc >
-  void photon_produce_pairs( Iter itr_e, Iter itr_p, Ptc& photon ) {
-    auto&& ptc_sec = Particle ( photon.q,
-                                photon.p * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p) ),
-                                flag::secondary );
+  template < typename BackInsertIter, typename Ptc >
+  void photon_produce_pairs( BackInsertIter itr_e, BackInsertIter itr_p, PtcExpression<Ptc>& photon ) {
+    auto&& ptc_sec = Particle<typename Ptc::vec_type::value_type,
+                              Ptc::Dim,
+                              typename Ptc::state_type
+                              > ( photon.q(),
+                                  photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
+                                  flag::secondary );
     ptc_sec.set(species::electron);
     *(itr_e++) = ptc_sec;
     ptc_sec.set(species::positron);

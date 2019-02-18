@@ -76,19 +76,15 @@ namespace particle {
 
     template < typename Attr, typename... Attrs >
     inline self_t& set( const Attr& attr, const Attrs&... attrs ) noexcept {
-      set(attr);
+      using utt = std::underlying_type_t<Attr>;
+
+      if constexpr ( std::is_same_v<Attr, flag> ) {
+        state() |= ( 1 << (static_cast<utt>(attr) + layout::begin<flag>() ) );
+      } else {
+        setbits< layout::begin<Attr>(), layout::size<Attr>() >( state(), static_cast<utt>(attr) );
+      }
+
       if constexpr( sizeof...(Attrs) > 0 ) set(attrs...);
-    }
-
-    template < typename Attr >
-    inline self_t& set( const Attr& a ) noexcept {
-      setbits< layout::begin<Attr>(), layout::size<Attr>() >( state(), static_cast<std::underlying_type_t<Attr>>(a) );
-      return *this;
-    }
-
-    inline self_t& set( const flag& fl ) noexcept {
-      using utt = std::underlying_type_t<flag>;
-      state() |= ( 1 << (static_cast<utt>(fl) + layout::begin<flag>() ) );
       return *this;
     }
 
@@ -104,13 +100,11 @@ namespace particle {
     }
 
     template < typename Attr >
-    inline bool is( const Attr& a ) const noexcept {
-      return get<Attr>() == a;
-    }
-
-    inline bool is( const flag& fl ) const noexcept {
-      using utt = std::underlying_type_t<flag>;
-      return state() & ( 1 << (static_cast<utt>(fl) + layout::begin<flag>()) );
+    inline bool is( const Attr& attr ) const noexcept {
+      if constexpr ( std::is_same_v<Attr, flag> )
+        return state() & ( 1 << (static_cast<std::underlying_type_t<flag>>(attr) + layout::begin<flag>()) );
+      else
+        return get<Attr>() == attr;
     }
 
 

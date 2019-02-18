@@ -29,10 +29,11 @@ namespace particle {
     constexpr auto& state() noexcept { return _state; }
     constexpr const auto& state() const noexcept { return _state; }
 
-    template < typename... Attr >
-    Particle( const apt::Vec<T, DPtc>& q, const apt::Vec<T, DPtc>& p, const Attr&... attrs ) noexcept
+    template < typename E1, typename E2, typename... Attrs >
+    Particle( const apt::VecExpression<E1>& q, const apt::VecExpression<E2>& p, const Attrs&... attrs ) noexcept
       : _q(q), _p(p), _state(0) {
-      if constexpr( sizeof...(Attr) > 0 ) set(attrs...);
+      // NOTE need this before set because of dependent base lookup
+      if constexpr( sizeof...(Attrs) > 0 ) this->set(attrs...);
     }
 
     template < typename E >

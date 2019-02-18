@@ -81,10 +81,8 @@ namespace particle {
       return *( iterator( *this, i ) );
     }
 
-    // TODO change them to ParticleExpression
     template < typename Ptc >
     void push_back( const PtcExpression<Ptc>& ptc );
-
     template < typename Ptc >
     void push_back( PtcExpression<Ptc>&& ptc );
 
@@ -104,7 +102,7 @@ namespace std {
   template < typename T, int DPtc, typename state_t >
   class back_insert_iterator<particle::array<T,DPtc, state_t>> {
   private:
-    particle::array<T,DPtc,state_t>& _c;
+    particle::array<T,DPtc,state_t>& _arr;
     int _index;
 
   public:
@@ -114,12 +112,11 @@ namespace std {
     using reference = void;
     using pointer = void;
 
-    explicit back_insert_iterator( particle::array<T,DPtc, state_t>& c ) noexcept : _c(c) {}
+    explicit back_insert_iterator( particle::array<T,DPtc, state_t>& arr ) noexcept : _arr(arr) {}
 
     template < typename Ptc >
     auto& operator= ( Ptc&& ptc ) {
-      // use emplace to accommodate for PtcExpression
-      _c.emplace_back(std::forward<Ptc>(ptc));
+      _arr.push_back(std::forward<Ptc>(ptc));
       return *this;
     }
 
