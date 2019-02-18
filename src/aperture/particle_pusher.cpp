@@ -1,7 +1,7 @@
 #include "particle/pusher.cpp"
 #include "traits.hpp"
 #include "apt/vec.hpp"
-#include "particle/particle.hpp"
+#include "particle/virtual_particle.hpp"
 
 using namespace traits;
 

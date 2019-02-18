@@ -51,7 +51,7 @@ link_mpi(parallel_lib)
 # module_gen(particle depositer)
 # module_gen(particle pair_producer)
 module_gen(particle pusher)
-# module_gen(particle array)
+module_gen(particle array)
 
 # add_library(particle_update_lib STATIC "particle/updater.cpp")
 # target_link_libraries(particle_update_lib PRIVATE ${particle_modules})

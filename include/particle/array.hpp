@@ -1,8 +1,10 @@
 #ifndef _PARTICLE_ARRAY_HPP_
 #define _PARTICLE_ARRAY_HPP_
 
-#include "particle/particle.hpp"
+#include "particle/virtual_particle.hpp"
+#include "apt/vec_from_function.hpp"
 #include <iterator>
+#include <memory>
 
 namespace particle {
   template < typename array_t >
@@ -15,7 +17,7 @@ namespace particle {
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = int;
     using value_type = void;
-    using reference = vParticle< typename array_t::value_type, array_t::DPtc, typename array_t::state_t >;
+    using reference = vParticle< typename array_t::value_type, array_t::DPtc, typename array_t::state_type >;
     using pointer = void;
     iterator( array_t& arr, int i ) noexcept : _array(arr), _index(i) {}
 
@@ -31,11 +33,12 @@ namespace particle {
 
     iterator& operator+= ( int n ) noexcept { _index += n; return *this; }
 
-    inline reference operator* () const noexcept {
-      auto f = [i=_index] ( auto&& x ) { return x[i]; };
-      // TODO check sematics of make_vvff
-      return reference( apt::make_vff( f, _array._q ),
-                        apt::make_vff( f, _array._p ),
+    inline reference operator* () noexcept {
+      auto f =
+        [i=_index] ( auto& x ) -> typename array_t::value_type& // force returning by lref
+        { return x[i]; };
+      return reference( apt::make_vff<array_t::DPtc>( f, _array._q ),
+                        apt::make_vff<array_t::DPtc>( f, _array._p ),
                         _array._state[_index] );
     }
 
@@ -47,9 +50,9 @@ namespace particle {
     std::size_t _capacity = 0;
     std::size_t _size = 0;
 
-    std::array<T*, Dim_Ptc> _q;
-    std::array<T*, Dim_Ptc> _p;
-    state_t* _state;
+    std::array<std::unique_ptr<T[]>, Dim_Ptc> _q;
+    std::array<std::unique_ptr<T[]>, Dim_Ptc> _p;
+    std::unique_ptr<state_t[]> _state;
 
   public:
     using value_type = T;
@@ -71,16 +74,19 @@ namespace particle {
     auto end() const noexcept { return iterator( *this, size() ); }
 
     // TODO check performance
-    auto operator[] ( int i ) noexcept { return *( iterator( *this, i ) ); }
-    auto operator[] ( int i ) const noexcept { return *( iterator( *this, i ) ); }
+    auto operator[] ( int i ) noexcept {
+      return *( iterator( *this, i ) );
+    }
+    auto operator[] ( int i ) const noexcept {
+      return *( iterator( *this, i ) );
+    }
 
-    // real particle
     // TODO change them to ParticleExpression
-    void push_back( const Particle<T, DPtc, state_type>& ptc ); // NOTE cannot use Dim_Ptc here!!!
-    void push_back( Particle<T, DPtc, state_type>&& ptc );
+    template < typename Ptc >
+    void push_back( const PtcExpression<Ptc>& ptc );
 
-    // // virtual particle TODO move virtual particle??
-    // void push_back( const Particle< T, DPtc, apt::vVec >& ptc );
+    template < typename Ptc >
+    void push_back( PtcExpression<Ptc>&& ptc );
 
     // NOTE from is inclusive, to is exclusive. from can be larger than to.
     void erase( int from, int to );

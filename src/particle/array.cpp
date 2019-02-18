@@ -6,21 +6,14 @@ namespace particle {
   array<T, DPtc, state_t >::array( std::size_t capacity )
     : _capacity(capacity), _size(0) {
 
-    for ( T*& ptr : _q ) ptr = new T[capacity];
-    for ( T*& ptr : _p ) ptr = new T[capacity];
-    _state = new state_t[capacity];
+    for ( auto& ptr : _q ) ptr.reset( new T[capacity] );
+    for ( auto& ptr : _p ) ptr.reset( new T[capacity] );
+    _state.reset( new state_t[capacity] );
   }
 
   template < typename T, int DPtc, typename state_t >
-  array<T, DPtc, state_t>::~array() {
-    for ( auto*& ptr : _q ) delete [] ptr;
-    for ( auto*& ptr : _p ) delete [] ptr;
-    delete [] _state;
-  }
-
-  // real particles
-  template < typename T, int DPtc, typename state_t >
-  void array<T, DPtc, state_t>::push_back( const Particle<T, DPtc, state_t>& ptc ) {
+  template < typename Ptc >
+  void array<T, DPtc, state_t>::push_back( const PtcExpression<Ptc>& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     apt::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
@@ -32,7 +25,8 @@ namespace particle {
   }
 
   template < typename T, int DPtc, typename state_t >
-  void array<T, DPtc, state_t>::push_back( Particle<T, DPtc, state_t>&& ptc ) {
+  template < typename Ptc >
+  void array<T, DPtc, state_t>::push_back( PtcExpression<Ptc>&& ptc ) {
     if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
     apt::foreach<0,DPtc>
       ( [size=this->_size]( auto& q_arr, auto& p_arr, auto&& q_ptc, auto&& p_ptc ) {
@@ -43,19 +37,6 @@ namespace particle {
     std::swap( _state[_size], ptc.state );
     ++_size;
   }
-
-  // // virtual particles
-  // template < typename T, int DPtc >
-  // void array<T, DPtc>::push_back( const Particle< const T&, DPtc >& ptc ) {
-  //   if ( _size == _capacity ) throw std::runtime_error( "size exceeds capacity" );
-  //   apt::foreach<0,DPtc>
-  //     ( [size=this->_size]( auto& q_arr, auto& p_arr, const auto& q_ptc, const auto& p_ptc ) {
-  //         q_arr[size] = q_ptc;
-  //         p_arr[size] = p_ptc;
-  //       }, _q, _p, ptc.q, ptc.p );
-  //   _state[_size] = ptc.state;
-  //   ++_size;
-  // }
 
   template < typename T, int DPtc, typename state_t >
   void array<T, DPtc, state_t>::erase( int from, int to ) {
