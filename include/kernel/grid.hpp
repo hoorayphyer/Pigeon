@@ -1,7 +1,6 @@
 #ifndef  _KNL_GRID_HPP_
 #define  _KNL_GRID_HPP_
 
-
 namespace knl {
   template < typename T >
   struct gridline_t {
@@ -39,27 +38,26 @@ namespace knl {
 }
 
 #include <array>
-#include "apt/virtual_vec.hpp"
 #include "apt/vec_from_function.hpp"
 
 namespace knl {
-  // Grid is designed to represent the supergrid
+  // Grid here means the supergrid
   template < int DGrid, typename T >
   struct Grid : public std::array< gridline_t<T>, DGrid >{
-    constexpr apt::vVec<T,DGrid> delta() noexcept{
-      return apt::make_vff<DGrid>( []( auto& x ) {return x.delta;}, *this);
+    constexpr auto delta() const noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.delta;}, *this);
     }
 
-    constexpr apt::vVec<T,DGrid> lower() noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) {return x.lower;}, *this);
+    constexpr auto lower() const noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.lower;}, *this);
     }
 
-    constexpr apt::vVec<T,DGrid> upper() noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) {return x.upper;}, *this);
+    constexpr auto upper() const noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.upper;}, *this);
     }
 
-    constexpr apt::vVec<int,DGrid> guard() noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) {return x.guard;}, *this);
+    constexpr auto guard() const noexcept {
+      return apt::make_vff<DGrid>( []( auto& x ) -> const int& {return x.guard;}, *this);
     }
 
   };

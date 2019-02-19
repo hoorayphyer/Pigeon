@@ -1,16 +1,26 @@
 #include "particle/depositer.cpp"
 #include "traits.hpp"
 
-// #include "kernel/shapef.hpp"
-// #include "field/field.hpp"
-// #include "particle/particle.hpp"
+#include "particle/virtual_particle.hpp"
+#include "apt/vec.hpp"
+#include "kernel/shapef.hpp"
+using namespace traits;
+
 namespace particle {
-  // TODO instantiate
-  // template < knl::shape S, typename T_WJ, typename Tvt,
-  //            int DPtc, int DField, int DGrid
-  //            typename Trl = apt::remove_cvref_t<Tvt> >
-  // void depositWJ ( field::Field<T_WJ,DField,DGrid>& WJ,
-  //                  const particle::Particle<Tvt,DPtc>& ptc,
-  //                  const apt::Vec<Trl,DPtc>& dq,
-  //                  const knl::Grid<DGrid, Trl>& grid );
+
+  using Ptc = vParticle<real_t, DPtc, ptc_state_t>;
+  using Vec = apt::Vec<real_t, DPtc>;
+  using ShapeF = knl::shapef_t<shape>;
+
+  template void
+  depositWJ< deposit_j_t, DGrid,
+             Ptc,
+             Vec,
+             real_t,
+             ShapeF
+             > ( field::Field<deposit_j_t,3,DGrid>& WJ,
+                 const PtcExpression<Ptc>& ptc,
+                 const apt::VecExpression<Vec>& dq,
+                 const knl::Grid<DGrid,real_t>& grid,
+                 const ShapeF& shapef );
 }

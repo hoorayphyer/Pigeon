@@ -4,85 +4,85 @@
 #include "apt/vec_expression.hpp"
 
 namespace apt {
-  template <typename E1, typename E2, typename T = typename E1::value_type>
-  struct VecPlus : public VecExpression<VecPlus<E1,E2,T>, T> {
+  enum class BinaryOps : int {ADD=0, SUB, MUL, DIV};
+
+  template < BinaryOps Op, typename E1, typename E2, typename T = typename E1::value_type>
+  struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T> {
   private:
     const E1& _e1;
     const E2& _e2;
   public:
     using value_type = T;
-    static constexpr int size = E1::size;
+    // NOTE use the smaller size here
+    static constexpr int size = (E1::size < E2::size) ? E1::size : E2::size;
 
-    constexpr VecPlus( const E1& e1, const E2& e2 ) noexcept
+    constexpr FCompWise_Vec_Vec( const E1& e1, const E2& e2 ) noexcept
       : _e1(e1), _e2(e2){}
 
     template < int I >
     constexpr T v() const noexcept {
-      return _e1.template v<I>() + _e2.template v<I>();
+      static_assert(I < size);
+      if constexpr ( Op == BinaryOps::ADD ) return _e1.template v<I>() + _e2.template v<I>();
+      else if ( Op == BinaryOps::SUB ) return _e1.template v<I>() - _e2.template v<I>();
+      else if ( Op == BinaryOps::MUL ) return _e1.template v<I>() * _e2.template v<I>();
+      else if ( Op == BinaryOps::DIV ) return _e1.template v<I>() / _e2.template v<I>();
     }
   };
 
-  template <typename E1, typename E2, typename T = typename E1::value_type>
-  struct VecMinus : public VecExpression<VecMinus<E1,E2,T>, T>{
+  template < BinaryOps Op, typename E, typename Real, typename T = typename E::value_type >
+  struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T> {
   private:
-    const E1& _e1;
-    const E2& _e2;
+    const E& _e;
+    const Real& _t;
 
   public:
     using value_type = T;
-    static constexpr int size = E1::size;
+    static constexpr int size = E::size;
 
-    constexpr VecMinus( const E1& e1, const E2& e2 ) noexcept
-      : _e1(e1), _e2(e2){}
+    constexpr FCompWise_Vec_Sca( const E& e, const Real& t ) noexcept
+      : _e(e), _t(t) {}
 
     template < int I >
     constexpr T v() const noexcept {
-      return _e1.template v<I>() - _e2.template v<I>();
+      if constexpr ( Op == BinaryOps::ADD ) return _e.template v<I>() + _t;
+      else if ( Op == BinaryOps::SUB ) return _e.template v<I>() - _t;
+      else if ( Op == BinaryOps::MUL ) return _e.template v<I>() * _t;
+      else if ( Op == BinaryOps::DIV ) return _e.template v<I>() / _t;
     }
   };
 
-  template <typename E1, typename T, typename U = typename E1::value_type >
-  struct VecTimes : public VecExpression<VecTimes<E1,T>, U> {
-  private:
-    const E1& _e1;
-    const T& _t;
-
-  public:
-    using value_type = T;
-    static constexpr int size = E1::size;
-
-    constexpr VecTimes( const E1& e1, const T& t ) noexcept
-      : _e1(e1), _t(t) {}
-
-    template < int I >
-    constexpr U v() const noexcept {
-      return _e1.template v<I>() * _t;
-    }
-  };
 }
 
 namespace {
-  template <typename E1, typename E2>
-  constexpr auto operator+(const apt::VecExpression<E1>& e1,
-                           const apt::VecExpression<E2>& e2) noexcept {
-    return apt::VecPlus<apt::VecExpression<E1>, apt::VecExpression<E2>>(e1, e2);
-  }
+#define vec_def_op(_OP_, _OP_NAME_)                                     \
+  template <typename E1, typename E2>                                   \
+  constexpr auto operator _OP_ (const apt::VecExpression<E1>& e1,       \
+                              const apt::VecExpression<E2>& e2)         \
+    noexcept {                                                          \
+    return                                                              \
+      apt::FCompWise_Vec_Vec< apt::BinaryOps:: _OP_NAME_,               \
+                              apt::VecExpression<E1>,                   \
+                              apt::VecExpression<E2> > (e1, e2);        \
+  }                                                                     \
+                                                                        \
+  template <typename E, typename Real>                                  \
+  constexpr std::enable_if_t< std::is_arithmetic_v<Real>,               \
+                              apt::FCompWise_Vec_Sca                    \
+                              <apt::BinaryOps::_OP_NAME_,               \
+                               apt::VecExpression<E>,                   \
+                               Real > >                                 \
+  operator _OP_ (const apt::VecExpression<E>& e, const Real& t)         \
+    noexcept {                                                          \
+    return                                                              \
+      apt::FCompWise_Vec_Sca<apt::BinaryOps::_OP_NAME_,                 \
+                             apt::VecExpression<E>,                     \
+                             Real >(e, t);                              \
+  }                                                                     \
 
-  template <typename E1, typename E2>
-  constexpr auto operator-(const apt::VecExpression<E1>& e1,
-                           const apt::VecExpression<E2>& e2) noexcept {
-    return apt::VecMinus<apt::VecExpression<E1>, apt::VecExpression<E2>>(e1, e2);
-  }
-
-  template <typename E1, typename T>
-  constexpr auto operator*(const apt::VecExpression<E1>& e1, const T& t) noexcept {
-    return apt::VecTimes<apt::VecExpression<E1>, T>(e1, t);
-  }
-
-  template <typename E1, typename T>
-  constexpr auto operator/( const apt::VecExpression<E1>& e1, const T& t) noexcept {
-    return apt::VecTimes<E1, T>(e1, 1.0 / t);
-  }
+  vec_def_op(+, ADD);
+  vec_def_op(-, SUB);
+  vec_def_op(*, MUL);
+  vec_def_op(/, DIV);
 
   template <typename E1, typename E2 >
   constexpr auto& operator+= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
@@ -98,15 +98,15 @@ namespace {
     return v1;
   }
 
-  template <typename E, typename T = typename E::value_type>
-  constexpr auto& operator*= ( apt::VecExpression<E>& v, const T& t ) noexcept {
+  template <typename E, typename Real = typename E::value_type>
+  constexpr auto& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x *= t; }, v );
     return v;
   }
 
-  template <typename E, typename T = typename E::value_type>
-  constexpr auto& operator/= ( apt::VecExpression<E>& v, const T& t ) noexcept {
+  template <typename E, typename Real = typename E::value_type>
+  constexpr auto& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x /= t; }, v );
     return v;

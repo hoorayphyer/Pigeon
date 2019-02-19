@@ -48,7 +48,7 @@ link_mpi(parallel_lib)
 # link_mpi(particle_migration_module)
 # target_link_libraries(particle_migration_module PRIVATE ${parallel_lib})
 
-# module_gen(particle depositer)
+module_gen(particle depositer)
 module_gen(particle pair_producer)
 module_gen(particle pusher)
 module_gen(particle array)

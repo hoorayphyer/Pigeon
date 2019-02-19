@@ -9,7 +9,7 @@ namespace knl {
     const int support = static_cast<int>(S);
 
     template < typename T >
-    constexpr T operator() ( T dx ) noexcept {
+    constexpr T operator() ( T dx ) const noexcept {
       dx = std::abs(dx);
 
       if constexpr( shape::Nearest_Grid_Point == S ) {

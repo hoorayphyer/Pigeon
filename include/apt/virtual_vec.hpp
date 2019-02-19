@@ -16,14 +16,14 @@ namespace apt {
   }
 
   template < typename T, int N >
-  struct vVec : public VecExpression<vVec<T,N>, T>,
-                public impl::ref_tuple_t<T,N> {
+  struct vVec : public VecExpression<vVec<T,N>, T> {
   private:
     using tuple_type = impl::ref_tuple_t<T,N>;
+    tuple_type _v;
 
     template < typename E, std::size_t... I > // NOTE using size_t instead of int is to make compiling work
     constexpr vVec( VecExpression<E>&& vec, std::index_sequence<I...> ) noexcept
-      : tuple_type( std::get<I>(vec)... ) {}
+      : _v( std::get<I>(vec)... ) {}
 
   public:
     using value_type = T;
@@ -31,21 +31,21 @@ namespace apt {
 
     template < int I >
     constexpr T v() const noexcept {
-      return std::get<I>(static_cast<const tuple_type&>(*this));
+      return std::get<I>(_v);
     }
 
     template < int I >
     constexpr T& v() noexcept {
-      return std::get<I>(static_cast<tuple_type&>(*this));
+      return std::get<I>(_v);
     }
 
 
     template < typename... U >
     constexpr vVec( U&... u ) noexcept
-      : tuple_type(u...) {};
+      : _v(u...) {};
 
     constexpr vVec( tuple_type&& tpl ) noexcept
-      : tuple_type(std::move(tpl)) {};
+      : _v(std::move(tpl)) {};
 
     constexpr vVec( vVec&& vec ) noexcept = default;
 

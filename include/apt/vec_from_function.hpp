@@ -28,6 +28,11 @@ namespace apt {
     std::tuple<VecArgs&&...> _vec_args;
 
     template < int Comp, std::size_t... VecNo_I >
+    constexpr decltype(auto) v( std::index_sequence<VecNo_I...> ) const noexcept {
+      return std::invoke( _f, std::get<Comp>(std::get<VecNo_I>(_vec_args))... );
+    }
+
+    template < int Comp, std::size_t... VecNo_I >
     constexpr decltype(auto) v( std::index_sequence<VecNo_I...> ) noexcept {
       return std::invoke( _f, std::get<Comp>(std::get<VecNo_I>(_vec_args))... );
     }
@@ -39,6 +44,11 @@ namespace apt {
 
     constexpr VecFromFunction( const ComponentWiseFunc& f, VecArgs&&... args ) noexcept
       : _f(f), _vec_args( std::forward<VecArgs>(args)... ) {}
+
+    template < int I >
+    constexpr decltype(auto) v() const noexcept {
+      return v<I>( std::index_sequence_for<VecArgs...>{} );
+    }
 
     template < int I >
     constexpr decltype(auto) v() noexcept {
