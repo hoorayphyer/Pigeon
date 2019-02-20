@@ -1,9 +1,14 @@
+#ifndef  _MAKE_FIELD_HPP_
+#define  _MAKE_FIELD_HPP_
+
 #include "field/field.hpp"
 
 namespace field {
   template < typename T, int DField, int DGrid >
   Field< T, DField, DGrid >
-  make_field( std::array< int, DGrid > anchor, std::array< int, DGrid > extent, std::array< std::array< bool, DGrid >, DField > offsets ) {
+  make_field( std::array< int, DGrid > anchor,
+              std::array< int, DGrid > extent,
+              std::array< std::array< bool, DGrid >, DField > offsets ) {
     Field< T, DField, DGrid > field;
     field.anchor = std::move(anchor);
     field.extent = std::move(extent);
@@ -25,3 +30,4 @@ namespace field {
   }
 }
 
+#endif

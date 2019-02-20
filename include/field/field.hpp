@@ -1,7 +1,6 @@
 #ifndef  _FIELD_HPP_
 #define  _FIELD_HPP_
 
-#include "apt/numeric.hpp"
 #include <array>
 #include <vector>
 
@@ -12,13 +11,15 @@ namespace field {
     template < typename T >
     constexpr operator T() noexcept { return static_cast<T>( 0.5 * val ); }
   };
+
+  constexpr offset_t INSITU{false};
+  constexpr offset_t MIDWAY{true};
+
   template < typename T, int DGrid >
   struct Component : std::vector<T> {
     const std::array< offset_t, DGrid > offset;
   };
 
-  constexpr offset_t INSITU{false};
-  constexpr offset_t MIDWAY{true};
 }
 
 namespace field {
@@ -32,58 +33,41 @@ namespace field {
     const std::array< int, Dim_Grid > extent;
     const std::array< int, Dim_Grid + 1 > stride;
 
-    // //------ int... inds_local -------
-    // // TODO indices
-    // template < int Comp >
-    // inline decltype(auto) c( int... inds ) {
-    //   static_assert( sizeof...(inds) >= Field::DGrid, "Not enough indices provided" );
-    //   // TODO inner_product
-    //   auto&& ind_linear = tum::inner_product( field.stride, std::forward_as_tuple(std::move(inds)...) );
-    //   return std::get<Comp>(components)[std::move(ind_linear)];
-    // }
-
-    // template < int Comp >
-    // inline decltype(auto) c( int... inds ) const {
-    //   static_assert( sizeof...(inds) >= Field::DGrid, "Not enough indices provided" );
-    //   // TODO inner_product
-    //   auto&& ind_linear = tum::inner_product( field.stride, std::forward_as_tuple(std::move(inds)...) );
-    //   return std::get<Comp>(components)[std::move(ind_linear)];
-    // }
-
     //------ int... inds_global -------
     template < int Comp >
-    inline decltype(auto) c( const std::array<int,DGrid>& I_global ) {
-      // TODO check if apt::dot can work on std::array
-      auto&& ind_linear = apt::dot( stride, I_global - anchor );
+    inline auto& c( const std::array<int,DGrid>& I_global ) {
+      auto&& ind_linear = std::get<0>(stride) * ( std::get<0>(I_global) - std::get<0>(anchor) );
+      if constexpr ( DGrid > 1 )
+                     ind_linear += std::get<1>(stride) * ( std::get<1>(I_global) - std::get<1>(anchor) );
+      if constexpr ( DGrid > 2 )
+                     ind_linear += std::get<2>(stride) * ( std::get<2>(I_global) - std::get<2>(anchor) );
+      static_assert( DGrid < 4 );
       return std::get<Comp>(*this)[std::move(ind_linear)];
     }
 
     template < int Comp >
-    inline const decltype(auto) c( const std::array<int,DGrid>& I_global ) const {
-      auto&& ind_linear = apt::dot( stride, I_global - anchor );
+    inline auto c( const std::array<int,DGrid>& I_global ) const {
+      auto&& ind_linear = std::get<0>(stride) * ( std::get<0>(I_global) - std::get<0>(anchor) );
+      if constexpr ( DGrid > 1 )
+                     ind_linear += std::get<1>(stride) * ( std::get<1>(I_global) - std::get<1>(anchor) );
+      if constexpr ( DGrid > 2 )
+                     ind_linear += std::get<2>(stride) * ( std::get<2>(I_global) - std::get<2>(anchor) );
+      static_assert( DGrid < 4 );
       return std::get<Comp>(*this)[std::move(ind_linear)];
     }
 
     //------ local index
     template < int Comp >
-    inline decltype(auto) c( int i_local_linear ) {
+    inline auto& c( int i_local_linear ) {
       return std::get<Comp>(*this)[i_local_linear];
     }
 
     template < int Comp >
-    inline const decltype(auto) c( int i_local_linear ) const {
+    inline auto c( int i_local_linear ) const {
       return std::get<Comp>(*this)[i_local_linear];
     }
 
   };
-}
-
-namespace field {
-  template < typename T, int DField, int DGrid >
-  Field< T, DField, DGrid >
-  make_field( std::array< int, DGrid > anchor,
-              std::array< int, DGrid > extent,
-              std::array< std::array< bool, DGrid >, DField > offsets );
 }
 
 #endif
