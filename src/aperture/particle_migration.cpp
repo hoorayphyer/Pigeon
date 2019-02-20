@@ -1,13 +1,21 @@
 #include "particle/migration.cpp"
 #include "traits.hpp"
-namespace particle {
-  // TODO instantiate
-  // template < typename Tvt, int DGrid,
-  //            typename Trl = apt::remove_cvref_t<Tvt> >
-  // template < typename q_t, typename borders_t >
-  // bool is_migrate( const apt::Vec<Tvt, DGrid>& q, const std::array< std::array<Trl, 2>, DGrid>& borders ) noexcept;
 
-  // template < int DGrid, typename T, int DPtc >
-  // void migrate ( array<T,DPtc>& buffer, const std::array< std::array<int,2>, DGrid >& neighbors,
-  //                const std::array< std::array<T,2>, DGrid>& borders, const mpi::InterComm& comm );
+#include "particle/virtual_particle.hpp"
+
+using namespace traits;
+
+namespace particle {
+  template bool
+  is_migrate< apt::vVec<real_t,DPtc>,
+              DGrid,
+              real_t > ( const apt::VecExpression<apt::vVec<real_t,DPtc>>& q,
+                         const std::array< std::array<real_t, 2>, DGrid>& borders ) noexcept;
+
+  template void
+  migrate < real_t, DPtc, ptc_state_t, DGrid >
+  ( std::vector<cParticle<real_t,DPtc,ptc_state_t>>& buffer,
+    const std::array< std::array<std::optional<mpi::InterComm>,2>, DGrid >& intercomms,
+    const std::array< std::array<real_t,2>, DGrid>& borders,
+    unsigned int pairing_shift );
 }

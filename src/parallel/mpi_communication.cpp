@@ -57,12 +57,12 @@ namespace mpi {
 
 namespace mpi {
   template < typename Comm >
-  template < typename DataType >
-  int P2P_Comm<Comm>::probe( int source_rank, int tag ) const {
+  template < typename T >
+  int P2P_Comm<Comm>::probe( int source_rank, int tag, const T* ) const {
     MPI_Status s;
     MPI_Probe( source_rank, tag, _comm(), &s );
     int count = 0;
-    MPI_Get_count( &s, datatype<DataType>(), &count );
+    MPI_Get_count( &s, datatype((const T*)0), &count );
     return count;
   }
 

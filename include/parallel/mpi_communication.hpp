@@ -8,9 +8,8 @@
 #include <vector>
 
 namespace mpi {
-  template <typename T_cvref>
-  constexpr MPI_Datatype datatype() noexcept {
-    using T = std::remove_cv_t< std::remove_reference_t< T_cvref > >;
+  template <typename T>
+  constexpr MPI_Datatype datatype(const T* = nullptr) noexcept {
     if constexpr ( std::is_same_v<T, char> ) return MPI_CHAR;
     else if ( std::is_same_v<T, short> ) return MPI_SHORT;
     else if ( std::is_same_v<T, int> ) return MPI_INT;
@@ -27,6 +26,11 @@ namespace mpi {
     else if ( std::is_same_v<T, long double> ) return MPI_LONG_DOUBLE;
     else if ( std::is_same_v<T, bool> ) return MPI_CXX_BOOL;
     else return MPI_DATATYPE_NULL;
+  }
+
+  template <typename T>
+  constexpr MPI_Datatype datatype(const T&) noexcept {
+    return datatype((const T*)0);
   }
 
 }
@@ -58,8 +62,13 @@ namespace mpi {
     inline const Comm& _comm() const { return static_cast<const Comm&>(*this)._comm(); }
 
   public:
-    template < typename DataType >
-    int probe( int source_rank, int tag ) const; // returns the send count
+    template < typename T >
+    int probe( int source_rank, int tag, const T* ) const; // returns the send count
+
+    template < typename T >
+    inline int probe( int source_rank, int tag, const T& ) const {
+      return probe( source_rank, tag, (const T*)0 );
+    }
 
     template <typename T>
     void send( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::SYN ) const;

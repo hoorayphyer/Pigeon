@@ -44,9 +44,9 @@ link_mpi(parallel_lib)
 # add_library(field_lib STATIC "field/field.cpp" )
 
 
-# module_gen(particle migration)
-# link_mpi(particle_migration_module)
-# target_link_libraries(particle_migration_module PRIVATE ${parallel_lib})
+module_gen(particle migration)
+link_mpi(particle_migration_module)
+target_link_libraries(particle_migration_module PRIVATE ${parallel_lib})
 
 module_gen(particle depositer)
 module_gen(particle pair_producer)

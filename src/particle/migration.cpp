@@ -1,20 +1,24 @@
 #include "particle/migration.hpp"
-#include "particle/array.hpp"
+#include "particle/c_particle.hpp"
 #include "parallel/mpi++.hpp"
 #include <memory>
 
 namespace mpi {
-  template < typename T, int DPtc, typename state_t >
-  constexpr MPI_Datatype datatype_for_cParticle() noexcept {
-    std::vector< particle::cParticle<T,DPtc,state_t> > ptcs(2);
+  template < typename Ptc >
+  MPI_Datatype datatype_for_cParticle() {
+    using T = typename Ptc::vec_type::value_type;
+    constexpr int DPtc = Ptc::Dim;
+    using state_t = typename Ptc::state_type;
+
+    std::vector< Ptc > ptcs(2);
     constexpr int numBlocks = 3;
     MPI_Datatype type[numBlocks] = { datatype<T>(), datatype<T>(), datatype<state_t>() };
     int blocklen[numBlocks] = { DPtc, DPtc, 1 };
     MPI_Aint disp[numBlocks];
 
-    MPI_Get_address( ptcs[0].q, disp );
-    MPI_Get_address( ptcs[0].p, disp+1 );
-    MPI_Get_address( ptcs[0].s, disp+2 );
+    MPI_Get_address( &(ptcs[0].q()), disp );
+    MPI_Get_address( &(ptcs[0].p()), disp+1 );
+    MPI_Get_address( &(ptcs[0].state()), disp+2 );
 
     auto base = disp[0];
     for ( int i = 0; i < numBlocks; ++i )
@@ -33,8 +37,13 @@ namespace mpi {
     return mdt_ptc;
   }
 
-    template < typename T, int DPtc, typename state_t >
-    constexpr MPI_Datatype MPI_CPARTICLE = datatype_for_cParticle<T, DPtc, state_t>();
+  namespace { MPI_Datatype MPI_CPARTICLE = MPI_DATATYPE_NULL; }
+
+  template < typename T, int DPtc, typename state_t >
+  constexpr MPI_Datatype datatype( const particle::cParticle<T,DPtc,state_t>* ) noexcept {
+    return MPI_CPARTICLE;
+  }
+
 }
 
 
@@ -64,18 +73,17 @@ namespace particle :: impl {
       }
     }
 
-    return std::array<const int, 2>{ ec, el, buffer.size() };
+    return std::array<const int, 3>{ ec, el, buffer.size() };
   }
 
 
-  template < typename T, int DPtc, typename state_t, int DGrid, typename F_LCR >
-  void migrate_1dim ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
+  template < typename Ptc, typename F_LCR >
+  void migrate_1dim ( std::vector<Ptc>& buffer,
                       const std::array<std::optional<mpi::InterComm>, 2>& intercomms,
                       const F_LCR& lcr, unsigned int shift ) {
     // sort order is center | left | right | empty. Returned are the delimiters between these catogories
     const auto begs = lcr_sort( buffer, lcr ); // begs = { begL, begR, begE_original };
 
-    // TODO finish the comm code. There are three buffers to send in particle::array
     // NOTE buffer may be relocated in response to size growing. DO NOT store its pointers or references
     int begE_run = begs[2]; // running begin of empty particles in buffer
     for ( int lr = 0; lr < 2; ++lr ) {
@@ -89,7 +97,7 @@ namespace particle :: impl {
       }
 
       // receiving
-      std::unique_ptr<T> p_tmp(nullptr);
+      std::unique_ptr<Ptc[]> p_tmp(nullptr);
       int tot_num_recv = 0;
       if ( intercomms[1-lr] ) {
         const auto& recv_comm = *intercomms[1-lr];
@@ -101,20 +109,20 @@ namespace particle :: impl {
         int src_rank = ( local_rank + local_size - (shift % local_size) ) % local_size;
         while ( src_rank < remote_size ) {
           remote_srcs.push_back(src_rank);
-          scan_recv_counts.push_back( scan_recv_counts.back() + recv_comm.probe<decltype(buffer[0])>( src_rank, 147 ) );
+          scan_recv_counts.push_back( scan_recv_counts.back() + recv_comm.probe( src_rank, 147, buffer[0] ) );
           src_rank += local_size;
         }
 
         tot_num_recv = scan_recv_counts.back();
         // If recved more than space allows, store them in a temporary buffer then later merge with the primary buffer
-        auto* p_recv = buffer.data() + begE_run;
+        Ptc* p_recv = buffer.data() + begE_run;
         if ( tot_num_recv > buffer.capacity() - begE_run ) {
-          p_tmp.reset( new T [tot_num_recv] );
+          p_tmp.reset( new Ptc [tot_num_recv] );
           p_recv = p_tmp.get();
         }
 
         for ( int i = 0; i < remote_srcs.size(); ++i ) {
-          reqs.push_back( recv_comm.Irecv( p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i], remote_srcs[i] ) );
+          reqs.push_back( recv_comm.Irecv( remote_srcs[i], p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i], 147 ) );
         }
 
       }
@@ -142,23 +150,27 @@ namespace particle :: impl {
 
 namespace particle {
   template < typename Vec, int DGrid, typename T >
-  bool is_migrate( const Vec& q, const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {
-    auto&& tmp = apt::make_vff<DGrid>
-      ( []( const auto& x, const auto& bd ) noexcept {
-          return x < std::get<0>(bd) || x > std::get<1>(bd);
+  bool is_migrate( const apt::VecExpression<Vec>& q,
+                   const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {
+    bool res = false;
+    apt::foreach<0,DGrid>
+      ( [&res]( const auto& x, const auto& bd ) noexcept {
+          res |= ( x < std::get<0>(bd) || x > std::get<1>(bd) );
         }, q, borders );
 
-    return std::apply( []( auto... args){ return (... || args); }, std::move(tmp) );
+    return res;
   }
 
   namespace impl {
-    template < int I, typename T, int DPtc, typename state_t, int DGrid >
+    // NOTE must use std::size_t for DGrid, otherwise type mismatched will be triggered for std::array
+    template < int I, typename T, int DPtc, typename state_t, std::size_t DGrid >
     inline void migrate( std::vector<cParticle<T,DPtc,state_t>>& buffer,
                          const std::array< std::array<std::optional<mpi::InterComm>, 2>, DGrid >& intercomms,
-                         const std::array< std::array<T,2>, DGrid>& borders, unsigned int shift ) {
+                         const std::array< std::array<T,2>, DGrid >& borders,
+                         unsigned int shift ) {
       auto&& lcr =
         [&bd=std::get<I>(borders)]( const auto& ptc ) noexcept {
-          return ( std::get<I>(ptc.q) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q) > std::get<1>(bd) );
+          return ( std::get<I>(ptc.q()) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q()) > std::get<1>(bd) );
         };
       impl::migrate_1dim( buffer, std::get<I>(intercomms), std::move(lcr), shift );
       if constexpr ( I > 0 )
@@ -169,10 +181,14 @@ namespace particle {
   template < typename T, int DPtc, typename state_t, int DGrid >
   void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
                  const std::array< std::array<std::optional<mpi::InterComm>,2>, DGrid >& intercomms,
-                 const std::array< std::array<T,2>, DGrid>& borders, unsigned int pairing_shift ) {
-    MPI_Type_commit(& mpi::MPI_CPARTICLE<T, DGrid, state_t>);
-    impl::migrate<DGrid - 1>( buffer, intercomms, borders, pairing_shift );
-    MPI_Type_free( & mpi::MPI_CPARTICLE<T, DGrid, state_t> );
+                 const std::array< std::array<T,2>, DGrid>& borders,
+                 unsigned int pairing_shift ) {
+    if ( mpi::MPI_CPARTICLE == MPI_DATATYPE_NULL )
+      mpi::MPI_CPARTICLE = mpi::datatype_for_cParticle<cParticle<T,DPtc,state_t>>();
+
+    MPI_Type_commit(&mpi::MPI_CPARTICLE);
+    impl::migrate<DGrid-1>( buffer, intercomms, borders, pairing_shift );
+    MPI_Type_free( &mpi::MPI_CPARTICLE );
   }
 
 }
