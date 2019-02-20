@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project (Aperture)
+enable_testing()
 message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
 
 # enable colored cmake message.
@@ -24,8 +25,6 @@ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
 # set(Project_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
 
-# Enable testing
-enable_testing(true)
 
 # if(LAB_ROOT_DIR)
 #   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LAB_ROOT_DIR}/lib)
@@ -40,5 +39,5 @@ find_package(MPI)
 set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
 add_subdirectory(src)
-# add_subdirectory(tests)
+add_subdirectory(tests)
 # add_subdirectory(tools)

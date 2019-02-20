@@ -27,6 +27,7 @@
 !include/field/*.hpp
 
 !src/
+!src/CMakeLists.txt
 !src/**/*.cpp
 !src/aperture/
 !src/aperture/*.cpp
@@ -42,7 +43,10 @@
 !src/field/*.cpp
 
 !tests/
-!tests/**/*
+!tests/CMakeLists.txt
+!tests/catch_main.cpp
+!tests/apt
+!tests/apt/*.cpp
 
 !tools/
 !tools/**/*
