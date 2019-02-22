@@ -3,6 +3,7 @@
 
 #include "kernel/coordsys_predef.hpp"
 #include "apt/numeric.hpp"
+#include "apt/vec.hpp"
 
 template < typename T >
 inline constexpr T PI (3.141592653589793238462643383279502884197169399375105820974944592307816406286L);
@@ -28,7 +29,7 @@ namespace knl {
 
     template < class X, class V, typename T >
     static inline auto geodesic_move( apt::VecExpression<X>& x, const apt::VecExpression<V>& v, const T& dt ) {
-      auto dx = v * dt;
+      apt::Vec<decltype(std::get<0>(v) * dt), V::size> dx = v * dt;
       x += dx;
       return dx;
     }
@@ -57,59 +58,6 @@ namespace knl {
       return std::exp( 3.0 * logr ) * std::sin(theta);
     }
 
-    // template < typename T >
-    // static inline Vec3<T> gdm_old( Vec3<T&>& x, Vec3<T&>& p, T dt ) {
-    //   auto& logr  = std::get<0>(x);
-    //   auto& theta = std::get<1>(x);
-    //   auto& phi = std::get<2>(x);
-
-    //   auto logr_o = logr;
-    //   auto theta_o = theta;
-    //   auto phi_o = phi;
-
-    //   auto& p_r = std::get<0>(p);
-    //   auto& p_t = std::get<1>(p);
-    //   auto& p_ph = std::get<2>(p);
-
-    //   auto r = std::exp(logr);
-    //   auto sin_t = std::sin(theta);
-    //   auto cos_t = std::cos(theta);
-    //   auto sin_ph = std::sin(phi);
-    //   auto cos_ph = std::cos(phi);
-
-    //   // transform momentum to cartesian
-    //   Vec3<T> p_cart ( (p_r * sin_t + p_t * cos_t) * cos_ph - p_ph * sin_ph,
-    //                       (p_r * sin_t + p_t * cos_t) * sin_ph + p_ph * cos_ph,
-    //                       p_r * cos_t - p_t * sin_t );
-    //   // transform position to cartesian
-    //   Vec3<T> x_cart ( r * sin_t * cos_ph,
-    //                       r * sin_t * sin_ph,
-    //                       r * cos_t );
-
-    //   // update x_cart
-    //   coord<coordsys::Cartesian>::geodesic_move( x_cart, p_cart, dt );
-
-    //   // transform the new position back from cartesian
-    //   logr = vecop::abs(x_cart);
-    //   theta = std::acos(std::get<2>(x_cart) / logr);
-    //   // TODO: Check correctness of this statement!
-    //   phi = std::atan( std::get<1>(x_cart)/ std::get<0>(x_cart) ) + ( std::get<0>(x_cart) < 0 ) * PI<T>;
-    //   logr = std::log(logr);
-
-    //   // rebase momentum to the new position in the original coordinate system
-    //   // These become vr, vtheta, vphi
-    //   r = std::exp(logr);
-    //   sin_t = std::sin(theta);
-    //   cos_t = std::cos(theta);
-    //   sin_ph = std::sin(phi);
-    //   cos_ph = std::cos(phi);
-
-    //   p_r = std::get<0>(p_cart) * sin_t * cos_ph + std::get<1>(p_cart) * sin_t * sin_ph + std::get<2>(p_cart) * cos_t;
-    //   p_t = std::get<0>(p_cart) * cos_t * cos_ph + std::get<1>(p_cart) * cos_t * sin_ph - std::get<2>(p_cart) * sin_t;
-    //   p_ph = -std::get<0>(p_cart) * sin_ph +  std::get<1>(p_cart) * cos_ph;
-
-    //   return Vec3<T>( logr - logr_o, theta - theta_o, phi - phi_o);
-    // }
 
 
     template < class X, class V, typename T >
@@ -117,7 +65,7 @@ namespace knl {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       // dx is the return value and meanwhile it serves as a temporary
-      auto dx = v * dt;
+       apt::Vec<decltype(std::get<0>(v) * dt), V::size> dx = v * dt;
       auto& dlogr = std::get<0>(dx);
       auto& dtheta = std::get<1>(dx);
       auto& dphi = std::get<2>(dx);
@@ -142,7 +90,10 @@ namespace knl {
         auto sdt = std::sin( dtheta );
         auto cdt = std::cos( dtheta );
 
-        auto[v_r, v_theta, v_phi] = v;
+        // store old values of v
+        auto v_r = std::get<0>(v);
+        auto v_theta = std::get<1>(v);
+        auto v_phi = std::get<2>(v);
 
         std::get<0>(v) =
           v_r * 0.5 * ( ( 1 - cdp ) * cT + ( 1 + cdp )  * cdt )
@@ -164,7 +115,7 @@ namespace knl {
         x += dx;
         // normalize phi
         auto& phi = std::get<2>(x);
-        phi -= 2 * PI<T> * std::floor( phi / 2 * PI<T> );
+        phi -= 2 * PI<T> * std::floor( phi / (2 * PI<T>) );
       }
 
       return dx;

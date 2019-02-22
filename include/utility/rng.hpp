@@ -22,9 +22,17 @@ namespace util {
       return _uniform_dist(_engine);
     }
 
+    inline auto uniform(T lb, T ub) {
+      return lb + _uniform_dist(_engine) * (ub - lb);
+    }
+
     // standard gaussian distribution
     inline auto gaussian() {
       return _gaussian_dist(_engine);
+    }
+
+    inline auto gaussian( T mu, T sig) {
+      return mu + _gaussian_dist(_engine) * sig;
     }
 
   };

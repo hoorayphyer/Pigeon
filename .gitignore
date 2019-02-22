@@ -48,6 +48,8 @@
 !tests/apt
 !tests/apt/*.hpp
 !tests/apt/*.cpp
+!tests/kernel
+!tests/kernel/*.cpp
 
 !tools/
 !tools/**/*
