@@ -85,31 +85,31 @@ namespace {
   vec_def_op(/, DIV);
 
   template <typename E1, typename E2 >
-  constexpr auto& operator+= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
+  constexpr E1& operator+= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
     apt::foreach<0, E1::size>
       ( []( auto& x, const auto& y ) noexcept { x += y; }, v1, v2 );
-    return v1;
+    return static_cast<E1&>(v1);
   }
 
   template <typename E1, typename E2 >
-  constexpr auto& operator-= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
+  constexpr E1& operator-= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
     apt::foreach<0, E1::size>
       ( []( auto& x, const auto& y ) noexcept { x -= y; }, v1, v2 );
-    return v1;
+    return static_cast<E1&>(v1);
   }
 
   template <typename E, typename Real = typename E::value_type>
-  constexpr auto& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
+  constexpr E& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x *= t; }, v );
-    return v;
+    return static_cast<E&>(v);
   }
 
   template <typename E, typename Real = typename E::value_type>
-  constexpr auto& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
+  constexpr E& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x /= t; }, v );
-    return v;
+    return static_cast<E&>(v);
   }
 }
 

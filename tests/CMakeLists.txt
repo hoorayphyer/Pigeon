@@ -21,6 +21,7 @@ endmacro()
 
 test_gen(apt vec)
 test_gen(apt virtual_vec)
+test_gen(apt numeric)
 
 # test_gen(particle state)
 # test_gen(particle particle)

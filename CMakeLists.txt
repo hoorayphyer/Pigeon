@@ -38,5 +38,5 @@ find_package(MPI)
 # find_package(Silo REQUIRED)
 set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
-add_subdirectory(src)
+# add_subdirectory(src)
 add_subdirectory(tests)
