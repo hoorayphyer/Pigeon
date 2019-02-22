@@ -7,7 +7,7 @@ namespace apt {
   enum class BinaryOps : int {ADD=0, SUB, MUL, DIV};
 
   template < BinaryOps Op, typename E1, typename E2, typename T = typename E1::value_type>
-  struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T> {
+  struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T, false> {
   private:
     const E1& _e1;
     const E2& _e2;
@@ -30,7 +30,7 @@ namespace apt {
   };
 
   template < BinaryOps Op, typename E, typename Real, typename T = typename E::value_type >
-  struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T> {
+  struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T, false> {
   private:
     const E& _e;
     const Real& _t;
@@ -115,7 +115,7 @@ namespace {
 
 namespace apt {
   template <typename E1, typename E2, typename T = typename E1::value_type>
-  struct VecCross : public VecExpression<VecCross<E1,E2,T>, T> {
+  struct VecCross : public VecExpression<VecCross<E1,E2,T>, T, false> {
   private:
     const E1& _e1;
     const E2& _e2;

@@ -2,6 +2,7 @@
 #define  _APT_VIRTUAL_VEC_HPP_
 
 #include "apt/vec_expression.hpp"
+#include <tuple>
 
 // NOTE virtual vector, or a vector proxy
 namespace apt {
@@ -16,7 +17,7 @@ namespace apt {
   }
 
   template < typename T, int N >
-  struct vVec : public VecExpression<vVec<T,N>, T> {
+  struct vVec : public VecExpression<vVec<T,N>, T, true> {
   private:
     using tuple_type = impl::ref_tuple_t<T,N>;
     tuple_type _v;
@@ -38,7 +39,6 @@ namespace apt {
     constexpr T& v() noexcept {
       return std::get<I>(_v);
     }
-
 
     template < typename... U >
     constexpr vVec( U&... u ) noexcept

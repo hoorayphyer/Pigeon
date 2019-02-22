@@ -2,7 +2,6 @@
 #define _PARTICLE_ARRAY_HPP_
 
 #include "particle/virtual_particle.hpp"
-#include "apt/vec_from_function.hpp"
 #include <iterator>
 #include <memory>
 
@@ -34,11 +33,13 @@ namespace particle {
     iterator& operator+= ( int n ) noexcept { _index += n; return *this; }
 
     inline reference operator* () noexcept {
-      auto f =
-        [i=_index] ( auto& x ) -> typename array_t::value_type& // force returning by lref
-        { return x[i]; };
-      return reference( apt::make_vff<array_t::DPtc>( f, _array._q ),
-                        apt::make_vff<array_t::DPtc>( f, _array._p ),
+      // TODO generalize to all DPtc
+      using vVec = apt::vVec<typename array_t::value_type, array_t::DPtc>;
+      auto f = [i=_index] ( auto& x ) {
+                 return vVec( std::get<0>(x)[i], std::get<1>(x)[i], std::get<2>(x)[i]);
+               };
+      return reference( f( _array._q ),
+                        f( _array._p ),
                         _array._state[_index] );
     }
 

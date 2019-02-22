@@ -38,26 +38,45 @@ namespace knl {
 }
 
 #include <array>
-#include "apt/vec_from_function.hpp"
+#include "apt/virtual_vec.hpp"
 
 namespace knl {
   // Grid here means the supergrid
   template < int DGrid, typename T >
-  struct Grid : public std::array< gridline_t<T>, DGrid >{
+  struct Grid : public std::array< gridline_t<T>, DGrid > {
+  private:
+    template < typename U >
+    using vVec = apt::vVec<const U, DGrid>;
+
+    enum class Mem { DELTA, LOWER, UPPER, GUARD };
+
+    template < Mem M, typename U, std::size_t... I >
+    constexpr vVec<U> mem_get( std::index_sequence<I...> ) const noexcept {
+      if constexpr ( M == Mem::DELTA )
+        return vVec<U>( std::get<I>(*this).delta... );
+      else if ( M == Mem::LOWER )
+        return vVec<U>( std::get<I>(*this).lower... );
+      else if ( M == Mem::UPPER )
+        return vVec<U>( std::get<I>(*this).upper... );
+      else if ( M == Mem::GUARD )
+        return vVec<U>( std::get<I>(*this).guard... );
+    }
+
+  public:
     constexpr auto delta() const noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.delta;}, *this);
+      return mem_get<Mem::DELTA,T>( std::make_index_sequence<DGrid>{} );
     }
 
     constexpr auto lower() const noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.lower;}, *this);
+      return mem_get<Mem::LOWER,T>( std::make_index_sequence<DGrid>{} );
     }
 
     constexpr auto upper() const noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) -> const T& {return x.upper;}, *this);
+      return mem_get<Mem::UPPER,T>( std::make_index_sequence<DGrid>{} );
     }
 
     constexpr auto guard() const noexcept {
-      return apt::make_vff<DGrid>( []( auto& x ) -> const int& {return x.guard;}, *this);
+      return mem_get<Mem::GUARD,int>( std::make_index_sequence<DGrid>{} );
     }
 
   };
