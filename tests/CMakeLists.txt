@@ -28,7 +28,7 @@ test_gen(apt numeric)
 test_gen(kernel coordinate) # TODO
 # test_gen(kernel grid_shape_interplay)
 
-# test_gen(particle state)
+test_gen(particle state)
 # test_gen(particle particle)
 # test_gen(particle virtual_particle)
 # test_gen(particle c_particle)

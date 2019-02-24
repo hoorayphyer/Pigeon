@@ -5,7 +5,7 @@
 
 namespace particle {
   template < typename Ptc, typename Vec = typename Ptc::vec_type, typename State = typename Ptc::state_type >
-  struct PtcExpression : public particle::StateExpression<Ptc> {
+  struct PtcExpression : public particle::StateExpression<Ptc, State> {
     static constexpr int Dim = Ptc::Dim;
     using vec_type = Vec;
     using state_type = State;
