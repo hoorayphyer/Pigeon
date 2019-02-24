@@ -2,6 +2,8 @@ include_directories(${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
 
 add_library(catch_main STATIC "catch_main.cpp")
 
+set(CMAKE_CXX_FLAGS "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
+
 macro(test_gen category name)
   set(test_target "test_${category}_${name}")
 

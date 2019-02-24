@@ -46,10 +46,9 @@
 !tests/CMakeLists.txt
 !tests/catch_main.cpp
 !tests/apt
-!tests/apt/*.hpp
-!tests/apt/*.cpp
+!tests/apt/*
 !tests/kernel
-!tests/kernel/*.cpp
+!tests/kernel/*
 
 !tools/
 !tools/**/*

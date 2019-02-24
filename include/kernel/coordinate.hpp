@@ -5,8 +5,8 @@
 #include "apt/numeric.hpp"
 #include "apt/vec.hpp"
 
-template < typename T >
-inline constexpr T PI (3.141592653589793238462643383279502884197169399375105820974944592307816406286L);
+inline constexpr
+long double PI_CONST =3.141592653589793238462643383279502884197169399375105820974944592307816406286L;
 
 namespace knl {
 
@@ -58,64 +58,71 @@ namespace knl {
       return std::exp( 3.0 * logr ) * std::sin(theta);
     }
 
-
-
     template < class X, class V, typename T >
-    static inline auto geodesic_move( apt::VecExpression<X>& x, apt::VecExpression<V>& v, const T& dt ) {
+    static inline auto geodesic_move( apt::VecExpression<X,T>& x, apt::VecExpression<V,T>& v, const T& dt ) {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
+      constexpr T PI = PI_CONST;
       // dx is the return value and meanwhile it serves as a temporary
-       apt::Vec<decltype(std::get<0>(v) * dt), V::size> dx = v * dt;
+      apt::Vec<T, V::size> dx = v * dt;
+
       auto& dlogr = std::get<0>(dx);
       auto& dtheta = std::get<1>(dx);
       auto& dphi = std::get<2>(dx);
 
       const auto& logr  = std::get<0>(x);
       const auto& theta = std::get<1>(x);
+
+      class Rotator {
+      private:
+        T _cos = 0.0;
+        T _sin = 0.0;
+      public:
+        inline void set_angle( T angle ) noexcept {
+          _cos = std::cos(angle);
+          _sin = std::sin(angle);
+        }
+
+        // in-place rotation
+        inline void rotate( T& v1, T& v2 ) const noexcept {
+          v1 = _cos * v1 - _sin * v2;
+          v2 = ( _sin * v1 + v2 ) / _cos;
+        }
+
+        inline T cos() const noexcept { return _cos; }
+        inline T sin() const noexcept { return _sin; }
+      } rot;
+
       { // compute dx in this block
-        dlogr += std::exp( logr ); // after this step, dx should be ( r0 + v_r * dt, v_theta * dt, v_phi * dt )
+        rot.set_angle(theta);
+
+        dlogr += std::exp( logr ); // now dx is ( r0 + v_r * dt, v_theta * dt, v_phi * dt )
 
         auto r_final = apt::abs( dx );
 
-        dtheta = std::acos( ( dlogr * std::cos(theta) - dtheta * std::sin(theta) ) / r_final ) - theta;
-        dphi = std::atan( dphi / std::abs( dlogr * std::sin(theta) + dtheta * std::cos(theta) ) );
+        dtheta = std::acos( ( dlogr * rot.cos() - dtheta * rot.sin() ) / r_final ) - theta;
+        dphi = std::atan( dphi / std::abs( dlogr * rot.sin() + dtheta * rot.cos() ) );
 
-        dlogr = std::log(r_final) - logr;
+        dlogr = std::log( r_final ) - logr;
       }
       { // rebase velocity to the new position
-        auto cdp = std::cos(dphi);
-        auto sdp = std::sin(dphi);
-        auto sT = std::sin( 2*theta + dtheta );
-        auto cT = std::cos( 2*theta + dtheta );
-        auto sdt = std::sin( dtheta );
-        auto cdt = std::cos( dtheta );
+        // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
+        rot.set_angle( theta - PI / 2.0 );
+        rot.rotate( std::get<0>(v), std::get<1>(v) );
 
-        // store old values of v
-        auto v_r = std::get<0>(v);
-        auto v_theta = std::get<1>(v);
-        auto v_phi = std::get<2>(v);
+        // then rotate in r-phi plane. Location is rotated by dphi, so velocity components are rotated -dphi
+        rot.set_angle( -dphi );
+        rot.rotate( std::get<0>(v), std::get<2>(v) );
 
-        std::get<0>(v) =
-          v_r * 0.5 * ( ( 1 - cdp ) * cT + ( 1 + cdp )  * cdt )
-          +  v_theta  * 0.5 * ( ( cdp - 1 ) * sT+ ( 1 + cdp ) * sdt )
-          + v_phi * std::sin( theta + dtheta ) * sdp;
-
-        std::get<1>(v) =
-          v_r * 0.5 * ( ( cdp - 1 ) * sT - ( 1 + cdp ) * sdt )
-          + v_theta * 0.5 * ( ( cdp - 1 ) * cT + ( 1 + cdp ) * cdt )
-          + v_phi * std::cos( theta + dtheta ) * sdp;
-
-        std::get<2>(v) =
-          - v_r * std::sin(theta) * sdp
-          - v_theta * std::cos(theta) * sdp
-          + v_phi * cdp;
+        // last rotate in r-theta plane to new location. Location is rotated by theta_new - PI/2, so velocity components are rotated by PI/2 - theta_new
+        rot.set_angle( PI / 2.0 - theta - dtheta );
+        rot.rotate( std::get<0>(v), std::get<1>(v) );
       }
 
       { // in this block we update x
         x += dx;
-        // normalize phi
-        auto& phi = std::get<2>(x);
-        phi -= 2 * PI<T> * std::floor( phi / (2 * PI<T>) );
+        // bring phi to [0, 2*PI)
+        std::get<2>(x) -= 2 * PI * std::floor( std::get<2>(x) / (2 * PI) );
       }
 
       return dx;

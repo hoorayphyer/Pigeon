@@ -21,6 +21,14 @@ namespace apt {
       return static_cast<const E&>(*this).template v<I>();
     }
 
+    constexpr T operator[] ( int i ) const noexcept {
+      if ( 0 == i ) return v<0>();
+      if constexpr ( size > 1 )
+         if ( 1 == i ) return v<1>();
+      if constexpr ( size > 2 )
+         if ( 2 == i ) return v<2>();
+    }
+
   };
 
   template <typename E, typename T>
@@ -35,9 +43,25 @@ namespace apt {
       return static_cast<const E&>(*this).template v<I>();
     }
 
+    constexpr T operator[] ( int i ) const noexcept {
+      if ( 0 == i ) return v<0>();
+      if constexpr ( size > 1 )
+                     if ( 1 == i ) return v<1>();
+      if constexpr ( size > 2 )
+                     if ( 2 == i ) return v<2>();
+    }
+
     template < int I >
     constexpr T& v() noexcept {
       return static_cast<E&>(*this).template v<I>();
+    }
+
+    constexpr T& operator[] ( int i ) noexcept {
+      if ( 0 == i ) return v<0>();
+      if constexpr ( size > 1 )
+                     if ( 1 == i ) return v<1>();
+      if constexpr ( size > 2 )
+                     if ( 2 == i ) return v<2>();
     }
   };
 }
