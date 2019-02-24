@@ -26,6 +26,10 @@ namespace apt {
     constexpr vVec( VecExpression<E>&& vec, std::index_sequence<I...> ) noexcept
       : _v( std::get<I>(vec)... ) {}
 
+    template < std::size_t... I >
+    constexpr vVec( std::array<T,N>& arr, std::index_sequence<I...> ) noexcept
+      : vVec(std::get<I>(arr)...) {}
+
   public:
     using value_type = T;
     static constexpr int size = N;
@@ -43,6 +47,9 @@ namespace apt {
     template < typename... U >
     constexpr vVec( U&... u ) noexcept
       : _v(u...) {};
+
+    constexpr vVec( std::array<T,N>& arr ) noexcept
+      : vVec( arr, std::make_index_sequence<N>{} ) {}
 
     constexpr vVec( tuple_type&& tpl ) noexcept
       : _v(std::move(tpl)) {};

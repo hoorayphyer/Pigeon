@@ -5,9 +5,9 @@
 #include "apt/foreach.hpp"
 
 namespace particle {
-  // cParticle uses C-native types for the sake of interfacing with MPI
+  // for communication
   template < typename T, int DPtc, typename state_t >
-  class cParticle : public PtcExpression<cParticle<T,DPtc,state_t>, T[DPtc], state_t> {
+  class cParticle : public PtcExpression<cParticle<T,DPtc,state_t>, std::array<T,DPtc>, state_t> {
   private:
     std::array<T,DPtc> _q;
     std::array<T,DPtc> _p;

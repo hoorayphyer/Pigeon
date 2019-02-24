@@ -3,7 +3,7 @@
 
 #include "particle/virtual_particle.hpp"
 #include <iterator>
-#include <memory>
+#include <vector>
 
 namespace particle {
   template < typename array_t >
@@ -48,12 +48,9 @@ namespace particle {
   template < typename T, int Dim_Ptc, typename state_t >
   struct array {
   private:
-    std::size_t _capacity = 0;
-    std::size_t _size = 0;
-
-    std::array<std::unique_ptr<T[]>, Dim_Ptc> _q;
-    std::array<std::unique_ptr<T[]>, Dim_Ptc> _p;
-    std::unique_ptr<state_t[]> _state;
+    std::array<std::vector<T>, Dim_Ptc> _q;
+    std::array<std::vector<T>, Dim_Ptc> _p;
+    std::vector<state_t> _state;
 
   public:
     using value_type = T;
@@ -63,10 +60,7 @@ namespace particle {
     friend class iterator< array >;
     friend class iterator< const array >;
 
-    array(std::size_t capacity);
-    ~array();
-
-    inline auto size() const noexcept { return _size; }
+    inline auto size() const noexcept { return _state.size(); }
 
     auto begin() noexcept { return iterator( *this, 0 ); }
     auto begin() const noexcept { return iterator( *this, 0 ); }
@@ -90,7 +84,6 @@ namespace particle {
     // NOTE from is inclusive, to is exclusive. from can be larger than to.
     void erase( int from, int to );
 
-    // TODO
     void resize(std::size_t size);
 
   };
@@ -106,6 +99,7 @@ namespace std {
     particle::array<T,DPtc,state_t>& _arr;
     int _index;
 
+    using self_type = back_insert_iterator<particle::array<T,DPtc, state_t>>;
   public:
     using iterator_category = std::output_iterator_tag;
     using difference_type = void;
@@ -116,14 +110,14 @@ namespace std {
     explicit back_insert_iterator( particle::array<T,DPtc, state_t>& arr ) noexcept : _arr(arr) {}
 
     template < typename Ptc >
-    auto& operator= ( Ptc&& ptc ) {
+    self_type& operator= ( Ptc&& ptc ) {
       _arr.push_back(std::forward<Ptc>(ptc));
       return *this;
     }
 
-    inline auto& operator++ () noexcept { return *this; }
-    inline auto& operator++ (int) noexcept { return *this; }
-    inline auto& operator* () noexcept { return *this; }
+    inline self_type& operator++ () noexcept { return *this; }
+    inline self_type& operator++ (int) noexcept { return *this; }
+    inline self_type& operator* () noexcept { return *this; }
 
   };
 

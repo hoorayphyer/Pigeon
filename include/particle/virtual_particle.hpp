@@ -28,8 +28,11 @@ namespace particle {
     constexpr auto& state() noexcept { return _state; }
     constexpr const auto& state() const noexcept { return _state; }
 
-    vParticle( apt::vVec<T, DPtc>&& q, apt::vVec<T, DPtc>&& p, state_t& state ) noexcept
-      : _q(std::move(q)), _p(std::move(p)), _state(state) {}
+    template < typename Q, typename P >
+    vParticle( Q&& q, P&& p, state_t& state ) noexcept
+      : _q(std::forward<Q>(q)),
+        _p(std::forward<P>(p)),
+        _state(state) {}
 
     vParticle( vParticle&& ptc ) noexcept
       : _q( std::move(ptc._q)), _p( std::move(ptc._p) ), _state( ptc._state ) {}
