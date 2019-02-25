@@ -3,7 +3,7 @@
 
 using vVec = apt::vVec<double,3>;
 
-SCENARIO( "vVec constructors", "[apt]" ) {
+SCENARIO( "vVec constructors", "[apt][vec]" ) {
   SECTION("value constructor and reference sematics") {
     double x = 1.2, y = 2.3;
     vVec v ( x, y, y );

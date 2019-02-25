@@ -49,6 +49,10 @@
 !tests/apt/*
 !tests/kernel
 !tests/kernel/*
+!tests/particle
+!tests/particle/*
+!tests/parallel
+!tests/parallel/*
 
 !tools/
 !tools/**/*

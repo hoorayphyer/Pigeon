@@ -6,7 +6,7 @@
 
 using namespace apt;
 
-SCENARIO("vec-vec algebra", "[apt]") {
+SCENARIO("vec-vec algebra", "[apt][vec]") {
   Vec<int,3> v1 ( 4, 9, 12 );
   Vec<int,3> v2 ( 1, 3, 2 );
   WHEN("v1 + v2") {
@@ -55,7 +55,7 @@ SCENARIO("vec-vec algebra", "[apt]") {
 
 }
 
-SCENARIO("vec-sca algebra", "[apt]") {
+SCENARIO("vec-sca algebra", "[apt][vec]") {
   Vec<int,3> v ( 3, 9, 12 );
   int s = 3;
   WHEN("v + s") {
@@ -104,7 +104,7 @@ SCENARIO("vec-sca algebra", "[apt]") {
 
 }
 
-SCENARIO("vec algebra with assign", "[apt]") {
+SCENARIO("vec algebra with assign", "[apt][vec]") {
   Vec<int,3> v1 ( 7, 70, 700 );
   Vec<int,3> v2 ( 1, 3, 2 );
   int s = 7;
@@ -156,7 +156,7 @@ SCENARIO("vec algebra with assign", "[apt]") {
   }
 }
 
-SCENARIO("vec cross product", "[apt]") {
+SCENARIO("vec cross product", "[apt][vec]") {
   Vec<int,3> v1 ( 7, 9, -5 );
   Vec<int,3> v2 ( -3, 2, -13 );
   auto v_crs = cross(v1, v2);
@@ -166,7 +166,7 @@ SCENARIO("vec cross product", "[apt]") {
   REQUIRE( v_crs[2] == 41 );
 }
 
-SCENARIO("vec inner product", "[apt]") {
+SCENARIO("vec inner product", "[apt][vec]") {
   Vec<int,3> v1 ( 7, 9, -5 );
   Vec<int,3> v2 ( -3, 2, -13 );
 

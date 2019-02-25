@@ -3,7 +3,7 @@
 
 using Vec = apt::Vec<double,3>;
 
-SCENARIO( "Vec constructors", "[apt]" ) {
+SCENARIO( "Vec constructors", "[apt][vec]" ) {
   SECTION("default constructor") {
     Vec v;
     REQUIRE( v[0] == 0.0 );
@@ -32,7 +32,7 @@ SCENARIO( "Vec constructors", "[apt]" ) {
   }
 }
 
-SCENARIO( "Vec lvalue ref accessor", "[apt]") {
+SCENARIO( "Vec lvalue ref accessor", "[apt][vec]") {
   double x = 1.2;
   Vec v ( x, x, x );
   v[1] = 3.4;
