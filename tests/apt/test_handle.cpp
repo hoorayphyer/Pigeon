@@ -11,6 +11,7 @@ void reset_foo_status() {
 
 struct Foo {
   ~Foo() { Foo_destructor_called = true; }
+  const int x = 147;
 };
 
 void FooDeleter ( Foo* foo) {
@@ -18,9 +19,13 @@ void FooDeleter ( Foo* foo) {
   delete foo;
 }
 
-SCENARIO("handle", "[apt]") {
-  using FooHdl = apt::Handle<Foo, FooDeleter>;
+Foo FooDefault() {
+  return Foo();
+}
 
+using FooHdl = apt::Handle<Foo, FooDeleter, FooDefault>;
+
+SCENARIO("Handle Reference Counts", "[apt]") {
   FooHdl h1;
   REQUIRE( h1.use_count() == 0 );
   auto* foo = new Foo;
@@ -51,5 +56,23 @@ SCENARIO("handle", "[apt]") {
     REQUIRE(FooDeleter_called);
     REQUIRE(Foo_destructor_called);
   }
+}
+
+struct DrvHdl : public FooHdl {};
+
+DrvHdl new_drvhdl () {
+  DrvHdl hdl;
+  hdl.reset(new Foo);
+  return hdl;
+}
+
+int call_on_raw_hdl( Foo a ) { return a.x; }
+
+SCENARIO("Conversion from Derived Handle", "[apt]") {
+  DrvHdl dh = new_drvhdl();
+  SECTION("conversion to raw handle") {
+    REQUIRE( call_on_raw_hdl( dh ) == 147 );
+  }
+
 }
 

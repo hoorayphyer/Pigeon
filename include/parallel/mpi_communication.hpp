@@ -38,7 +38,8 @@ namespace mpi {
 
 namespace mpi {
   void request_free ( MPI_Request* p );
-  using Request = apt::Handle<MPI_Request, request_free >;
+  MPI_Request request_default();
+  using Request = apt::Handle<MPI_Request, request_free, request_default >;
 }
 
 namespace std {
@@ -59,7 +60,9 @@ namespace mpi {
   template < typename Comm >
   struct P2P_Comm {
   private:
-    inline const Comm& _comm() const { return static_cast<const Comm&>(*this)._comm(); }
+    inline MPI_Comm _comm() const {
+      return static_cast<MPI_Comm>(static_cast<const Comm&>(*this));
+    }
 
   public:
     template < typename T >
@@ -71,14 +74,14 @@ namespace mpi {
     }
 
     template <typename T>
-    void send( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::SYN ) const;
+    void send( int dest_rank, int tag, const T* send_buf, int send_count = 1, SendMode mode = SendMode::SYN ) const;
     template <typename T>
-    Request Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode = SendMode::STD ) const;
+    Request Isend( int dest_rank, int tag, const T* send_buf, int send_count = 1, SendMode mode = SendMode::STD ) const;
 
     template <typename T>
-    int recv( int source_rank, T* recv_buf, int recv_count_max, int tag ) const; // return the actual recved number
+    int recv( int source_rank, int tag , T* recv_buf, int recv_count_max) const; // return the actual recved number
     template <typename T>
-    Request Irecv(int source_rank, T* recv_buf, int recv_count_max, int tag ) const;
+    Request Irecv(int source_rank, int tag, T* recv_buf, int recv_count_max ) const;
 
   };
 
@@ -94,7 +97,9 @@ namespace mpi {
   template < typename Comm >
   struct Collective_Comm {
   private:
-    inline const Comm& _comm() const { return static_cast<const Comm&>(*this)._comm(); }
+    inline MPI_Comm _comm() const {
+      return static_cast<MPI_Comm>(static_cast<const Comm&>(*this));
+    }
 
   public:
     void barrier() const;

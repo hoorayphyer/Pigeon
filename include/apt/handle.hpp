@@ -4,25 +4,32 @@
 #include <memory>
 
 namespace apt {
-  template < typename RawHdl, void (*Deleter) ( RawHdl* ) >
-  struct Handle : public std::shared_ptr<RawHdl> {
+  template < typename RawHdl,
+             void (*Deleter) (RawHdl*),
+             RawHdl (*Default) () >
+  struct Handle {
+  private:
+    using shared_ptr = std::shared_ptr<RawHdl>;
+    shared_ptr _ptr;
+
+  public:
     Handle() = default;
 
-    Handle( RawHdl* raw_handle ) {
-      reset( raw_handle );
-    }
-
-    inline void reset() {
-      std::shared_ptr<RawHdl>::reset();
-    }
+    inline void reset() { _ptr.reset(); }
 
     inline void reset( RawHdl* raw_handle ) {
-      std::shared_ptr<RawHdl>::reset( raw_handle, Deleter );
+      _ptr.reset( raw_handle, Deleter );
     }
 
-    operator RawHdl () const noexcept { return *this; }
+    operator RawHdl () const noexcept {
+      return use_count() ? *_ptr : Default();
+    }
 
-    operator RawHdl* () const noexcept { return this->get(); }
+    operator RawHdl* () const noexcept {
+      return _ptr.get();
+    }
+
+    long use_count() const noexcept { return _ptr.use_count(); }
   };
 }
 

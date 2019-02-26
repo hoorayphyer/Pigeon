@@ -57,9 +57,7 @@ test_gen(kernel coordinate) # TODO
 # test_gen(kernel grid_shape_interplay)
 
 mpi_test_gen(parallel mpi++)
-# link_mpi(test_parallel_mpi++)
 mpi_test_gen(parallel locale)
-# link_mpi(test_parallel_locale)
 
 test_gen(particle state)
 # test_gen(particle particle)

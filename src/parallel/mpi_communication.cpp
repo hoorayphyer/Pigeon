@@ -26,6 +26,10 @@ namespace mpi {
       MPI_Request_free(p);
   }
 
+  MPI_Request request_default() {
+    return MPI_REQUEST_NULL;
+  }
+
   void wait( Request& request ) {
     // MPI_Status status;
     // MPI_Wait( &request, &status );
@@ -87,23 +91,23 @@ namespace mpi {
   // TODOL consider add error handling for send
   template < typename Comm >
   template < typename T >
-  void P2P_Comm<Comm>::send(int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
-    *(pick_send<false>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm() );
+  void P2P_Comm<Comm>::send(int dest_rank, int tag, const T* send_buf, int send_count, SendMode mode ) const {
+    (*(pick_send<false>(mode))) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm() );
   }
 
 
   template < typename Comm >
   template < typename T >
-  Request P2P_Comm<Comm>::Isend( int dest_rank, const T* send_buf, int send_count, int tag, SendMode mode ) const {
+  Request P2P_Comm<Comm>::Isend( int dest_rank, int tag, const T* send_buf, int send_count, SendMode mode ) const {
     Request req;
-    *(pick_send<true>(mode)) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm(), req );
+    (*(pick_send<true>(mode))) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm(), req );
 
     return req;
   }
 
   template < typename Comm >
   template < typename T >
-  int P2P_Comm<Comm>::recv( int source_rank, T* recv_buf, int recv_count_max, int tag ) const {
+  int P2P_Comm<Comm>::recv( int source_rank, int tag, T* recv_buf, int recv_count_max ) const {
     MPI_Status status;
     MPI_Recv( recv_buf, recv_count_max, datatype<T>(), source_rank, tag, _comm(), &status);
 
@@ -115,7 +119,7 @@ namespace mpi {
 
   template < typename Comm >
   template < typename T >
-  Request P2P_Comm<Comm>::Irecv(int source_rank, T* recv_buf, int recv_count_max, int tag ) const {
+  Request P2P_Comm<Comm>::Irecv(int source_rank, int tag, T* recv_buf, int recv_count_max ) const {
     Request req;
     MPI_Irecv( recv_buf, recv_count_max, datatype<T>(), source_rank, tag, _comm(), req );
     return req;

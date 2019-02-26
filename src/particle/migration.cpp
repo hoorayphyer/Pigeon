@@ -93,7 +93,7 @@ namespace particle :: impl {
         const auto& send_comm = *intercomms[lr];
         int local_rank = send_comm.rank();
         int remote_dest = ( local_rank + shift ) % send_comm.remote_size();
-        reqs.push_back( send_comm.Isend( remote_dest, buffer.data() + begs[lr], begs[lr+1] - begs[lr], 147 ) );
+        reqs.push_back( send_comm.Isend( remote_dest, 147, buffer.data() + begs[lr], begs[lr+1] - begs[lr] ) );
       }
 
       // receiving
@@ -122,7 +122,7 @@ namespace particle :: impl {
         }
 
         for ( int i = 0; i < remote_srcs.size(); ++i ) {
-          reqs.push_back( recv_comm.Irecv( remote_srcs[i], p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i], 147 ) );
+          reqs.push_back( recv_comm.Irecv( remote_srcs[i], 147, p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i] ) );
         }
 
       }
