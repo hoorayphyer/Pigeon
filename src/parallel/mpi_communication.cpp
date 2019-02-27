@@ -13,10 +13,10 @@ namespace mpi {
 
   template <typename T>
   inline auto decay_buf( T&& buf ) {
-    if constexpr ( is_container<T>(buf) )
-      return std::make_tuple( buf.data(), buf.size(), datatype<decltype(buf[0])>() );
+    if constexpr ( is_container<T>() )
+                   return std::make_tuple( buf.data(), buf.size(), datatype(buf.data()) );
     else
-      return std::make_tuple( &buf, 1, datatype<decltype(buf)>() );
+      return std::make_tuple( &buf, 1, datatype(&buf) );
   }
 
 }
@@ -26,7 +26,7 @@ namespace mpi {
       MPI_Request_free(p);
   }
 
-  MPI_Request request_default() {
+  MPI_Request request_null() {
     return MPI_REQUEST_NULL;
   }
 

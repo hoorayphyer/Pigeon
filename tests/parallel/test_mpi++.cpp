@@ -43,7 +43,9 @@ SCENARIO("Group", "[parallel][mpi]") {
 }
 
 SCENARIO("Comm", "[parallel][mpi]") {
-  Comm comm( world, world.group() );
+  auto comm_opt = world.split( world.group() );
+  REQUIRE( comm_opt );
+  auto& comm = *comm_opt;
   if ( world.size() == 2 ) {
     int myrank = comm.rank();
     if ( 0 == myrank ) {
@@ -57,6 +59,28 @@ SCENARIO("Comm", "[parallel][mpi]") {
   }
 }
 
+SCENARIO("Datatype", "[parallel][mpi]") {
+#define TestType(_T_, _MPIT_)                        \
+  REQUIRE( datatype((_T_*)0) == MPI_##_MPIT_ );      \
+  REQUIRE( datatype((const _T_*)0) == MPI_##_MPIT_); \
+  REQUIRE( datatype((_T_)0) == MPI_##_MPIT_);        \
+
+  TestType(int, INT);
+  TestType(char, CHAR);
+  TestType(short, SHORT);
+  TestType(long, LONG);
+
+  TestType(unsigned char, UNSIGNED_CHAR);
+  TestType(unsigned short, UNSIGNED_SHORT);
+  TestType(unsigned int, UNSIGNED);
+  TestType(unsigned long, UNSIGNED_LONG);
+
+  TestType(float, FLOAT);
+  TestType(double, DOUBLE);
+  TestType(bool, CXX_BOOL);
+#undef TestType
+}
+
 // SCENARIO("intra P2P communications", "[parallel][mpi]") {}
 
 // SCENARIO("intra collective communications", "[parallel][mpi]") {}
@@ -65,7 +89,9 @@ SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
   if ( world.size() == 2 ) {
     SECTION("each comm has one member") {
       int myrank = world.rank();
-      Comm local ( world, myrank, myrank );
+      auto local_opt = world.split(Group({myrank}));
+      REQUIRE(local_opt);
+      auto& local = *local_opt;
       std::optional<Comm> peer_comm(world);
       InterComm inter( local, 0, peer_comm, 1-myrank, 147 );
       if ( 0 == myrank ) {

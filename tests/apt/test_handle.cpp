@@ -11,7 +11,7 @@ void reset_foo_status() {
 
 struct Foo {
   ~Foo() { Foo_destructor_called = true; }
-  const int x = 147;
+  int x = 147;
 };
 
 void FooDeleter ( Foo* foo) {

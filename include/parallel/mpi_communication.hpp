@@ -8,8 +8,9 @@
 #include <vector>
 
 namespace mpi {
-  template <typename T>
-  constexpr MPI_Datatype datatype(const T* = nullptr) noexcept {
+  template <typename Type>
+  constexpr MPI_Datatype datatype(Type* = nullptr) noexcept {
+    using T = std::remove_const_t<Type>;
     if constexpr ( std::is_same_v<T, char> ) return MPI_CHAR;
     else if ( std::is_same_v<T, short> ) return MPI_SHORT;
     else if ( std::is_same_v<T, int> ) return MPI_INT;
@@ -30,7 +31,7 @@ namespace mpi {
 
   template <typename T>
   constexpr MPI_Datatype datatype(const T&) noexcept {
-    return datatype((const T*)0);
+    return datatype((T*)0);
   }
 
 }
@@ -38,8 +39,8 @@ namespace mpi {
 
 namespace mpi {
   void request_free ( MPI_Request* p );
-  MPI_Request request_default();
-  using Request = apt::Handle<MPI_Request, request_free, request_default >;
+  MPI_Request request_null();
+  using Request = apt::Handle<MPI_Request, request_free, request_null >;
 }
 
 namespace std {

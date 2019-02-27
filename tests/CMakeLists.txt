@@ -47,7 +47,6 @@ macro(mpi_test_gen category name)
   unset(test_target)
 endmacro()
 
-
 test_gen(apt vec)
 test_gen(apt virtual_vec)
 test_gen(apt numeric)
@@ -56,7 +55,7 @@ test_gen(apt handle)
 test_gen(kernel coordinate) # TODO
 # test_gen(kernel grid_shape_interplay)
 
-mpi_test_gen(parallel mpi++)
+mpi_test_gen(parallel mpi++) # TODO
 mpi_test_gen(parallel locale)
 
 test_gen(particle state)

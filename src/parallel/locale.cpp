@@ -1,10 +1,9 @@
 #include "parallel/locale.hpp"
 #include <stdexcept>
-#include <algorithm> // std::find
 
 namespace parallel {
-  std::optional<mpi::Comm> create_primary_comm( std::vector<int> dims, std::vector<bool> periodic ) {
-    std::optional<mpi::Comm> result;
+  std::optional<mpi::CartComm> create_primary_comm( std::vector<int> dims, std::vector<bool> periodic ) {
+    std::optional<mpi::CartComm> result;
 
     const int ndims = std::min( dims.size(), periodic.size() );
 
@@ -20,34 +19,29 @@ namespace parallel {
     for ( int i = 0; i < r_prmy.size(); ++i )
       r_prmy[i] = i;
 
-    if ( std::find( r_prmy.begin(), r_prmy.end(), mpi::world.rank() ) != r_prmy.end() ) {
-      result.emplace( mpi::world, r_prmy );
-      mpi::cartesianize( *result, dims, periodic );
+    auto comm_tmp = mpi::world.split(r_prmy);
+
+    if ( comm_tmp ) {
+      result.emplace( *comm_tmp, dims, periodic );
     }
 
     return result;
   }
 
-  std::optional<mpi::Comm> create_ensemble_comm ( const std::vector<int>& members ) {
-    std::optional<mpi::Comm> result;
-
-    if ( std::find( members.begin(), members.end(), mpi::world.rank() ) != members.end() )
-      result.emplace( mpi::world, members );
-    return result;
-  }
-
   template < int DGrid >
-  Locale<DGrid> create_locale( const std::optional<mpi::Comm>& cart, const mpi::Comm& ensemble ) {
+  Locale<DGrid> create_locale( const std::optional<mpi::CartComm>& cart_comm, const mpi::Comm& ensemble ) {
     constexpr int neigh_null = -147;
     Locale<DGrid> locale;
 
     std::array<int, 2 + DGrid + 2*DGrid> buf;
-    if ( cart ) {
-      locale.label = mpi::cart::linear_coord( *cart );
-      locale.chief_cart_rank = cart->rank();
-      locale.cart_coords = mpi::cart::coords( *cart );
+    if ( cart_comm ) {
+      const auto& cart = *cart_comm;
+      locale.label = cart.linear_coord();
+      locale.chief_cart_rank = cart.rank();
+      auto coords = cart.coords();
       for ( int i = 0; i < DGrid; ++i ) {
-        locale.neighbors[i] = mpi::cart::shift( *cart, i, 1 );
+        locale.cart_coords[i] = coords[i];
+        locale.neighbors[i] = cart.shift( i, 1 );
       }
 
       buf[0] = locale.label;
@@ -84,14 +78,14 @@ namespace parallel {
   // NOTE InterComm constructor is blocking
   template < int DGrid >
   std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid >
-  link_neighbors( const std::optional<mpi::Comm>& cart,
+  link_neighbors( const std::optional<mpi::CartComm>& cart,
                   const mpi::Comm& ensemble,
                   const Locale<DGrid>& locale ) {
     std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid > result;
     const auto& crk_chief = locale.chief_cart_rank;
 
     // loop over each primary, for each of which loop over DGrid, for each of which loop over left and right.
-    // Check first if neighbor is null, then if there is already an intercomm.
+    // Check first whether neighbor is null, then whether there is already an intercomm.
     for ( int i_cart = 0; i_cart < cart->size(); ++i_cart ) {
       for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
         const auto& neighs = locale.neighbors[i_dim];// this is in cartesian ranks

@@ -7,7 +7,7 @@ namespace mpi {
       MPI_Group_free(p);
   }
 
-  MPI_Group group_default() {
+  MPI_Group group_empty() {
     return MPI_GROUP_EMPTY;
   }
 
@@ -16,11 +16,16 @@ namespace mpi {
       MPI_Comm_free(p);
   }
 
-  MPI_Comm comm_default() {
-    return MPI_COMM_WORLD;
+  MPI_Comm comm_null() {
+    return MPI_COMM_NULL;
   }
 
-  const Comm world;
+  Comm make_world() {
+    Comm comm;
+    comm.set_fallback_handle(MPI_COMM_WORLD);
+    return comm;
+  }
+  const Comm world = make_world();
 
   void initialize() {
     int is_initialized = 0;
@@ -150,18 +155,37 @@ namespace mpi {
 
 // mpi::Comm
 namespace mpi {
-  Comm::Comm ( const Comm& super_comm, const Group& sub_group ) {
+  // Comm::Comm ( const Comm& super_comm, const Group& sub_group ) {
+  //   auto* comm = new MPI_Comm;
+  //   MPI_Comm_create_group(super_comm, sub_group, 147, comm );
+  //   reset(comm);
+  // }
+
+  std::optional<Comm> Comm::split ( const Group& sub_group ) const {
+    std::optional<Comm> res;
     auto* comm = new MPI_Comm;
-    MPI_Comm_create_group(super_comm, sub_group, 147, comm );
-    reset(comm);
+    MPI_Comm_create(*this, sub_group, comm );
+    if ( *comm != MPI_COMM_NULL ) {
+      res.emplace();
+      res->reset(comm);
+    } else {
+      delete comm;
+    }
+    return res;
   }
 
-  Comm::Comm ( const Comm& super_comm, int color, int key ) {
+  std::optional<Comm> Comm::split ( int color, int key ) const {
+    std::optional<Comm> res;
     auto* comm = new MPI_Comm;
-    MPI_Comm_split(super_comm, color, key, comm );
-    reset(comm);
+    MPI_Comm_split(*this, color, key, comm );
+    if ( *comm != MPI_COMM_NULL ) {
+      res.emplace();
+      res->reset(comm);
+    } else {
+      delete comm;
+    }
+    return res;
   }
-
 }
 
 // mpi cartesian
@@ -178,7 +202,7 @@ namespace mpi {
     reset( comm_cart );
   }
 
-  std::vector<int> CartComm::rank2coords ( int rank ) {
+  std::vector<int> CartComm::rank2coords ( int rank ) const {
     int ndims = 0;
     MPI_Cartdim_get( *this, &ndims );
     std::vector<int> coords(ndims);
@@ -186,13 +210,13 @@ namespace mpi {
     return coords;
   }
 
-  int CartComm::coords2rank( const std::vector<int>& coords ) {
+  int CartComm::coords2rank( const std::vector<int>& coords ) const {
     int rank = 0;
     MPI_Cart_rank( *this, coords.data(), &rank);
     return rank;
   }
 
-  int CartComm::linear_coord() {
+  int CartComm::linear_coord() const {
     int result = 0;
 
     int ndims = 0;
@@ -212,7 +236,7 @@ namespace mpi {
     return result;
   }
 
-  std::array<std::optional<int>, 2> CartComm::shift( int direction, int disp ) {
+  std::array<std::optional<int>, 2> CartComm::shift( int direction, int disp ) const {
     std::array<std::optional<int>, 2> results;
     int rank_src = 0, rank_dest = 0;
     MPI_Cart_shift( *this, direction, disp, &rank_src, &rank_dest );

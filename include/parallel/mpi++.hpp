@@ -6,10 +6,10 @@
 
 namespace mpi {
   void group_free( MPI_Group* p );
-  MPI_Group group_default();
+  MPI_Group group_empty();
 
   // NOTE MPI_Group being an ordered set seems to mean that ( group_rank, process ) are stored as elements and ordered by group_rank. The mapping is solely determined by the order of processes user passed in when constructing the group.
-  struct Group : apt::Handle<MPI_Group, group_free, group_default> {
+  struct Group : apt::Handle<MPI_Group, group_free, group_empty> {
     Group() = default;
     Group ( const std::vector<int>& ranks ); // using MPI_WORLD_GROUP
     Group ( const std::vector<int>& ranks, const Group& source );
@@ -46,33 +46,36 @@ namespace mpi {
 
 namespace mpi {
   void comm_free ( MPI_Comm* p );
-  MPI_Comm comm_default();
+  MPI_Comm comm_null();
 
   // a simple communicator that manages a shared memory.
-  struct Comm : public apt::Handle<MPI_Comm, comm_free, comm_default>,
+  struct Comm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
                 public CommAccessor<Comm>,
                 public P2P_Comm<Comm>,
                 public Collective_Comm<Comm> {
     Comm () = default;
-    Comm ( const Comm& super_comm, const Group& sub_group );
-    Comm ( const Comm& super_comm, int color, int key ); // MPI_Comm_split
+    // Comm ( const Comm& super_comm, const Group& sub_group ); // TODO what if sub_group is empty?
+
+    std::optional<Comm> split ( const Group& sub_group ) const;
+    std::optional<Comm> split ( int color, int key ) const;
   };
+
 }
 
 namespace mpi {
   struct CartComm : public Comm {
     CartComm( const Comm& comm, std::vector<int> dims, std::vector<bool> periodic );
 
-    std::vector<int> rank2coords ( int rank );
-    int coords2rank( const std::vector<int>& coords );
+    std::vector<int> rank2coords ( int rank ) const;
+    int coords2rank( const std::vector<int>& coords ) const;
 
-    inline std::vector<int> coords () {
+    inline std::vector<int> coords () const {
       return rank2coords( rank());
     }
 
-    int linear_coord();
+    int linear_coord() const;
 
-    std::array<std::optional<int>, 2> shift(int direction, int disp = 1 );
+    std::array<std::optional<int>, 2> shift(int direction, int disp = 1 ) const;
   };
 
 }
