@@ -29,13 +29,13 @@ namespace parallel {
   std::optional<mpi::CartComm> create_primary_comm ( std::vector<int> dims, std::vector<bool> periodic );
 
   template < int DGrid >
-  Locale<DGrid> create_locale( const std::optional<mpi::CartComm>& cart, const mpi::Comm& ensemble );
+  std::optional<Locale<DGrid>> create_locale( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& ensemble );
 
   template < int DGrid >
   std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid >
   link_neighbors( const std::optional<mpi::CartComm>& cart_comm,
-                  const mpi::Comm& ensemble,
-                  const Locale<DGrid>& locale );
+                  const std::optional<mpi::Comm>& ensemble,
+                  const std::optional<Locale<DGrid>>& locale );
 
 }
 

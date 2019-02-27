@@ -29,10 +29,14 @@ namespace parallel {
   }
 
   template < int DGrid >
-  Locale<DGrid> create_locale( const std::optional<mpi::CartComm>& cart_comm, const mpi::Comm& ensemble ) {
-    constexpr int neigh_null = -147;
-    Locale<DGrid> locale;
+  std::optional<Locale<DGrid>> create_locale( const std::optional<mpi::CartComm>& cart_comm, const std::optional<mpi::Comm>& ensemble_opt ) {
+    std::optional<Locale<DGrid>> locale_opt;
+    if ( !ensemble_opt ) return locale_opt;
+    const auto& ensemble = *ensemble_opt;
 
+    locale_opt.emplace();
+    auto& locale = *locale_opt;
+    constexpr int neigh_null = -147;
     std::array<int, 2 + DGrid + 2*DGrid> buf;
     if ( cart_comm ) {
       const auto& cart = *cart_comm;
@@ -72,16 +76,20 @@ namespace parallel {
         locale.is_at_boundary[i][lr] = !locale.neighbors[i][lr];
     }
 
-    return locale;
+    return locale_opt;
   }
 
   // NOTE InterComm constructor is blocking
   template < int DGrid >
   std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid >
   link_neighbors( const std::optional<mpi::CartComm>& cart,
-                  const mpi::Comm& ensemble,
-                  const Locale<DGrid>& locale ) {
+                  const std::optional<mpi::Comm>& ensemble_opt,
+                  const std::optional<Locale<DGrid>>& locale_opt ) {
     std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid > result;
+    if (! ensemble_opt ) return result;
+    const auto& ensemble = *ensemble_opt;
+    auto& locale = *locale_opt;
+
     const auto& crk_chief = locale.chief_cart_rank;
 
     // loop over each primary, for each of which loop over DGrid, for each of which loop over left and right.

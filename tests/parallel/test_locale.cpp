@@ -20,22 +20,40 @@ SCENARIO("Create Locale", "[parallel]") {
       auto ens_opt = world.split(Group({0,1}));
       REQUIRE(ens_opt);
 
-      auto locale = create_locale<DGrid>( cart_opt, *ens_opt );
+      auto locale_opt = create_locale<DGrid>( cart_opt, ens_opt );
+      REQUIRE( locale_opt );
+      const auto& locale = *locale_opt;
       REQUIRE( 0 == locale.chief );
       REQUIRE( 0 == locale.label );
       REQUIRE( 0 == locale.chief_cart_rank );
 
       REQUIRE( std::array<int,1>{0} == locale.cart_coords );
-      for ( int IGrid = 0; IGrid < DGrid; ++ IGrid )
+      for ( int IGrid = 0; IGrid < DGrid; ++ IGrid ) {
         for ( int i = 0; i < 2; ++i ) {
           REQUIRE_FALSE( locale.neighbors[IGrid][i] );
           REQUIRE( locale.is_at_boundary[IGrid][i] );
         }
+      }
     }
-
   }
 }
 
 SCENARIO("Link Neighbors", "[parallel]") {
-  
+  constexpr int DGrid = 1;
+  if ( world.size() == 2 ) {
+    auto cart_opt = create_primary_comm({2}, {true});
+    REQUIRE( cart_opt );
+    auto ens_opt = world.split(Group({world.rank()}));
+    REQUIRE( ens_opt );
+    auto locale_opt = create_locale<DGrid>( cart_opt, ens_opt );
+    REQUIRE( locale_opt );
+
+    auto neighbors = std::get<0>(link_neighbors( cart_opt, ens_opt, locale_opt ));
+    for ( int i = 0; i < 2; ++i ) {
+      REQUIRE( neighbors[i] );
+      const auto& inter_comm = *(neighbors[i]);
+      REQUIRE( inter_comm.remote_size() == 1 );
+      // REQUIRE( inter_comm.remote_group() ==  ); // TODO group comparison
+    }
+  }
 }
