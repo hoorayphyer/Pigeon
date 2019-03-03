@@ -23,7 +23,7 @@ namespace esirkepov :: impl {
   }
 
   template < int DGrid, typename T, class ShapeRange, int DField >
-  class ShapeRangeInterator {
+  class ShapeRangeIterator {
     static_assert( DField == 3 );
   private:
     int _I = 0;
@@ -42,13 +42,20 @@ namespace esirkepov :: impl {
     using pointer = void;
     using iterator_category = std::forward_iterator_tag;
 
-    ShapeRangeInterator( int I, const ShapeRange& sr ) noexcept : _I(I), _sr(sr) {}
+    ShapeRangeIterator( int I, const ShapeRange& sr ) noexcept : _I(I), _sr(sr) {}
 
-    inline bool operator!= ( const ShapeRangeInterator& other ) const noexcept {
+    inline bool operator!= ( const ShapeRangeIterator& other ) const noexcept {
       return _I != other._I;
     }
 
+    difference_type operator-( const ShapeRangeIterator& other ) const noexcept {
+      return _I - other._I;
+    }
+
     auto& operator++() noexcept { ++_I; return *this; }
+    auto operator++(int) noexcept {
+      auto res = ShapeRangeIterator(_I, _sr); ++_I; return res;
+    }
 
     // TODO make sure ShapeF can be passed in as constexpr. This may be used to optimize the ever-checking away.
     reference operator*() noexcept {
@@ -63,16 +70,16 @@ namespace esirkepov :: impl {
 
       if constexpr ( DGrid >= 2 ) {
           std::get<0>(ijk) = _I % std::get<0>(stride);
-          apt::foreach<0,1>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+          apt::foreach<0,1>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr._dq );
 
           if ( std::get<0>(ijk) != 0 ) goto CALCW;
           std::get<1>(ijk) = ( _I % std::get<1>(stride) ) / std::get<0>(stride);
-          apt::foreach<1,2>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+          apt::foreach<1,2>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr._dq );
 
           if constexpr ( DGrid == 3 ) {
               if ( std::get<1>(ijk) != 0 ) goto CALCW;
               std::get<2>(ijk) = _I / stride[1];
-              apt::foreach<2,3>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr.dq );
+              apt::foreach<2,3>( f_calc_s0s1, s0, s1, ijk, _sr._sep1_b, _sr._dq );
             }
 
         CALCW:
@@ -100,46 +107,46 @@ namespace esirkepov :: impl {
   template < int DGrid, typename T, typename ShapeF, int DField >
   class ShapeRange {
   private:
-    const apt::Vec<T,DGrid>& dq; // NOTE DGrid, not DPtc
+    const apt::Vec<T,DGrid>& _dq; // NOTE DGrid, not DPtc
     const ShapeF& shapef;
     apt::Vec<int, DGrid> _I_b;
     apt::Vec<T, DGrid> _sep1_b;
     apt::Vec<int, DGrid> _stride;
 
   public:
-    friend class ShapeRangeInterator<DGrid, T, ShapeRange, DField >;
-    using sr_iterator = ShapeRangeInterator<DGrid, T, ShapeRange, DField >;
+    friend class ShapeRangeIterator<DGrid, T, ShapeRange, DField >;
+    using sr_iterator = ShapeRangeIterator<DGrid, T, ShapeRange, DField >;
 
     template < typename E1, typename E2 >
     ShapeRange( const apt::VecExpression<E1>& q1_abs,
                 const apt::VecExpression<E2>& dq_abs,
                 const knl::Grid<DGrid,T>& grid,
                 const ShapeF& shapefunc )
-      : dq( dq_abs / grid.delta() ),
+      : _dq( dq_abs / grid.delta() ),
         shapef(shapefunc) {
-      auto min = []( const auto& a, const auto& b ) noexcept {
-                   return a < b ? a : b;};
-      auto max = []( const auto& a, const auto& b ) noexcept {
-                   return a > b ? a : b;};
+      // RATIONALE: assume the offset 0.5 in the dimension. The native grid is one offset by 0.5 with respect to the original one.
+      // - q1 is relative position in the native grid. Since the original grid has cell 0 in the very first guard cell, the native grid follows this, hence q1 starts from 0.0.
+      // - the contributing cells in the native grid are [ int(q1 - sf.r) + 1,  int(q1 + sf.r) + 1 )
+      // - index_original = index_native + ( q1 - int(q1) >= 0.5 )
+      // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
 
-      // NOTE offset is 0.5
-      auto&& q1 = grid.guard() - 0.5 + ( q1_abs - grid.lower() ) / grid.delta();
+      apt::Vec<T,DGrid>&& q1 = grid.guard() - 0.5 + ( q1_abs - grid.lower() ) / grid.delta();
       apt::foreach<0, DGrid>
-        ( [&sf=shapef, &min, &max]( auto& ind_b, auto& sep1_b, auto& stride, const auto& x1, const auto& dx ) noexcept {
-            ind_b = int( min(x1, x1-dx) - sf.support / 2.0 ) + 1;
-            sep1_b = ind_b - x1;
-            stride = int( max(x1, x1-dx) - sf.support / 2.0 ) + 1 + sf.support - ind_b;
-          }, _I_b, _sep1_b, _stride, std::move(q1), dq );
+        ( [&sf=shapef]( auto& ind_b, auto& sep1_b, auto& stride, auto xmin, auto xmax ) noexcept {
+            // initially, xmin = x1, xmax = dx. xmin/max should be min/max( x1, x1 - dx )
+            sep1_b = - xmin;
+            xmin -= (( xmax > 0 ? xmax : 0.0 ) + sf.support / 2.0);
+            xmax = xmin + xmax * ( (xmax > 0.0) - ( xmax < 0.0) ) + sf.support;
+            ind_b = int( xmin ) + 1 ;
+            stride = int( xmax ) + 1 - ind_b;
+            sep1_b += ind_b;
+          }, _I_b, _sep1_b, _stride, std::move(q1), _dq );
 
-      if constexpr ( DGrid == 2 ) {
-        std::get<1>(_stride) *= std::get<0>(_stride);
-      } else if ( DGrid == 3 ) {
-        std::get<1>(_stride) *= std::get<0>(_stride);
-        std::get<2>(_stride) *= std::get<1>(_stride);
-      }
       static_assert( DGrid > 1 && DGrid < 4 );
-
+      if constexpr ( DGrid > 1 ) std::get<1>(_stride) *= std::get<0>(_stride);
+      if constexpr ( DGrid > 2 ) std::get<2>(_stride) *= std::get<1>(_stride);
     }
+
 
     auto begin() const {
       return sr_iterator( 0, *this );

@@ -13,7 +13,7 @@ namespace knl {
       dx = std::abs(dx);
 
       if constexpr( shape::Nearest_Grid_Point == S ) {
-          return static_cast<T> ( dx <= 0.5 );
+          return static_cast<T> ( dx < 0.5 );
         }
       else if ( shape::Cloud_In_Cell == S ) {
         return std::max ( 1.0 - dx, 0.0 );

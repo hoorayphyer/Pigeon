@@ -170,7 +170,6 @@ SCENARIO("LogSpherical", "[knl]") {
       // REQUIRE( v1[1] == Approx(v2[1]));
       // REQUIRE( v1[2] == Approx(v2[2]));
 
-
     }
 
   }

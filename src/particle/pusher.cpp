@@ -20,24 +20,26 @@ namespace particle :: force {
       return p_new - p;
     };
 
-  auto lorentz = // lambda = dt / mass_x * e/m NOTE this is actually rescaling Lorentz force
-    []( auto lambda, const auto& p, const auto& E, const auto& B ) noexcept {
-      // TODO optimize use of intermediate variables
-      lambda /= 2.0;
+  // lambda = dt / mass_x * e/m NOTE this is actually rescaling Lorentz force
+  template <typename E_p, typename E_E, typename E_B, typename T = typename E_p::value_type, int N = E_p::size>
+  apt::Vec<T,N> lorentz ( T lambda, const apt::VecExpression<E_p>& p, const apt::VecExpression<E_E>& E, const apt::VecExpression<E_B>& B ) noexcept {
+    using Vec = apt::Vec<T,N>;
+    // TODO optimize use of intermediate variables
+    lambda /= 2.0;
 
-      auto u_halfstep = p + E * lambda + apt::cross(p, B) * ( lambda / std::sqrt( 1.0 + apt::sqabs(p) ) );
-      auto upr = u_halfstep + E * lambda;
-      auto tau = B * lambda;
-      // store some repeatedly used intermediate results
-      auto tt = apt::sqabs(tau);
-      auto ut = apt::dot(upr, tau);
+    Vec u_halfstep = p + E * lambda + apt::cross(p, B) * ( lambda / std::sqrt( 1.0 + apt::sqabs(p) ) );
+    Vec upr = u_halfstep + E * lambda;
+    Vec tau = B * lambda;
+    // store some repeatedly used intermediate results
+    auto tt = apt::sqabs(tau);
+    auto ut = apt::dot(upr, tau);
 
-      auto sigma = 1.0 + apt::sqabs(upr) - tt;
-      auto inv_gamma2 =  2.0 / ( sigma + std::sqrt( sigma * sigma + 4.0 * ( tt + ut * ut ) ) ); // inv_gamma2 means ( 1 / gamma^(i+1) ) ^2
-      auto s = 1.0 / ( 1.0 + inv_gamma2 * tt );
-      auto p_vay = ( upr + tau * ( ut * inv_gamma2 ) + apt::cross(upr, tau) * std::sqrt(inv_gamma2) ) * s;
-      return p_vay - p;
-    };
+    auto sigma = 1.0 + apt::sqabs(upr) - tt;
+    auto inv_gamma2 =  2.0 / ( sigma + std::sqrt( sigma * sigma + 4.0 * ( tt + ut * ut ) ) ); // inv_gamma2 means ( 1 / gamma^(i+1) ) ^2
+    auto s = 1.0 / ( 1.0 + inv_gamma2 * tt );
+    Vec p_vay = ( upr + tau * ( ut * inv_gamma2 ) + apt::cross(upr, tau) * std::sqrt(inv_gamma2) ) * s;
+    return Vec(p_vay - p);
+  };
 
 }
 

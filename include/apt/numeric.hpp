@@ -4,9 +4,26 @@
 #include "apt/vec_expression.hpp"
 
 namespace apt {
+  namespace impl {
+    template <class, typename... T >
+    struct higher_precision{
+      using type = decltype( (... + (T)0) );
+    };
+  }
+
+  template < typename... T >
+  using higher_precision_t
+  = typename impl::higher_precision
+    < std::enable_if_t<(... && std::is_arithmetic_v<T>)>,
+      T... >::type;
+}
+
+namespace apt {
+
   enum class BinaryOps : int {ADD=0, SUB, MUL, DIV};
 
-  template < BinaryOps Op, typename E1, typename E2, typename T = typename E1::value_type>
+  template < BinaryOps Op, typename E1, typename E2,
+             typename T = higher_precision_t<typename E1::value_type, typename E2::value_type> >
   struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T, false> {
   private:
     const E1& _e1;
@@ -29,7 +46,8 @@ namespace apt {
     }
   };
 
-  template < BinaryOps Op, typename E, typename Real, typename T = typename E::value_type >
+  template < BinaryOps Op, typename E, typename Real,
+             typename T = higher_precision_t<typename E::value_type, Real> >
   struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T, false> {
   private:
     const E& _e;

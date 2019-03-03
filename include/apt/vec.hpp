@@ -18,7 +18,10 @@ namespace apt {
 
     template < typename... U,
                class = std::enable_if_t<sizeof...(U) == N> >
-    constexpr Vec( U... args ) noexcept : _v{ args...} {}
+    constexpr Vec( U... args ) noexcept : _v{{ args... }} {}
+
+    template < typename U >
+    constexpr Vec( const std::array<U, N>& arr ) noexcept : _v{arr} {}
 
     template < typename E >
     constexpr Vec( const VecExpression<E>& vec ) noexcept {

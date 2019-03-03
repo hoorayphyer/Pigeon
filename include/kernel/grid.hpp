@@ -9,8 +9,6 @@ namespace knl {
     int guard;
     T delta;
 
-    static_assert( std::is_floating_point_v<T> );
-
     constexpr gridline_t() noexcept: gridline_t( 0.0, 1.0, 0, 1 ) {}
 
     constexpr gridline_t( T grid_lower, T grid_upper, int grid_guard, int grid_N ) noexcept
@@ -45,6 +43,8 @@ namespace knl {
   template < int DGrid, typename T >
   struct Grid : public std::array< gridline_t<T>, DGrid > {
   private:
+    static_assert( std::is_floating_point_v<T> );
+
     template < typename U >
     using vVec = apt::vVec<const U, DGrid>;
 
@@ -63,6 +63,9 @@ namespace knl {
     }
 
   public:
+    constexpr Grid( const std::array< gridline_t<T>, DGrid >& arr ) noexcept
+       : std::array< gridline_t<T>, DGrid >{arr} {}
+
     constexpr auto delta() const noexcept {
       return mem_get<Mem::DELTA,T>( std::make_index_sequence<DGrid>{} );
     }
