@@ -17,8 +17,8 @@
 !include/kernel/*.hpp
 !include/utility/
 !include/utility/*.hpp
-!include/export/
-!include/export/*.hpp
+!include/io/
+!include/io/*.hpp
 !include/parallel/
 !include/parallel/*.hpp
 !include/particle/
@@ -33,8 +33,8 @@
 !src/aperture/*.cpp
 !src/utility/
 !src/utility/*.cpp
-!src/export/
-!src/export/*.cpp
+!src/io/
+!src/io/*.cpp
 !src/parallel/
 !src/parallel/*.cpp
 !src/particle/

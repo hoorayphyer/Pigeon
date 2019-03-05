@@ -1,4 +1,6 @@
-include_directories( ${Silo_INCLUDE_DIR} ../include )
+include_directories( ../include )
+
+# NOTE since all implementation cpp is separated from the instantiation cpp, just include the directory of src/ in Lab to achieve the automatic shadow that was impossible to achieve before
 
 # if(LAB_ROOT_DIR)
 #   include("${LAB_ROOT_DIR}/src/CMakeLists.txt")
@@ -22,9 +24,17 @@ include_directories( ${Silo_INCLUDE_DIR} ../include )
 
 #TODO precede particle/.cpp with lab/.cpp
 macro(module_gen category name)
-  add_library( ${category}_${name}_module STATIC "aperture/${category}_${name}.cpp")
-  target_include_directories(${category}_${name}_module PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-  list( APPEND ${category}_modules ${category}_${name}_module )
+  set(module_target "${category}_${name}_module")
+  if(EXISTS "aperture/${category}_${name}.cpp")
+    set(src_file "aperture/${category}_${name}.cpp")
+  else()
+    set(src_file "${category}/${name}.cpp")
+  endif()
+  add_library( ${module_target} STATIC ${src_file} )
+  target_include_directories(${module_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  list( APPEND ${category}_modules ${module_target} )
+  unset(src_file)
+  unset(module_target)
 endmacro()
 
 function(link_mpi target)
@@ -34,19 +44,26 @@ function(link_mpi target)
   set_target_properties(${target} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
 endfunction()
 
-set( particle_modules "" )
+# set( particle_modules "" )
 
-add_library(parallel_lib STATIC "parallel/locale.cpp" "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
-target_include_directories(parallel_lib PUBLIC ${MPI_INCLUDE_PATH})
-link_mpi(parallel_lib)
+add_library(mpi_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
+link_mpi(mpi_lib)
+
+
+module_gen(parallel locale)
+target_link_libraries( parallel_locale_module PRIVATE ${mpi_lib})
+
+add_library(silo_lib STATIC "io/silo++.cpp" "io/silo++_putters.cpp")
+target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} )
+target_link_libraries( silo_lib PRIVATE ${mpi_lib} ${Silo_LIBRARIES})
 
 
 # add_library(field_lib STATIC "field/field.cpp" )
 
 
 module_gen(particle migration)
-link_mpi(particle_migration_module)
-target_link_libraries(particle_migration_module PRIVATE ${parallel_lib})
+# link_mpi(particle_migration_module)
+target_link_libraries(particle_migration_module PRIVATE ${mpi_lib})
 
 module_gen(particle depositer)
 module_gen(particle pair_producer)

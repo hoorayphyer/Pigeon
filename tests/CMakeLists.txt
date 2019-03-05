@@ -58,6 +58,10 @@ test_gen(kernel coordinate) # TODO
 mpi_test_gen(parallel mpi++) # TODO
 mpi_test_gen(parallel locale)
 
+mpi_test_gen(io silo++)
+target_include_directories(test_io_silo++ PRIVATE ${Silo_INCLUDE_DIR} )
+target_link_libraries( test_io_silo++ PRIVATE ${Silo_LIBRARIES})
+
 test_gen(particle state)
 # test_gen(particle particle)
 # test_gen(particle virtual_particle)

@@ -23,7 +23,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu+
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
 # set(CMAKE_CXX_COMPILER "g++")
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules" )
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_find_package" )
 
 
 # if(LAB_ROOT_DIR)
@@ -35,8 +35,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules" )
 # endif()
 
 find_package(MPI)
-# find_package(Silo REQUIRED)
+find_package(Silo REQUIRED)
 set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
-# add_subdirectory(src)
+add_subdirectory(src)
 add_subdirectory(tests)
