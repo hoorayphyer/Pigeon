@@ -4,7 +4,7 @@
 namespace apt {
 
   template <typename E,
-            typename T = typename E::value_type,
+            typename T = typename E::element_type,
             bool is_lvalue = E::is_lvalue>
   class VecExpression;
 
@@ -12,7 +12,7 @@ namespace apt {
   class VecExpression<E,T,false> {
   public:
     static constexpr int size = E::size;
-    using value_type = T;
+    using element_type = T;
     static constexpr bool is_lvalue = false;
 
     // NOTE .template v<I>() is necessary to tell compiler that v is a template. It works like typename
@@ -35,7 +35,7 @@ namespace apt {
   class VecExpression<E,T,true> {
   public:
     static constexpr int size = E::size;
-    using value_type = T;
+    using element_type = T;
     static constexpr bool is_lvalue = true;
 
     template < int I >

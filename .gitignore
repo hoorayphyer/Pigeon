@@ -47,12 +47,18 @@
 !tests/catch_main.cpp
 !tests/apt
 !tests/apt/*
+!tests/utility/
+!tests/utility/*.cpp
+!tests/io
+!tests/io/*
 !tests/kernel
 !tests/kernel/*
 !tests/particle
 !tests/particle/*
 !tests/parallel
 !tests/parallel/*
+!tests/field/
+!tests/field/*.cpp
 
 !tools/
 !tools/**/*

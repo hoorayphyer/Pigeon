@@ -1,3 +1,4 @@
+#include "apt/print_vec.hpp"
 #include "particle/depositer.cpp"
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
@@ -10,7 +11,7 @@ constexpr int DPtc = 3;
 
 SCENARIO("Testing ShapeRange with 2D grid", "[particle]") {
   constexpr int DGrid = 2;
-  using Grid = knl::Grid<DGrid, double>;
+  using Grid = knl::Grid<double, DGrid>;
 
   auto test
     = []( Grid grid, auto shapef, std::array<int,DGrid> cell,
@@ -24,11 +25,10 @@ SCENARIO("Testing ShapeRange with 2D grid", "[particle]") {
         std::array<double,DPtc> dq_abs = {0.0, 0.0, 0.0};
 
         for ( int i = 0; i < DGrid; ++i ) {
-          dq_abs[i] = dx_rel[i] * grid[i].delta;
+          dq_abs[i] = dx_rel[i] * grid[i].delta();
           q1_abs[i] = grid[i].absc(cell[i], x0_rel[i]) + dq_abs[i];
         }
         CAPTURE(q1_abs);
-
 
 
         auto sr = make_shape_range(q1_abs, apt::Vec<double,DPtc>{dq_abs}, grid, shapef ); // NOTE need q1 as 1st argument
@@ -47,10 +47,8 @@ SCENARIO("Testing ShapeRange with 2D grid", "[particle]") {
 
   GIVEN("Nearest_Grid_Point") {
     auto sf = knl::shapef_t<knl::shape::Nearest_Grid_Point>();
-    Grid grid{ {{
-                 { 0.0, 1.0, 0, 100 },
-                 { 0.0, 1.0, 0, 100 }
-                   }} };
+    Grid grid{ { 0.0, 1.0, 100 },
+               { 0.0, 1.0, 100 } };
 
 
     WHEN("q0 and q1 affect same X and Y") {
@@ -90,10 +88,8 @@ SCENARIO("Testing ShapeRange with 2D grid", "[particle]") {
 
   GIVEN("Cloud_In_Cell") {
     auto sf = knl::shapef_t<knl::shape::Cloud_In_Cell>();
-    Grid grid{ {{
-                 { 1.0, 2.0, 1, 100 },
-                 { 1.0, 2.0, 1, 100 }
-                   }} };
+    Grid grid{ { 1.0, 2.0, 100 },
+               { 1.0, 2.0, 100 } };
 
     WHEN("q0 and q1 affect same X and Y") {
       test( grid, sf,

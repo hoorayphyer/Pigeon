@@ -1,7 +1,6 @@
 #include "particle/depositer.hpp"
 #include "apt/numeric.hpp"
 #include "field/field.hpp"
-#include "kernel/grid.hpp"
 #include "apt/vec.hpp"
 
 namespace esirkepov :: impl {
@@ -15,14 +14,14 @@ namespace esirkepov :: impl {
     return (sx1 - sx0) * calcW_2D(sy0, sy1, sz0, sz1);
   }
 
-  template < typename E, typename T = typename E::value_type, int N = E::size >
+  template < typename E, typename T = apt::element_t<E>, int N = E::size >
   auto vec_to_array( const apt::VecExpression<E>& vec ) {
     std::array<T,N> arr;
     apt::foreach<0,N>([](auto& a, const auto& b){ a = b; }, arr, vec );
     return arr;
   }
 
-  template < int DGrid, typename T, class ShapeRange, int DField >
+  template < typename T, int DGrid, class ShapeRange, int DField >
   class ShapeRangeIterator {
     static_assert( DField == 3 );
   private:
@@ -104,43 +103,47 @@ namespace esirkepov :: impl {
   };
 
 
-  template < int DGrid, typename T, typename ShapeF, int DField >
+  template < typename T, int DGrid, typename ShapeF, int DField >
   class ShapeRange {
   private:
-    const apt::Vec<T,DGrid>& _dq; // NOTE DGrid, not DPtc
     const ShapeF& shapef;
+    apt::Vec<T,DGrid> _dq; // NOTE DGrid, not DPtc
     apt::Vec<int, DGrid> _I_b;
     apt::Vec<T, DGrid> _sep1_b;
     apt::Vec<int, DGrid> _stride;
 
   public:
-    friend class ShapeRangeIterator<DGrid, T, ShapeRange, DField >;
-    using sr_iterator = ShapeRangeIterator<DGrid, T, ShapeRange, DField >;
+    friend class ShapeRangeIterator<T, DGrid, ShapeRange, DField >;
+    using sr_iterator = ShapeRangeIterator<T, DGrid, ShapeRange, DField >;
 
-    template < typename E1, typename E2 >
+    template < typename E1, typename E2, typename Grid >
     ShapeRange( const apt::VecExpression<E1>& q1_abs,
                 const apt::VecExpression<E2>& dq_abs,
-                const knl::Grid<DGrid,T>& grid,
+                const Grid& grid,
                 const ShapeF& shapefunc )
-      : _dq( dq_abs / grid.delta() ),
-        shapef(shapefunc) {
-      // RATIONALE: assume the offset 0.5 in the dimension. The native grid is one offset by 0.5 with respect to the original one.
-      // - q1 is relative position in the native grid. Since the original grid has cell 0 in the very first guard cell, the native grid follows this, hence q1 starts from 0.0.
+      : shapef(shapefunc) {
+      // RATIONALE: assume the offset = 0.5 in the dimension. The native grid is one offset by 0.5 with respect to the original one.
+      // - q1 is relative position in the native grid. q1 starts at 0.0
       // - the contributing cells in the native grid are [ int(q1 - sf.r) + 1,  int(q1 + sf.r) + 1 )
       // - index_original = index_native + ( q1 - int(q1) >= 0.5 )
       // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
 
-      apt::Vec<T,DGrid>&& q1 = grid.guard() - 0.5 + ( q1_abs - grid.lower() ) / grid.delta();
       apt::foreach<0, DGrid>
-        ( [&sf=shapef]( auto& ind_b, auto& sep1_b, auto& stride, auto xmin, auto xmax ) noexcept {
-            // initially, xmin = x1, xmax = dx. xmin/max should be min/max( x1, x1 - dx )
+        ( [&sf=shapef]( auto& dq_rel, auto& ind_b, auto& sep1_b, auto& stride,
+                        auto xmin, auto xmax, const auto& gl ) noexcept {
+            // initially, xmin = q1_abs, xmax = dq_abs.
+            xmax /= gl.delta();
+            dq_rel = xmax;
+            xmin = ( xmin - gl.lower() ) / gl.delta() - 0.5;
+            // now, xmin = q1_rel, xmax = dq_rel. xmin/max should be min/max( q1_rel, q1_rel - dq_rel )
             sep1_b = - xmin;
             xmin -= (( xmax > 0 ? xmax : 0.0 ) + sf.support / 2.0);
             xmax = xmin + xmax * ( (xmax > 0.0) - ( xmax < 0.0) ) + sf.support;
             ind_b = int( xmin ) + 1 ;
             stride = int( xmax ) + 1 - ind_b;
             sep1_b += ind_b;
-          }, _I_b, _sep1_b, _stride, std::move(q1), _dq );
+          },
+          _dq, _I_b, _sep1_b, _stride, q1_abs, dq_abs, grid );
 
       static_assert( DGrid > 1 && DGrid < 4 );
       if constexpr ( DGrid > 1 ) std::get<1>(_stride) *= std::get<0>(_stride);
@@ -161,27 +164,28 @@ namespace esirkepov :: impl {
 }
 
 namespace esirkepov {
-  template < int DGrid, typename T, typename E1, typename E2,
+  template < typename E1, typename E2, typename Grid,
              typename ShapeF, int DField = 3 >
   inline auto make_shape_range( const apt::VecExpression<E1>& q1_abs,
                                 const apt::VecExpression<E2>& dq_abs,
-                                const knl::Grid<DGrid,T>& grid,
+                                const Grid& grid,
                                 const ShapeF& shapef ) {
-    return impl::ShapeRange<DGrid, T, ShapeF, DField>( q1_abs, dq_abs, grid, shapef );
+    using T = apt::most_precise_t< apt::element_t<E1>, apt::element_t<E2>, apt::element_t<Grid> >;
+    return impl::ShapeRange<T, apt::ndim_v<Grid>, ShapeF, DField>( q1_abs, dq_abs, grid, shapef );
   }
 }
 
 namespace particle {
 
-  template < typename T_deposit_j, int DGrid,
+  template < typename T_deposit_j,
              typename Ptc,
              typename Vec,
-             typename T,
+             typename Grid,
              typename ShapeF >
-  void depositWJ ( field::Field<T_deposit_j,3,DGrid>& WJ,
+  void depositWJ ( field::Field<T_deposit_j,3,apt::ndim_v<Grid>>& WJ,
                    const PtcExpression<Ptc>& ptc,
                    const apt::VecExpression<Vec>& dq,
-                   const knl::Grid<DGrid,T>& grid,
+                   const Grid& grid,
                    const ShapeF& shapef ) {
     namespace esir = esirkepov;
     // NOTE static_assert(WJ is the correct stagger)
@@ -198,6 +202,7 @@ namespace particle {
       // to improve this is obviously calling updatePos before deposition
       // and accordingly change expressions for calculating shapefunctions.
       // FIXME: But, where is J based? Does one really need rebasing momentum?
+      constexpr int DGrid = apt::ndim_v<Grid>;
       if constexpr ( DGrid == 2 ) {
         WJ.template c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p()) / std::sqrt( 1.0 + apt::sqabs(ptc.p()) );
       } else if ( DGrid == 3 ) {

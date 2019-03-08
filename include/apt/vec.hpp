@@ -12,7 +12,7 @@ namespace apt {
 
   public:
     static constexpr auto size = N;
-    using value_type = T;
+    using element_type = T;
 
     constexpr Vec() noexcept = default;
 

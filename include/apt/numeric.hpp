@@ -2,20 +2,12 @@
 #define  _APT_NUMERIC_HPP_
 
 #include "apt/vec_expression.hpp"
+#include "apt/type_traits.hpp"
 
 namespace apt {
-  namespace impl {
-    template <class, typename... T >
-    struct higher_precision{
-      using type = decltype( (... + (T)0) );
-    };
-  }
-
   template < typename... T >
-  using higher_precision_t
-  = typename impl::higher_precision
-    < std::enable_if_t<(... && std::is_arithmetic_v<T>)>,
-      T... >::type;
+  using most_precise_t = std::enable_if_t< (... && std::is_arithmetic_v<T>),
+                                           decltype( (... + (T)0) ) >;
 }
 
 namespace apt {
@@ -23,13 +15,13 @@ namespace apt {
   enum class BinaryOps : int {ADD=0, SUB, MUL, DIV};
 
   template < BinaryOps Op, typename E1, typename E2,
-             typename T = higher_precision_t<typename E1::value_type, typename E2::value_type> >
+             typename T = most_precise_t< element_t<E1>, element_t<E2> > >
   struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T, false> {
   private:
     const E1& _e1;
     const E2& _e2;
   public:
-    using value_type = T;
+    using element_type = T;
     // NOTE use the smaller size here
     static constexpr int size = (E1::size < E2::size) ? E1::size : E2::size;
 
@@ -47,14 +39,14 @@ namespace apt {
   };
 
   template < BinaryOps Op, typename E, typename Real,
-             typename T = higher_precision_t<typename E::value_type, Real> >
+             typename T = most_precise_t< element_t<E>, Real > >
   struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T, false> {
   private:
     const E& _e;
     const Real& _t;
 
   public:
-    using value_type = T;
+    using element_type = T;
     static constexpr int size = E::size;
 
     constexpr FCompWise_Vec_Sca( const E& e, const Real& t ) noexcept
@@ -116,14 +108,14 @@ namespace {
     return static_cast<E1&>(v1);
   }
 
-  template <typename E, typename Real = typename E::value_type>
+  template <typename E, typename Real = typename E::element_type>
   constexpr E& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x *= t; }, v );
     return static_cast<E&>(v);
   }
 
-  template <typename E, typename Real = typename E::value_type>
+  template <typename E, typename Real = typename E::element_type>
   constexpr E& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
     apt::foreach<0, E::size>
       ( [&t]( auto& x ) noexcept { x /= t; }, v );
@@ -132,14 +124,14 @@ namespace {
 }
 
 namespace apt {
-  template <typename E1, typename E2, typename T = typename E1::value_type>
+  template <typename E1, typename E2, typename T = typename E1::element_type>
   struct VecCross : public VecExpression<VecCross<E1,E2,T>, T, false> {
   private:
     const E1& _e1;
     const E2& _e2;
 
   public:
-    using value_type = T;
+    using element_type = T;
     static constexpr int size = E1::size;
 
     constexpr VecCross( const E1& e1, const E2& e2 ) noexcept

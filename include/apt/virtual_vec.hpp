@@ -31,7 +31,7 @@ namespace apt {
       : vVec(std::get<I>(arr)...) {}
 
   public:
-    using value_type = T;
+    using element_type = T;
     static constexpr int size = N;
 
     template < int I >
