@@ -11,7 +11,7 @@ namespace apt {
   template <typename E, typename T>
   class VecExpression<E,T,false> {
   public:
-    static constexpr int size = E::size;
+    static constexpr int NDim = E::NDim;
     using element_type = T;
     static constexpr bool is_lvalue = false;
 
@@ -23,9 +23,9 @@ namespace apt {
 
     constexpr T operator[] ( int i ) const noexcept {
       if ( 0 == i ) return v<0>();
-      if constexpr ( size > 1 )
+      if constexpr ( NDim > 1 )
          if ( 1 == i ) return v<1>();
-      if constexpr ( size > 2 )
+      if constexpr ( NDim > 2 )
          if ( 2 == i ) return v<2>();
     }
 
@@ -34,7 +34,7 @@ namespace apt {
   template <typename E, typename T>
   class VecExpression<E,T,true> {
   public:
-    static constexpr int size = E::size;
+    static constexpr int NDim = E::NDim;
     using element_type = T;
     static constexpr bool is_lvalue = true;
 
@@ -45,9 +45,9 @@ namespace apt {
 
     constexpr T operator[] ( int i ) const noexcept {
       if ( 0 == i ) return v<0>();
-      if constexpr ( size > 1 )
+      if constexpr ( NDim > 1 )
                      if ( 1 == i ) return v<1>();
-      if constexpr ( size > 2 )
+      if constexpr ( NDim > 2 )
                      if ( 2 == i ) return v<2>();
     }
 
@@ -58,9 +58,9 @@ namespace apt {
 
     constexpr T& operator[] ( int i ) noexcept {
       if ( 0 == i ) return v<0>();
-      if constexpr ( size > 1 )
+      if constexpr ( NDim > 1 )
                      if ( 1 == i ) return v<1>();
-      if constexpr ( size > 2 )
+      if constexpr ( NDim > 2 )
                      if ( 2 == i ) return v<2>();
     }
   };
@@ -88,7 +88,7 @@ namespace std{
   // TODO can this work on vVec?
   template < typename E1, typename T1, typename E2, typename T2 >
   void swap ( apt::VecExpression<E1,T1>& a, apt::VecExpression<E2,T2>& b ) noexcept {
-    apt::foreach<0, E1::size>
+    apt::foreach<0, E1::NDim>
       ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
   }
 }

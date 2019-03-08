@@ -1,6 +1,5 @@
 #include "particle/depositer.hpp"
 #include "apt/numeric.hpp"
-#include "field/field.hpp"
 #include "apt/vec.hpp"
 
 namespace esirkepov :: impl {
@@ -14,7 +13,7 @@ namespace esirkepov :: impl {
     return (sx1 - sx0) * calcW_2D(sy0, sy1, sz0, sz1);
   }
 
-  template < typename E, typename T = apt::element_t<E>, int N = E::size >
+  template < typename E, typename T = apt::element_t<E>, int N = apt::ndim_v<E> >
   auto vec_to_array( const apt::VecExpression<E>& vec ) {
     std::array<T,N> arr;
     apt::foreach<0,N>([](auto& a, const auto& b){ a = b; }, arr, vec );
@@ -177,21 +176,17 @@ namespace esirkepov {
 
 namespace particle {
 
-  template < typename T_deposit_j,
+  template < typename Field,
              typename Ptc,
              typename Vec,
-             typename Grid,
              typename ShapeF >
-  void depositWJ ( field::Field<T_deposit_j,3,apt::ndim_v<Grid>>& WJ,
+  void depositWJ ( Field& WJ,
                    const PtcExpression<Ptc>& ptc,
                    const apt::VecExpression<Vec>& dq,
-                   const Grid& grid,
                    const ShapeF& shapef ) {
     namespace esir = esirkepov;
-    // NOTE static_assert(WJ is the correct stagger)
 
-    for ( auto[ I, W ] : esir::make_shape_range(ptc.q(), dq, grid, shapef) ) {
-      // TODO optimize indices use. The problem is that I_b + ijk is global, hence when passed to the interface of f( global index ), the same subtraction I_b - anchor will happen many times.
+    for ( auto[ I, W ] : esir::make_shape_range(ptc.q(), dq, WJ.mesh().bulk(), shapef) ) {
       WJ.template c<0>(I) += std::get<0>(W);
       WJ.template c<1>(I) += std::get<1>(W);
 
@@ -202,7 +197,7 @@ namespace particle {
       // to improve this is obviously calling updatePos before deposition
       // and accordingly change expressions for calculating shapefunctions.
       // FIXME: But, where is J based? Does one really need rebasing momentum?
-      constexpr int DGrid = apt::ndim_v<Grid>;
+      constexpr int DGrid = apt::ndim_v<decltype(WJ.mesh().bulk())>;
       if constexpr ( DGrid == 2 ) {
         WJ.template c<2>(I) += std::get<2>(W) * std::get<2>(ptc.p()) / std::sqrt( 1.0 + apt::sqabs(ptc.p()) );
       } else if ( DGrid == 3 ) {

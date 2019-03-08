@@ -11,7 +11,7 @@ namespace apt {
     std::array<T,N> _v{}; // NOTE {} here performs zero initialization.
 
   public:
-    static constexpr auto size = N;
+    static constexpr auto NDim = N;
     using element_type = T;
 
     constexpr Vec() noexcept = default;

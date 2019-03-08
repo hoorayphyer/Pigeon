@@ -29,7 +29,7 @@ namespace knl {
 
     template < class X, class V, typename T >
     static inline auto geodesic_move( apt::VecExpression<X>& x, const apt::VecExpression<V>& v, const T& dt ) {
-      apt::Vec<decltype(std::get<0>(v) * dt), V::size> dx = v * dt;
+      apt::Vec<decltype(std::get<0>(v) * dt), apt::ndim_v<V>> dx = v * dt;
       x += dx;
       return dx;
     }
@@ -64,7 +64,7 @@ namespace knl {
 
       constexpr T PI = PI_CONST;
       // dx is the return value and meanwhile it serves as a temporary
-      apt::Vec<T, V::size> dx = v * dt;
+      apt::Vec<T, apt::ndim_v<V>> dx = v * dt;
 
       auto& dlogr = std::get<0>(dx);
       auto& dtheta = std::get<1>(dx);

@@ -3,7 +3,7 @@
 
 namespace apt {
   template < class C >
-  inline constexpr int ndim_v = C::size;
+  inline constexpr int ndim_v = C::NDim;
 
   template < class C >
   struct element {

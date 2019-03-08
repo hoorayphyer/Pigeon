@@ -23,14 +23,14 @@ namespace apt {
   public:
     using element_type = T;
     // NOTE use the smaller size here
-    static constexpr int size = (E1::size < E2::size) ? E1::size : E2::size;
+    static constexpr int NDim = (E1::NDim < E2::NDim) ? E1::NDim : E2::NDim;
 
     constexpr FCompWise_Vec_Vec( const E1& e1, const E2& e2 ) noexcept
       : _e1(e1), _e2(e2){}
 
     template < int I >
     constexpr T v() const noexcept {
-      static_assert(I < size);
+      static_assert(I < NDim);
       if constexpr ( Op == BinaryOps::ADD ) return _e1.template v<I>() + _e2.template v<I>();
       else if ( Op == BinaryOps::SUB ) return _e1.template v<I>() - _e2.template v<I>();
       else if ( Op == BinaryOps::MUL ) return _e1.template v<I>() * _e2.template v<I>();
@@ -47,7 +47,7 @@ namespace apt {
 
   public:
     using element_type = T;
-    static constexpr int size = E::size;
+    static constexpr int NDim = E::NDim;
 
     constexpr FCompWise_Vec_Sca( const E& e, const Real& t ) noexcept
       : _e(e), _t(t) {}
@@ -96,28 +96,28 @@ namespace {
 
   template <typename E1, typename E2 >
   constexpr E1& operator+= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
-    apt::foreach<0, E1::size>
+    apt::foreach<0, E1::NDim>
       ( []( auto& x, const auto& y ) noexcept { x += y; }, v1, v2 );
     return static_cast<E1&>(v1);
   }
 
   template <typename E1, typename E2 >
   constexpr E1& operator-= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
-    apt::foreach<0, E1::size>
+    apt::foreach<0, E1::NDim>
       ( []( auto& x, const auto& y ) noexcept { x -= y; }, v1, v2 );
     return static_cast<E1&>(v1);
   }
 
   template <typename E, typename Real = typename E::element_type>
   constexpr E& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
-    apt::foreach<0, E::size>
+    apt::foreach<0, E::NDim>
       ( [&t]( auto& x ) noexcept { x *= t; }, v );
     return static_cast<E&>(v);
   }
 
   template <typename E, typename Real = typename E::element_type>
   constexpr E& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
-    apt::foreach<0, E::size>
+    apt::foreach<0, E::NDim>
       ( [&t]( auto& x ) noexcept { x /= t; }, v );
     return static_cast<E&>(v);
   }
@@ -132,7 +132,7 @@ namespace apt {
 
   public:
     using element_type = T;
-    static constexpr int size = E1::size;
+    static constexpr int NDim = E1::NDim;
 
     constexpr VecCross( const E1& e1, const E2& e2 ) noexcept
       : _e1(e1), _e2(e2) {}
@@ -158,7 +158,7 @@ namespace apt {
 
   template < typename E1, typename E2, int I = 0 >
   constexpr auto dot ( const VecExpression<E1>& v1, const VecExpression<E2>& v2 ) noexcept {
-    constexpr int END = E1::size;
+    constexpr int END = E1::NDim;
     if constexpr ( I == END ) return 0;
     else return v1.template v<I>() * v2.template v<I>() + dot<E1, E2, I+1>(v1, v2);
   }
@@ -170,7 +170,7 @@ namespace apt {
 
   template < typename E >
   constexpr auto abs( const VecExpression<E>& vec ) noexcept {
-    constexpr int N = E::size;
+    constexpr int N = E::NDim;
     if constexpr ( N == 1 ) return std::abs( vec.template v<0>() );
     else return std::sqrt( sqabs(vec) );
   }

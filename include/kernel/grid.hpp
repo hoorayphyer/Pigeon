@@ -3,36 +3,26 @@
 
 // NOTE convention: the zero of all indices exposed to users start at the first cell in BULK. In other words, guard cells have indices outside [0, dim_of_bulk). Guard is important only when converting from vectorial to linear index, which can be encapsulated in a dedicated function
 
-namespace knl {
-  template < typename T >
-  struct gridline {
+// guard, indent are controlled by fields directly, where they are collectively called margin cells.
+
+namespace knl :: grid1d {
+  template < class E >
+  struct Expression {
   private:
-    T _lower;
-    // int _guard;
-    int _dim; // doesn't include guards
-    T _delta;
+    constexpr auto _lower_rel() const noexcept { return static_cast<const E&>(*this)._lower_rel(); }
 
   public:
-    constexpr gridline() noexcept: gridline( 0.0, 1.0, 0, 1 ) {}
+    constexpr int dim() const noexcept { return static_cast<const E&>(*this).dim(); }
+    constexpr auto delta() const noexcept { return static_cast<const E&>(*this).delta(); }
 
-    constexpr gridline( T lower, T upper,
-                        // int guard,
-                        int dim ) noexcept
-      : _lower(lower),
-        // _guard(guard),
-        _dim(dim),
-        _delta( (upper - lower) / dim ) {}
+    constexpr auto lower() const noexcept { return _lower_rel() * delta(); }
+    constexpr auto upper() const noexcept { return absc(dim()); }
 
     // abscissa
-    constexpr T absc( int i, T shift_from_lb ) const noexcept {
-      return _lower + _delta * ( i + shift_from_lb );
+    template < typename U >
+    constexpr auto absc( int i, U shift_from_lb = 0.0 ) const noexcept {
+      return  delta() * ( _lower_rel() + i + shift_from_lb );
     }
-
-    constexpr T lower() const noexcept { return _lower; }
-    constexpr T upper() const noexcept { return absc(dim, 0.0); }
-    // constexpr int guard() noexcept { return _guard; }
-    constexpr int dim() const noexcept { return _dim; }
-    constexpr T delta() const noexcept { return _delta; }
 
     // constexpr T rel_absc( int i, T shift_from_lb ) noexcept {
     //   return (lower / delta) - guard + i + shift_from_lb;
@@ -46,48 +36,66 @@ namespace knl {
     //   return static_cast<int>( rel_abscissa - (lower / delta) + guard );
     // }
   };
+}
+
+namespace knl :: grid1d {
+  template < typename T > struct Clip;
+
+  template < typename T >
+  struct Whole : Expression<Whole<T>> {
+  private:
+    int _dim;
+    T _delta;
+    T _lo_rel;
+
+    constexpr T _lower_rel() const noexcept { return _lo_rel; }
+  public:
+    friend class Expression<Whole<T>>;
+    friend class Clip<T>;
+    constexpr Whole() noexcept: Whole( 0.0, 1.0, 0, 1 ) {}
+
+    constexpr Whole( T lower, T upper, int dim ) noexcept
+      : _dim(dim), _delta( (upper - lower) / dim ) {
+      _lo_rel = lower / _delta;
+    }
+
+    constexpr int dim() const noexcept { return _dim; }
+    constexpr T delta() const noexcept { return _delta; }
+  };
 
 }
 
-namespace knl {
+namespace knl :: grid1d {
   template < typename T >
-  struct gridline_slice {
+  struct Clip : Expression<Clip<T>> {
   private:
-    const gridline<T>& _gl;
-    int _anchor; // the cell in the super gridline, guard cells not included
+    const Whole<T>& _whole;
+    int _anchor; // the cell in the super gridline
     int _extent;
 
+    constexpr T _lower_rel() const noexcept { return _whole._lower_rel() + _anchor; }
   public:
-    constexpr gridline_slice( const gridline<T>& gl, int anchor, int extent ) noexcept
-      : _gl(gl), _anchor(anchor), _extent(extent) {}
-    constexpr T lower() const noexcept { return _gl.absc( _anchor, 0 ); }
-    constexpr T upper() const noexcept { return _gl.absc( _anchor + _extent, 0 ); }
-    constexpr int dim() const noexcept { return _extent; }
-    // constexpr int guard() noexcept { return _gl.guard(); }
-    constexpr T delta() const noexcept { return _gl.delta(); }
+    friend class Expression<Clip<T>>;
 
-    constexpr T absc( int i, T shift_from_lb ) const noexcept {
-      return _gl( i + _anchor, shift_from_lb );
-    }
+    constexpr Clip( const Whole<T>& whole, int anchor, int extent ) noexcept
+      : _whole(whole), _anchor(anchor), _extent(extent) {}
+
+    constexpr int dim() const noexcept { return _extent; }
+    constexpr T delta() const noexcept { return _whole.delta(); }
+
+    constexpr int anchor() const noexcept { return _anchor; }
+    constexpr int extent() const noexcept { return _extent; }
 
     constexpr void set_anchor( int anchor ) noexcept { _anchor = anchor; }
     constexpr void set_extent( int extent ) noexcept { _extent = extent; }
-
   };
 }
 
 #include <array>
 
 namespace knl {
-  // TODO
-  // const std::array< int, Dim_Grid + 1 > stride;
-
-  // template < typename T, int DGrid, template < typename > class GL_t = gridline >
-  // using Grid = std::array< GL_t<T>, DGrid >;
-
-
-  template < typename T, int DGrid, template < typename > class GL_t = gridline >
-  struct Grid : public std::array< GL_t<T>, DGrid > {
+  template < typename T, int DGrid, template < typename > class grid1d = grid1d::Whole >
+  struct Grid : public std::array< grid1d<T>, DGrid > {
   private:
     static_assert( std::is_floating_point_v<T> );
 
@@ -107,10 +115,15 @@ namespace knl {
 
   public:
     using element_type = T;
-    static constexpr int size = DGrid;
+    static constexpr int NDim = DGrid;
 
-    constexpr Grid( const GL_t<T>& gl0, const GL_t<T>& gl1 ) noexcept
-      : std::array< GL_t<T>, DGrid >{ gl0, gl1 } {}
+    // TODO use DGrid as number of arguments
+    constexpr Grid( const grid1d<T>& gl0, const grid1d<T>& gl1 ) noexcept
+      : std::array< grid1d<T>, DGrid >{ gl0, gl1 } {}
+
+    constexpr const auto& operator[] ( int i ) const noexcept {
+      return std::array< grid1d<T>, DGrid >::operator[] (i);
+    }
 
     // constexpr Grid( const GL_t<T>& gl0, const GL_t<T>& gl1 ) noexcept
     //   : std::array< GL_t<T>, DGrid >{ gl0, gl1 } {}
@@ -136,9 +149,9 @@ namespace knl {
 
 namespace std {
   // define this so as to be used in apt::foreach
-  template < int I, typename T, int DGrid, template < typename > class GL_t>
-  constexpr const auto& get( const knl::Grid<T,DGrid,GL_t>& grid ) noexcept {
-    return std::get<I>( static_cast<const std::array< GL_t<T>, DGrid >&>(grid) );
+  template < int I, typename T, int DGrid, template < typename > class G>
+  constexpr const auto& get( const knl::Grid<T,DGrid,G>& grid ) noexcept {
+    return std::get<I>( static_cast<const std::array< G<T>, DGrid >&>(grid) );
   }
 }
 

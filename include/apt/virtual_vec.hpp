@@ -32,7 +32,7 @@ namespace apt {
 
   public:
     using element_type = T;
-    static constexpr int size = N;
+    static constexpr int NDim = N;
 
     template < int I >
     constexpr T v() const noexcept {
@@ -58,7 +58,7 @@ namespace apt {
 
     template <typename E>
     constexpr vVec( VecExpression<E>&& vec ) noexcept
-      : vVec( std::move(vec), std::make_index_sequence<E::size>{} ) {}
+      : vVec( std::move(vec), std::make_index_sequence<E::NDim>{} ) {}
 
     vVec() = delete;
     vVec( const vVec& ) = delete; // because it breaks copy sematics

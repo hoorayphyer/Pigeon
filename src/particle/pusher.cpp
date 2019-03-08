@@ -21,7 +21,7 @@ namespace particle :: force {
     };
 
   // lambda = dt / mass_x * e/m NOTE this is actually rescaling Lorentz force
-  template <typename E_p, typename E_E, typename E_B, typename T = typename E_p::value_type, int N = E_p::size>
+  template <typename E_p, typename E_E, typename E_B, typename T = typename E_p::value_type, int N = apt::ndim_v<E_p>>
   apt::Vec<T,N> lorentz ( T lambda, const apt::VecExpression<E_p>& p, const apt::VecExpression<E_E>& E, const apt::VecExpression<E_B>& B ) noexcept {
     using Vec = apt::Vec<T,N>;
     // TODO optimize use of intermediate variables

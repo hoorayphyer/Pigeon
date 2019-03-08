@@ -7,7 +7,7 @@
 namespace std {
   template < typename E, typename T, bool L >
   string to_string( const apt::VecExpression<E,T,L>& vec ) {
-    constexpr int N = E::size;
+    constexpr int N = E::NDim;
     string res = "( " + to_string( std::get<0>(vec) );
     apt::foreach<1,N>
       ( [&]( auto x ) {
@@ -20,7 +20,7 @@ namespace std {
 
 template < typename OStream, typename E, typename T, bool L >
 OStream& operator<< ( OStream& os, const apt::VecExpression<E,T,L>& vec ) {
-  constexpr int N = E::size;
+  constexpr int N = E::NDim;
   os << "( " << std::get<0>(vec);
   apt::foreach<1,N>
     ( [&]( auto x ) {
