@@ -62,7 +62,7 @@ namespace particle {
         // pusher handle boundary condition
         if constexpr ( is_charged<sp> ) depositWJ<Shape>( _WJ, ptc, std::move(dq), grid );
 
-        if ( is_migrate( ptc.q(), params.borders ) ) {
+        if ( is_migrate( ptc.q(), params.borders ) ) {// TODO params.borders at real physical boundary need to be specified still, because now mesh controls margin
           // TODO make sure after move, the moved from ptc is set to flag::empty
           _migrators.emplace_back(std::move(ptc));
           // ptc.set(flag::empty);

@@ -53,12 +53,13 @@ link_mpi(mpi_lib)
 module_gen(parallel locale)
 target_link_libraries( parallel_locale_module PRIVATE ${mpi_lib})
 
-add_library(silo_lib STATIC "io/silo++.cpp" "io/silo++_putters.cpp")
+add_library(silo_lib STATIC "io/silo++.cpp" "io/silo_optlist.cpp" "io/silo_operations.cpp")
 target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} )
 target_link_libraries( silo_lib PRIVATE ${mpi_lib} ${Silo_LIBRARIES})
 
 
-# add_library(field_lib STATIC "field/field.cpp" )
+module_gen(field communication)
+target_link_libraries( field_communication_module PRIVATE ${mpi_lib})
 
 
 module_gen(particle migration)
