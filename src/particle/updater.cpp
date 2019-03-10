@@ -1,11 +1,10 @@
 #include "particle/updater.hpp"
 
 #include "particle/pusher.hpp"
-#include "particle/depositer.hpp"
 #include "particle/pair_producer.hpp"
 #include "particle/properties.hpp"
 
-#include "field/interpolation.hpp"
+#include "field/field_shape_interplay.hpp"
 #include <algorithm>
 
 #include "dynamic_variables.hpp"
@@ -16,11 +15,11 @@
 #include "kernel/shapef.hpp"
 
 namespace particle {
-  template < typename Real, int DGrid, int DPtc, typename state_t, knl::shape Shape,
+  template < typename Real, int DGrid, int DPtc, typename state_t,
              PairScheme pair_scheme, knl::coordsys CS, species posion >
   template < species sp, typename Dynvar_t, typename Params_t, typename Grid >
   void Updater<Real,DGrid,DPtc,state_t,Shape,pair_scheme,CS,posion>
-  ::update_species( Dynvar_t& dvars, const Params_t& params, const Grid& grid ) {
+  ::update_species( Dynvar_t& dvars, const Params_t& params, const Grid& grid, const ShapeF& shapef  ) {
       if ( dvars[sp].size() == 0 ) return;
 
       auto dt = params.dt;
@@ -60,7 +59,7 @@ namespace particle {
         // NOTE q is updated, starting from here, particles may be in the guard cells.
         auto&& dq = update_q<sp,CS>( ptc, dt );
         // pusher handle boundary condition
-        if constexpr ( is_charged<sp> ) depositWJ<Shape>( _WJ, ptc, std::move(dq), grid );
+        if constexpr ( is_charged<sp> ) field::depositWJ( _WJ, ptc.q(), std::move(dq), shapef );
 
         if ( is_migrate( ptc.q(), params.borders ) ) {// TODO params.borders at real physical boundary need to be specified still, because now mesh controls margin
           // TODO make sure after move, the moved from ptc is set to flag::empty

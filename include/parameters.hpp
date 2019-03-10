@@ -12,8 +12,6 @@ struct Params {
 
   Real e; // electric charge
 
-  std::string this_run_dir;
-
   // Grid grid; // local simulation grid
   // Grid dataGrid; // local data export grid
 

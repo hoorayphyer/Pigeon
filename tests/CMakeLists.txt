@@ -52,10 +52,11 @@ test_gen(apt numeric)
 test_gen(apt handle)
 
 test_gen(kernel coordinate) # TODO
-# test_gen(kernel grid_shape_interplay)
 
 mpi_test_gen(parallel mpi++) # TODO
 mpi_test_gen(parallel locale)
+
+test_gen(field field_shape_interplay)
 
 mpi_test_gen(io silo++)
 target_include_directories(test_io_silo++ PRIVATE ${Silo_INCLUDE_DIR} )
@@ -68,6 +69,5 @@ test_gen(particle state)
 test_gen(particle array)
 
 test_gen(particle pusher)
-# test_gen(particle depositer)
 # mpi_test_gen(particle migration)
 # test_gen(particle pair_producer)

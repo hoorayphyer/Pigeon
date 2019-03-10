@@ -8,7 +8,9 @@ namespace field {
 
   template < typename T, int DField, int DGrid >
   void sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::Comm& comm );
-  // void send_add_guard_cells( auto& field );
+
+  template < typename T, int DField, int DGrid >
+  void sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::Comm& comm );
 }
 
 #endif

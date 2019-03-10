@@ -58,15 +58,14 @@ target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} )
 target_link_libraries( silo_lib PRIVATE ${mpi_lib} ${Silo_LIBRARIES})
 
 
+module_gen(field field_shape_interplay)
 module_gen(field communication)
 target_link_libraries( field_communication_module PRIVATE ${mpi_lib})
 
 
 module_gen(particle migration)
-# link_mpi(particle_migration_module)
 target_link_libraries(particle_migration_module PRIVATE ${mpi_lib})
 
-module_gen(particle depositer)
 module_gen(particle pair_producer)
 module_gen(particle pusher)
 module_gen(particle array)
