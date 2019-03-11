@@ -26,4 +26,10 @@ namespace apt {
   };
 }
 
+namespace apt {
+  template < typename... T >
+  using most_precise_t = std::enable_if_t< (... && std::is_arithmetic_v<T>),
+                                           decltype( (... + (T)0) ) >;
+}
+
 #endif

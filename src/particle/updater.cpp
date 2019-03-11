@@ -28,8 +28,8 @@ namespace particle {
         if( ptc.is(flag::empty) ) continue;
 
         if constexpr ( is_charged<sp> ) {
-          auto E = field::interpolate(dvars.E, grid, ptc.q);
-          auto B = field::interpolate(dvars.E, grid, ptc.q);
+          auto E = field::interpolate(dvars.E, ptc.q, shapef );
+          auto B = field::interpolate(dvars.E, ptc.q, shapef );
           auto&& dp = update_p<sp>( ptc, dt, E, B );
 
           // TODO make sure the newly added particles will not participate in the loop

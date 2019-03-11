@@ -5,12 +5,6 @@
 #include "apt/type_traits.hpp"
 
 namespace apt {
-  template < typename... T >
-  using most_precise_t = std::enable_if_t< (... && std::is_arithmetic_v<T>),
-                                           decltype( (... + (T)0) ) >;
-}
-
-namespace apt {
 
   enum class BinaryOps : int {ADD=0, SUB, MUL, DIV};
 

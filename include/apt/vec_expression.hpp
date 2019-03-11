@@ -66,7 +66,7 @@ namespace apt {
   };
 }
 
-#include <type_traits>
+#include <type_traits> // std::enable_if
 
 namespace std {
   // define this so as to be used in apt::foreach

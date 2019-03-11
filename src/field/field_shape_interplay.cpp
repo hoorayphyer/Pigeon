@@ -1,7 +1,7 @@
 #include "field/field_shape_interplay.hpp"
-#include "apt/numeric.hpp"
 #include "apt/block.hpp"
 #include "apt/vec.hpp"
+#include "apt/type_traits.hpp"
 #include <tuple>
 
 namespace esirkepov {
@@ -92,10 +92,7 @@ namespace field {
 
 namespace field {
 
-  template < typename Field,
-             typename Vec_q,
-             typename Vec_dq,
-             typename ShapeF >
+  template < typename Field, typename Vec_q, typename Vec_dq, typename ShapeF >
   void depositWJ ( Field& WJ,
                    const apt::VecExpression<Vec_q>& q1_abs,
                    const apt::VecExpression<Vec_dq>& dq_abs,
@@ -121,6 +118,74 @@ namespace field {
     // confusion about where to base the v_ptc_z.
 
     return;
+  }
+
+}
+
+namespace field {
+  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
+                                    const apt::VecExpression<Vec_q>& q_abs,
+                                    const ShapeF& shapef ) {
+    apt::Vec<T, DField> result;
+    const auto& grid = field.mesh().bulk();
+    constexpr auto supp = ShapeF::support;
+    std::array<T, DGrid> loc {}; // location at which to interpolate field
+
+    apt::foreach<0,DGrid>
+      ( []( auto& l, auto q, const auto& g ){
+          l = ( q - g.lower() ) / g.delta();
+        }, loc, q_abs, grid );
+
+    apt::Index<DGrid> I_b {};
+
+    apt::foreach<0,DField>
+      ( [&] ( auto& res, const auto& comp ) {
+          res = 0.0;
+          std::array<T,DGrid> sep_b {};
+
+          // correct loc by offset
+          apt::foreach<0,DGrid>
+            ( []( auto& l, auto ofs ){
+                l -= ofs;
+              }, loc, comp.offset );
+
+          apt::foreach<0,DGrid>
+            ( []( auto& i_b, auto& s_b, auto l ){
+                i_b = int(l - supp / 2.0) + 1;
+                s_b = i_b - l;
+              }, I_b, sep_b, loc );
+
+          T wgt [DGrid] {};
+
+          auto calc_wgt
+            = [&]( auto& wgt, const auto& I ) {
+                wgt[0] = shapef( I[0] + sep_b[0] );
+                if constexpr ( DGrid > 1 ) {
+                    if( I[0] != 0 ) return;
+                    wgt[1] = shapef( I[1] + sep_b[1] );
+                  }
+                if constexpr ( DGrid > 2 ) {
+                    if( I[1] != 0 ) return;
+                    wgt[2] = shapef( I[2] + sep_b[2] );
+                  }
+              };
+
+          for ( const auto& I : apt::Block( { supp, supp, supp } ) ) {
+            calc_wgt( wgt, I );
+            res += comp( I_b + I ) * wgt[0] * wgt[1] * wgt[2];
+          }
+
+          // restore loc
+          apt::foreach<0,DGrid>
+            ( []( auto& l, auto ofs ){
+                l += ofs;
+              }, loc, comp.offset );
+
+        }, result, field );
+
+
+    return result;
   }
 
 }

@@ -2,6 +2,7 @@
 #define  _APT_BLOCK_HPP_
 
 #include "apt/index.hpp"
+#include <iterator>
 
 namespace apt {
   template < int D >
