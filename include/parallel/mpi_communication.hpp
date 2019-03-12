@@ -3,48 +3,24 @@
 
 #include "apt/handle.hpp"
 #include <mpi.h>
-#include <type_traits>
 #include <optional>
 #include <vector>
 
 namespace mpi {
   template <typename Type>
-  constexpr MPI_Datatype datatype(Type* = nullptr) noexcept {
-    using T = std::remove_const_t<Type>;
-    if constexpr ( std::is_same_v<T, char> ) return MPI_CHAR;
-    else if ( std::is_same_v<T, short> ) return MPI_SHORT;
-    else if ( std::is_same_v<T, int> ) return MPI_INT;
-    else if ( std::is_same_v<T, long> ) return MPI_LONG;
-
-    else if ( std::is_same_v<T, unsigned char> ) return MPI_UNSIGNED_CHAR;
-    else if ( std::is_same_v<T, unsigned short> ) return MPI_UNSIGNED_SHORT;
-    else if ( std::is_same_v<T, unsigned int> ) return MPI_UNSIGNED;
-    else if ( std::is_same_v<T, unsigned long> ) return MPI_UNSIGNED_LONG;
-
-    else if ( std::is_same_v<T, float> ) return MPI_FLOAT;
-    else if ( std::is_same_v<T, double> ) return MPI_DOUBLE;
-
-    else if ( std::is_same_v<T, long double> ) return MPI_LONG_DOUBLE;
-    else if ( std::is_same_v<T, bool> ) return MPI_CXX_BOOL;
-    else return MPI_DATATYPE_NULL;
-  }
+  MPI_Datatype datatype(Type* = nullptr) noexcept;
 
   template <typename T>
-  constexpr MPI_Datatype datatype(const T&) noexcept {
+  MPI_Datatype datatype(const T&) noexcept {
     return datatype((T*)0);
   }
 
 }
 
-
 namespace mpi {
   void request_free ( MPI_Request* p );
   MPI_Request request_null();
   using Request = apt::Handle<MPI_Request, request_free, request_null >;
-}
-
-namespace std {
-  template < class, class > class vector;
 }
 
 namespace mpi {

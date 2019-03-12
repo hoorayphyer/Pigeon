@@ -4,8 +4,8 @@
 #include "apt/vec.hpp"
 
 namespace field {
-  template < typename Field, typename Vec_q, typename Vec_dq, typename ShapeF >
-  void depositWJ ( Field& WJ,
+  template < typename Field, typename T, typename Vec_q, typename Vec_dq, typename ShapeF >
+  void depositWJ ( Field& WJ, T charge,
                    const apt::VecExpression<Vec_q>& q1_abs, // q1 means it's the value after update
                    const apt::VecExpression<Vec_dq>& dq_abs,
                    const ShapeF& shapef );

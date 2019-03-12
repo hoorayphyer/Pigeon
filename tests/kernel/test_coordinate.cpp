@@ -1,7 +1,7 @@
 #include <iostream>
 #include "kernel/coordinate.hpp"
 #include "apt/vec.hpp"
-#include "apt/print_vec.hpp"
+#include "apt/print.hpp"
 #include "catch2/catch.hpp"
 #include "utility/rng.hpp"
 #include <ctime>

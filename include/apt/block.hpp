@@ -27,8 +27,14 @@ namespace apt {
 
     constexpr BlockIterator& operator++() noexcept {
       ( ++ (_ijk[0]) ) %= _extent[0];
-      if constexpr ( D > 1 ) if ( _ijk[0] == 0 ) ( ++ (_ijk[1]) ) %= _extent[1];
-      if constexpr ( D > 2 ) if ( _ijk[1] == 0 ) ( ++ (_ijk[2]) ) %= _extent[2];
+      if constexpr ( D > 1 ) {
+          if ( 0 != _ijk[0] ) return *this;
+          else ( ++ (_ijk[1]) ) %= _extent[1];
+        }
+      if constexpr ( D > 2 ) {
+          if ( 0 != _ijk[1]) return *this;
+          else ( ++ (_ijk[2]) ) %= _extent[2];
+        }
       return *this;
     }
 

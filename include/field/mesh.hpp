@@ -2,8 +2,8 @@
 #define  _FIELD_MESH_HPP_
 
 #include "kernel/grid.hpp"
-#include "apt/foreach.hpp"
 #include "apt/index.hpp"
+#include "apt/pair.hpp"
 
 namespace field {
   template < typename T, int D >
@@ -12,14 +12,14 @@ namespace field {
     using Bulk_t = knl::Grid<T, D, knl::grid1d::Clip>;
 
     const Bulk_t& _bulk; // bulk's zero sets the zero of the mesh
-    std::array< int[2], D > _margin {}; // margin is where boundary conditions are applied. They don't include guard cells
+    apt::array< apt::pair<int>, D > _margin {}; // margin is where boundary conditions are applied. They don't include guard cells
     int _guard = 0; // uniform value in all directions
-    std::array< int, D + 1 > _stride; // bulk and margin combined
+    apt::array< int, D + 1 > _stride; // bulk and margin combined
 
   public:
     static constexpr int NDim = D;
 
-    constexpr Mesh( const Bulk_t& bulk, std::array< int[2], NDim > margin, int guard ) noexcept
+    constexpr Mesh( const Bulk_t& bulk, apt::array< apt::pair<int>, NDim > margin, int guard ) noexcept
       : _bulk(bulk), _margin(std::move(margin)), _guard(guard) {
       _stride[0] = 1;
       for ( int i = 0; i < NDim; ++i ) {
@@ -30,10 +30,8 @@ namespace field {
     constexpr int linearized_index_of_whole_mesh( const apt::Index<NDim>& i_bulk ) const noexcept {
       // TODO check bounds on i_bulk???
       int I = 0;
-      apt::foreach<0,NDim>
-        ( [&I,g=_guard]( auto i, auto m, auto s ) {
-            I += ( i + m[0] + g ) * s;
-          }, i_bulk, _margin, _stride );
+      for ( int i = 0; i < NDim; ++i )
+        I += ( i_bulk[i] + _margin[i][0] + _guard ) * _stride[i];
       return I;
     }
 
@@ -45,10 +43,8 @@ namespace field {
 
     constexpr apt::Index<NDim> origin() const noexcept { // the first mesh cell expressed in bulk_indices
       apt::Index<NDim> origin;
-      apt::foreach<0,NDim>
-        ( [g=_guard]( auto& o, const auto& marg ) {
-            o = -marg[0] - g;
-          }, origin, _margin );
+      for ( int i = 0; i < NDim; i++ )
+        origin[i] = - _margin[i][0] - _guard;
       return origin;
     }
 

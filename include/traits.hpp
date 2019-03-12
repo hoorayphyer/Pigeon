@@ -6,6 +6,9 @@
 #include "particle/species_predef.hpp"
 #include "kernel/coordsys_predef.hpp"
 
+#include "apt/array.hpp"
+#include "apt/pair.hpp"
+
 namespace traits {
   using real_t = double;
   using ptc_state_t = unsigned long long;
@@ -14,12 +17,12 @@ namespace traits {
 
   constexpr int DPtc = 3; // simulation dimension
 
-  constexpr std::array<int, 3> grid_N { 10, 5, 2 };
+  constexpr apt::array<int, 3> grid_N { 10, 5, 2 };
 
-  constexpr std::array<int, 3> grid_guard { 1, 1, 1 };
+  constexpr apt::array<int, 3> grid_guard { 1, 1, 1 };
 
-  constexpr std::array< std::array< real_t , 2 >, 3 >
-  q_limit { 0.0, 100.0, 0.0, 50.0, 0.0, 20.0 }; // TODO initializer
+  constexpr apt::array< apt::pair<real_t>, 3 >
+  q_limit {{ {0.0, 100.0}, {0.0, 50.0}, {0.0, 20.0} }};
 
   constexpr auto shape = knl::shape::Cloud_In_Cell;
 

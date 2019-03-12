@@ -6,11 +6,10 @@
 namespace particle {
   template < typename Ptc, typename Vec = typename Ptc::vec_type, typename State = typename Ptc::state_type >
   struct PtcExpression : public particle::StateExpression<Ptc, State> {
-    static constexpr int Dim = Ptc::Dim;
+    static constexpr int NDim = Ptc::NDim;
     using vec_type = Vec;
     using state_type = State;
 
-    // q and p must be std::get-able
     constexpr Vec& q() noexcept { return static_cast<Ptc&>(*this).q(); }
     constexpr const Vec& q() const noexcept { return static_cast<const Ptc&>(*this).q(); }
 

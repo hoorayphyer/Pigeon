@@ -1,9 +1,6 @@
 #ifndef  _PARAMETERS_H_
 #define  _PARAMETERS_H_
 
-#include <array>
-#include <string>
-
 // TODOL traits and params are basically the same thing. Just compile time known or not
 template < typename Real, int DGrid >
 struct Params {
@@ -18,17 +15,17 @@ struct Params {
   // std::array<bool, 3> is_periodic; // only needed in sendcellsleftright
 
   // the following are ensemble specs, which will be stored on primary and be passed on to all replicas
-  struct Locale {
-    int label;
-    std::array< int, DGrid > anchor;
-    std::array< int, DGrid > extent;
-    std::array< std::array<Real, 2>, DGrid > borders;
+  // struct Locale {
+  //   int label;
+  //   std::array< int, DGrid > anchor;
+  //   std::array< int, DGrid > extent;
+  //   std::array< std::array<Real, 2>, DGrid > borders;
 
-    std::array< int, DGrid > cart_coords;
-    std::array< std::array<bool, 2>, DGrid > is_at_boundary;
-    std::array< std::array<bool, 2>, DGrid > is_axis;
-    std::array< std::array<int, 2>, DGrid > neighbors;
-  } locale;
+  //   std::array< int, DGrid > cart_coords;
+  //   std::array< std::array<bool, 2>, DGrid > is_at_boundary;
+  //   std::array< std::array<bool, 2>, DGrid > is_axis;
+  //   std::array< std::array<int, 2>, DGrid > neighbors;
+  // } locale;
 
   // void Init(const Dashboard& db, const MPICommunicator& comm);
 

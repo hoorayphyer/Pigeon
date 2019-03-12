@@ -51,8 +51,8 @@ SCENARIO("array push_back and iterator", "[particle]") {
   }
 
   WHEN("push back virtual particle") {
-    std::array<double,3> q { 15,6,73 };
-    std::array<double,3> p { 20,-3,-5 };
+    apt::array<double,3> q { 15,6,73 };
+    apt::array<double,3> p { 20,-3,-5 };
     unsigned long long state = 147;
     vPtc ptc0 ( q, p, state );
     arr.push_back(std::move(ptc0));

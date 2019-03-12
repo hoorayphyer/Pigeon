@@ -1,13 +1,13 @@
 #include "particle/migration.hpp"
-#include "particle/c_particle.hpp"
 #include "parallel/mpi++.hpp"
+#include "apt/type_traits.hpp"
 #include <memory>
 
 namespace mpi {
   template < typename Ptc >
   MPI_Datatype datatype_for_cParticle() {
     using T = typename Ptc::vec_type::value_type;
-    constexpr int DPtc = Ptc::Dim;
+    constexpr int DPtc = apt::ndim_v<Ptc>;
     using state_t = typename Ptc::state_type;
 
     std::vector< Ptc > ptcs(2);
@@ -73,13 +73,13 @@ namespace particle :: impl {
       }
     }
 
-    return std::array<const int, 3>{ ec, el, buffer.size() };
+    return apt::array<const int, 3>{ ec, el, buffer.size() };
   }
 
 
   template < typename Ptc, typename F_LCR >
   void migrate_1dim ( std::vector<Ptc>& buffer,
-                      const std::array<std::optional<mpi::InterComm>, 2>& intercomms,
+                      const apt::pair<std::optional<mpi::InterComm>>& intercomms,
                       const F_LCR& lcr, unsigned int shift ) {
     // sort order is center | left | right | empty. Returned are the delimiters between these catogories
     const auto begs = lcr_sort( buffer, lcr ); // begs = { begL, begR, begE_original };
@@ -151,28 +151,27 @@ namespace particle :: impl {
 namespace particle {
   template < typename Vec, int DGrid, typename T >
   bool is_migrate( const apt::VecExpression<Vec>& q,
-                   const std::array< std::array<T, 2>, DGrid>& borders ) noexcept {
+                   const apt::array< apt::pair<T>, DGrid>& borders ) noexcept {
     bool res = false;
     apt::foreach<0,DGrid>
       ( [&res]( const auto& x, const auto& bd ) noexcept {
-          res |= ( x < std::get<0>(bd) || x > std::get<1>(bd) );
+          res |= ( x < bd[0] || x > bd[1] );
         }, q, borders );
 
     return res;
   }
 
   namespace impl {
-    // NOTE must use std::size_t for DGrid, otherwise type mismatched will be triggered for std::array
-    template < int I, typename T, int DPtc, typename state_t, std::size_t DGrid >
+    template < int I, typename T, int DPtc, typename state_t, int DGrid >
     inline void migrate( std::vector<cParticle<T,DPtc,state_t>>& buffer,
-                         const std::array< std::array<std::optional<mpi::InterComm>, 2>, DGrid >& intercomms,
-                         const std::array< std::array<T,2>, DGrid >& borders,
+                         const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
+                         const apt::array< apt::pair<T>, DGrid >& borders,
                          unsigned int shift ) {
       auto&& lcr =
-        [&bd=std::get<I>(borders)]( const auto& ptc ) noexcept {
-          return ( std::get<I>(ptc.q()) >= std::get<0>(bd) ) + ( std::get<I>(ptc.q()) > std::get<1>(bd) );
+        [&bd=borders[I]]( const auto& ptc ) noexcept {
+          return ( ptc.q()[I] >= bd[0] ) + ( ptc.q()[I] > bd[1] );
         };
-      impl::migrate_1dim( buffer, std::get<I>(intercomms), std::move(lcr), shift );
+      impl::migrate_1dim( buffer, intercomms[I], std::move(lcr), shift );
       if constexpr ( I > 0 )
                      migrate<I-1>( buffer, intercomms, borders, shift );
     }
@@ -180,8 +179,8 @@ namespace particle {
 
   template < typename T, int DPtc, typename state_t, int DGrid >
   void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
-                 const std::array< std::array<std::optional<mpi::InterComm>,2>, DGrid >& intercomms,
-                 const std::array< std::array<T,2>, DGrid>& borders,
+                 const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
+                 const apt::array< apt::pair<T>, DGrid >& borders,
                  unsigned int pairing_shift ) {
     if ( mpi::MPI_CPARTICLE == MPI_DATATYPE_NULL )
       mpi::MPI_CPARTICLE = mpi::datatype_for_cParticle<cParticle<T,DPtc,state_t>>();

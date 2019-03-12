@@ -46,14 +46,19 @@ macro(mpi_test_gen category name)
   unset(test_target)
 endmacro()
 
+test_gen(apt array)
+test_gen(apt pair)
+test_gen(apt "foreach")
+test_gen(apt block)
 test_gen(apt vec)
 test_gen(apt virtual_vec)
 test_gen(apt numeric)
 test_gen(apt handle)
 
-test_gen(kernel coordinate) # TODO
+test_gen(kernel coordinate) # TODO slight mismatched in phi
+# test_gen(kernel grid) # TODO
 
-mpi_test_gen(parallel mpi++) # TODO
+mpi_test_gen(parallel mpi++) # TODO larger tests
 mpi_test_gen(parallel locale)
 
 test_gen(field field_shape_interplay)
@@ -63,11 +68,11 @@ target_include_directories(test_io_silo++ PRIVATE ${Silo_INCLUDE_DIR} )
 target_link_libraries( test_io_silo++ PRIVATE ${Silo_LIBRARIES})
 
 test_gen(particle state)
-# test_gen(particle particle)
-# test_gen(particle virtual_particle)
-# test_gen(particle c_particle)
+# test_gen(particle particle) # TODO some tests on this are in particle_array
+# test_gen(particle virtual_particle) # TODO
+# test_gen(particle c_particle) # TODO
 test_gen(particle array)
 
 test_gen(particle pusher)
-# mpi_test_gen(particle migration)
+# mpi_test_gen(particle migration) # TODO
 # test_gen(particle pair_producer)

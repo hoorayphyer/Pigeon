@@ -2,6 +2,7 @@
 #define _KNL_SHAPEF_HPP_
 
 #include "kernel/shape_predef.hpp"
+#include <cmath>
 
 namespace knl {
   template < shape S >

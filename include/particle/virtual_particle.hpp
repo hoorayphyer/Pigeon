@@ -15,7 +15,7 @@ namespace particle {
     state_t& _state;
 
   public:
-    static constexpr int Dim = DPtc;
+    static constexpr int NDim = DPtc;
     using vec_type = apt::vVec<T, DPtc>;
     using state_type = state_t;
 

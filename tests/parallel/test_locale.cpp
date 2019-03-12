@@ -27,7 +27,7 @@ SCENARIO("Create Locale", "[parallel]") {
       REQUIRE( 0 == locale.label );
       REQUIRE( 0 == locale.chief_cart_rank );
 
-      REQUIRE( std::array<int,1>{0} == locale.cart_coords );
+      REQUIRE( apt::array<int,1>{0} == locale.cart_coords );
       for ( int IGrid = 0; IGrid < DGrid; ++ IGrid ) {
         for ( int i = 0; i < 2; ++i ) {
           REQUIRE_FALSE( locale.neighbors[IGrid][i] );
@@ -48,7 +48,7 @@ SCENARIO("Link Neighbors", "[parallel]") {
     auto locale_opt = create_locale<DGrid>( cart_opt, ens_opt );
     REQUIRE( locale_opt );
 
-    auto neighbors = std::get<0>(link_neighbors( cart_opt, ens_opt, locale_opt ));
+    auto neighbors = link_neighbors( cart_opt, ens_opt, locale_opt )[0];
     for ( int i = 0; i < 2; ++i ) {
       REQUIRE( neighbors[i] );
       const auto& inter_comm = *(neighbors[i]);

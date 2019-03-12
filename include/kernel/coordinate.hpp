@@ -29,7 +29,7 @@ namespace knl {
 
     template < class X, class V, typename T >
     static inline auto geodesic_move( apt::VecExpression<X>& x, const apt::VecExpression<V>& v, const T& dt ) {
-      apt::Vec<decltype(std::get<0>(v) * dt), apt::ndim_v<V>> dx = v * dt;
+      apt::Vec<decltype(v[0] * dt), apt::ndim_v<V>> dx = v * dt;
       x += dx;
       return dx;
     }
@@ -66,12 +66,12 @@ namespace knl {
       // dx is the return value and meanwhile it serves as a temporary
       apt::Vec<T, apt::ndim_v<V>> dx = v * dt;
 
-      auto& dlogr = std::get<0>(dx);
-      auto& dtheta = std::get<1>(dx);
-      auto& dphi = std::get<2>(dx);
+      auto& dlogr = dx[0];
+      auto& dtheta = dx[1];
+      auto& dphi = dx[2];
 
-      const auto& logr  = std::get<0>(x);
-      const auto& theta = std::get<1>(x);
+      const auto& logr  = x[0];
+      const auto& theta = x[1];
 
       class Rotator {
       private:
@@ -108,21 +108,21 @@ namespace knl {
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
         rot.set_angle( theta - PI / 2.0 );
-        rot.rotate( std::get<0>(v), std::get<1>(v) );
+        rot.rotate( v[0], v[1] );
 
         // then rotate in r-phi plane. Location is rotated by dphi, so velocity components are rotated -dphi
         rot.set_angle( -dphi );
-        rot.rotate( std::get<0>(v), std::get<2>(v) );
+        rot.rotate( v[0], v[2] );
 
         // last rotate in r-theta plane to new location. Location is rotated by theta_new - PI/2, so velocity components are rotated by PI/2 - theta_new
         rot.set_angle( PI / 2.0 - theta - dtheta );
-        rot.rotate( std::get<0>(v), std::get<1>(v) );
+        rot.rotate( v[0], v[1] );
       }
 
       { // in this block we update x
         x += dx;
         // bring phi to [0, 2*PI)
-        std::get<2>(x) -= 2 * PI * std::floor( std::get<2>(x) / (2 * PI) );
+        x[2] -= 2 * PI * std::floor( x[2] / (2 * PI) );
       }
 
       return dx;

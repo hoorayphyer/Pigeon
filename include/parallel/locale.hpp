@@ -2,6 +2,7 @@
 #define  _LOCALE_HPP_
 
 #include "mpi++.hpp"
+#include "apt/array.hpp"
 
 namespace parallel {
 
@@ -13,14 +14,10 @@ namespace parallel {
     int chief_cart_rank = 0;
 
     // need the following so replicas can also know
-    std::array< int, DGrid > cart_coords;
-    std::array< std::array< std::optional<int>, 2 >, DGrid > neighbors; // cartesian rank, for each dimension, 0 means upstream, 1 means downstream
-    std::array< std::array<bool, 2>, DGrid > is_at_boundary;
+    apt::array< int, DGrid > cart_coords;
+    apt::array< apt::pair<std::optional<int>>, DGrid > neighbors; // cartesian rank, for each dimension, 0 means upstream, 1 means downstream
+    apt::array< apt::pair<bool>, DGrid > is_at_boundary;
 
-    // std::array< std::array<bool, 2>, DGrid > is_axis;
-
-    // std::array< int, DGrid > anchor;
-    // std::array< int, DGrid > extent;
   };
 
 }
@@ -32,7 +29,7 @@ namespace parallel {
   std::optional<Locale<DGrid>> create_locale( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& ensemble );
 
   template < int DGrid >
-  std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid >
+  apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >
   link_neighbors( const std::optional<mpi::CartComm>& cart_comm,
                   const std::optional<mpi::Comm>& ensemble,
                   const std::optional<Locale<DGrid>>& locale );

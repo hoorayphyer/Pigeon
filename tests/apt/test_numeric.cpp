@@ -117,7 +117,7 @@ SCENARIO("vec algebra with assign", "[apt][vec]") {
     REQUIRE( v1[1] == 73 );
     REQUIRE( v1[2] == 702 );
 
-    std::get<0>(v1 += v2) = 17;
+    (v1 += v2)[0] = 17;
     REQUIRE( v1[0] == 17 );
     REQUIRE( v1[1] == 76 );
     REQUIRE( v1[2] == 704 );
@@ -131,7 +131,7 @@ SCENARIO("vec algebra with assign", "[apt][vec]") {
     REQUIRE( v1[1] == 67 );
     REQUIRE( v1[2] == 698 );
 
-    std::get<0>(v1 -= v2) = 17;
+    (v1 -= v2)[0] = 17;
     REQUIRE( v1[0] == 17 );
     REQUIRE( v1[1] == 64 );
     REQUIRE( v1[2] == 696 );

@@ -2,13 +2,13 @@
 #define  _APT_VEC_HPP_
 
 #include "apt/vec_expression.hpp"
-#include <array>
+#include "apt/array.hpp"
 
 namespace apt {
   template < typename T, int N >
   struct Vec : public VecExpression<Vec<T,N>, T, true> {
   private:
-    std::array<T,N> _v{}; // NOTE {} here performs zero initialization.
+    array<T,N> _v{}; // NOTE {} here performs zero initialization.
 
   public:
     static constexpr auto NDim = N;
@@ -16,26 +16,23 @@ namespace apt {
 
     constexpr Vec() noexcept = default;
 
-    template < typename... U,
-               class = std::enable_if_t<sizeof...(U) == N> >
+    template < typename... U, class = std::enable_if_t<sizeof...(U) == N> >
     constexpr Vec( U... args ) noexcept : _v{{ args... }} {}
 
     template < typename U >
-    constexpr Vec( const std::array<U, N>& arr ) noexcept : _v{arr} {}
+    constexpr Vec( const array<U, N>& arr ) noexcept : _v{arr} {}
 
     template < typename E >
     constexpr Vec( const VecExpression<E>& vec ) noexcept {
       foreach<0,N>( [](auto& a, const auto& b){ a = b;}, _v, vec);
     }
 
-    template < int I >
-    constexpr T v() const noexcept {
-      return std::get<I>(_v);
+    constexpr T operator[] ( int i ) const noexcept {
+      return _v[i];
     }
 
-    template < int I >
-    constexpr T& v() noexcept {
-      return std::get<I>(_v);
+    constexpr T& operator[] ( int i ) noexcept {
+      return _v[i];
     }
 
   };

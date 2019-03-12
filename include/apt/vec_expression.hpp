@@ -15,18 +15,8 @@ namespace apt {
     using element_type = T;
     static constexpr bool is_lvalue = false;
 
-    // NOTE .template v<I>() is necessary to tell compiler that v is a template. It works like typename
-    template < int I >
-    constexpr T v() const noexcept {
-      return static_cast<const E&>(*this).template v<I>();
-    }
-
     constexpr T operator[] ( int i ) const noexcept {
-      if ( 0 == i ) return v<0>();
-      if constexpr ( NDim > 1 )
-         if ( 1 == i ) return v<1>();
-      if constexpr ( NDim > 2 )
-         if ( 2 == i ) return v<2>();
+      return static_cast<const E&>(*this)[i];
     }
 
   };
@@ -38,48 +28,14 @@ namespace apt {
     using element_type = T;
     static constexpr bool is_lvalue = true;
 
-    template < int I >
-    constexpr T v() const noexcept {
-      return static_cast<const E&>(*this).template v<I>();
-    }
-
     constexpr T operator[] ( int i ) const noexcept {
-      if ( 0 == i ) return v<0>();
-      if constexpr ( NDim > 1 )
-                     if ( 1 == i ) return v<1>();
-      if constexpr ( NDim > 2 )
-                     if ( 2 == i ) return v<2>();
-    }
-
-    template < int I >
-    constexpr T& v() noexcept {
-      return static_cast<E&>(*this).template v<I>();
+      return static_cast<const E&>(*this)[i];
     }
 
     constexpr T& operator[] ( int i ) noexcept {
-      if ( 0 == i ) return v<0>();
-      if constexpr ( NDim > 1 )
-                     if ( 1 == i ) return v<1>();
-      if constexpr ( NDim > 2 )
-                     if ( 2 == i ) return v<2>();
+      return static_cast<E&>(*this)[i];
     }
   };
-}
-
-#include <type_traits> // std::enable_if
-
-namespace std {
-  // define this so as to be used in apt::foreach
-  template < int I, typename E, typename T, bool is_lvalue >
-  constexpr T get( const apt::VecExpression<E,T,is_lvalue>& vec ) noexcept {
-    return vec.template v<I>();
-  }
-
-  template < int I, typename E, typename T, bool is_lvalue >
-  constexpr std::enable_if_t<is_lvalue, T&>
-  get( apt::VecExpression<E,T,is_lvalue>& vec ) noexcept {
-    return vec.template v<I>();
-  }
 }
 
 #include "apt/foreach.hpp"

@@ -37,7 +37,7 @@ namespace parallel {
     locale_opt.emplace();
     auto& locale = *locale_opt;
     constexpr int neigh_null = -147;
-    std::array<int, 2 + DGrid + 2*DGrid> buf;
+    apt::array< int, 2 + DGrid + 2*DGrid > buf; // TODOL need reflection to implement the non-hard-coded version
     if ( cart_comm ) {
       const auto& cart = *cart_comm;
       locale.label = cart.linear_coord();
@@ -53,7 +53,7 @@ namespace parallel {
       for ( int i = 0; i < DGrid; ++i ) {
         buf[2+i] = locale.cart_coords[i];
         for ( int lr = 0; lr < 2; ++lr )
-          buf[2+DGrid+2*i+lr] = locale.neighbors[i][lr] ? *locale.neighbors[i][lr] : neigh_null;
+          buf[2+DGrid+2*i+lr] = locale.neighbors[i][lr] ? *(locale.neighbors[i][lr]) : neigh_null;
       }
 
       ensemble.broadcast( buf, locale.chief );
@@ -81,11 +81,11 @@ namespace parallel {
 
   // NOTE InterComm constructor is blocking
   template < int DGrid >
-  std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid >
+  apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >
   link_neighbors( const std::optional<mpi::CartComm>& cart,
                   const std::optional<mpi::Comm>& ensemble_opt,
                   const std::optional<Locale<DGrid>>& locale_opt ) {
-    std::array< std::array< std::optional<mpi::InterComm>, 2>, DGrid > result;
+    apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid > result;
     if (! ensemble_opt ) return result;
     const auto& ensemble = *ensemble_opt;
     auto& locale = *locale_opt;

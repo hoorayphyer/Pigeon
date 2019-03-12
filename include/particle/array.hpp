@@ -36,7 +36,7 @@ namespace particle {
       // TODO generalize to all DPtc
       using vVec = apt::vVec<typename array_t::value_type, array_t::DPtc>;
       auto f = [i=_index] ( auto& x ) {
-                 return vVec( std::get<0>(x)[i], std::get<1>(x)[i], std::get<2>(x)[i]);
+                 return vVec( x[0][i], x[1][i], x[2][i]);
                };
       return reference( f( _array._q ),
                         f( _array._p ),
@@ -48,13 +48,13 @@ namespace particle {
   template < typename T, int Dim_Ptc, typename state_t >
   struct array {
   private:
-    std::array<std::vector<T>, Dim_Ptc> _q;
-    std::array<std::vector<T>, Dim_Ptc> _p;
+    apt::array<std::vector<T>, Dim_Ptc> _q;
+    apt::array<std::vector<T>, Dim_Ptc> _p;
     std::vector<state_t> _state;
 
   public:
     using value_type = T;
-    static constexpr auto DPtc = Dim_Ptc;
+    static constexpr int DPtc = Dim_Ptc;
     using state_type = state_t;
 
     friend class iterator< array >;

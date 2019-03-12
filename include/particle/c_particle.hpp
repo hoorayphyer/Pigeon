@@ -3,26 +3,27 @@
 
 #include "particle/particle_expression.hpp"
 #include "apt/foreach.hpp"
+#include "apt/array.hpp"
 
 namespace particle {
   // for communication
   template < typename T, int DPtc, typename state_t >
-  class cParticle : public PtcExpression<cParticle<T,DPtc,state_t>, std::array<T,DPtc>, state_t> {
+  class cParticle : public PtcExpression<cParticle<T,DPtc,state_t>, apt::array<T,DPtc>, state_t> {
   private:
-    std::array<T,DPtc> _q;
-    std::array<T,DPtc> _p;
-    state_t _s;
+    apt::array<T,DPtc> _q {};
+    apt::array<T,DPtc> _p {};
+    state_t _s {};
 
   public:
-    static constexpr int Dim = DPtc;
-    using vec_type = std::array<T,DPtc>;
+    static constexpr int NDim = DPtc;
+    using vec_type = apt::array<T,DPtc>;
     using state_type = state_t;
 
-    constexpr auto& q() noexcept { return _q; }
-    constexpr const auto& q() const noexcept { return _q; }
+    constexpr vec_type& q() noexcept { return _q; }
+    constexpr const vec_type& q() const noexcept { return _q; }
 
-    constexpr auto& p() noexcept { return _p; }
-    constexpr const auto& p() const noexcept { return _p; }
+    constexpr vec_type& p() noexcept { return _p; }
+    constexpr const vec_type& p() const noexcept { return _p; }
 
     constexpr auto& state() noexcept { return _s; }
     constexpr const auto& state() const noexcept { return _s; }

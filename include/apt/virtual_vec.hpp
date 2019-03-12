@@ -2,6 +2,7 @@
 #define  _APT_VIRTUAL_VEC_HPP_
 
 #include "apt/vec_expression.hpp"
+#include "apt/array.hpp"
 #include <tuple>
 
 // NOTE virtual vector, or a vector proxy
@@ -22,33 +23,39 @@ namespace apt {
     using tuple_type = impl::ref_tuple_t<T,N>;
     tuple_type _v;
 
-    template < typename E, std::size_t... I > // NOTE using size_t instead of int is to make compiling work
+    template < typename E, std::size_t... I >
     constexpr vVec( VecExpression<E>&& vec, std::index_sequence<I...> ) noexcept
-      : _v( std::get<I>(vec)... ) {}
+      : _v( vec[I]... ) {}
 
     template < std::size_t... I >
-    constexpr vVec( std::array<T,N>& arr, std::index_sequence<I...> ) noexcept
-      : vVec(std::get<I>(arr)...) {}
+    constexpr vVec( array<T,N>& arr, std::index_sequence<I...> ) noexcept
+      : vVec(arr[I]...) {}
 
   public:
     using element_type = T;
     static constexpr int NDim = N;
 
-    template < int I >
-    constexpr T v() const noexcept {
-      return std::get<I>(_v);
+    constexpr T operator[] ( int i ) const noexcept {
+      if ( 0 == i ) return std::get<0>(_v);
+      if constexpr ( NDim > 1 )
+                     if ( 1 == i ) return std::get<1>(_v);
+      if constexpr ( NDim > 2 )
+                     if ( 2 == i ) return std::get<2>(_v);
     }
 
-    template < int I >
-    constexpr T& v() noexcept {
-      return std::get<I>(_v);
+    constexpr T& operator[] ( int i ) noexcept {
+      if ( 0 == i ) return std::get<0>(_v);
+      if constexpr ( NDim > 1 )
+                     if ( 1 == i ) return std::get<1>(_v);
+      if constexpr ( NDim > 2 )
+                     if ( 2 == i ) return std::get<2>(_v);
     }
 
     template < typename... U >
     constexpr vVec( U&... u ) noexcept
       : _v(u...) {};
 
-    constexpr vVec( std::array<T,N>& arr ) noexcept
+    constexpr vVec( array<T,N>& arr ) noexcept
       : vVec( arr, std::make_index_sequence<N>{} ) {}
 
     constexpr vVec( tuple_type&& tpl ) noexcept

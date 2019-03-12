@@ -10,7 +10,7 @@ struct Vec3 {
 
   // conversion from apt::Vec
   Vec3(const apt::Vec<T,3>& vec)
-    : Vec3(std::get<0>(vec), std::get<1>(vec), std::get<2>(vec)) {}
+    : Vec3(vec[0], vec[1], vec[2]) {}
 
   Vec3(const self_type& other) = default;
   Vec3(self_type&& other) = default;

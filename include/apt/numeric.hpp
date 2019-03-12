@@ -22,13 +22,11 @@ namespace apt {
     constexpr FCompWise_Vec_Vec( const E1& e1, const E2& e2 ) noexcept
       : _e1(e1), _e2(e2){}
 
-    template < int I >
-    constexpr T v() const noexcept {
-      static_assert(I < NDim);
-      if constexpr ( Op == BinaryOps::ADD ) return _e1.template v<I>() + _e2.template v<I>();
-      else if ( Op == BinaryOps::SUB ) return _e1.template v<I>() - _e2.template v<I>();
-      else if ( Op == BinaryOps::MUL ) return _e1.template v<I>() * _e2.template v<I>();
-      else if ( Op == BinaryOps::DIV ) return _e1.template v<I>() / _e2.template v<I>();
+    constexpr T operator[] ( int i ) const noexcept {
+      if constexpr ( Op == BinaryOps::ADD ) return _e1[i] + _e2[i];
+      else if ( Op == BinaryOps::SUB ) return _e1[i] - _e2[i];
+      else if ( Op == BinaryOps::MUL ) return _e1[i] * _e2[i];
+      else if ( Op == BinaryOps::DIV ) return _e1[i] / _e2[i];
     }
   };
 
@@ -46,12 +44,11 @@ namespace apt {
     constexpr FCompWise_Vec_Sca( const E& e, const Real& t ) noexcept
       : _e(e), _t(t) {}
 
-    template < int I >
-    constexpr T v() const noexcept {
-      if constexpr ( Op == BinaryOps::ADD ) return _e.template v<I>() + _t;
-      else if ( Op == BinaryOps::SUB ) return _e.template v<I>() - _t;
-      else if ( Op == BinaryOps::MUL ) return _e.template v<I>() * _t;
-      else if ( Op == BinaryOps::DIV ) return _e.template v<I>() / _t;
+    constexpr T operator[] ( int i ) const noexcept {
+      if constexpr ( Op == BinaryOps::ADD ) return _e[i] + _t;
+      else if ( Op == BinaryOps::SUB ) return _e[i] - _t;
+      else if ( Op == BinaryOps::MUL ) return _e[i] * _t;
+      else if ( Op == BinaryOps::DIV ) return _e[i] / _t;
     }
   };
 
@@ -131,10 +128,8 @@ namespace apt {
     constexpr VecCross( const E1& e1, const E2& e2 ) noexcept
       : _e1(e1), _e2(e2) {}
 
-    template < int I >
-    constexpr T v() const noexcept {
-      return _e1.template v<(I+1)%3>() * _e2.template v<(I+2)%3>()
-        - _e1.template v<(I+2)%3>() * _e2.template v<(I+1)%3>();
+    constexpr T operator[] ( int i ) const noexcept {
+      return _e1[(i+1)%3] * _e2[(i+2)%3] - _e1[(i+2)%3] * _e2[(i+1)%3];
     }
   };
 
@@ -146,15 +141,11 @@ namespace apt {
 
 #include <cmath>
 namespace apt {
-  template < int I, typename E1, typename E2 >
-  constexpr auto dot ( const VecExpression<E1>& v1, const VecExpression<E2>& v2 ) noexcept {
-  }
-
   template < typename E1, typename E2, int I = 0 >
   constexpr auto dot ( const VecExpression<E1>& v1, const VecExpression<E2>& v2 ) noexcept {
-    constexpr int END = E1::NDim;
+    constexpr int END = ndim_v<E1>;
     if constexpr ( I == END ) return 0;
-    else return v1.template v<I>() * v2.template v<I>() + dot<E1, E2, I+1>(v1, v2);
+    else return v1[I] * v2[I] + dot<E1, E2, I+1>(v1, v2);
   }
 
   template < typename E >
@@ -164,8 +155,7 @@ namespace apt {
 
   template < typename E >
   constexpr auto abs( const VecExpression<E>& vec ) noexcept {
-    constexpr int N = E::NDim;
-    if constexpr ( N == 1 ) return std::abs( vec.template v<0>() );
+    if constexpr ( ndim_v<E> == 1 ) return std::abs( vec[0] );
     else return std::sqrt( sqabs(vec) );
   }
 

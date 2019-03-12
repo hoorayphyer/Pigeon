@@ -15,8 +15,8 @@ namespace field {
   using ShapeF = knl::shapef_t<shape>;
 
   template void
-  depositWJ< Field, Vec_q, Vec_dq, ShapeF> ( Field& WJ,
-                                             const apt::VecExpression<Vec_q>& q1_abs,
-                                             const apt::VecExpression<Vec_dq>& dq_abs,
-                                             const ShapeF& shapef );
+  depositWJ< Field, real_t, Vec_q, Vec_dq, ShapeF> ( Field& WJ, real_t charge,
+                                                     const apt::VecExpression<Vec_q>& q1_abs,
+                                                     const apt::VecExpression<Vec_dq>& dq_abs,
+                                                     const ShapeF& shapef );
 }

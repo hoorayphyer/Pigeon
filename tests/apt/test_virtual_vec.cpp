@@ -1,4 +1,5 @@
 #include "apt/virtual_vec.hpp"
+#include "apt/print.hpp"
 #include "catch2/catch.hpp"
 
 using vVec = apt::vVec<double,3>;
@@ -22,7 +23,7 @@ SCENARIO( "vVec constructors", "[apt][vec]" ) {
   }
 
   SECTION("constructor from std::array") {
-    std::array<double,3> arr { 1, 2, 3 };
+    apt::array<double,3> arr { 1, 2, 3 };
     vVec v (arr);
 
     REQUIRE( v[0] == 1 );

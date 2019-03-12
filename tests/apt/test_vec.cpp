@@ -1,4 +1,5 @@
 #include "apt/vec.hpp"
+#include "apt/print.hpp"
 #include "catch2/catch.hpp"
 
 using Vec = apt::Vec<double,3>;

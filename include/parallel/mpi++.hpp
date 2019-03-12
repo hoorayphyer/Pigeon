@@ -2,7 +2,7 @@
 #define  _MPI_XX_HPP_
 
 #include "parallel/mpi_communication.hpp"
-#include <array>
+#include "apt/pair.hpp"
 
 namespace mpi {
   void group_free( MPI_Group* p );
@@ -75,7 +75,7 @@ namespace mpi {
 
     int linear_coord() const;
 
-    std::array<std::optional<int>, 2> shift(int direction, int disp = 1 ) const;
+    apt::pair<std::optional<int>> shift(int direction, int disp = 1 ) const;
   };
 
 }

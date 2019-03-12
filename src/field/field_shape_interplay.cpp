@@ -16,9 +16,9 @@ namespace esirkepov {
   }
 
   template < typename T, int DGrid, typename ShapeF >
-  constexpr std::array<T,3> calcW( const apt::Index<DGrid>& index,
-                                   const std::array<T, DGrid>& sep0_b,
-                                   const std::array<T, DGrid>& sep1_b,
+  constexpr apt::array<T,3> calcW( const apt::Index<DGrid>& index,
+                                   const apt::array<T, DGrid>& sep0_b,
+                                   const apt::array<T, DGrid>& sep1_b,
                                    const ShapeF& shapef ) noexcept {
     T W[3]{};
 
@@ -57,13 +57,13 @@ namespace field {
   // - index_original = index_native + ( q1 - int(q1) >= 0.5 )
   // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
   template < typename Vec_q1_abs, typename Vec_dq_abs, typename Grid, typename ShapeF >
-  constexpr auto prep( const Vec_q1_abs& q1_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
+  constexpr auto depositWJ_prep( const Vec_q1_abs& q1_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
     constexpr int DGrid = apt::ndim_v<Grid>;
     using T = apt::most_precise_t<apt::element_t<Vec_q1_abs>, apt::element_t<Vec_dq_abs>>;
     apt::Index<DGrid> I_b;
     apt::Index<DGrid> extent;
-    std::array<T, DGrid> sep0_b; // separation 0 is defined to be i_cell_beginning - q0_ptc
-    std::array<T, DGrid> sep1_b;
+    apt::array<T, DGrid> sep0_b; // separation 0 is defined to be i_cell_beginning - q0_ptc
+    apt::array<T, DGrid> sep1_b;
 
     apt::foreach<0, DGrid>
       ( [] ( auto& i_b, auto& ext, auto& sp0, auto& sp1,
@@ -92,8 +92,8 @@ namespace field {
 
 namespace field {
 
-  template < typename Field, typename Vec_q, typename Vec_dq, typename ShapeF >
-  void depositWJ ( Field& WJ,
+  template < typename Field, typename T, typename Vec_q, typename Vec_dq, typename ShapeF >
+  void depositWJ ( Field& WJ, T charge,
                    const apt::VecExpression<Vec_q>& q1_abs,
                    const apt::VecExpression<Vec_dq>& dq_abs,
                    const ShapeF& shapef ) {
@@ -102,13 +102,13 @@ namespace field {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
-    const auto[I_b, extent, sep0_b, sep1_b] = prep( q1_abs, dq_abs, WJ.mesh().bulk(), shapef );
+    const auto[I_b, extent, sep0_b, sep1_b] = depositWJ_prep( q1_abs, dq_abs, WJ.mesh().bulk(), shapef );
 
     for ( const auto& I : apt::Block(extent) ) {
       auto W = esirkepov::calcW( I, sep0_b, sep1_b, shapef );
-      if constexpr ( DGrid == 2 ) std::get<2>(W) *= std::get<2>(dq_abs); // see NOTE below
+      if constexpr ( DGrid == 2 ) W[2] *= dq_abs[2]; // see NOTE below
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
-        ( [&]( auto& wj, auto w ) { wj(I_b + I) += w; } , WJ, W );
+        ( [&]( auto& wj, auto w ) { wj(I_b + I) += w * charge; } , WJ, W );
     }
 
     // NOTE in eq.36 in Esirkepov, V_z is really del_z / dt, where del_z should
@@ -130,7 +130,7 @@ namespace field {
     apt::Vec<T, DField> result;
     const auto& grid = field.mesh().bulk();
     constexpr auto supp = ShapeF::support;
-    std::array<T, DGrid> loc {}; // location at which to interpolate field
+    apt::array<T, DGrid> loc {}; // location at which to interpolate field
 
     apt::foreach<0,DGrid>
       ( []( auto& l, auto q, const auto& g ){
@@ -142,7 +142,7 @@ namespace field {
     apt::foreach<0,DField>
       ( [&] ( auto& res, const auto& comp ) {
           res = 0.0;
-          std::array<T,DGrid> sep_b {};
+          apt::array<T,DGrid> sep_b {};
 
           // correct loc by offset
           apt::foreach<0,DGrid>

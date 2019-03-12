@@ -70,8 +70,8 @@ module_gen(particle pair_producer)
 module_gen(particle pusher)
 module_gen(particle array)
 
-# add_library(particle_update_lib STATIC "particle/updater.cpp")
-# target_link_libraries(particle_update_lib PRIVATE ${particle_modules})
+add_library(particle_updater STATIC "particle/updater.cpp")
+target_link_libraries(particle_updater PRIVATE ${particle_modules})
 
 
 # TODO now src are scattered

@@ -1,42 +1,20 @@
 #ifndef  _APT_INDEX_HPP_
 #define  _APT_INDEX_HPP_
 
-namespace apt {
-  template < int D >
-  struct Index {
-    int data[D] {};
-
-    constexpr int operator[] ( int i ) const noexcept { return data[i]; }
-    constexpr int& operator[] ( int i ) noexcept { return data[i]; }
-
-    constexpr Index operator+( Index other ) const noexcept;
-  };
-
-}
-
-namespace std {
-  // define this so as to be used in apt::foreach
-  template < int I, int D >
-  constexpr auto get( const apt::Index<D>& index ) noexcept {
-    static_assert( I < D );
-    return index[I];
-  }
-
-  template < int I, int D >
-  constexpr auto& get( apt::Index<D>& index ) noexcept {
-    static_assert( I < D );
-    return index[I];
-  }
-}
-
+#include "apt/array.hpp"
 #include "apt/foreach.hpp"
+
 namespace apt {
   template < int D >
-  constexpr Index<D> Index<D>::operator+( Index<D> other ) const noexcept {
-    foreach<0,D>( [](int& a, int b ) { a += b; }, other, *this );
-    return other;
-  }
+  using Index = array<int,D>;
 
+}
+
+template < int D >
+constexpr apt::Index<D> operator+( apt::Index<D> ind_a, const apt::Index<D>& ind_b ) noexcept {
+  apt::foreach<0,D>
+    ( []( auto& a, auto b ) { a += b; }, ind_a, ind_b );
+  return ind_a;
 }
 
 #endif

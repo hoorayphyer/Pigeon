@@ -14,20 +14,18 @@
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
 
-namespace particle {
-  template < typename Real, int DGrid, int DPtc, typename state_t,
-             PairScheme pair_scheme, knl::coordsys CS, species posion >
-  template < species sp, typename Dynvar_t, typename Params_t, typename Grid >
-  void Updater<Real,DGrid,DPtc,state_t,Shape,pair_scheme,CS,posion>
-  ::update_species( Dynvar_t& dvars, const Params_t& params, const Grid& grid, const ShapeF& shapef  ) {
-      if ( dvars[sp].size() == 0 ) return;
+namespace particle::impl {
+  template < species sp, PairScheme pair_scheme, knl::coordsys CS,
+             typename DynaVars_t, typename WJField, typename Migrators, typename Params_t, typename ShapeF, typename Rng, typename Borders >
+  void update_species( DynaVars_t& dvars, WJField& WJ, Migrators& migrators, const Params_t& params, const ShapeF& shapef, Rng& rng, const Borders& borders ) {
+    if ( dvars[sp].size() == 0 ) return;
 
-      auto dt = params.dt;
+    auto dt = params.dt;
 
-      for ( auto&& ptc : dvars[sp] ) {
-        if( ptc.is(flag::empty) ) continue;
+    for ( auto& ptc : dvars[sp] ) {
+      if( ptc.is(flag::empty) ) continue;
 
-        if constexpr ( is_charged<sp> ) {
+      if constexpr ( is_charged<sp> ) {
           auto E = field::interpolate(dvars.E, ptc.q, shapef );
           auto B = field::interpolate(dvars.E, ptc.q, shapef );
           auto&& dp = update_p<sp>( ptc, dt, E, B );
@@ -36,7 +34,7 @@ namespace particle {
           if constexpr ( pair_scheme != PairScheme::Disabled && is_radiative<sp> ) {
             auto Rc = calc_Rc( dt, ptc.p, std::move(dp) );
             auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p) );
-            if ( !is_productive_lepton( ptc, gamma, Rc, _rng ) )
+            if ( !is_productive_lepton( ptc, gamma, Rc, rng ) )
               goto end_of_pair_produce;
 
             if constexpr ( pair_scheme == PairScheme::Photon ) {
@@ -50,83 +48,94 @@ namespace particle {
           }
           end_of_pair_produce:;
 
-        } else if ( sp == species::photon && pair_scheme == PairScheme::Photon ) {
-          photon_produce_pairs( std::back_inserter( dvars.electrons ),
-                                std::back_inserter( dvars.positrons ),
-                                ptc );
         }
-
-        // NOTE q is updated, starting from here, particles may be in the guard cells.
-        auto&& dq = update_q<sp,CS>( ptc, dt );
-        // pusher handle boundary condition
-        if constexpr ( is_charged<sp> ) field::depositWJ( _WJ, ptc.q(), std::move(dq), shapef );
-
-        if ( is_migrate( ptc.q(), params.borders ) ) {// TODO params.borders at real physical boundary need to be specified still, because now mesh controls margin
-          // TODO make sure after move, the moved from ptc is set to flag::empty
-          _migrators.emplace_back(std::move(ptc));
-          // ptc.set(flag::empty);
-        }
-
+      else if ( sp == species::photon && pair_scheme == PairScheme::Photon ) {
+        photon_produce_pairs( std::back_inserter( dvars.electrons ),
+                              std::back_inserter( dvars.positrons ),
+                              ptc );
       }
 
-      if constexpr ( is_charged<sp> ) {
-        auto tmp = -1 * charge_x<sp> * params.e * grid[0].delta / dt;
-        for ( auto& elm : _WJ[0] ) elm *= tmp;
+      // NOTE q is updated, starting from here, particles may be in the guard cells.
+      auto&& dq = update_q<sp,CS>( ptc, dt );
+      // pusher handle boundary condition
+      if constexpr ( is_charged<sp> )
+        field::depositWJ( WJ, charge_x<sp>, ptc.q(), std::move(dq), shapef );
 
-        tmp *= (grid[1].delta / grid[0].delta);
-        for ( auto& elm : _WJ[1] ) elm *= tmp;
-
-        if constexpr ( DGrid == 2 ) {
-          tmp = charge_x<sp> * params.e;
-        } else if ( DGrid == 3 ) {
-          tmp *= (grid[2].delta / grid[1].delta);
-        } static_assert(DGrid < 4);
-
-        for ( auto& elm : _WJ[2] ) elm *= tmp;
-
-        // // TODO check here if needs to output species J
-        // if ( is_dataexport ) {
-        //   data_out.WJ[sp] = WJ;
-        //   todo::getJ_from_WJ(data_out.J[sp], data_out.WJ[sp] );
-        // }
+      if ( is_migrate( ptc.q(), borders ) ) {
+        migrators.emplace_back(std::move(ptc));
       }
 
-      // TODO sort particle array periodically
     }
 
-  template < typename Real, int DGrid, int DPtc, typename state_t, knl::shape Shape,
-             PairScheme pair_scheme, knl::coordsys CS, species posion >
-  void Updater<Real,DGrid,DPtc,state_t,Shape,pair_scheme,CS,posion>
-  ::operator() ( DynamicVars<Real, DGrid, DPtc, state_t>& dvars,
-                 const Params<Real, DGrid>& params,
-                 const knl::Grid<DGrid, Real>& grid,
-                 const mpi::Comm& ensemble ) {
-      const auto& borders = params.borders;
-      const auto& neighbors = params.neighbors;
+    // TODO sort particle array periodically
+  }
 
-      for ( auto& comp : _WJ ) for ( auto& elm : comp ) elm = 0.0;
+  template < PairScheme PS, knl::coordsys CS, int I = 0, typename... Args >
+  inline void iterate_species( Args&&... args ) {
+    if constexpr ( I == 4 ) return; // TODOL loop over all species. Would void_t help?
+    else {
+      // update_species<static_cast<species>(I), PS, CS>( std::forward<Args>(args)... );
+      return iterate_species<PS, CS, I+1>( std::forward<Args>(args)... );
+    }
+  }
+
+}
+
+namespace particle {
+  template < typename Real, int DGrid, int DPtc, typename state_t,
+             knl::shape Shape, PairScheme pair_scheme,
+             knl::coordsys CS, species posion // posion = positron || ion in injection
+             >
+  void Updater< Real, DGrid, DPtc, state_t, Shape, pair_scheme, CS, posion >
+  ::operator() ( int timestep, DynaVars_t& dvars,
+                 const Params_t& params,
+                 const std::optional<mpi::Comm>& ensemble ) {
+
+    // TODO borders at real physical boundary need to be specified still, because now mesh controls margin
+    apt::array< apt::pair<Real>, DGrid > borders; // TODO
+
+    apt::foreach<0, 3>
+      ( []( auto comp ) { // returns a proxy
+          for ( auto& elm : comp.data() ) elm = 0.0;
+        }, _WJ );
+
       // EnsBroadcastFields( dvars.E, dvars.B ); // TODO
       //-------------------------------
-      inject( dvars.electrons, dvars[posion] );
+      // inject( dvars.electrons, dvars[posion] ); // TODO
 
       // NOTE one can deposit in the end
       // annihilate_mark_pairs( ); // TODO
 
       //-------------------------------
-      // TODO use compile time known
-      iterate_species( dvars, params, grid );
+    impl::iterate_species<pair_scheme, CS>( dvars, _WJ, _migrators, params,
+                             knl::shapef_t<Shape>(), _rng, borders );
 
-      // TODO migrate needs all migrators to have species set. How to enforce it?
-      migrate( _migrators, params.neighbors, borders, _intercomms );
-      for ( auto&& ptc : _migrators ) {
-        // TODO something wrong
-        // dvars[ptc.get<species>()].push_back( std::move(ptc) );
-      }
-      _migrators.resize(0);
-
-      // // TODO do this before J is actually used
-      // todo::getJ_from_WJ( dvars.J, _WJ );
+    migrate( _migrators, _intercomms, borders, timestep );
+    for ( auto&& ptc : _migrators ) {
+      dvars[ptc.template get<species>()].push_back( std::move(ptc) );
     }
+    _migrators.resize(0);
+
+    // TODO do this before J is actually used
+    {
+      const auto& grid = dvars.E.mesh().bulk();
+
+      apt::foreach<0, DGrid>
+        ( [&]( auto comp, const auto& g ) {
+            auto tmp = -1 * params.e * g.delta() / params.dt;
+            for ( auto& elm : comp.data() ) elm *= tmp;
+          }, _WJ, grid );
+
+      if constexpr ( DGrid == 2 ) {
+        auto tmp = params.e / params.dt;
+        for ( auto& elm : _WJ[2].data() ) elm *= tmp;
+      }
+
+      //   // TODO getJ_from_WJ( dvars.J, _WJ );
+      // }
+      // TODOL now WJ mixes all species, how to output species components of the current?
+    }
+  }
 
 }
 

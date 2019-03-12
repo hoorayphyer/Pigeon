@@ -14,22 +14,12 @@ namespace apt {
   using element_t = typename element<C>::type;
 }
 
-
-#include <array>
 namespace apt {
-  template < typename T, std::size_t N >
-  inline constexpr int ndim_v<std::array<T,N>> = N;
-
-  template < typename T, std::size_t N >
-  struct element<std::array<T,N>> {
-    using type = T;
-  };
-}
-
-namespace apt {
+  // template < typename... T >
+  // using most_precise_t = std::enable_if_t< (... && std::is_arithmetic_v<T>),
+  //                                          decltype( (... + (T)0) ) >;
   template < typename... T >
-  using most_precise_t = std::enable_if_t< (... && std::is_arithmetic_v<T>),
-                                           decltype( (... + (T)0) ) >;
+  using most_precise_t = decltype( (... + (T)0) );
 }
 
 #endif
