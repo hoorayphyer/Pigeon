@@ -9,6 +9,13 @@
 !logo3_small.svg
 !README.md
 
+!old_field_solver/
+!old_field_solver/*
+!old_field_solver/boundaryconditions/
+!old_field_solver/boundaryconditions/*
+!old_field_solver/multiarray/
+!old_field_solver/multiarray/*
+
 !include/
 !include/**/*.hpp
 !include/apt/

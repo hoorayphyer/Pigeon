@@ -37,34 +37,36 @@ macro(module_gen category name)
   unset(module_target)
 endmacro()
 
-function(link_mpi target)
-  target_include_directories(${target} PUBLIC ${MPI_INCLUDE_PATH})
-  target_link_libraries(${target} PRIVATE ${MPI_LIBRARIES})
+add_library(mpipp_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
+target_include_directories(mpipp_lib PUBLIC ${MPI_INCLUDE_PATH})
+target_link_libraries(mpipp_lib PRIVATE ${MPI_LIBRARIES})
+set_target_properties(mpipp_lib PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+set_target_properties(mpipp_lib PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
+
+function(link_mpipp target)
+  # target_include_directories(${target} PUBLIC ${MPI_INCLUDE_PATH})
+  target_link_libraries(${target} PRIVATE mpipp_lib)
   set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
   set_target_properties(${target} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
 endfunction()
 
-# set( particle_modules "" )
+macro(mpi_module_gen category name)
+  module_gen( ${category} ${name} )
+  link_mpipp( "${category}_${name}_module" )
+endmacro()
 
-add_library(mpi_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
-link_mpi(mpi_lib)
 
-
-module_gen(parallel locale)
-target_link_libraries( parallel_locale_module PRIVATE ${mpi_lib})
+mpi_module_gen(parallel locale)
 
 add_library(silo_lib STATIC "io/silo++.cpp" "io/silo_optlist.cpp" "io/silo_operations.cpp")
 target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} )
-target_link_libraries( silo_lib PRIVATE ${mpi_lib} ${Silo_LIBRARIES})
-
+target_link_libraries( silo_lib PRIVATE ${Silo_LIBRARIES})
+link_mpipp(silo_lib)
 
 module_gen(field field_shape_interplay)
-module_gen(field communication)
-target_link_libraries( field_communication_module PRIVATE ${mpi_lib})
+mpi_module_gen(field communication)
 
-
-module_gen(particle migration)
-target_link_libraries(particle_migration_module PRIVATE ${mpi_lib})
+mpi_module_gen(particle migration)
 
 module_gen(particle pair_producer)
 module_gen(particle pusher)
@@ -91,8 +93,11 @@ target_link_libraries(particle_updater PRIVATE ${particle_modules})
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
 # add_library(UserControl STATIC ${UserControl_src})
 
+include(../old_field_solver/CMakeLists.txt)
+
 # add_executable(aperture "main.cpp" "aperture.cpp")
-# target_link_libraries(aperture PRIVATE ${field_lib} ${particle_update_lib})
+# target_link_libraries(aperture PRIVATE ${field_lib} ${particle_updater})
+# link_mpipp(aperture)
 
 # target_link_libraries(aperture AperLib UserControl)
 
