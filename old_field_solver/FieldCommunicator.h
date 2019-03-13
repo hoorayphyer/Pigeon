@@ -39,7 +39,7 @@ private:
   }
 
 public:
-  MPICartComm( const MPI_Comm& comm ) : _comm(comm) {}
+  MPICartComm( const MPI_Comm comm ) : _comm(comm) {}
 
   template <typename T>
   MPI_Request Isend(int dest_rank, int tag, const T* values, int n ) const {

@@ -73,7 +73,10 @@ namespace ofs {
       fbc.type = FieldBCType::ROTATING_CONDUCTOR;
       fbc.indent = 5;
       fbc.ft = FT_SpinUp(0.0, spinup_duration);
-      Rotating_Dipole_LogSph( fbc, mu0, omega_max );
+      if ( magnetic_pole == 1 )
+        Rotating_Monopole_LogSph( fbc, mu0, omega_max );
+      else if ( magnetic_pole == 2 )
+        Rotating_Dipole_LogSph( fbc, mu0, omega_max );
     }
     { auto& fbc = fieldBC[UPPER_1];
       fbc.type = FieldBCType::DAMPING;
@@ -91,7 +94,7 @@ namespace ofs {
   }
 
   OldFieldUpdater::OldFieldUpdater( const Params<double>& params,
-                                    const mpi::Comm& comm,
+                                    const mpi::CartComm& comm,
                                     const knl::Grid<double,DGrid>& local_grid,
                                     const parallel::Locale<DGrid>& locale,
                                     int guard
@@ -141,11 +144,11 @@ namespace ofs {
     fu.reset( new FieldUpdater( fuparams, *fd, *fc ) );
   }
 
-  // TODO factor of 4\pi on J ?
   void OldFieldUpdater::operator() ( field_type& E,
                                      field_type& B,
                                      const field_type& J,
                                      field_type::element_type dt, int timestep ) {
+    // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,
     // 1) for unstaggered components (MIDWAY), indexing is field::Field[i] <-> VectorField[guard + i];
@@ -170,6 +173,11 @@ namespace ofs {
       convert_from_new( Efield, E );
       convert_from_new( Bfield, B );
       convert_from_new( current, J );
+      // NOTE
+      // The new code will evolve Maxwell's equations with 4\pi. So `current` should first be multiplied by 4\pi
+      for ( int c = 0; c < 3; ++c )
+        for ( int i = 0; i < current.gridSize(); ++i )
+          current.ptr(c)[i] *= (4 * CONST_PI);
     }
 
     {
