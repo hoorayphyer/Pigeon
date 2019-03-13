@@ -17,14 +17,12 @@ namespace field {
     constexpr Component( Data_t& data, const Mesh_t& mesh, const Offset_t& offset ) noexcept
       : _data(data), _mesh(mesh), _offset(offset) {}
 
-    template < typename... Indices >
-    inline T& operator() ( const Indices&... indices_bulk  ) {
-      return _data [_mesh.linearized_index_of_whole_mesh(indices_bulk...) ];
+    inline T& operator() ( const apt::Index<Mesh_t::NDim>& i_bulk ) {
+      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
-    template < typename... Indices >
-    inline T operator() ( const Indices&... indices_bulk  ) const {
-      return _data [_mesh.linearized_index_of_whole_mesh(indices_bulk...) ];
+    inline T operator() ( const apt::Index<Mesh_t::NDim>& i_bulk ) const {
+      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
     inline auto offset() const noexcept { return _offset; }

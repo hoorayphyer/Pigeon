@@ -3,6 +3,7 @@
 
 namespace mpi { struct Comm; }
 
+// TODO edge cases: when there is only one node in a dimension, a) what if periodic b) what if not.  Case a) needs some careful treatment because the process may have to send recv within itself, which MPI may not support. Case b) has null neighbors so it shouldn't cause any problem.
 namespace field {
   template < typename, int, int > struct Field;
 

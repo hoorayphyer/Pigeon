@@ -2,7 +2,7 @@
 #include "CoordSystem.h"
 #include "ArrayOperations.h"
 #include "Scales.h"
-#include "Domain.h"
+#include "FieldCommunicator.h"
 
 #define H1 1
 #define H2 2
@@ -445,7 +445,7 @@ FiniteDiff::ComputeGradient(const scalar_field &input, vector_field &output,
 }
 
 void
-FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, FieldType input_type, const bool isBoundary[], Domain &domain, const Index& start, const Extent& ext, bool skipDiv) {
+FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, FieldType input_type, const bool isBoundary[], FieldCommunicator &fc, const Index& start, const Extent& ext, bool skipDiv) {
   // Obtain the correct stagger
   FieldType antitype = (FieldType::ETYPE == input_type)?
       FieldType::BTYPE : FieldType::ETYPE;
@@ -454,12 +454,12 @@ FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, Fi
 
   // Invoke the series of differential operators
   ComputeCurl(input,_vector_tmp,input_type,isBoundary, start, ext);
-  domain.SendGuardCells(_vector_tmp);
+  fc.SendGuardCells(_vector_tmp);
 
   // Skip the divergence part if the flag is false
   if (!skipDiv) {
     ComputeDivergence(input,_scalar_tmp,input_type, isBoundary, start, ext);
-    domain.SendGuardCells(_scalar_tmp);
+    fc.SendGuardCells(_scalar_tmp);
   }
 
   // Adjust for conductor boundary where a shift of the evaluation
@@ -493,13 +493,6 @@ FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, Fi
 }
 
 void
-FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, FieldType input_type, const bool isBoundary[], Domain &domain, bool skipDiv) {
-  ComputeLaplacian(input, output, input_type, isBoundary, domain, _d_start0, _d_ext0, skipDiv);
+FiniteDiff::ComputeLaplacian(const vector_field &input, vector_field &output, FieldType input_type, const bool isBoundary[], FieldCommunicator& fc, bool skipDiv) {
+  ComputeLaplacian(input, output, input_type, isBoundary, fc, _d_start0, _d_ext0, skipDiv);
 }
-
-// void
-// FiniteDiff::ComputeLaplacian(const scalar_field &input, scalar_field &output, StaggerType input_type, Domain &domain) {}
-
-// Instantiate the class with all the desired coordinate systems
-//INSTANTIATE_CLASS_WITH_COORDTYPES(FiniteDiff);
-

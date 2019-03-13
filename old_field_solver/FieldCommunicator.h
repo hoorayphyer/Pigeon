@@ -6,8 +6,6 @@
 #include "ArrayOperations.h"
 #include "FUParams.h"
 
-#define NEIGHBOR_NULL -1
-
 enum CommTags {
   SEND_LEFT = 0,
   SEND_RIGHT
@@ -15,7 +13,7 @@ enum CommTags {
 
 struct MPICartComm {
 private:
-  const MPI_Comm& _comm;
+  const MPI_Comm _comm;
 
   void Handle_MPI_Error(int error_code) const {
     constexpr int BUFSIZE = 1024;
@@ -87,7 +85,7 @@ public:
   }
 };
 
-class Domain {
+class FieldCommunicator {
   typedef MultiArray<Scalar> array_type;
 
   const MPICartComm& _comm;
@@ -100,8 +98,6 @@ class Domain {
   void SendGuardCellsLeftRight(int direction, CommTags leftright, MultiArray<T>& array, const Grid& grid) {
     if (direction >= 3 || direction < 0)
       throw std::invalid_argument("Invalid direction!");
-
-    if (!_params.is_periodic[direction]) return;
 
     // Obtain the starting index of send and receive buffers in the grid
     Index sendId, recvId;
@@ -167,9 +163,6 @@ class Domain {
     if (direction >= 3 || direction < 0)
       throw std::invalid_argument("Invalid direction!");
 
-    if (!_params.is_periodic[direction]) return;
-
-
     const auto& neighbor_left = _params.neighbor_left;
     const auto& neighbor_right = _params.neighbor_right;
     // Determine the from and destination rank
@@ -199,9 +192,8 @@ class Domain {
   }
 
 public:
-  Domain(const MPICartComm& comm, const FUParams& params )
+  FieldCommunicator(const MPI_Comm& comm, const FUParams& params )
     : _comm(comm), _params(params) {
-    // if ( !comm.is_primary() ) return;
 
     const auto& grid = params.grid;
 
@@ -224,7 +216,6 @@ public:
     }
 
   }
-  ~Domain() {}
 
   // overloads of SendGuardCells
   template <typename T>
@@ -294,7 +285,7 @@ public:
     return;
   }
 
-}; // ----- end of class Domain -----
+};
 
 
 #endif   // ----- #ifndef _DOMAIN_H_  -----

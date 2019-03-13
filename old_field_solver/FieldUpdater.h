@@ -2,13 +2,13 @@
 #define _FIELDUPDATER_H_
 
 #include "Fields.h"
+#include "FUParams.h"
 #include <unordered_map>
 
 class FiniteDiff;
 // struct SaveSnapshotProxy;
-struct FUParams;
 class FieldBC;
-class Domain;
+class FieldCommunicator;
 ////////////////////////////////////////////////////////////////////////////////
 
 // TODO TODO put this part in the particle updater as a boundary condition
@@ -42,13 +42,13 @@ class FieldUpdater {
   typedef VectorField<Scalar> vector_field_type;
   typedef ScalarField<Scalar> scalar_field_type;
 
-  FieldUpdater( const FUParams& params, FiniteDiff& fd, Domain* domain, Scalar alpha, Scalar beta);
+  FieldUpdater( const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc );
   ~FieldUpdater();
 
   void Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,
               const VectorField<Scalar>& current, Scalar dt, int timestep);
 
-  void CopyToSnapshot( SaveSnapshotProxy& proxy ) const;
+  // void CopyToSnapshot( SaveSnapshotProxy& proxy ) const;
 
  private:
   void ComputeEfieldUpdate(Scalar dt, VectorField<Scalar>& B, VectorField<Scalar>& E, const VectorField<Scalar>& current);
@@ -58,10 +58,11 @@ class FieldUpdater {
 
   const Grid& _grid;
   const std::array<bool, 6>& _is_at_boundary;
-  FiniteDiff& _fd;
 
-  Scalar _alpha, _beta;
-  Domain* _domain;
+  FiniteDiff& _fd;
+  FieldCommunicator& _fc;
+
+  Scalar _alpha = 1.0, _beta = 0.0;
 
   // contains fieldBC objects if the current ensemble is at physical boundary
   std::unordered_map<BoundaryPosition, FieldBC*> _fieldBC;

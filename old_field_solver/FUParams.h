@@ -34,11 +34,9 @@ struct FBC {
 // TODO listen on locale
 struct FUParams {
   Scalar dt;
-  std::array<bool, 6> is_at_boundary;
-  // std::array<bool, 6> is_axis;
-  std::array<bool,3> is_periodic;
-  std::array<int, 3> neighbor_left;
-  std::array<int, 3> neighbor_right;
+  std::array<bool, 6> is_at_boundary{};
+  std::array<int, 3> neighbor_left{};
+  std::array<int, 3> neighbor_right{};
   Grid grid;
 
   std::unordered_map< BoundaryPosition, FBC > fieldBC;

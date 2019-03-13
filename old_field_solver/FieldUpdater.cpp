@@ -1,4 +1,4 @@
-#include "Domain.h"
+#include "FieldCommunicator.h"
 #include "FiniteDiff.h"
 #include "FieldUpdater.h"
 
@@ -14,7 +14,7 @@ static void CleanField (MultiArray<Scalar>& input, Scalar upper_lim) {
 }
 
 template < typename FBCParams_t >
-void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond, const FUParams& params, Domain* domain, const FBCParams_t& fieldBC ) {
+void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond, const FUParams& params, const FBCParams_t& fieldBC ) {
   const auto& isBoundary = params.is_at_boundary;
   for ( const auto& elm : fieldBC ) {
     auto b = elm.first;
@@ -35,12 +35,13 @@ void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond,
   } // end of for
 }
 
-FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, Domain* domain, Scalar alpha, Scalar beta)
-  : _grid(params.grid), _fd(fd), _is_at_boundary(params.is_at_boundary), _alpha(alpha), _beta(beta), _domain(domain) {
+FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc)
+  : _grid(params.grid), _is_at_boundary(params.is_at_boundary),
+    _fd(fd), _fc(fc) {
 
   const auto& grid = params.grid;
 
-  SetFieldBC( _fieldBC, params, domain, params.fieldBC );
+  SetFieldBC( _fieldBC, params, params.fieldBC );
 
   _BfieldOld = vector_field_type(grid);
   _BfieldDelta = vector_field_type(grid);
@@ -110,10 +111,10 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
 
   _BfieldOld.copyFrom(Bfield);
 
-  _domain->SendGuardCells(_BfieldOld);
+  _fc.SendGuardCells(_BfieldOld);
 
   if (std::abs(_beta) > EPS) {
-    _fd.ComputeLaplacian(Bfield, _BfieldDelta, FieldType::BTYPE, _is_at_boundary.data(), *_domain, _d_start, _d_ext, true);
+    _fd.ComputeLaplacian(Bfield, _BfieldDelta, FieldType::BTYPE, _is_at_boundary.data(), _fc, _d_start, _d_ext, true);
 
     _BfieldDelta.multiplyBy(_alpha * _beta * dt * dt);
 
@@ -123,7 +124,7 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
     Bfield.addBy(_BfieldDelta);
   }
 
-  _domain->SendGuardCells(Efield);
+  _fc.SendGuardCells(Efield);
 
 
   // FIXME: using _isBdry_EJ as an expediency. Should use _domain->isBoundary().
@@ -152,23 +153,23 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
   _BfieldDelta.multiplyBy(_alpha * dt * dt);
   Bfield.addBy(_BfieldDelta);
 
-  _domain->SendGuardCells(Bfield);
+  _fc.SendGuardCells(Bfield);
 
   _BfieldDelta.copyFrom(Bfield);
 
   Scalar factor = dt * dt * _alpha * _alpha;
   for (int j = 0; j < 5; ++j) {
     _BfieldDelta.multiplyBy(factor);
-    _fd.ComputeLaplacian(_BfieldDelta, _BfieldDelta, FieldType::BTYPE, _is_at_boundary.data(), *_domain, _d_start, _d_ext, true);
+    _fd.ComputeLaplacian(_BfieldDelta, _BfieldDelta, FieldType::BTYPE, _is_at_boundary.data(), _fc, _d_start, _d_ext, true);
     // std::cout << "At iteration " << j << ": " << _BfieldDelta(0, 3, 257) << std::endl;
     // for (int i = 0; i < VECTOR_DIM; i++)
       // CleanField(_BfieldDelta.data(i), UPPER_LIMIT);
 
     Bfield.addBy(_BfieldDelta);
-    _domain->SendGuardCells(_BfieldDelta);
+    _fc.SendGuardCells(_BfieldDelta);
   }
 
-  _domain->SendGuardCells(Bfield);
+  _fc.SendGuardCells(Bfield);
 }
 
 void
@@ -179,7 +180,7 @@ FieldUpdater::ComputeBfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& Efield
   _BfieldDelta.multiplyBy(-1.0 * dt);
 
   Bfield.addBy(_BfieldDelta);
-  _domain->SendGuardCells(Bfield);
+  _fc.SendGuardCells(Bfield);
 }
 
 void
@@ -203,7 +204,7 @@ FieldUpdater::ComputeEfieldUpdate(Scalar dt, VectorField<Scalar>& Bfield, Vector
   for (int i = 0; i < VECTOR_DIM; i++)
     CleanField(Efield.data(i), UPPER_LIMIT);
 
-  _domain->SendGuardCells(Efield);
+  _fc.SendGuardCells(Efield);
 }
 
 void
@@ -218,7 +219,7 @@ FieldUpdater::ComputeEfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& Bfield
   for (int i = 0; i < VECTOR_DIM; i++)
     CleanField(Efield.data(i), UPPER_LIMIT);
 
-  _domain->SendGuardCells(Efield);
+  _fc.SendGuardCells(Efield);
 }
 
 void

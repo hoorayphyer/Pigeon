@@ -9,7 +9,7 @@
 //#define ORDER 4
 
 enum class CoordType;
-class Domain;
+class FieldCommunicator;
 class Scales;
 
 struct DiffParams
@@ -80,14 +80,11 @@ class FiniteDiff {
                    const Index& start, const Extent& ext);
 
   void ComputeLaplacian(const vector_field& input, vector_field& output, FieldType input_type,
-                        const bool isBoundary[], Domain& domain, bool skipDiv = false);
+                        const bool isBoundary[], FieldCommunicator& fc, bool skipDiv = false);
 
   void ComputeLaplacian(const vector_field& input, vector_field& output, FieldType input_type,
-                        const bool isBoundary[], Domain& domain,
+                        const bool isBoundary[], FieldCommunicator& fc,
                         const Index& start, const Extent& ext, bool skipDiv = false);
-
-  // void ComputeLaplacian(const scalar_field& input, scalar_field& output,
-  //                       StaggerType input_type, Domain& domain);
 
   array_type& get_scales(int n, int istag, int jstag, int kstag);
 

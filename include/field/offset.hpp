@@ -14,10 +14,19 @@ namespace field {
 
     template < typename T >
     constexpr operator T() noexcept { return static_cast<T>( 0.5 * _val ); }
+
+    constexpr bool operator== ( offset_t other ) const noexcept {
+      return _val == other._val;
+    }
+
+    constexpr bool operator!= ( offset_t other ) const noexcept {
+      return !( *this == other );
+    }
   };
 
-  constexpr offset_t INSITU{false}; // right on the grid point
-  constexpr offset_t MIDWAY{true}; // in the middle of an edge connecting two grid points
 }
+
+constexpr field::offset_t INSITU{false}; // right on the grid point
+constexpr field::offset_t MIDWAY{true}; // in the middle of an edge connecting two grid points
 
 #endif

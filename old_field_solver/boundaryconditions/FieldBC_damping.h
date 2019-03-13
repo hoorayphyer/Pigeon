@@ -2,6 +2,7 @@
 #define FIELDBC_DAMPING_H
 
 #include "FieldBC.h"
+#include <cmath>
 
 class FieldBC_damping : public FieldBC {
 private:
