@@ -17,12 +17,12 @@ namespace particle {
   // TODO this template parameter list is ugly. Maybe use Policy, for injection, for pair_creation?
   template < typename Real, int DGrid, int DPtc, typename state_t,
              knl::shape Shape, PairScheme pair_scheme,
-             knl::coordsys CS, species posion // posion = positron || ion in injection
+             knl::coordsys CS
              >
   class Updater {
   public:
     using DynaVars_t = DynamicVars<Real, DGrid, DPtc, state_t>;
-    using Params_t = Params<Real, DGrid>;
+    using Params_t = Params<Real>;
 
   private:
     using WJ_t = long double; // TODO

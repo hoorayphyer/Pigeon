@@ -1,6 +1,5 @@
 #include "parallel/mpi_communication.hpp"
 #include <type_traits>
-#include <experimental/type_traits> // for is_detected
 #include <mpi.h>
 
 namespace mpi {
@@ -26,24 +25,6 @@ namespace mpi {
   }
 }
 
-namespace mpi {
-  template <typename T>
-  using is_container_t = decltype( std::declval<T>().data()[  std::declval<T>().size() ] );
-
-  template <typename T>
-  constexpr bool is_container() {
-    return std::experimental::is_detected< is_container_t, T >::value;
-  }
-
-  template <typename T>
-  inline auto decay_buf( T&& buf ) {
-    if constexpr ( is_container<T>() )
-                   return std::make_tuple( buf.data(), buf.size(), datatype(buf.data()) );
-    else
-      return std::make_tuple( &buf, 1, datatype(&buf) );
-  }
-
-}
 namespace mpi {
   void request_free ( MPI_Request* p ) {
     if ( p && *p != MPI_REQUEST_NULL )
@@ -157,40 +138,35 @@ namespace mpi {
     MPI_Barrier( _comm() );
   }
 
-  constexpr auto mpi_op( ReduceOp op ) {
-    if ( ReduceOp::SUM == op ) return MPI_SUM;
-    if ( ReduceOp::MAX == op ) return MPI_MAX;
-    if ( ReduceOp::MAXLOC == op ) return MPI_MAXLOC;
+  constexpr auto mpi_op( by op ) {
+    if ( by::SUM == op ) return MPI_SUM;
+    if ( by::MAX == op ) return MPI_MAX;
+    if ( by::MAXLOC == op ) return MPI_MAXLOC;
   }
 
-  template < bool In_Place, typename T >
-  std::tuple< const void*, void* > find_out_reduce_buffers( void* buf, const T& buffer, reduce_return_t<T>& result, bool is_root ) {
+  template < typename Comm >
+  template < by Op, bool In_Place, typename T >
+  std::optional<std::vector<T>>
+  Collective_Comm<Comm>::reduce( T* buffer, int count, int root ) const {
+    std::optional<std::vector<T>> result;
+
     const void* send_buf = nullptr;
     void* recv_buf = nullptr;
 
-    if ( !is_root ) {
+    if ( _comm().rank() != root ) {
       send_buf = buf;
     } else {
       if constexpr( In_Place ) {
           send_buf = MPI_IN_PLACE;
-          recv_buf = buf;
+          recv_buf = buffer;
         } else {
-        send_buf = buf;
-        result.emplace( buffer ); // copy construct the recv_buf
-        recv_buf = std::get<0>( decay_buf( *result ) );
+        send_buf = buffer;
+        result.emplace(); // copy construct the recv_buf
+        (*result).resize(count);
+        (*result).shrink_to_fit();
+        recv_buf = (*result).data();
       }
     }
-
-    return std::make_tuple( send_buf, recv_buf );
-  }
-
-  template < typename Comm >
-  template < bool In_Place, ReduceOp op, typename T>
-  reduce_return_t<T> Collective_Comm<Comm>::reduce( T& buffer, int root ) const {
-    reduce_return_t<T> result;
-
-    auto[ buf, count, datatype ] = decay_buf( std::forward<T>(buffer) );
-    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, _comm().rank() == root );
 
     MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm() );
 
@@ -198,12 +174,27 @@ namespace mpi {
   }
 
   template < typename Comm >
-  template < bool In_Place, ReduceOp op, typename T>
+  template < by Op, bool In_Place, typename T >
   std::tuple<Request, reduce_return_t<T> > Collective_Comm<Comm>::Ireduce( T& buffer, int root ) const {
-    reduce_return_t<T> result;
+    std::optional<std::vector<T>> result;
 
-    auto[ buf, count, datatype ] = decay_buf( std::forward<T>(buffer) );
-    auto[ send_buf, recv_buf ] = find_out_reduce_buffers<In_Place>( buf, buffer, result, _comm().rank() == root );
+    const void* send_buf = nullptr;
+    void* recv_buf = nullptr;
+
+    if ( _comm().rank() != root ) {
+      send_buf = buf;
+    } else {
+      if constexpr( In_Place ) {
+          send_buf = MPI_IN_PLACE;
+          recv_buf = buffer;
+        } else {
+        send_buf = buffer;
+        result.emplace(); // copy construct the recv_buf
+        (*result).resize(count);
+        (*result).shrink_to_fit();
+        recv_buf = (*result).data();
+      }
+    }
 
     Request req;
     MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm(), req );
@@ -211,20 +202,33 @@ namespace mpi {
     return std::make_tuple( req, result );
   }
 
+  template < bool In_Place, ReduceOp Op, typename T >
+  std::tuple< Request, std::optional<std::vector<T> > >
+  Ireduce( T* buffer, int count, int root ) const;
+
   template < typename Comm>
   template < typename T >
-  void Collective_Comm<Comm>::broadcast( T& buffer, int root ) const {
-    auto[ buf, count, datatype ] = decay_buf(buffer);
-    MPI_Bcast( buf, count, datatype, root, _comm() );
+  void Collective_Comm<Comm>::broadcast( int root, T* buffer, int count ) const {
+    MPI_Bcast( buffer, count, datatype<T>(), root, _comm() );
   }
 
 
   template < typename Comm>
   template < typename T >
-  Request Collective_Comm<Comm>::Ibroadcast( T& buffer, int root ) const {
+  Request Collective_Comm<Comm>::Ibroadcast( int root, T* buffer, int count ) const {
     Request req;
-    auto[ buf, count, datatype ] = decay_buf(buffer);
-    MPI_Ibcast( buf, count, datatype, root, _comm(), req );
+    MPI_Ibcast( buffer, count, datatype<T>(), root, _comm(), req );
     return req;
+  }
+
+
+  template < typename Comm>
+  template < typename T >
+  std::vector<T> Collective_Comm<Comm>::allgather( const T* send_buf, int send_count ) const {
+    std::vector<T> recv( send_count * _comm().size() ); // CLAIM: also works with intercomm
+    recv.shrink_to_fit();
+    MPI_Allgather( send_buf, send_count, datatype<T>(), recv.data(), recv.size(), datatype<T>(), _comm() );
+    return recv;
+
   }
 }

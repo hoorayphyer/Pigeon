@@ -66,10 +66,9 @@ namespace mpi {
 
 
 namespace mpi {
-  enum class ReduceOp : char { SUM = 0, MAX, MAXLOC};
+  enum class by : char { SUM = 0, MAX, MAXLOC};
 
-  template < typename T >
-  using reduce_return_t = std::optional< typename std::remove_cv<typename std::remove_reference<T>::type>::type >;
+  constexpr bool INPLACE = true;
 
   template < typename Comm >
   struct Collective_Comm {
@@ -81,34 +80,22 @@ namespace mpi {
   public:
     void barrier() const;
 
-    template < bool In_Place, ReduceOp Op, typename T_or_Container>
-    reduce_return_t<T_or_Container> reduce( T_or_Container& buffer, int root ) const;
-    template < bool In_Place, ReduceOp Op, typename T_or_Container>
-    std::tuple< Request, reduce_return_t<T_or_Container> > Ireduce( T_or_Container& buffer, int root ) const;
+    template < by Op, bool In_Place = false, typename T >
+    std::optional<std::vector<T>>
+    reduce( T* buffer, int count, int root ) const;
 
-    template < typename T_or_Container >
-    void broadcast( T_or_Container& buffer, int root ) const;
-    template < typename T_or_Container >
-    Request Ibroadcast( T_or_Container& buffer, int root ) const;
+    template < by Op, bool In_Place = false, typename T >
+    std::tuple< Request, std::optional<std::vector<T> > >
+    Ireduce( T* buffer, int count, int root ) const;
 
+    template < typename T >
+    void broadcast( int root, T* buffer, int count ) const;
 
-    // // recvcount refers to counts of recved data from one single process, rather
-    // // than the total counts from all processes.
-    // // supports passing in MPI_IN_PLACE as the send_buf at root
-    // // use RecvTypePtr to allow use of nullptr at non-root processes
-    // template <typename SendType, typename RecvTypePtr>
-    // void gather( const SendType* send_buf, int sendcount, RecvTypePtr recv_buf, int recvcount, int root ) const;
+    template < typename T >
+    Request Ibroadcast( int root, T* buffer, int count ) const;
 
-    // template <typename SendType, typename RecvTypePtr>
-    // MPI_Request Igather( const SendType* send_buf, int sendcount, RecvTypePtr recv_buf, int recvcount, int root ) const;
-
-    // // variable gather
-    // template <typename SendType, typename RecvTypePtr>
-    // void gatherv( const SendType* send_buf, int sendcount, RecvTypePtr recv_buf, const int* recvcounts, const int* displs, int root ) const;
-
-    // template <typename SendType, typename RecvTypePtr>
-    // MPI_Request Igatherv( const SendType* send_buf, int sendcount, RecvTypePtr recv_buf, const int* recvcounts, const int* displs, int root ) const;
-
+    template < typename T >
+    std::vector<T> allgather( const T* send_buf, int send_count ) const;
   };
 
 }
