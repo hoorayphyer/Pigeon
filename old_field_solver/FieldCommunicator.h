@@ -39,7 +39,7 @@ private:
   }
 
 public:
-  MPICartComm( const MPI_Comm comm ) : _comm(comm) {}
+  MPICartComm( MPI_Comm comm ) : _comm(comm) {}
 
   template <typename T>
   MPI_Request Isend(int dest_rank, int tag, const T* values, int n ) const {
@@ -88,7 +88,7 @@ public:
 class FieldCommunicator {
   typedef MultiArray<Scalar> array_type;
 
-  const MPICartComm& _comm;
+  MPICartComm _comm;
   const FUParams& _params;
 
   std::array<array_type, 3> _bufferFieldRecv; ///< Receive buffer for field guard cell exchange
@@ -192,7 +192,7 @@ class FieldCommunicator {
   }
 
 public:
-  FieldCommunicator(const MPI_Comm& comm, const FUParams& params )
+  FieldCommunicator(MPI_Comm comm, const FUParams& params )
     : _comm(comm), _params(params) {
 
     const auto& grid = params.grid;

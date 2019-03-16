@@ -59,7 +59,6 @@ test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
 mpi_test_gen(parallel mpi++) # TODO larger tests
-mpi_test_gen(parallel locale)
 
 test_gen(field field_shape_interplay)
 
@@ -76,3 +75,5 @@ test_gen(particle array)
 test_gen(particle pusher)
 # mpi_test_gen(particle migration) # TODO
 # test_gen(particle pair_producer)
+
+mpi_test_gen(aperture ensemble)

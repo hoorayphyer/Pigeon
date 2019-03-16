@@ -4,6 +4,7 @@
 #include "particle/particle_expression.hpp"
 #include "apt/foreach.hpp"
 #include "apt/array.hpp"
+#include "parallel/mpi_datatype.hpp"
 
 namespace particle {
   // for communication
@@ -40,5 +41,16 @@ namespace particle {
 
   };
 }
+
+namespace mpi {
+  extern MPI_Datatype MPI_CPARTICLE;
+
+  template < typename T, int DPtc, typename state_t >
+  constexpr MPI_Datatype datatype( const particle::cParticle<T,DPtc,state_t>* ) noexcept {
+    return MPI_CPARTICLE;
+  }
+
+}
+
 
 #endif

@@ -1,21 +1,11 @@
 #ifndef  _MPI_COMMUNICATION_HPP_
 #define  _MPI_COMMUNICATION_HPP_
 
+#include "parallel/mpi_datatype.hpp"
 #include "apt/handle.hpp"
 #include <mpi.h>
 #include <optional>
 #include <vector>
-
-namespace mpi {
-  template <typename Type>
-  MPI_Datatype datatype(Type* = nullptr) noexcept;
-
-  template <typename T>
-  MPI_Datatype datatype(const T&) noexcept {
-    return datatype((T*)0);
-  }
-
-}
 
 namespace mpi {
   void request_free ( MPI_Request* p );
@@ -70,7 +60,7 @@ namespace mpi {
 
   constexpr bool INPLACE = true;
 
-  template < typename Comm >
+  template < typename Comm, bool Inter = false >
   struct Collective_Comm {
   private:
     inline MPI_Comm _comm() const {
@@ -84,9 +74,10 @@ namespace mpi {
     std::optional<std::vector<T>>
     reduce( T* buffer, int count, int root ) const;
 
-    template < by Op, bool In_Place = false, typename T >
-    std::tuple< Request, std::optional<std::vector<T> > >
-    Ireduce( T* buffer, int count, int root ) const;
+    // TODO fix this. Returning optional on nonblocking call may not make sense
+    // template < by Op, bool In_Place = false, typename T >
+    // std::tuple< Request, std::optional<std::vector<T> > >
+    // Ireduce( T* buffer, int count, int root ) const;
 
     template < typename T >
     void broadcast( int root, T* buffer, int count ) const;
@@ -96,6 +87,10 @@ namespace mpi {
 
     template < typename T >
     std::vector<T> allgather( const T* send_buf, int send_count ) const;
+
+    // scatter for intra_comm is assumed to be in_place. This means in any case, root will not send anything to itself
+    template < typename T >
+    void scatter( int root, T* buffer, int count ) const;
   };
 
 }

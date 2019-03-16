@@ -1,29 +1,5 @@
 #include "parallel/mpi_communication.hpp"
 #include <type_traits>
-#include <mpi.h>
-
-namespace mpi {
-  template <typename Type>
-  MPI_Datatype datatype(Type*) noexcept {
-    using T = std::remove_const_t<Type>;
-    if constexpr ( std::is_same_v<T, char> ) return MPI_CHAR;
-    else if ( std::is_same_v<T, short> ) return MPI_SHORT;
-    else if ( std::is_same_v<T, int> ) return MPI_INT;
-    else if ( std::is_same_v<T, long> ) return MPI_LONG;
-
-    else if ( std::is_same_v<T, unsigned char> ) return MPI_UNSIGNED_CHAR;
-    else if ( std::is_same_v<T, unsigned short> ) return MPI_UNSIGNED_SHORT;
-    else if ( std::is_same_v<T, unsigned int> ) return MPI_UNSIGNED;
-    else if ( std::is_same_v<T, unsigned long> ) return MPI_UNSIGNED_LONG;
-
-    else if ( std::is_same_v<T, float> ) return MPI_FLOAT;
-    else if ( std::is_same_v<T, double> ) return MPI_DOUBLE;
-
-    else if ( std::is_same_v<T, long double> ) return MPI_LONG_DOUBLE;
-    else if ( std::is_same_v<T, bool> ) return MPI_CXX_BOOL;
-    else return MPI_DATATYPE_NULL;
-  }
-}
 
 namespace mpi {
   void request_free ( MPI_Request* p ) {
@@ -133,8 +109,8 @@ namespace mpi {
 }
 
 namespace mpi {
-  template < typename Comm >
-  void Collective_Comm<Comm>::barrier() const {
+  template < typename Comm ,bool Inter >
+  void Collective_Comm<Comm, Inter>::barrier() const {
     MPI_Barrier( _comm() );
   }
 
@@ -144,17 +120,18 @@ namespace mpi {
     if ( by::MAXLOC == op ) return MPI_MAXLOC;
   }
 
-  template < typename Comm >
+  template < typename Comm, bool Inter >
   template < by Op, bool In_Place, typename T >
   std::optional<std::vector<T>>
-  Collective_Comm<Comm>::reduce( T* buffer, int count, int root ) const {
+  Collective_Comm<Comm, Inter>::reduce( T* buffer, int count, int root ) const {
+    static_assert( !Inter );
     std::optional<std::vector<T>> result;
 
     const void* send_buf = nullptr;
     void* recv_buf = nullptr;
 
     if ( _comm().rank() != root ) {
-      send_buf = buf;
+      send_buf = buffer;
     } else {
       if constexpr( In_Place ) {
           send_buf = MPI_IN_PLACE;
@@ -168,67 +145,97 @@ namespace mpi {
       }
     }
 
-    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm() );
+    MPI_Reduce( send_buf, recv_buf, count, datatype, mpi_op(Op), root, _comm() );
 
     return result;
   }
 
-  template < typename Comm >
-  template < by Op, bool In_Place, typename T >
-  std::tuple<Request, reduce_return_t<T> > Collective_Comm<Comm>::Ireduce( T& buffer, int root ) const {
-    std::optional<std::vector<T>> result;
+  // template < typename Comm, bool Inter >
+  // template < by Op, bool In_Place, typename T >
+  // std::tuple< Request, std::optional<std::vector<T> > >
+  // Collective_Comm<Comm,Inter>::Ireduce( T& buffer, int root ) const {
+  //   static_assert( !Inter );
+  //   std::optional<std::vector<T>> result;
 
-    const void* send_buf = nullptr;
-    void* recv_buf = nullptr;
+  //   const void* send_buf = nullptr;
+  //   void* recv_buf = nullptr;
 
-    if ( _comm().rank() != root ) {
-      send_buf = buf;
-    } else {
-      if constexpr( In_Place ) {
-          send_buf = MPI_IN_PLACE;
-          recv_buf = buffer;
-        } else {
-        send_buf = buffer;
-        result.emplace(); // copy construct the recv_buf
-        (*result).resize(count);
-        (*result).shrink_to_fit();
-        recv_buf = (*result).data();
-      }
-    }
+  //   if ( _comm().rank() != root ) {
+  //     send_buf = buf;
+  //   } else {
+  //     if constexpr( In_Place ) {
+  //         send_buf = MPI_IN_PLACE;
+  //         recv_buf = buffer;
+  //       } else {
+  //       send_buf = buffer;
+  //       result.emplace(); // copy construct the recv_buf
+  //       (*result).resize(count);
+  //       (*result).shrink_to_fit();
+  //       recv_buf = (*result).data();
+  //     }
+  //   }
 
-    Request req;
-    MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm(), req );
+  //   Request req;
+  //   MPI_Ireduce( send_buf, recv_buf, count, datatype, mpi_op(op), root, _comm(), req );
 
-    return std::make_tuple( req, result );
-  }
+  //   return std::make_tuple( req, result );
+  // }
 
-  template < bool In_Place, ReduceOp Op, typename T >
-  std::tuple< Request, std::optional<std::vector<T> > >
-  Ireduce( T* buffer, int count, int root ) const;
-
-  template < typename Comm>
+  template < typename Comm, bool Inter>
   template < typename T >
-  void Collective_Comm<Comm>::broadcast( int root, T* buffer, int count ) const {
+  void Collective_Comm<Comm, Inter>::broadcast( int root, T* buffer, int count ) const {
+    static_assert( !Inter );
     MPI_Bcast( buffer, count, datatype<T>(), root, _comm() );
   }
 
 
-  template < typename Comm>
+  template < typename Comm, bool Inter >
   template < typename T >
-  Request Collective_Comm<Comm>::Ibroadcast( int root, T* buffer, int count ) const {
+  Request Collective_Comm<Comm, Inter>::Ibroadcast( int root, T* buffer, int count ) const {
+    static_assert( !Inter );
     Request req;
     MPI_Ibcast( buffer, count, datatype<T>(), root, _comm(), req );
     return req;
   }
 
 
-  template < typename Comm>
+  template < typename Comm, bool Inter >
   template < typename T >
-  std::vector<T> Collective_Comm<Comm>::allgather( const T* send_buf, int send_count ) const {
+  std::vector<T> Collective_Comm<Comm, Inter>::allgather( const T* send_buf, int send_count ) const {
     std::vector<T> recv( send_count * _comm().size() ); // CLAIM: also works with intercomm
     recv.shrink_to_fit();
     MPI_Allgather( send_buf, send_count, datatype<T>(), recv.data(), recv.size(), datatype<T>(), _comm() );
     return recv;
 
+  }
+
+  template < typename Comm, bool Inter>
+  template < typename T >
+  void Collective_Comm<Comm, Inter>::scatter( int root, T* buffer, int count ) const {
+    void* sendbuf = nullptr;
+    void* recvbuf = nullptr;
+    int sendcount = 0, recvcount = 0;
+    if constexpr ( Inter ) {
+        if ( MPI_ROOT == root ) {
+          sendbuf = buffer;
+          sendcount = count;
+        }
+        else if ( MPI_PROC_NULL == root );
+        else {
+          recvbuf = buffer;
+          recvcount = count;
+        }
+      } else {
+      if ( _comm().rank() == root ) {
+        sendbuf = buffer;
+        sendcount = count;
+        recvbuf = MPI_IN_PLACE;
+      } else {
+        recvbuf = buffer;
+        recvcount = count;
+      }
+    }
+
+    MPI_Scatter(sendbuf, sendcount, datatype<T>(), recvbuf, recvcount, datatype<T>(), root, _comm() );
   }
 }

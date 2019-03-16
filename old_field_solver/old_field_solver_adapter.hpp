@@ -3,32 +3,33 @@
 
 #include "parameters.hpp"
 #include "field/field.hpp"
-#include <mpi.h>
+#include <optional>
 
-namespace parallel { template < int > struct Locale; }
 namespace mpi { struct CartComm; }
 
 namespace ofs {
   // only applicable in 2D log spherical
+  template < int DGrid = 2 >
   struct OldFieldUpdater {
+    static_assert( DGrid == 2 );
   private:
-    const mpi::CartComm& _comm;
+    const mpi::CartComm& _cart;
 
   public:
-    static constexpr int DGrid = 2;
     using field_type = field::Field<double,3,DGrid>;
 
     OldFieldUpdater( const Params<double>& params,
-                     const mpi::CartComm& comm,
+                     const mpi::CartComm& cart,
                      const knl::Grid<double,DGrid>& local_grid,
-                     const parallel::Locale<DGrid>& locale,
+                     apt::array< apt::pair<bool>, DGrid > is_at_boundary,
+                     apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks,
                      int guard
                      );
 
     void operator() ( field_type& E,
                       field_type& B,
                       const field_type& J,
-                      field_type::element_type dt, int timestep );
+                      typename field_type::element_type dt, int timestep );
   };
 }
 

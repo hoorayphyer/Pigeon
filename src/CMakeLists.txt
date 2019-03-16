@@ -37,7 +37,7 @@ macro(module_gen category name)
   unset(module_target)
 endmacro()
 
-add_library(mpipp_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp")
+add_library(mpipp_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp" "parallel/mpi_datatype.cpp")
 target_include_directories(mpipp_lib PUBLIC ${MPI_INCLUDE_PATH})
 target_link_libraries(mpipp_lib PRIVATE ${MPI_LIBRARIES})
 set_target_properties(mpipp_lib PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
@@ -56,7 +56,6 @@ macro(mpi_module_gen category name)
 endmacro()
 
 
-mpi_module_gen(parallel locale)
 
 add_library(silo_lib STATIC "io/silo++.cpp" "io/silo_optlist.cpp" "io/silo_operations.cpp")
 target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} )
@@ -75,6 +74,7 @@ module_gen(particle array)
 add_library(particle_updater STATIC "particle/updater.cpp")
 target_link_libraries(particle_updater PRIVATE ${particle_modules})
 
+mpi_module_gen(aperture ensemble)
 
 # TODO now src are scattered
 # # modify Aperture_src using

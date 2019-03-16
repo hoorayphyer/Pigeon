@@ -85,7 +85,6 @@ namespace particle {
     void erase( int from, int to );
 
     void resize(std::size_t size);
-
   };
 
 

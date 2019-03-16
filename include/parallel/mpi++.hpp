@@ -20,6 +20,11 @@ namespace mpi {
 
     std::vector<int> translate( const std::vector<int>& ranks, const Group& target ) const;
 
+    int translate( int rank, const Group& target ) const;
+
+    // translate all members in this group to the target group
+    std::vector<int> translate_all( const Group& target ) const;
+
     int rank() const;
     int size() const;
   };
@@ -56,8 +61,10 @@ namespace mpi {
     Comm () = default;
     // Comm ( const Comm& super_comm, const Group& sub_group ); // TODO what if sub_group is empty?
 
+
+
     std::optional<Comm> split ( const Group& sub_group ) const;
-    std::optional<Comm> split ( int color, int key ) const;
+    std::optional<Comm> split ( std::optional<unsigned int> color, int key ) const;
   };
 
 }
@@ -73,6 +80,9 @@ namespace mpi {
       return rank2coords( rank());
     }
 
+    std::tuple<std::vector<int>, std::vector<int>>
+    coords_dims() const;
+
     int linear_coord() const;
 
     apt::pair<std::optional<int>> shift(int direction, int disp = 1 ) const;
@@ -81,8 +91,15 @@ namespace mpi {
 }
 
 namespace mpi {
-  struct InterComm : public Comm {
+  struct InterComm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
+                     public CommAccessor<Comm>,
+                     public P2P_Comm<Comm>,
+                     public Collective_Comm<Comm,true> {
     InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag );
+
+    // when peer_comm is known to all
+    InterComm( const Comm& local_comm, int local_leader, const Comm& peer_comm, int remote_leader, int tag );
+
     int remote_size() const;
     Group remote_group() const;
   };

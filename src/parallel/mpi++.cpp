@@ -90,6 +90,18 @@ namespace mpi {
     return results;
   }
 
+  int Group::translate( int rank, const Group& target ) const {
+    int res;
+    MPI_Group_translate_ranks( *this, 1, &rank, target, &res );
+    return res;
+  }
+
+  std::vector<int> Group::translate_all( const Group& target ) const {
+    std::vector<int> ranks( size() );
+    for ( int i = 0; i < size(); ++i ) ranks[i] = i;
+    return translate( ranks, target );
+  }
+
   int Group::rank() const {
     int rank;
     MPI_Group_rank(*this, &rank);
@@ -174,10 +186,10 @@ namespace mpi {
     return res;
   }
 
-  std::optional<Comm> Comm::split ( int color, int key ) const {
+  std::optional<Comm> Comm::split ( std::optional<unsigned int> color, int key ) const {
     std::optional<Comm> res;
     auto* comm = new MPI_Comm;
-    MPI_Comm_split(*this, color, key, comm );
+    MPI_Comm_split(*this, color ? *color : MPI_UNDEFINED, key, comm );
     if ( *comm != MPI_COMM_NULL ) {
       res.emplace();
       res->reset(comm);
@@ -216,22 +228,25 @@ namespace mpi {
     return rank;
   }
 
-  int CartComm::linear_coord() const {
-    int result = 0;
-
+  std::tuple<std::vector<int>, std::vector<int>>
+  CartComm::coords_dims () const {
     int ndims = 0;
     MPI_Cartdim_get( *this, &ndims );
-    std::vector<int> strides(ndims+1);
-    strides[0] = 1;
-    std::vector<int> periods (ndims);
     std::vector<int> coords (ndims);
-    MPI_Cart_get( *this, ndims, strides.data()+1, periods.data(), coords.data() );
+    std::vector<int> dims(ndims);
+    std::vector<int> is_per (ndims);
+    MPI_Cart_get( *this, ndims, dims.data(), is_per.data(), coords.data() );
+    return make_tuple( coords, dims );
+  }
 
-    for ( int i = 1; i < ndims + 1; ++i )
-      strides[i] *= strides[i-1];
-
-    for ( int i = 0; i < ndims; ++i )
-      result += coords[i] * strides[i];
+  int CartComm::linear_coord() const {
+    int result = 0;
+    auto [coords, dims] = coords_dims();
+    result = coords[0];
+    for ( int i = 1; i < coords.size(); ++i ) {
+      result += coords[i] * dims[i-1];
+      dims[i] *= dims[i-1];
+    }
 
     return result;
   }
@@ -253,6 +268,12 @@ namespace mpi {
     auto* comm = new MPI_Comm;
     auto pc = ( local_comm.rank() == local_leader ) ? (*peer_comm) : MPI_COMM_NULL;
     MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, comm );
+    reset( comm );
+  }
+
+  InterComm::InterComm( const Comm& local_comm, int local_leader, const mpi::Comm& peer_comm, int remote_leader, int tag ) {
+    auto* comm = new MPI_Comm;
+    MPI_Intercomm_create( local_comm, local_leader, peer_comm, remote_leader, tag, comm );
     reset( comm );
   }
 

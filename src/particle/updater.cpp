@@ -113,7 +113,7 @@ namespace particle {
 
     migrate( _migrators, _intercomms, borders, timestep );
     for ( auto&& ptc : _migrators ) {
-      dvars[ptc.template get<species>()].push_back( std::move(ptc) ); // TODO check this
+      dvars.particles[ptc.template get<species>()].push_back( std::move(ptc) ); // TODO check this
     }
     _migrators.resize(0);
 

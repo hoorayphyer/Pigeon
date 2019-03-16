@@ -2,12 +2,13 @@
 
 #include "field/field.hpp"
 #include "field/communication.hpp"
-#include "parallel/locale.hpp"
 
 #include "FieldUpdater.h"
 #include "FieldCommunicator.h"
 #include "FiniteDiff.h"
 #include "CoordSystem.h"
+
+#include "parallel/mpi++.hpp"
 #include <cmath>
 #include <memory>
 
@@ -93,18 +94,21 @@ namespace ofs {
     }
   }
 
-  OldFieldUpdater::OldFieldUpdater( const Params<double>& params,
-                                    const mpi::CartComm& comm,
-                                    const knl::Grid<double,DGrid>& local_grid,
-                                    const parallel::Locale<DGrid>& locale,
-                                    int guard
-                                    ) : _comm(comm) {
+  template < int DGrid >
+  OldFieldUpdater<DGrid>::OldFieldUpdater( const Params<double>& params,
+                                           const mpi::CartComm& cart,
+                                           const knl::Grid<double,DGrid>& local_grid,
+                                           apt::array< apt::pair<bool>, DGrid > is_at_boundary,
+                                           apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks,
+                                           int guard
+                                           ) : _cart(cart) {
     fuparams.dt = params.dt;
     for ( int i = 0; i < DGrid; ++i ) {
-      fuparams.is_at_boundary[2*i] = locale.is_at_boundary[i][LFT];
-      fuparams.is_at_boundary[2*i + 1] = locale.is_at_boundary[i][RGT];
-      fuparams.neighbor_left[i] = locale.neighbors[i][LFT] ? *(locale.neighbors[i][LFT]) : NEIGHBOR_NULL;
-      fuparams.neighbor_right[i] = locale.neighbors[i][RGT] ? *(locale.neighbors[i][RGT]) : NEIGHBOR_NULL;
+      fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
+      fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
+      const auto& neighs = neigh_cart_ranks[i];
+      fuparams.neighbor_left[i] = neighs[LFT] ? *(neighs[LFT]) : NEIGHBOR_NULL;
+      fuparams.neighbor_right[i] = neighs[RGT] ? *(neighs[RGT]) : NEIGHBOR_NULL;
     }
     for ( int i = DGrid; i < 3; ++i ) {
       fuparams.is_at_boundary[2*i] = true;
@@ -139,15 +143,16 @@ namespace ofs {
     }
 
     // create FieldUpdater
-    fc.reset( new FieldCommunicator( comm, fuparams ) );
+    fc.reset( new FieldCommunicator( cart, fuparams ) );
     fd.reset( new FiniteDiff(CoordType::LOG_SPHERICAL, fuparams.grid) );
     fu.reset( new FieldUpdater( fuparams, *fd, *fc ) );
   }
 
-  void OldFieldUpdater::operator() ( field_type& E,
-                                     field_type& B,
-                                     const field_type& J,
-                                     field_type::element_type dt, int timestep ) {
+  template < int DGrid >
+  void OldFieldUpdater<DGrid>::operator() ( field_type& E,
+                                            field_type& B,
+                                            const field_type& J,
+                                            typename field_type::element_type dt, int timestep ) {
     // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,
@@ -197,12 +202,15 @@ namespace ofs {
                                          i + g[0] - (o[0] == INSITU),
                                          j + g[1] - (o[1] == INSITU)
                                          );
-
-                field::sync_guard_cells_from_bulk( new_f, _comm );
+                field::sync_guard_cells_from_bulk( new_f, _cart );
               }}}
         };
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
     }
   }
+}
+
+namespace ofs {
+  template struct OldFieldUpdater<>;
 }

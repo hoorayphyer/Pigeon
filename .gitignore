@@ -37,6 +37,7 @@
 !src/CMakeLists.txt
 !src/**/*.cpp
 !src/aperture/
+!src/aperture/*.hpp
 !src/aperture/*.cpp
 !src/utility/
 !src/utility/*.cpp
@@ -54,6 +55,8 @@
 !tests/catch_main.cpp
 !tests/apt
 !tests/apt/*
+!tests/aperture
+!tests/aperture/*.cpp
 !tests/utility/
 !tests/utility/*.cpp
 !tests/io

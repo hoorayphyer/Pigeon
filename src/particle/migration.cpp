@@ -1,51 +1,7 @@
 #include "particle/migration.hpp"
-#include "parallel/mpi++.hpp"
 #include "apt/type_traits.hpp"
+#include "parallel/mpi++.hpp"
 #include <memory>
-
-namespace mpi {
-  template < typename Ptc >
-  MPI_Datatype datatype_for_cParticle() {
-    using T = typename Ptc::vec_type::value_type;
-    constexpr int DPtc = apt::ndim_v<Ptc>;
-    using state_t = typename Ptc::state_type;
-
-    std::vector< Ptc > ptcs(2);
-    constexpr int numBlocks = 3;
-    MPI_Datatype type[numBlocks] = { datatype<T>(), datatype<T>(), datatype<state_t>() };
-    int blocklen[numBlocks] = { DPtc, DPtc, 1 };
-    MPI_Aint disp[numBlocks];
-
-    MPI_Get_address( &(ptcs[0].q()), disp );
-    MPI_Get_address( &(ptcs[0].p()), disp+1 );
-    MPI_Get_address( &(ptcs[0].state()), disp+2 );
-
-    auto base = disp[0];
-    for ( int i = 0; i < numBlocks; ++i )
-      disp[i] = MPI_Aint_diff( disp[i], base );
-
-    // first create a tmp type
-    MPI_Datatype mdt_tmp;
-    MPI_Type_create_struct( numBlocks, blocklen, disp, type, &mdt_tmp );
-    // adjust in case of mysterious compiler padding
-    MPI_Aint sizeofentry;
-    MPI_Get_address( ptcs.data() + 1, &sizeofentry );
-    sizeofentry = MPI_Aint_diff(sizeofentry, base);
-
-    MPI_Datatype mdt_ptc;
-    MPI_Type_create_resized(mdt_tmp, 0, sizeofentry, &mdt_ptc);
-    return mdt_ptc;
-  }
-
-  namespace { MPI_Datatype MPI_CPARTICLE = MPI_DATATYPE_NULL; }
-
-  template < typename T, int DPtc, typename state_t >
-  constexpr MPI_Datatype datatype( const particle::cParticle<T,DPtc,state_t>* ) noexcept {
-    return MPI_CPARTICLE;
-  }
-
-}
-
 
 namespace particle :: impl {
 
@@ -182,12 +138,7 @@ namespace particle {
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  const apt::array< apt::pair<T>, DGrid >& borders,
                  unsigned int pairing_shift ) {
-    if ( mpi::MPI_CPARTICLE == MPI_DATATYPE_NULL )
-      mpi::MPI_CPARTICLE = mpi::datatype_for_cParticle<cParticle<T,DPtc,state_t>>();
-
-    MPI_Type_commit(&mpi::MPI_CPARTICLE);
     impl::migrate<DGrid-1>( buffer, intercomms, borders, pairing_shift );
-    MPI_Type_free( &mpi::MPI_CPARTICLE );
   }
 
 }

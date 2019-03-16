@@ -11,7 +11,7 @@ namespace apt {
   private:
     using shared_ptr = std::shared_ptr<RawHdl>;
     shared_ptr _ptr;
-    const RawHdl _default = Default();
+    RawHdl _default = Default();
     RawHdl _fallback = Default();
 
   public:

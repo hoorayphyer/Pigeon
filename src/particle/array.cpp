@@ -36,8 +36,14 @@ namespace particle {
 
   template < typename T, int DPtc, typename state_t >
   void array<T, DPtc, state_t>::resize(std::size_t size) {
-    for ( auto& x : _q ) x.resize( size );
-    for ( auto& x : _p ) x.resize( size );
-    _state.resize(size);
+    const auto old_size = _state.size();
+    for ( auto& x : _q ) x.resize( size, {} );
+    for ( auto& x : _p ) x.resize( size, {} );
+    _state.resize(size, {});
+    // flag padded particles as empty
+    for ( auto i = old_size; i < size; ++i ) {
+      (*this)[i].state().set(flag::empty);
+    }
+
   }
 }

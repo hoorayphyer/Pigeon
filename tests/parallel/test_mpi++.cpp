@@ -1,5 +1,6 @@
-#include "parallel/mpi++.cpp"
+#include "parallel/mpi_datatype.cpp"
 #include "parallel/mpi_communication.cpp"
+#include "parallel/mpi++.cpp"
 #include "catch2/catch.hpp"
 
 using namespace mpi;
