@@ -10,11 +10,13 @@ namespace mpi {
     else if ( std::is_same_v<T, short> ) return MPI_SHORT;
     else if ( std::is_same_v<T, int> ) return MPI_INT;
     else if ( std::is_same_v<T, long> ) return MPI_LONG;
+    else if ( std::is_same_v<T, long long int> ) return MPI_LONG_LONG_INT;
 
     else if ( std::is_same_v<T, unsigned char> ) return MPI_UNSIGNED_CHAR;
     else if ( std::is_same_v<T, unsigned short> ) return MPI_UNSIGNED_SHORT;
     else if ( std::is_same_v<T, unsigned int> ) return MPI_UNSIGNED;
     else if ( std::is_same_v<T, unsigned long> ) return MPI_UNSIGNED_LONG;
+    else if ( std::is_same_v<T, unsigned long long int> ) return MPI_UNSIGNED_LONG_LONG;
 
     else if ( std::is_same_v<T, float> ) return MPI_FLOAT;
     else if ( std::is_same_v<T, double> ) return MPI_DOUBLE;

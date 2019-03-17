@@ -77,3 +77,4 @@ test_gen(particle pusher)
 # test_gen(particle pair_producer)
 
 mpi_test_gen(aperture ensemble)
+mpi_test_gen(aperture dynamic_balance)

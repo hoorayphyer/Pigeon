@@ -58,7 +58,7 @@ namespace mpi {
 namespace mpi {
   enum class by : char { SUM = 0, MAX, MAXLOC};
 
-  constexpr bool INPLACE = true;
+  constexpr bool IN_PLACE = true;
 
   template < typename Comm, bool Inter = false >
   struct Collective_Comm {
