@@ -184,7 +184,6 @@ namespace mpi {
   template < typename Comm, bool Inter>
   template < typename T >
   void Collective_Comm<Comm, Inter>::broadcast( int root, T* buffer, int count ) const {
-    static_assert( !Inter );
     MPI_Bcast( buffer, count, datatype<T>(), root, _comm() );
   }
 
@@ -192,7 +191,6 @@ namespace mpi {
   template < typename Comm, bool Inter >
   template < typename T >
   Request Collective_Comm<Comm, Inter>::Ibroadcast( int root, T* buffer, int count ) const {
-    static_assert( !Inter );
     Request req;
     MPI_Ibcast( buffer, count, datatype<T>(), root, _comm(), req );
     return req;

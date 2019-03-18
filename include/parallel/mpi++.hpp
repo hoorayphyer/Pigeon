@@ -92,9 +92,9 @@ namespace mpi {
 
 namespace mpi {
   struct InterComm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
-                     public CommAccessor<Comm>,
-                     public P2P_Comm<Comm>,
-                     public Collective_Comm<Comm,true> {
+                     public CommAccessor<InterComm>,
+                     public P2P_Comm<InterComm>,
+                     public Collective_Comm<InterComm,true> {
     InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag );
 
     // when peer_comm is known to all

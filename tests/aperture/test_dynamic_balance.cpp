@@ -38,12 +38,12 @@ SCENARIO("Test get_proc_surplus", "[aperture]") {
     //                               679201 , 71 };
     unsigned int tot_nprocs_old = 0;
     load_t tot_load = 0;
-    load_t avld_min_old = 1000*1000*1000*1000; // should be enough
+    load_t avld_min_old = 1000l*1000*1000*1000; // should be enough. NOTE 1000 postfixed with l to avoid integer overflow
     load_t avld_max_old = 0;
     for ( int i = 0; i < nens; ++i ) {
       tot_load += loads[2*i];
       tot_nprocs_old += loads[2*i + 1];
-      auto avld = loads[2*i] / loads[2*i + 1];
+      load_t avld = loads[2*i] / loads[2*i + 1];
       avld_min_old = std::min<load_t>( avld_min_old, avld );
       avld_max_old = std::max<load_t>( avld_max_old, avld );
     }
@@ -59,7 +59,7 @@ SCENARIO("Test get_proc_surplus", "[aperture]") {
         }
         REQUIRE( tot_nprocs_new <= std::max<unsigned int>(tot_nprocs_old, max_num_procs) );
       }
-      load_t avld_min_new = 1000*1000*1000*1000; // should be enough
+      load_t avld_min_new = 1000l*1000*1000*1000; // should be enough
       load_t avld_max_new = 0;
       for ( int i = 0; i < nens; ++i ) {
         auto avld = loads[2*i] / nprocs_new[i];

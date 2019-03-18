@@ -2,7 +2,7 @@
 #include "./ensemble.hpp"
 #include "parallel/mpi++.hpp"
 #include "particle/c_particle.hpp"
-#include "apt/priority_queue.hpp" // used in get_proc_surplus
+#include "apt/priority_queue.hpp" // used in calc_new_nprocs
 
 using load_t = unsigned long long;
 
@@ -130,42 +130,54 @@ namespace aperture::impl {
   }
 }
 
-// assign_lables
+// assign_labels
 namespace aperture::impl{
   std::optional<int> assign_labels( const mpi::InterComm& job_market,
-                                    const std::vector<unsigned int>& nprocs_new,
+                                    const std::vector<int>& deficits,
                                     std::optional<int> cur_label ) {
     // RATIONALE job_market contains all primaries and all idles including those just fired from shrinking ensembles. The goal here is for all primaries to coordinate whom to send their labels to.
-    // RATIONALE `surpluses` is assumed to be feasible already. However, it may not need all idles. In that case, idles will be picked by their rank in the job_market.
-    // const int offer_tag = 835;
+    // NOTE `deficits` should be valid already. This means
+    //   - deficits[i] >= 0
+    //   - the sum of deficits <= num_idles. In the case of inequality, idles will be picked by their rank in the job_market.
+    // Edge cases:
+    //   - no idles
 
-    // auto f_employer =
-    //   [&](){
+    if ( job_market.remote_size() == 0 ) return {};
 
-    //     int num_offers = 0;
-    //     for ( int i = 0; i < loads.size() / 2; ++i ) num_offers += loads[2*i];
+    std::optional<int> new_label;
 
-    //     // a leader in the employers is selected to notify all idle employees how many of them will be recruited
-    //     if ( job_markdet.remote_size() > 0 ) {
-    //       int root = ( 0 == employers->rank() ) ? MPI_ROOT : MPI_PROC_NULL;
-    //       job_markdet.broadcast( &num_offers, 1, root );
-    //     }
+    if ( cur_label ) { // primary
+      new_label = cur_label;
+      int num_offers = 0;
+      for ( int i = 0; i < deficits.size(); ++i ) num_offers += deficits[i];
 
-    //     // TODO here prmies need to do something
+      int root = ( 0 == job_market.rank() ) ? MPI_ROOT : MPI_PROC_NULL;
+      job_market.broadcast( root, &num_offers, 1 );
 
-    //   };
+      int myrank = job_market.rank();
+      int num_offers_ahead = 0;
+      for ( int i = 0; i < myrank; ++i )
+        num_offers_ahead += deficits[i];
 
-    // auto f_employee =
-    //   [&]() {
-    //     int num_offers = 0;
-    //     job_market.broadcast(&num_offers, 1, 0);
-    //     if ( employees.rank() >= num_offers ) return;
+      int label = *cur_label;
+      std::vector<mpi::Request> reqs(deficits[myrank]);
+      for ( int i = 0; i < deficits[myrank]; ++i )
+        reqs[i] = job_market.Isend(num_offers_ahead + i, 835, &label, 1 );
 
-    //     int offer = 0;
-    //     job_market.recv(MPI_ANY_SOURCE, offer_tag, &offer, 1);
-    //   };
+      mpi::waitall(reqs);
 
-  }
+    } else {
+      int num_offers = 0;
+      job_market.broadcast(0, &num_offers, 1 );
+      if ( job_market.rank() < num_offers ) {
+        int label = 0;
+        job_market.recv(MPI_ANY_SOURCE, 835, &label, 1);
+        new_label.emplace(label);
+      }
+    }
+
+    return new_label;
+  };
 }
 
 namespace aperture::impl {
@@ -176,7 +188,7 @@ namespace aperture::impl {
   };
 
   std::vector<int> get_ptc_num_surplus ( const std::vector<load_t>& nums_ptc ) {
-    // NOTE: surplus = actual number - needed number
+    // NOTE: surplus = actual number - expected number
     std::vector<int> spls( nums_ptc.size() );
     load_t num_tot = 0;
     for ( auto x : nums_ptc ) num_tot += x;
@@ -287,7 +299,8 @@ namespace aperture {
                        std::optional<Ensemble<DGrid>>& ens_opt,
                        const std::optional<mpi::CartComm>& cart_opt,
                        unsigned int target_load ) {
-    std::vector<unsigned int> nprocs_new; // significant only at primaries
+    // NOTE deficit = desired number - current number
+    std::vector<int> nproc_deficit; // significant only at primaries
 
     bool is_leaving = false;
     { // Step 1. based on particle load, primaries figure out the surpluses. If an ensemble has surplus > 0, the primary will flag the last few processes to be leaving the ensemble.
@@ -304,10 +317,15 @@ namespace aperture {
         intra.reduce<mpi::by::SUM, mpi::IN_PLACE>(&my_tot_load, 1, ens_opt->chief);
         int new_ens_size = 0;
         if ( cart_opt ) {
+          auto& nprocs_new = nproc_deficit;
+          nprocs_new.resize(cart_opt->size());
+          nprocs_new.shrink_to_fit();
           load_t my_load[2] = { my_tot_load, intra->size() };
-          auto loads = cart_opt->allgather(my_load, 2);
-          nprocs_new = impl::calc_new_nprocs( loads, target_load, mpi::world.size() );
-          new_ens_size = intra->size() - nprocs_new[cart_opt->rank()];
+          auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
+          nprocs_new = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
+          new_ens_size = nprocs_new[cart_opt->rank()];
+          for ( int i = 0; i < nproc_deficit.size(); ++i )
+            nproc_deficit[i] -= loads_and_nprocs[2*i+1];
         }
         intra.broadcast(&new_ens_size, 1, ens_opt->chief);
         if ( intra.rank() >= new_ens_size ) is_leaving = true;
@@ -368,6 +386,9 @@ namespace aperture {
           }
         }
       }
+      if ( cart_opt ) { // clear negative deficits
+        for ( auto& x : nproc_deficit ) x = ( x > 0 ) ? x : 0;
+      }
     }
 
     { // Step 3. Assign ensemble labels to all processes and update Ensemble. Need an intercommunicator between all primaries and all idles
@@ -379,7 +400,7 @@ namespace aperture {
         bool is_idle = !ens_opt;
         auto[comm, job_market] = impl::bifurcate( prmy_idle_comm, is_idle );
         std::optional<unsigned int> cur_label {ens_opt ? ens_opt->label : nullptr };
-        new_label = impl::assign_labels( *job_market, nprocs_new, cur_label );
+        new_label = impl::assign_labels( *job_market, nproc_deficit, cur_label );
       }
       auto new_ens_intra_opt = mpi::world.split( new_label, mpi::world.rank() );
 

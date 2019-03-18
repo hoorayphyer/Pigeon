@@ -60,7 +60,7 @@ namespace mpi {
 
   constexpr bool IN_PLACE = true;
 
-  template < typename Comm, bool Inter = false >
+  template < typename Comm, bool Inter = false > // Inter can help simplify interfaces
   struct Collective_Comm {
   private:
     inline MPI_Comm _comm() const {
