@@ -6,7 +6,7 @@ using namespace apt;
 
 SCENARIO("Block", "[apt]") {
   int N[3] = { 13, 15, 17 };
-  Block<3> block{{ N[0], N[1], N[2] }};
+  Block block{ Index<3>{ N[0], N[1], N[2] }};
   auto itr = block.begin();
   auto end = block.end();
   REQUIRE( end == Index<3>{ N[0], N[1]-1, N[2]-1 } );

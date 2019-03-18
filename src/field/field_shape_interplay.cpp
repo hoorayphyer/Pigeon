@@ -171,7 +171,7 @@ namespace field {
                   }
               };
 
-          for ( const auto& I : apt::Block( { supp, supp, supp } ) ) {
+          for ( const auto& I : apt::Block( apt::Index<DGrid>{ supp, supp, supp } ) ) {
             calc_wgt( wgt, I );
             res += comp( I_b + I ) * wgt[0] * wgt[1] * wgt[2];
           }

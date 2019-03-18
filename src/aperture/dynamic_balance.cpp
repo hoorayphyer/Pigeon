@@ -251,6 +251,7 @@ namespace aperture::impl {
 
 }
 
+// detailed balance
 namespace aperture {
   template < typename T, int DPtc, typename state_t >
   void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
@@ -292,13 +293,13 @@ namespace aperture {
   }
 }
 
+// dynamic_load_balance
 namespace aperture {
-
   template < typename T, int DPtc, typename state_t, int DGrid >
-  void dynamic_adjust( particle::map<particle::array<T, DPtc, state_t>>& particles,
-                       std::optional<Ensemble<DGrid>>& ens_opt,
-                       const std::optional<mpi::CartComm>& cart_opt,
-                       unsigned int target_load ) {
+  void dynamic_load_balance( particle::map<particle::array<T, DPtc, state_t>>& particles,
+                             std::optional<Ensemble<DGrid>>& ens_opt,
+                             const std::optional<mpi::CartComm>& cart_opt,
+                             unsigned int target_load ) {
     // NOTE deficit = desired number - current number
     std::vector<int> nproc_deficit; // significant only at primaries
 

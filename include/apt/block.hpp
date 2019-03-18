@@ -49,19 +49,19 @@ namespace apt {
 }
 
 namespace apt {
-  template < int D >
+  template < typename Extent >
   struct Block {
   private:
-    Index<D> _extent{};
+    Extent _extent{};
 
   public:
-    constexpr Block( Index<D> extent ) noexcept : _extent(std::move(extent)) {}
+    constexpr Block( Extent extent ) noexcept : _extent(std::move(extent)) {}
 
-    constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
+    constexpr auto begin() const noexcept { return BlockIterator<Extent::NDim>(_extent);}
 
     constexpr auto end() const noexcept {
       auto res = _extent;
-      apt::foreach<1,D> ( [](auto& x){ --x; }, res );
+      apt::foreach<1,Extent::NDim> ( [](auto& x){ --x; }, res );
       return res;
     }
 

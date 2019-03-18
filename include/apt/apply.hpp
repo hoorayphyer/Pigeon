@@ -1,0 +1,22 @@
+#ifndef _APT_APPLY_HPP_
+#define _APT_APPLY_HPP_
+
+#include <utility> // for std::forward
+
+namespace apt {
+  namespace impl {
+    template < typename Func, typename Arg, int... I >
+    constexpr decltype(auto) apply_impl( const Func& f, Arg&& arg, std::integer_sequence<int,N>  ) noexcept {
+      // TODO add bounds check
+      // static_assert( sizeof...(I) <= Arg::NDim );
+      return f( std::forward<Arg>(arg)[I]... );
+  }
+
+  template < typename Func, typename Arg >
+  constexpr decltype(auto) apply( const Func& f, Arg&& arg  ) noexcept {
+    return impl::apply_impl( f, std::forward<Arg>(arg), std::make_integer_sequence<int, Arg::NDim>{} );
+  }
+
+}
+
+#endif

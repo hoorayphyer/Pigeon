@@ -11,6 +11,8 @@
 
 using namespace aperture;
 
+// TODO check if dynamic balance invalidates any existing references and pointers. This can introduce very subtle bug. One principle to help is to always clear data, but never clear objects. Another is never hold references to these perishable objects
+
 SCENARIO("Test get_proc_surplus", "[aperture]") {
   // Most important is to have a feasible surplus
   // std::default_random_engine eng(std::time(nullptr));

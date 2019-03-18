@@ -32,8 +32,6 @@ namespace traits {
 
   constexpr unsigned int ion_mass = 5;
 
-  constexpr auto posion_inj = particle::species::positron; // posion = positron || ion in injection
-
   using deposit_j_t = long double;
 };
 

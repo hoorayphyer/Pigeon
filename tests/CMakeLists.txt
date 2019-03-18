@@ -46,6 +46,7 @@ macro(mpi_test_gen category name)
   unset(test_target)
 endmacro()
 
+# TODO all uses of std::abs in the code, see if anywhere std::labs should be used
 test_gen(apt array)
 test_gen(apt pair)
 test_gen(apt "foreach")
