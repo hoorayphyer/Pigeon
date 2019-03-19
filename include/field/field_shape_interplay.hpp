@@ -16,5 +16,12 @@ namespace field {
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
                                     const apt::VecExpression<Vec_q>& q_abs,
                                     const ShapeF& shapef );
+
+  // the opposite of interpolate. `var` is +=ed to field
+  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  void deposit ( Field<T,DField,DGrid>& field,
+                 apt::Vec<T, DField> var,
+                 const apt::VecExpression<Vec_q>& q_abs,
+                 const ShapeF& shapef );
 }
 #endif

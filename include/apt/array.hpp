@@ -25,6 +25,12 @@ namespace apt {
 
     constexpr int size() const noexcept { return NDim; }
   };
+
+  // a C-array is not allowed to have size 0
+  template < typename T >
+  struct array<T,0> {
+    static constexpr int NDim = 0;
+  };
 }
 
 #endif

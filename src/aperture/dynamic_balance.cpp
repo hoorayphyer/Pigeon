@@ -107,10 +107,12 @@ namespace aperture::impl {
     load_t total_load = 0;
     unsigned int total_nprocs = 0;
 
-    std::vector<load_t> load(nens, 0);
-    load.shrink_to_fit();
-    std::vector<unsigned int> nproc(nens, 0);
-    nproc.shrink_to_fit();
+    std::vector<load_t> load;
+    load.reserve(nens);
+    load.resize(nens, 0);
+    std::vector<unsigned int> nproc;
+    nproc.reserve(nens);
+    nproc.resize(nens, 0);
 
     for ( int i = 0; i < nens; ++i ) {
       load[i] = loads_and_nprocs[2*i];
@@ -128,6 +130,42 @@ namespace aperture::impl {
 
     return nproc;
   }
+}
+
+// relinguish
+namespace aperture::impl {
+  template < typename T, int DPtc, typename state_t >
+  void relinguish_data( particle::array<T, DPtc, state_t>& ptc_array,
+                        const mpi::InterComm& itc, int root ) {
+    std::vector<particle::cParticle<T,DPtc,state_t>> buf;
+    int count = 0;
+    if ( root == MPI_ROOT ) {
+      const auto size = ptc_array.size();
+      count = ( size / itc.remote_size() ) + 1; // will do padding
+      itc.broadcast( root, &count, 1 );
+      buf.reserve( count * itc.remote_size() );
+    } else {
+      itc.broadcast( root, &count, 1 );
+      if ( root != MPI_PROC_NULL )
+        buf.reserve( count );
+    }
+    buf.resize( buf.capacity() );
+
+    if ( root == MPI_ROOT ) {
+      for ( int i = 0; i < ptc_array.size(); ++i )
+        buf[i] = ptc_array[i];
+    }
+
+    itc.scatter(root, buf.data(), count );
+
+    if ( root != MPI_ROOT && root != MPI_PROC_NULL ) {
+      auto old_size = ptc_array.size();
+      ptc_array.resize( old_size + count );
+      for ( int i = 0; i < count; ++i )
+        ptc_array[ old_size + i ] = buf[i];
+    }
+  }
+
 }
 
 // assign_labels
@@ -319,8 +357,8 @@ namespace aperture {
         int new_ens_size = 0;
         if ( cart_opt ) {
           auto& nprocs_new = nproc_deficit;
+          nprocs_new.reserve(cart_opt->size());
           nprocs_new.resize(cart_opt->size());
-          nprocs_new.shrink_to_fit();
           load_t my_load[2] = { my_tot_load, intra->size() };
           auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
           nprocs_new = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
@@ -339,45 +377,15 @@ namespace aperture {
         if ( itc_opt ) {
           const auto& itc = *itc_opt;
 
-          std::vector<particle::cParticle<T,DPtc,state_t>> buf;
-
-          auto scatter =
-            [&] (auto& ptc_array, int root) {
-              int count = 0;
-              if ( root == MPI_ROOT ) {
-                const auto size = ptc_array.size();
-                count = ( size / itc.remote_size() ) + 1; // will do padding
-                itc.broadcast( &count, 1, root );
-                buf.resize( count * itc.remote_size() );
-              } else {
-                itc.broadcast( &count, 1, root );
-                buf.resize( count );
-              }
-
-
-              if ( root == MPI_ROOT ) {
-                for ( int i = 0; i < ptc_array.size(); ++i )
-                  buf[i] = ptc_array[i];
-              }
-
-              itc.scatter(root, buf.data(), count );
-
-              if ( root != MPI_ROOT && root != MPI_PROC_NULL ) {
-                ptc_array.resize( ptc_array.size() + count );
-                for ( int i = 0; i < count; ++i )
-                  ptc_array[i] = buf[i];
-              }
-            };
-
           for ( auto[sp, ptcs] : particles ) {
             if (is_leaving) {
               for ( int i = 0; i < itc.size(); ++i ) {
-                if ( itc.rank() == i ) scatter( ptcs, MPI_ROOT );
-                else scatter( ptcs, MPI_PROC_NULL );
+                int root = (itc.rank() == i) ? MPI_ROOT : MPI_PROC_NULL;
+                relinguish_data( ptcs, itc, root );
               }
             } else {
               for ( int i = 0; i < itc.remote_size(); ++i )
-                scatter( ptcs, i );
+                relinguish_data( ptcs, itc, i );
             }
           }
 
