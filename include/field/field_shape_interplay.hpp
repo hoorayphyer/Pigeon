@@ -5,23 +5,23 @@
 
 namespace field {
   template < typename Field, typename T, typename Vec_q, typename Vec_dq, typename ShapeF >
-  void depositWJ ( Field& WJ, T charge,
+  void deposit_dJ ( Field& dJ, T charge,
                    const apt::VecExpression<Vec_q>& q1_abs, // q1 means it's the value after update
                    const apt::VecExpression<Vec_dq>& dq_abs,
                    const ShapeF& shapef );
 
   template < typename, int, int > struct Field;
 
-  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
-                                    const apt::VecExpression<Vec_q>& q_abs,
+                                    const LocType& q_abs,
                                     const ShapeF& shapef );
 
   // the opposite of interpolate. `var` is +=ed to field
-  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
   void deposit ( Field<T,DField,DGrid>& field,
                  apt::Vec<T, DField> var,
-                 const apt::VecExpression<Vec_q>& q_abs,
+                 const LocType& q_abs,
                  const ShapeF& shapef );
 }
 #endif

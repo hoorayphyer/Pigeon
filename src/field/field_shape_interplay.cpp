@@ -58,7 +58,7 @@ namespace field {
   // - index_original = index_native + ( q1 - int(q1) >= 0.5 )
   // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
   template < typename Vec_q1_abs, typename Vec_dq_abs, typename Grid, typename ShapeF >
-  constexpr auto depositWJ_prep( const Vec_q1_abs& q1_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
+  constexpr auto deposit_dJ_prep( const Vec_q1_abs& q1_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
     constexpr int DGrid = apt::ndim_v<Grid>;
     using T = apt::most_precise_t<apt::element_t<Vec_q1_abs>, apt::element_t<Vec_dq_abs>>;
     apt::Index<DGrid> I_b;
@@ -94,22 +94,22 @@ namespace field {
 namespace field {
 
   template < typename Field, typename T, typename Vec_q, typename Vec_dq, typename ShapeF >
-  void depositWJ ( Field& WJ, T charge,
+  void deposit_dJ ( Field& dJ, T charge,
                    const apt::VecExpression<Vec_q>& q1_abs,
                    const apt::VecExpression<Vec_dq>& dq_abs,
                    const ShapeF& shapef ) {
-    constexpr int DGrid = apt::ndim_v<decltype(WJ.mesh().bulk())>;
+    constexpr int DGrid = apt::ndim_v<decltype(dJ.mesh().bulk())>;
     constexpr int DField = apt::ndim_v<Field>;
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
-    const auto[I_b, extent, sep0_b, sep1_b] = depositWJ_prep( q1_abs, dq_abs, WJ.mesh().bulk(), shapef );
+    const auto[I_b, extent, sep0_b, sep1_b] = deposit_dJ_prep( q1_abs, dq_abs, dJ.mesh().bulk(), shapef );
 
     for ( const auto& I : apt::Block(extent) ) {
       auto W = esirkepov::calcW( I, sep0_b, sep1_b, shapef );
       if constexpr ( DGrid == 2 ) W[2] *= dq_abs[2]; // see NOTE below
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
-        ( [&]( auto& wj, auto w ) { wj(I_b + I) += w * charge; } , WJ, W );
+        ( [&]( auto& dj, auto w ) { dj(I_b + I) += w * charge; } , dJ, W );
     }
 
     // NOTE in eq.36 in Esirkepov, V_z is really del_z / dt, where del_z should
@@ -174,9 +174,9 @@ namespace field {
     };
   }
 
-  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
-                                    const apt::VecExpression<Vec_q>& q_abs,
+                                    const LocType& q_abs,
                                     const ShapeF& shapef ) {
     apt::Vec<T, DField> result;
     const auto& grid = field.mesh().bulk();
@@ -205,10 +205,10 @@ namespace field {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid, typename Vec_q, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
   void deposit ( Field<T,DField,DGrid>& field,
                  apt::Vec<T, DField> variable,
-                 const apt::VecExpression<Vec_q>& q_abs,
+                 const LocType& q_abs,
                  const ShapeF& shapef ) {
     const auto& grid = field.mesh().bulk();
     constexpr auto supp = ShapeF::support;

@@ -5,115 +5,124 @@
 
 // TODOL can we use the most continous part of field for another temporary buffer? More generally, can we change the memory layout? Because guard cells in other directions are not continous anyway. Those guard cells can be used as temporary buffers.
 namespace field {
-  template < typename T, int DField, int DGrid >
-  void sync_guard_cells_from_bulk( Field<T, DField, DGrid>& field, const mpi::Comm& comm ) {
-    // Looping order: DGrid, LeftRightness, DField
 
-    const auto& mesh = field.mesh();
-    auto I_b = mesh.origin();
-    auto extent = mesh.extent();
+  namespace impl {
+    constexpr bool bulk_to_guard = false;
+    constexpr bool guard_to_bulk = true;
 
-    std::vector<T> send_buf, recv_buf;
+    template < typename T, int DField, int DGrid, template < typename > struct Policy >
+    void communicate( Field<T, DField, DGrid>& field, const mpi::CartComm& comm, Policy<T> ) {
+      // Looping order: DGrid, LeftRightness, DField
+      const auto& mesh = field.mesh();
 
-    auto ext_size
-      = []( const auto& ext ) noexcept {
-          int size = 1;
-          apt::foreach<0,DGrid>
-            ( [&size] (auto e) { size *= e;}, ext );
-          return size;
+      auto f_Ib_send =
+        [&mesh] ( int ith_dim, bool is_send_to_right ) {
+          if constexpr ( Policy<T>::send_mode == bulk_to_guard ) {
+              return is_send_to_right ? ( mesh.bulk()[ith_dim].dim() - mesh.guard() ) : 0;
+            } else {
+            return is_send_to_right ? ( mesh.bulk()[ith_dim].dim()  ) : - mesh.guard();
+          }
         };
 
-    auto copy_to_buffer
-      = [] ( T* buffer, const auto& field_comp, const auto& I_b, const auto& extent ) {
-          int i = 0;
-          for ( const auto& I : apt::Block(extent) )
-            buffer[i++] = field_comp(I_b + I);
+      auto f_Ib_recv =
+        [&mesh] ( int ith_dim, bool is_send_to_right ) {
+          if constexpr ( Policy<T>::send_mode == bulk_to_guard ) {
+              return is_send_to_right ? - mesh.guard() : mesh.bulk()[ith_dim].dim();
+            } else {
+            return is_send_to_right ? 0 : ( mesh.bulk()[ith_dim].dim() - mesh.guard() );
+          }
         };
 
-    for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
-      int ext_orig = extent[i_grid];
-      extent[i_grid] = mesh.guard();
-      send_buf.resize( ext_size(extent) );
-      recv_buf.resize( send_buf.size() );
+      auto I_b = mesh.origin();
+      auto extent = mesh.extent();
 
-      int I_b_orig = I_b[i_grid];
-      for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
-        I_b[i_grid] = lr_send ? ( mesh.bulk()[i_grid].dim() - mesh.guard() ) : 0;
+      std::vector<T> send_buf, recv_buf;
 
-        apt::foreach<0,DField>
-          ( [&]( auto& comp )
-            {
-              // TODO sendrecv here.
-              copy_to_buffer( send_buf.data(), comp, I_b, extent );
-              // mpi_Isend(send_buf);
-              // mpi_Irecv(recv_buf);
-              // mpi_wait();
-              // copy_from_buffer( recv_buf, comp, I_b, extent );
-            }, field );
+      for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
+        int ext_orig = extent[i_grid];
+        extent[i_grid] = mesh.guard();
+        int ext_size = 1;
+        apt::foreach<0,DGrid>
+          ( [&ext_size] (auto e) { ext_size *= e;}, extent );
 
+        int I_b_orig = I_b[i_grid];
+        for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
+
+          auto [ src, dest ] = comm.shift( i_grid, lr_send ? 1 : -1 );
+
+          mpi::Request reqs[2];
+          // copy all components into one buffer
+          if ( dest ) {
+            send_buf.resize( ext_size * DField );
+            auto itr_s = send_buffer.begin();
+            I_b[i_grid] = f_Ib_send( i_grid, lr_send );
+            apt::foreach<0,DField>
+              ( [&]( auto& comp ) {
+                  for ( const auto& I : apt::Block(extent) )
+                    Policy<T>::to_send_buf( *(itr_s++), comp(I_b + I) );
+                }, field );
+            reqs[0] = comm.Isend( *dest, 924, send_buf.data(), send_buf.size() );
+          }
+          if ( src ) {
+            recv_buf.resize( ext_size * DField );
+            reqs[1] = comm.Irecv( *src, 924, recv_buf.data(), recv_buf.size() );
+          }
+          mpi::waitall(reqs);
+          if ( src ) {
+            auto itr_r = recv_buffer.cbegin();
+            I_b[i_grid] = f_Ib_recv( i_grid, lr_send );
+            apt::foreach<0,DField>
+              ( [&]( auto& comp ) {
+                  for ( const auto& I : apt::Block(extent) )
+                    Policy<T>::from_recv_buf( comp(I_b + I), *(itr_r++) );
+                }, field );
+          }
+        }
+        // restroe
+        I_b[i_grid] = I_b_orig;
+        extent[i_grid] = ext_orig;
       }
-      // restroe
-      I_b[i_grid] = I_b_orig;
-      extent[i_grid] = ext_orig;
     }
-
   }
+
+
 }
 
 namespace field {
   template < typename T, int DField, int DGrid >
-  void merge_guard_cells_into_bulk( Field<T, DField, DGrid>& field, const mpi::Comm& comm ) {
-    // Looping order: DGrid, LeftRightness, DField
-    // erase contents in guard cells immediately upon copied to send_buffer to avoid double counting in the corner guard cells
+  void sync_guard_cells_from_bulk( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
+    template < typename T >
+      struct sync_policy {
+      static constexpr bool send_mode = impl::bulk_to_guard;
 
-    const auto& mesh = field.mesh();
-    auto I_b = mesh.origin();
-    auto extent = mesh.extent();
-
-    std::vector<T> send_buf, recv_buf;
-
-    auto ext_size
-      = []( const auto& ext ) noexcept {
-          int size = 1;
-          apt::foreach<0,DGrid>
-            ( [&size] (auto e) { size *= e;}, ext );
-          return size;
-        };
-
-    auto swap_into_buffer
-      = [] ( T* buffer, const auto& field_comp, const auto& I_b, const auto& extent ) {
-          int i = 0;
-          for ( const auto& I : apt::Block(extent) )
-            std::swap( buffer[i++], field_comp(I_b + I) );
-        };
-
-    for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
-      int ext_orig = extent[i_grid];
-      extent[i_grid] = mesh.guard();
-      send_buf.resize( ext_size(extent) );
-      std::fill(send_buf.begin(), send_buf.end(), 0.0); // zeroing is necessary
-      recv_buf.resize( send_buf.size() );
-
-      int I_b_orig = I_b[i_grid];
-      for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
-        I_b[i_grid] = lr_send ? ( mesh.bulk()[i_grid].dim() - mesh.guard() ) : 0;
-
-        apt::foreach<0,DField>
-          ( [&]( auto& comp )
-            {
-              // TODO sendrecv here.
-              swap_into_buffer( send_buf.data(), comp, I_b, extent );
-              // mpi_Isend(send_buf);
-              // mpi_Irecv(recv_buf);
-              // mpi_wait();
-              // copy_from_buffer( recv_buf, comp, I_b, extent );
-            }, field );
-
+      static constexpr void to_send_buf( T& v_buf, const T& v_data ) noexcept {
+        v_buf = v_data;
       }
-      // restroe
-      I_b[i_grid] = I_b_orig;
-      extent[i_grid] = ext_orig;
-    }
 
+      static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
+        v_data = v_buf;
+      }
+    };
+
+    impl::communicate( field, comm, sync_policy<T>{} );
+  }
+
+  template < typename T, int DField, int DGrid >
+  void merge_guard_cells_into_bulk( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
+    template < typename T >
+      struct merge_policy {
+      static constexpr bool send_mode = impl::guard_to_bulk;
+
+      static constexpr void to_send_buf( T& v_buf, T& v_data ) noexcept {
+        v_buf = v_data;
+        v_data = static_cast<T>(0);
+      }
+
+      static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
+        v_data += v_buf;
+      }
+    };
+
+    impl::communicate( field, comm, merge_policy<T>{} );
   }
 }

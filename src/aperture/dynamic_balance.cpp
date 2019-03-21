@@ -3,8 +3,7 @@
 #include "parallel/mpi++.hpp"
 #include "particle/c_particle.hpp"
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
-
-using load_t = unsigned long long;
+#include "particle/load_type.hpp"
 
 namespace aperture::impl {
   auto bifurcate( const mpi::Comm& parent, bool color ) {
@@ -37,7 +36,7 @@ namespace aperture::impl {
 
 // calc_nprocs_new
 namespace aperture::impl {
-  void calc_new_nprocs_impl ( std::vector<unsigned int>& nproc, const std::vector<load_t>& load, load_t ave_load, const load_t target_load ) {
+  void calc_new_nprocs_impl ( std::vector<unsigned int>& nproc, const std::vector<particle::load_t>& load, particle::load_t ave_load, const particle::load_t target_load ) {
     // nproc is valid to start with
     const unsigned int nens = nproc.size();
 
@@ -53,7 +52,7 @@ namespace aperture::impl {
 
     if ( total_surplus > 0 ) {
       // have more than needed. Leverage idles to mitigate the most stressed
-      apt::priority_queue<load_t> pq; // store average load in pq
+      apt::priority_queue<particle::load_t> pq; // store average load in pq
       for ( int i = 0; i < nens; ++i )
           pq.push( i, load[i] / nproc[i] );
 
@@ -63,7 +62,7 @@ namespace aperture::impl {
         if ( avld > target_load ) {
           pq.pop();
           ++nproc[i];
-          load_t avld_new = load[i] / nproc[i];
+          particle::load_t avld_new = load[i] / nproc[i];
           if ( avld_new > target_load )
             pq.push( i, avld_new );
           --count;
@@ -72,7 +71,7 @@ namespace aperture::impl {
       }
     } else if ( total_surplus < 0 ) { //
       // have less than needed. The richest needs to spit out
-      apt::priority_queue< load_t, std::greater<load_t> > pq; // store average load in pq
+      apt::priority_queue< particle::load_t, std::greater<particle::load_t> > pq; // store average load in pq
       for ( int i = 0; i < nens; ++i )
           pq.push( i, load[i] / nproc[i] );
 
@@ -91,7 +90,7 @@ namespace aperture::impl {
 
   // loads = [ ens_tot_load_0, ens_size_0, ens_tot_load_1, ens_size_1... ]
   // actual total_nprocs = max( total_num_procs, accummulated_value_from_loads)
-  std::vector<unsigned int> calc_new_nprocs( const std::vector<load_t>& loads_and_nprocs, load_t target_load, const unsigned int max_nprocs = 0 ) {
+  std::vector<unsigned int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs = 0 ) {
     // RATIONALE The following gives a close to the, if not THE, most optimal deployment
     // 1. Priority Queue is used to accommodate excess or leftover of processes if any
     // 2. Edge cases:
@@ -104,10 +103,10 @@ namespace aperture::impl {
     const auto nens = loads_and_nprocs.size() / 2;
     if ( nens == 1 ) return { loads_and_nprocs[1]};
 
-    load_t total_load = 0;
+    particle::load_t total_load = 0;
     unsigned int total_nprocs = 0;
 
-    std::vector<load_t> load;
+    std::vector<particle::load_t> load;
     load.reserve(nens);
     load.resize(nens, 0);
     std::vector<unsigned int> nproc;
@@ -122,7 +121,7 @@ namespace aperture::impl {
     }
     total_nprocs = ( total_nprocs > max_nprocs ? total_nprocs : max_nprocs );
 
-    const load_t ave_load_least_possible = (total_load / total_nprocs) + 1; // ceiling
+    const particle::load_t ave_load_least_possible = (total_load / total_nprocs) + 1; // ceiling
 
     int N = 1; // TODOL does iteration give better results?
     while( N-- )
@@ -225,16 +224,16 @@ namespace aperture::impl {
     static constexpr int recv = -1;
   };
 
-  std::vector<int> get_ptc_num_surplus ( const std::vector<load_t>& nums_ptc ) {
+  std::vector<int> get_ptc_num_surplus ( const std::vector<particle::load_t>& nums_ptc ) {
     // NOTE: surplus = actual number - expected number
     std::vector<int> spls( nums_ptc.size() );
-    load_t num_tot = 0;
+    particle::load_t num_tot = 0;
     for ( auto x : nums_ptc ) num_tot += x;
 
-    load_t average = num_tot / nums_ptc.size();
+    particle::load_t average = num_tot / nums_ptc.size();
     int remain = num_tot % nums_ptc.size();
     for ( unsigned int rank = 0; rank < nums_ptc.size(); ++rank ) {
-      load_t num_exp = average + ( rank < remain );
+      particle::load_t num_exp = average + ( rank < remain );
       spls[rank] = nums_ptc[rank] - num_exp;
     }
 
@@ -294,7 +293,7 @@ namespace aperture {
   template < typename T, int DPtc, typename state_t >
   void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
                           const mpi::Comm& intra ) {
-    load_t my_load = ptcs.size();
+    particle::load_t my_load = ptcs.size();
     auto loads = intra.allgather(&my_load, 1);
     auto instr = impl::get_instr( impl::get_ptc_num_surplus( loads ), intra.rank() );
 
@@ -344,7 +343,7 @@ namespace aperture {
     bool is_leaving = false;
     { // Step 1. based on particle load, primaries figure out the surpluses. If an ensemble has surplus > 0, the primary will flag the last few processes to be leaving the ensemble.
       if ( ens_opt ) {
-        load_t my_tot_load = 0; // a process within an ensemble
+        particle::load_t my_tot_load = 0; // a process within an ensemble
         for ( auto[sp,ptcs] : particles ) {
           if ( sp == particle::species::photon )
             my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
@@ -359,7 +358,7 @@ namespace aperture {
           auto& nprocs_new = nproc_deficit;
           nprocs_new.reserve(cart_opt->size());
           nprocs_new.resize(cart_opt->size());
-          load_t my_load[2] = { my_tot_load, intra->size() };
+          particle::load_t my_load[2] = { my_tot_load, intra->size() };
           auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
           nprocs_new = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
           new_ens_size = nprocs_new[cart_opt->rank()];
