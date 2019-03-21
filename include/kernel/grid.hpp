@@ -14,6 +14,13 @@ namespace knl {
     constexpr Grid( const grid1d<T>& gl0, const grid1d<T>& gl1 ) noexcept
       : apt::array< grid1d<T>, DGrid >{ gl0, gl1 } {}
 
+    constexpr apt::Index<DGrid> extent() const noexcept {
+      apt::Index<DGrid> ext;
+      for ( int i = 0; i < DGrid; ++i )
+        ext[i] = (*this)[i].dim();
+      return ext;
+    }
+
   };
 }
 

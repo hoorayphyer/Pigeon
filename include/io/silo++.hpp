@@ -2,7 +2,7 @@
 #define  _SILO_XX_HPP_
 
 #include "apt/handle.hpp"
-#include <string>
+#include "io/silo_operations.hpp"
 
 namespace silo :: traits {
   extern bool display_guard;
@@ -21,9 +21,10 @@ namespace silo {
 
   enum class Mode : char { Read = 0, Write, Append };
 
-  struct file_t : public apt::Handle<DBfileHandle, dbfile_free, dbfile_null> {};
+  struct file_t : public apt::Handle<DBfileHandle, dbfile_free, dbfile_null>,
+                  public SiloPutter<file_t> {};
 
-  template < Mode mode >
+  template < Mode mode > // use template to prohibit use of Mode::Append in silo::pmpio::open
   file_t open( std::string filename );
 
 }
@@ -43,23 +44,18 @@ namespace silo::pmpio {
   void pmpio_file_free( PmpioDBfileHandle* p );
   inline PmpioDBfileHandle pmpio_file_null() { return {}; }
 
-  struct file_t : public apt::Handle<PmpioDBfileHandle, pmpio_file_free, pmpio_file_null> {};
+  struct file_t : public apt::Handle<PmpioDBfileHandle, pmpio_file_free, pmpio_file_null>,
+                  public SiloPutter<file_t>{
+    operator DBfile*() noexcept { return *this ? static_cast<PmpioDBfileHandle*>(*this)->file_h : nullptr; }
+  };
 
-  // use template to prohibit use of Mode::Append here
   template < Mode mode >
   file_t open( std::string dirname, const mpi::Comm& comm );
 }
 
 namespace silo {
   inline void close( file_t& f ) { f.reset(); }
-  // inline void close( pmpio::file_t& f ) { pmpio_file_free(&f); }
-}
-
-namespace silo {
-  // extern std::function<void(DBfile*)> put_mesh;
-  // extern std::function<void(DBfile*)> put_var;
-  // extern std::function<void(DBfile*, int timestep)> put_multimesh;
-  // extern std::function<void(DBfile*, int timestep, std::string name_sth, const int type)> put_multivar;
+  inline void close( pmpio::file_t& f ) { f.reset(); }
 }
 
 #endif

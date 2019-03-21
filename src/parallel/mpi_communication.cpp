@@ -122,8 +122,8 @@ namespace mpi {
 
   template < typename Comm, bool Inter >
   template < by Op, bool In_Place, typename T >
-  std::optional<std::vector<T>>
-  Collective_Comm<Comm, Inter>::reduce( T* buffer, int count, int root ) const {
+  std::conditional< IN_Place, void, std::optional<std::vector<T>> >
+  Collective_Comm<Comm, Inter>::reduce( int root, T* buffer, int count ) const {
     static_assert( !Inter );
     std::optional<std::vector<T>> result;
 

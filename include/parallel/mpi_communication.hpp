@@ -71,13 +71,13 @@ namespace mpi {
     void barrier() const;
 
     template < by Op, bool In_Place = false, typename T >
-    std::optional<std::vector<T>>
-    reduce( T* buffer, int count, int root ) const;
+    std::conditional< IN_Place, void, std::optional<std::vector<T>> >
+    reduce( int root, T* buffer, int count ) const;
 
     // TODO fix this. Returning optional on nonblocking call may not make sense
     // template < by Op, bool In_Place = false, typename T >
     // std::tuple< Request, std::optional<std::vector<T> > >
-    // Ireduce( T* buffer, int count, int root ) const;
+    // Ireduce( int root, T* buffer, int count ) const;
 
     template < typename T >
     void broadcast( int root, T* buffer, int count ) const;

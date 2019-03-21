@@ -251,10 +251,10 @@ namespace mpi {
     return result;
   }
 
-  apt::pair<std::optional<int>> CartComm::shift( int direction, int disp ) const {
+  apt::pair<std::optional<int>> CartComm::shift( int ith_dim, int disp ) const {
     apt::pair<std::optional<int>> results;
     int rank_src = 0, rank_dest = 0;
-    MPI_Cart_shift( *this, direction, disp, &rank_src, &rank_dest );
+    MPI_Cart_shift( *this, ith_dim, disp, &rank_src, &rank_dest );
     if ( rank_src != MPI_PROC_NULL ) results[LFT].emplace(rank_src);
     if ( rank_dest != MPI_PROC_NULL ) results[RGT].emplace(rank_dest );
     return results;

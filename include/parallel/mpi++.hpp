@@ -85,7 +85,8 @@ namespace mpi {
 
     int linear_coord() const;
 
-    apt::pair<std::optional<int>> shift(int direction, int disp = 1 ) const;
+    // Sending in the `ith_dim` by `disp`, returns [ src_rank, dest_rank ]
+    apt::pair<std::optional<int>> shift(int ith_dim, int disp = 1 ) const;
   };
 
 }

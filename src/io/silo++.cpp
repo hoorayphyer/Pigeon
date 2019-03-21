@@ -8,6 +8,10 @@ namespace silo :: traits {
   int create_mode = DB_CLOBBER;
   int create_target = DB_LOCAL;
   int filetype = DB_HDF5;
+
+  // TODO these are global settings
+  // DBSetFriendlyHDF5Names(1);
+  // DBSetCompression("METHOD=GZIP");
 }
 
 namespace silo {
@@ -15,7 +19,7 @@ namespace silo {
     if (p && *p) DBClose(*p);
   }
 
-  // TODOL check file existence
+  // TODO check file existence
   template < Mode mode >
   file_t open(  std::string filename ) {
     file_t dbfile;
@@ -23,7 +27,7 @@ namespace silo {
     if constexpr ( Mode::Read == mode )
                    dbfile.reset( new DBfileHandle(DBOpen( filename.c_str(), traits::filetype, DB_READ )));
     else if ( Mode::Write == mode )
-      // TODOL what if an existing file?
+      // TODO what if an existing file?
       dbfile.reset( new DBfileHandle(DBCreate( filename.c_str(), traits::create_mode, traits::create_target, NULL, traits::filetype )));
     else
       dbfile.reset(new DBfileHandle( DBOpen( filename.c_str(), traits::filetype, DB_APPEND )));
@@ -69,6 +73,7 @@ namespace silo :: pmpio {
     return (void *) siloFile;
   }
 
+  // TODO check file existence
   template< Mode mode >
   file_t open(  std::string dirname, const mpi::Comm& comm ) {
     file_t dbfile;
