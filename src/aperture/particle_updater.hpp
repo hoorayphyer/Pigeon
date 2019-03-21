@@ -25,17 +25,18 @@ namespace particle {
     using Params_t = Params<Real>;
 
   private:
-    using WJ_t = long double; // TODO
+    using Jmesh_t = long double; // TODO
     using ShapeF = knl::shapef_t<Shape>;
 
-    field::Field< WJ_t, 3, DGrid > _WJ;
+    field::Field< Jmesh_t, 3, DGrid > _Jmesh; // TODO need shape support + 1
     std::vector<cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
     apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid > _intercomms;
 
   public:
     void operator() ( int timestep, DynaVars_t& dvars, const Params_t& params,
-                      const std::optional<mpi::Comm>& ensemble );
+                      const std::optional<mpi::CartComm>& cart,
+                      const Ensemble<DGrid>& ensemble );
   };
 
 }

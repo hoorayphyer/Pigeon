@@ -10,10 +10,11 @@
 #include <algorithm> // std::min, std::max
 
 using namespace aperture;
+using particle::load_t;
 
 // TODO check if dynamic balance invalidates any existing references and pointers. This can introduce very subtle bug. One principle to help is to always clear data, but never clear objects. Another is never hold references to these perishable objects
 
-SCENARIO("Test get_proc_surplus", "[aperture]") {
+SCENARIO("Test calc_new_nprocs", "[aperture][dlb]") {
   // Most important is to have a feasible surplus
   // std::default_random_engine eng(std::time(nullptr));
   std::default_random_engine eng;
@@ -75,4 +76,10 @@ SCENARIO("Test get_proc_surplus", "[aperture]") {
     }
   }
 
+}
+
+SCENARIO("Test relinguish_data", "[aperture][dlb]") {
+  WHEN("3 members of a 10-member ensemble are leaving") {
+    
+  }
 }

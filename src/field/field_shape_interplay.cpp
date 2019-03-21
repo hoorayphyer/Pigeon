@@ -53,14 +53,14 @@ namespace esirkepov {
 namespace field {
 
   // RATIONALE: assume the offset = 0.5 in the dimension. The native grid is one offset by 0.5 with respect to the original one.
-  // - q1 is relative position in the native grid. q1 starts at 0.0
-  // - the contributing cells in the native grid are [ int(q1 - sf.r) + 1,  int(q1 + sf.r) + 1 )
-  // - index_original = index_native + ( q1 - int(q1) >= 0.5 )
+  // - q is relative position in the native grid. q starts at 0.0
+  // - the contributing cells in the native grid are [ int(q - sf.r) + 1,  int(q + sf.r) + 1 )
+  // - index_original = index_native + ( q - int(q) >= 0.5 )
   // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
-  template < typename Vec_q1_abs, typename Vec_dq_abs, typename Grid, typename ShapeF >
-  constexpr auto deposit_dJ_prep( const Vec_q1_abs& q1_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
+  template < typename Vec_q_abs, typename Vec_dq_abs, typename Grid, typename ShapeF >
+  constexpr auto deposit_dJ_prep( const Vec_q_abs& q0_abs, const Vec_dq_abs& dq_abs, const Grid& grid, const ShapeF& ) {
     constexpr int DGrid = apt::ndim_v<Grid>;
-    using T = apt::most_precise_t<apt::element_t<Vec_q1_abs>, apt::element_t<Vec_dq_abs>>;
+    using T = apt::most_precise_t<apt::element_t<Vec_q_abs>, apt::element_t<Vec_dq_abs>>;
     apt::Index<DGrid> I_b;
     apt::Index<DGrid> extent;
     apt::array<T, DGrid> sep0_b; // separation 0 is defined to be i_cell_beginning - q0_ptc
@@ -70,21 +70,21 @@ namespace field {
       ( [] ( auto& i_b, auto& ext, auto& sp0, auto& sp1,
              auto qmin, auto qmax, const auto& g1d )
         noexcept {
-          // initially, qmin = q1_abs, qmax = dq_abs.
+          // initially, qmin = q0_abs, qmax = dq_abs.
           qmax /= g1d.delta();
           qmin = ( qmin - g1d.lower() ) / g1d.delta() - 0.5;
-          // now, qmin = q1_rel, qmax = dq_rel.
-          sp1 = - qmin;
-          sp0 = sp1 + qmax;
-          qmin -= (( qmax > 0 ? qmax : 0.0 ) + ShapeF::support / 2.0);
+          // now, qmin = q0_native, qmax = dq_native.
+          sp0 = - qmin;
+          sp1 = sp0 - qmax;
+          qmin += ( ( qmax < 0 ? qmax : 0.0 ) - ShapeF::support / 2.0 );
           qmax = qmin + qmax * ( (qmax > 0.0) - ( qmax < 0.0) ) + ShapeF::support;
           i_b = int( qmin ) + 1 ;
           ext = int( qmax ) + 1 - i_b;
-          sp1 += i_b;
           sp0 += i_b;
+          sp1 += i_b;
         },
         I_b, extent, sep0_b, sep1_b,
-        q1_abs, dq_abs, grid );
+        q0_abs, dq_abs, grid );
 
     return std::make_tuple( I_b, extent, sep0_b, sep1_b );
   }
@@ -95,7 +95,7 @@ namespace field {
 
   template < typename Field, typename T, typename Vec_q, typename Vec_dq, typename ShapeF >
   void deposit_dJ ( Field& dJ, T charge,
-                   const apt::VecExpression<Vec_q>& q1_abs,
+                   const apt::VecExpression<Vec_q>& q0_abs,
                    const apt::VecExpression<Vec_dq>& dq_abs,
                    const ShapeF& shapef ) {
     constexpr int DGrid = apt::ndim_v<decltype(dJ.mesh().bulk())>;
@@ -103,7 +103,7 @@ namespace field {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
-    const auto[I_b, extent, sep0_b, sep1_b] = deposit_dJ_prep( q1_abs, dq_abs, dJ.mesh().bulk(), shapef );
+    const auto[I_b, extent, sep0_b, sep1_b] = deposit_dJ_prep( q0_abs, dq_abs, dJ.mesh().bulk(), shapef );
 
     for ( const auto& I : apt::Block(extent) ) {
       auto W = esirkepov::calcW( I, sep0_b, sep1_b, shapef );

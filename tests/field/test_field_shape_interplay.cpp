@@ -18,16 +18,16 @@ void test ( const knl::Grid<T,DGrid>& grid,
             const array<double,DPtc>& x0_rel,
             const array<double, DPtc>& dx_rel,
             const array<apt::pair<int>,DGrid>& cells_bounds ) {
-  apt::Vec<double,DPtc> q1_abs = {0.0, 0.0, 0.0};
+  apt::Vec<double,DPtc> q0_abs = {0.0, 0.0, 0.0};
   apt::Vec<double,DPtc> dq_abs = {0.0, 0.0, 0.0};
 
   for ( int i = 0; i < DGrid; ++i ) {
+    q0_abs[i] = grid[i].absc(cell[i], x0_rel[i]);
     dq_abs[i] = dx_rel[i] * grid[i].delta();
-    q1_abs[i] = grid[i].absc(cell[i], x0_rel[i]) + dq_abs[i];
   }
 
   // NOTE need q1 as 1st argument
-  const auto[I_b, extent, sep0_b, sep1_b] = depositWJ_prep( q1_abs, dq_abs, grid, shapef );
+  const auto[I_b, extent, sep0_b, sep1_b] = depositWJ_prep( q0_abs, dq_abs, grid, shapef );
 
   for ( int i = 0; i < DGrid; ++i ) {
     REQUIRE( I_b[i] == cells_bounds[i][0] );
