@@ -4,6 +4,8 @@
 #include "particle/c_particle.hpp"
 #include "catch2/catch.hpp"
 
+// TODO test particle array resize
+
 using namespace particle;
 using ptc_array = array<double,3,unsigned long long>;
 using Ptc = Particle<double,3,unsigned long long>;

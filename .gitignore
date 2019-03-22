@@ -9,12 +9,15 @@
 !logo3_small.svg
 !README.md
 
-!old_field_solver/
-!old_field_solver/*
-!old_field_solver/boundaryconditions/
-!old_field_solver/boundaryconditions/*
-!old_field_solver/multiarray/
-!old_field_solver/multiarray/*
+!aperture/
+!aperture/*.hpp
+!aperture/*.cpp
+!aperture/old_field_solver/
+!aperture/old_field_solver/*
+!aperture/old_field_solver/boundaryconditions/
+!aperture/old_field_solver/boundaryconditions/*
+!aperture/old_field_solver/multiarray/
+!aperture/old_field_solver/multiarray/*
 
 !include/
 !include/**/*.hpp

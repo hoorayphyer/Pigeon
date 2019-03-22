@@ -1,5 +1,4 @@
 #include "particle/pusher.hpp"
-#include "particle/properties.hpp"
 #include "apt/numeric.hpp"
 #include "kernel/coordinate.hpp"
 
@@ -43,14 +42,15 @@ namespace particle :: force {
 
 }
 
-// TODO move check of forces on_off to somewhere else
+// TODO move check of forces on_off to somewhere else. Use Factory
 namespace particle {
-  template < species sp, typename dp_t, typename Ptc, typename Field, typename T >
-  dp_t update_p( PtcExpression<Ptc>& ptc, const T& dt,
-                 const apt::VecExpression<Field>& E, const apt::VecExpression<Field>& B ) {
+  template < typename dp_t, typename Ptc, typename Field, typename T >
+  dp_t update_p( PtcExpression<Ptc>& ptc, T dt, unsigned int mass_x,
+                 const apt::VecExpression<Field>& E,
+                 const apt::VecExpression<Field>& B ) {
     dp_t dp;
 
-    dp += force::lorentz( dt / mass_x<sp>, ptc.p(), E, B );
+    dp += force::lorentz( dt / mass_x, ptc.p(), E, B );
     // TODO pane
     // Apply Lorentz force
     // if ( _pane.lorentz_On  ) {
@@ -80,9 +80,9 @@ namespace particle {
   }
 
 
-  template < species sp, knl::coordsys CS, typename dq_t, typename Ptc, typename T >
-  dq_t update_q( PtcExpression<Ptc>& ptc, const T& dt ) {
-    auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p()) );
+  template < knl::coordsys CS, typename dq_t, typename Ptc, typename T >
+  dq_t update_q( PtcExpression<Ptc>& ptc, T dt, bool is_massive ) {
+    auto gamma = std::sqrt( is_massive + apt::sqabs(ptc.p()) );
 
     if constexpr ( CS == knl::coordsys::Cartesian ) {
       // a small optimization for Cartesian

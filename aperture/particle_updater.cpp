@@ -3,7 +3,7 @@
 
 #include "particle/pusher.hpp"
 #include "particle/pair_producer.hpp"
-#include "particle/properties.hpp"
+#include "./particle_properties.hpp"
 #include "particle/migration.hpp"
 
 #include "field/field_shape_interplay.hpp"
@@ -32,7 +32,7 @@ namespace aperture::impl {
       if constexpr ( is_charged<sp> ) {
           auto E = field::interpolate(dvars.E, ptc.q, shapef );
           auto B = field::interpolate(dvars.E, ptc.q, shapef );
-          auto&& dp = update_p<sp>( ptc, dt, E, B );
+          auto&& dp = update_p( ptc, dt, mass_x<sp>, E, B );
 
           // TODOL make sure the newly added particles will not participate in the loop
           if constexpr ( pair_scheme != PairScheme::Disabled && is_radiative<sp> ) {
@@ -60,7 +60,7 @@ namespace aperture::impl {
       }
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
-      auto&& dq = update_q<sp,CS>( ptc, dt );
+      auto&& dq = update_q<CS>( ptc, dt, is_massive<sp> );
       // TODOL pusher handle boundary condition. Is it needed?
       if constexpr ( is_charged<sp> )
                      dJ.deposit( charge_over_dt, ptc.q()-std::move(dq), ptc.q(), shapef ); // TODOL check the 2nd argument

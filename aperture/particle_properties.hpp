@@ -1,7 +1,7 @@
 #ifndef  _PARTICLE_PROPERTIES_HPP_
 #define  _PARTICLE_PROPERTIES_HPP_
 
-#include "species_predef.hpp"
+#include "particle/species_predef.hpp"
 
 namespace particle {
   template < species sp >
