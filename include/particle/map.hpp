@@ -32,6 +32,10 @@ namespace particle {
       return _data.at(sp);
     }
 
+    inline bool has( species sp ) const noexcept {
+      return _data.find(sp) != _data.end();
+    }
+
     // TODO
     auto begin() noexcept {
       

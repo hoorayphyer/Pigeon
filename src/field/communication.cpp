@@ -10,7 +10,7 @@ namespace field {
     constexpr bool bulk_to_guard = false;
     constexpr bool guard_to_bulk = true;
 
-    template < typename T, int DField, int DGrid, template < typename > struct Policy >
+    template < typename T, int DField, int DGrid, template < typename > class Policy >
     void communicate( Field<T, DField, DGrid>& field, const mpi::CartComm& comm, Policy<T> ) {
       // Looping order: DGrid, LeftRightness, DField
       const auto& mesh = field.mesh();
@@ -50,11 +50,11 @@ namespace field {
 
           auto [ src, dest ] = comm.shift( i_grid, lr_send ? 1 : -1 );
 
-          mpi::Request reqs[2];
+          std::vector<mpi::Request> reqs(2);
           // copy all components into one buffer
           if ( dest ) {
             send_buf.resize( ext_size * DField );
-            auto itr_s = send_buffer.begin();
+            auto itr_s = send_buf.begin();
             I_b[i_grid] = f_Ib_send( i_grid, lr_send );
             apt::foreach<0,DField>
               ( [&]( auto& comp ) {
@@ -69,7 +69,7 @@ namespace field {
           }
           mpi::waitall(reqs);
           if ( src ) {
-            auto itr_r = recv_buffer.cbegin();
+            auto itr_r = recv_buf.cbegin();
             I_b[i_grid] = f_Ib_recv( i_grid, lr_send );
             apt::foreach<0,DField>
               ( [&]( auto& comp ) {
@@ -89,40 +89,40 @@ namespace field {
 }
 
 namespace field {
+  template < typename T >
+  struct sync_policy {
+    static constexpr bool send_mode = impl::bulk_to_guard;
+
+    static constexpr void to_send_buf( T& v_buf, const T& v_data ) noexcept {
+      v_buf = v_data;
+    }
+
+    static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
+      v_data = v_buf;
+    }
+  };
+
   template < typename T, int DField, int DGrid >
   void sync_guard_cells_from_bulk( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
-    template < typename T >
-      struct sync_policy {
-      static constexpr bool send_mode = impl::bulk_to_guard;
-
-      static constexpr void to_send_buf( T& v_buf, const T& v_data ) noexcept {
-        v_buf = v_data;
-      }
-
-      static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
-        v_data = v_buf;
-      }
-    };
-
     impl::communicate( field, comm, sync_policy<T>{} );
   }
 
+  template < typename T >
+  struct merge_policy {
+    static constexpr bool send_mode = impl::guard_to_bulk;
+
+    static constexpr void to_send_buf( T& v_buf, T& v_data ) noexcept {
+      v_buf = v_data;
+      v_data = static_cast<T>(0);
+    }
+
+    static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
+      v_data += v_buf;
+    }
+  };
+
   template < typename T, int DField, int DGrid >
   void merge_guard_cells_into_bulk( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
-    template < typename T >
-      struct merge_policy {
-      static constexpr bool send_mode = impl::guard_to_bulk;
-
-      static constexpr void to_send_buf( T& v_buf, T& v_data ) noexcept {
-        v_buf = v_data;
-        v_data = static_cast<T>(0);
-      }
-
-      static constexpr void from_recv_buf( T& v_data, const T& v_buf ) noexcept {
-        v_data += v_buf;
-      }
-    };
-
     impl::communicate( field, comm, merge_policy<T>{} );
   }
 }

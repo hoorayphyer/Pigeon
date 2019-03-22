@@ -61,7 +61,8 @@ test_gen(kernel coordinate) # TODO slight mismatched in phi
 
 mpi_test_gen(parallel mpi++) # TODO larger tests
 
-test_gen(field field_shape_interplay)
+test_gen(field field_shape_interplay) # TODO
+mpi_test_gen(field current_deposition)
 
 mpi_test_gen(io silo++)
 target_include_directories(test_io_silo++ PRIVATE ${Silo_INCLUDE_DIR} )

@@ -6,34 +6,40 @@
 #include "particle/species_predef.hpp"
 #include "particle/pair_produce_predef.hpp"
 
-#include "particle/migration.hpp"
+#include "particle/c_particle.hpp"
+#include "field/field_shape_interplay.hpp"
+
 #include "utility/rng.hpp"
 #include "parallel/mpi++.hpp"
 
 #include "dynamic_variables.hpp"
 #include "parameters.hpp"
 
-namespace particle {
+namespace aperture {
+  template < int > struct Ensemble;
+
   // TODO this template parameter list is ugly. Maybe use Policy, for injection, for pair_creation?
   template < typename Real, int DGrid, int DPtc, typename state_t,
-             knl::shape Shape, PairScheme pair_scheme,
+             knl::shape Shape, particle::PairScheme pair_scheme,
              knl::coordsys CS
              >
-  class Updater {
+  class ParticleUpdater {
   public:
     using DynaVars_t = DynamicVars<Real, DGrid, DPtc, state_t>;
     using Params_t = Params<Real>;
 
   private:
-    using Jmesh_t = long double; // TODO
     using ShapeF = knl::shapef_t<Shape>;
 
-    field::Field< Jmesh_t, 3, DGrid > _Jmesh; // TODO need shape support + 1
-    std::vector<cParticle<Real, DPtc, state_t>> _migrators;
+    field::dJ_Field< long double, 3, DGrid > _dJ; // TODO long double is hard coded
+    std::vector<particle::cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
     apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid > _intercomms;
 
   public:
+    // TODO constructor?
+
+
     void operator() ( int timestep, DynaVars_t& dvars, const Params_t& params,
                       const std::optional<mpi::CartComm>& cart,
                       const Ensemble<DGrid>& ensemble );

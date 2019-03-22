@@ -6,35 +6,22 @@
 // guard, indent are controlled by fields directly, where they are collectively called margin cells.
 
 namespace knl :: grid1d {
-  template < class E >
+  template < class E, typename T >
   struct Expression {
   private:
-    constexpr auto _lower_rel() const noexcept { return static_cast<const E&>(*this)._lower_rel(); }
+    constexpr T _lower_rel() const noexcept { return static_cast<const E&>(*this)._lower_rel(); }
 
   public:
     constexpr int dim() const noexcept { return static_cast<const E&>(*this).dim(); }
-    constexpr auto delta() const noexcept { return static_cast<const E&>(*this).delta(); }
+    constexpr T delta() const noexcept { return static_cast<const E&>(*this).delta(); }
 
-    constexpr auto lower() const noexcept { return _lower_rel() * delta(); }
-    constexpr auto upper() const noexcept { return absc(dim()); }
+    constexpr T lower() const noexcept { return _lower_rel() * delta(); }
+    constexpr T upper() const noexcept { return absc(dim()); }
 
     // abscissa
-    template < typename U >
-    constexpr auto absc( int i, U shift_from_lb = 0.0 ) const noexcept {
+    constexpr T absc( int i, T shift_from_lb = 0.0 ) const noexcept {
       return  delta() * ( _lower_rel() + i + shift_from_lb );
     }
-
-    // constexpr T rel_absc( int i, T shift_from_lb ) noexcept {
-    //   return (lower / delta) - guard + i + shift_from_lb;
-    // }
-
-    // constexpr int index ( T abscissa ) noexcept {
-    //   return static_cast<int>( ( abscissa - lower ) / delta + guard );
-    // }
-
-    // constexpr int index_from_rel ( T rel_abscissa ) noexcept {
-    //   return static_cast<int>( rel_abscissa - (lower / delta) + guard );
-    // }
   };
 }
 
@@ -42,7 +29,7 @@ namespace knl :: grid1d {
   template < typename T > struct Clip;
 
   template < typename T >
-  struct Whole : Expression<Whole<T>> {
+  struct Whole : Expression<Whole<T>, T> {
   private:
     int _dim;
     T _delta;
@@ -50,7 +37,7 @@ namespace knl :: grid1d {
 
     constexpr T _lower_rel() const noexcept { return _lo_rel; }
   public:
-    friend class Expression<Whole<T>>;
+    friend class Expression<Whole<T>, T>;
     friend class Clip<T>;
     constexpr Whole() noexcept: Whole( 0.0, 1.0, 0, 1 ) {}
 
@@ -67,7 +54,7 @@ namespace knl :: grid1d {
 
 namespace knl :: grid1d {
   template < typename T >
-  struct Clip : Expression<Clip<T>> {
+  struct Clip : Expression<Clip<T>, T> {
   private:
     const Whole<T>& _whole;
     int _anchor; // the cell in the super gridline
@@ -75,7 +62,7 @@ namespace knl :: grid1d {
 
     constexpr T _lower_rel() const noexcept { return _whole._lower_rel() + _anchor; }
   public:
-    friend class Expression<Clip<T>>;
+    friend class Expression<Clip<T>, T>;
 
     constexpr Clip( const Whole<T>& whole, int anchor, int extent ) noexcept
       : _whole(whole), _anchor(anchor), _extent(extent) {}

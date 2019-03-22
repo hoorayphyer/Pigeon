@@ -3,6 +3,7 @@
 
 #include "kernel/grid_1d.hpp"
 #include "apt/array.hpp"
+#include "apt/index.hpp"
 
 namespace knl {
   template < typename T, int DGrid, template < typename > class grid1d = grid1d::Whole >

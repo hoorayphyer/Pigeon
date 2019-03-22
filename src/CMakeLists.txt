@@ -63,6 +63,7 @@ target_link_libraries( silo_lib PRIVATE ${Silo_LIBRARIES})
 link_mpipp(silo_lib)
 
 module_gen(field field_shape_interplay)
+mpi_module_gen(field current_deposition)
 mpi_module_gen(field communication)
 
 mpi_module_gen(particle migration)
@@ -71,10 +72,12 @@ module_gen(particle pair_producer)
 module_gen(particle pusher)
 module_gen(particle array)
 
-add_library(particle_updater STATIC "particle/updater.cpp")
-target_link_libraries(particle_updater PRIVATE ${particle_modules})
 
 mpi_module_gen(aperture ensemble)
+
+module_gen(aperture particle_updater)
+# add_library(particle_updater STATIC "particle_updater.cpp")
+target_link_libraries(aperture_particle_updater_module PRIVATE ${particle_modules})
 
 # TODO now src are scattered
 # # modify Aperture_src using
