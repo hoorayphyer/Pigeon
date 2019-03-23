@@ -1,15 +1,26 @@
-include_directories(${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
-
-add_library(catch_main STATIC "catch_main.cpp")
 set(CMAKE_CXX_FLAGS "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC") # -Wmissing-braces
+add_library(catch_main STATIC "catch_main.cpp")
+target_include_directories(catch_main PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
 
-macro(test_gen category name)
+add_library(catch_main_mpipp STATIC "catch_main_mpi++.cpp")
+target_include_directories(catch_main_mpipp PRIVATE "${CMAKE_SOURCE_DIR}/include")
+target_include_directories(catch_main_mpipp PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
+target_link_libraries(catch_main_mpipp PRIVATE mpipp_lib)
+
+function(test_gen category name)
+  if ( ${ARGC} GREATER 2 )
+    set( link_main ${ARGV2} ) # ARGV0, ARGV1, ARGV2..
+  else()
+    set( link_main catch_main )
+  endif()
+
   set(test_target "test_${category}_${name}")
 
   add_executable( ${test_target} "${category}/test_${name}.cpp")
   target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/include")
-  target_include_directories(${test_target} PRIVATE "../src")
-  target_link_libraries(${test_target} PRIVATE catch_main)
+  target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+  target_link_libraries(${test_target} PRIVATE ${link_main})
   set_target_properties( ${test_target}
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../test_bin"
@@ -18,33 +29,7 @@ macro(test_gen category name)
   add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
 
   unset(test_target)
-endmacro()
-
-function(link_mpi target)
-  target_include_directories(${target} PUBLIC ${MPI_INCLUDE_PATH})
-  target_link_libraries(${target} PRIVATE ${MPI_LIBRARIES})
-  set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-  set_target_properties(${target} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
 endfunction()
-add_library(catch_main_mpi STATIC "catch_main_mpi.cpp")
-link_mpi(catch_main_mpi)
-
-macro(mpi_test_gen category name)
-  set(test_target "test_${category}_${name}")
-
-  add_executable( ${test_target} "${category}/test_${name}.cpp")
-  target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/include")
-  target_include_directories(${test_target} PRIVATE "../src")
-  target_link_libraries(${test_target} PRIVATE catch_main_mpi)
-  set_target_properties( ${test_target}
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../test_bin"
-    )
-
-  add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
-
-  unset(test_target)
-endmacro()
 
 # TODO all uses of std::abs in the code, see if anywhere std::labs should be used
 test_gen(apt array)
@@ -59,14 +44,13 @@ test_gen(apt handle)
 test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
-mpi_test_gen(parallel mpi++) # TODO larger tests
+test_gen(parallel mpi++ catch_main_mpipp) # TODO larger tests
 
 test_gen(field field_shape_interplay) # TODO
-mpi_test_gen(field current_deposition)
+test_gen(field current_deposition catch_main_mpipp)
 
-mpi_test_gen(io silo++)
-target_include_directories(test_io_silo++ PRIVATE ${Silo_INCLUDE_DIR} )
-target_link_libraries( test_io_silo++ PRIVATE ${Silo_LIBRARIES})
+test_gen(io silo++ catch_main_mpipp)
+target_link_libraries( test_io_silo++ PRIVATE silo_lib )
 
 test_gen(particle state)
 # test_gen(particle particle) # TODO some tests on this are in particle_array
@@ -75,8 +59,8 @@ test_gen(particle state)
 test_gen(particle array)
 
 test_gen(particle pusher)
-# mpi_test_gen(particle migration) # TODO
-# test_gen(particle pair_producer)
+# test_gen(particle migration catch_main_mpipp) # TODO
+# test_gen(particle pair_producer)# TODO
 
-mpi_test_gen(aperture ensemble)
-mpi_test_gen(aperture dynamic_balance)
+# test_gen(aperture ensemble catch_main_mpipp)
+# test_gen(aperture dynamic_balance catch_main_mpipp)

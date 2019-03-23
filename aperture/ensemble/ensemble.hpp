@@ -13,17 +13,16 @@ namespace aperture {
     apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid > inter;
 
     int chief = 0; // the ensemble rank of the primary process in this ensemble
-    int label = 0; // ensemble label;
     int chief_cart_rank = 0;
 
     // need the following so replicas can also know
     apt::array< int, DGrid > cart_coords;
     apt::array< int, DGrid > cart_dims;
+    apt::array< bool, DGrid > is_periodic;
 
-    apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
-
-    apt::array< apt::pair<bool>, DGrid > is_at_boundary() const;
-
+    int label() const noexcept;
+    apt::pair<bool> is_at_boundary( int ith_dim ) const noexcept;
+    apt::array< apt::pair<bool>, DGrid > is_at_boundary() const noexcept;
   };
 
 }

@@ -7,7 +7,6 @@
 namespace apt {
   template < int D >
   using Index = array<int,D>;
-
 }
 
 template < int D >

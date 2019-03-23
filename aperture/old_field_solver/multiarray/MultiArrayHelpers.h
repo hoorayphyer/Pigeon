@@ -1,7 +1,7 @@
 #ifndef _MULTIARRAYHELPERS_H_
 #define _MULTIARRAYHELPERS_H_
 
-#include "MultiArray.h"
+#include "../MultiArray.h"
 
 namespace Helpers {
 

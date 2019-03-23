@@ -53,7 +53,7 @@ namespace apt {
 
     template < typename... U >
     constexpr vVec( U&... u ) noexcept
-      : _v(u...) {};
+      : _v(std::tie(u...)) {};
 
     constexpr vVec( array<T,N>& arr ) noexcept
       : vVec( arr, std::make_index_sequence<N>{} ) {}
@@ -63,14 +63,31 @@ namespace apt {
 
     constexpr vVec( vVec&& vec ) noexcept = default;
 
-    template <typename E>
-    constexpr vVec( VecExpression<E>&& vec ) noexcept
-      : vVec( std::move(vec), std::make_index_sequence<E::NDim>{} ) {}
+      // : vVec( std::move(vec), std::make_index_sequence<E::NDim>{} ) {}
 
     vVec() = delete;
     vVec( const vVec& ) = delete; // because it breaks copy sematics
+
+    constexpr vVec& operator= ( const vVec& vec ) noexcept {
+      _v = vec._v;
+      return *this;
+    }
+
     template <typename E>
-    vVec( const VecExpression<E>& ) = delete;
+    constexpr vVec& operator= ( const VecExpression<E>& vec ) noexcept {
+      std::get<0>(_v) = vec[0];
+      if constexpr ( NDim > 1 ) std::get<1>(_v) = vec[1];
+      if constexpr ( NDim > 2 ) std::get<2>(_v) = vec[2];
+      return *this;
+    }
+
+    constexpr vVec& operator= ( const array<T,N>& arr ) noexcept {
+      std::get<0>(_v) = arr[0];
+      if constexpr ( NDim > 1 ) std::get<1>(_v) = arr[1];
+      if constexpr ( NDim > 2 ) std::get<2>(_v) = arr[2];
+      return *this;
+    }
+
   };
 
 }

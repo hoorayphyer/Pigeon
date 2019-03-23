@@ -1,5 +1,4 @@
 #include "./dynamic_balance.hpp"
-#include "./ensemble.hpp"
 #include "parallel/mpi++.hpp"
 #include "particle/c_particle.hpp"
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
@@ -36,7 +35,7 @@ namespace aperture::impl {
 
 // calc_nprocs_new
 namespace aperture::impl {
-  void calc_new_nprocs_impl ( std::vector<unsigned int>& nproc, const std::vector<particle::load_t>& load, particle::load_t ave_load, const particle::load_t target_load ) {
+  void calc_new_nprocs_impl ( std::vector<int>& nproc, const std::vector<particle::load_t>& load, particle::load_t ave_load, const particle::load_t target_load ) {
     // nproc is valid to start with
     const unsigned int nens = nproc.size();
 
@@ -90,7 +89,7 @@ namespace aperture::impl {
 
   // loads = [ ens_tot_load_0, ens_size_0, ens_tot_load_1, ens_size_1... ]
   // actual total_nprocs = max( total_num_procs, accummulated_value_from_loads)
-  std::vector<unsigned int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs = 0 ) {
+  std::vector<int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs = 0 ) {
     // RATIONALE The following gives a close to the, if not THE, most optimal deployment
     // 1. Priority Queue is used to accommodate excess or leftover of processes if any
     // 2. Edge cases:
@@ -109,7 +108,7 @@ namespace aperture::impl {
     std::vector<particle::load_t> load;
     load.reserve(nens);
     load.resize(nens, 0);
-    std::vector<unsigned int> nproc;
+    std::vector<int> nproc;
     nproc.reserve(nens);
     nproc.resize(nens, 0);
 
@@ -344,7 +343,7 @@ namespace aperture {
     { // Step 1. based on particle load, primaries figure out the surpluses. If an ensemble has surplus > 0, the primary will flag the last few processes to be leaving the ensemble.
       if ( ens_opt ) {
         particle::load_t my_tot_load = 0; // a process within an ensemble
-        for ( auto[sp,ptcs] : particles ) {
+        for ( auto&[sp,ptcs] : particles ) {
           if ( sp == particle::species::photon )
             my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
           else
@@ -352,20 +351,20 @@ namespace aperture {
         }
 
         const auto& intra = ens_opt -> intra;
-        intra.reduce<mpi::by::SUM, mpi::IN_PLACE>(&my_tot_load, 1, ens_opt->chief);
+        intra.template reduce< mpi::by::SUM, mpi::IN_PLACE >( ens_opt->chief, &my_tot_load, 1 );
         int new_ens_size = 0;
         if ( cart_opt ) {
           auto& nprocs_new = nproc_deficit;
           nprocs_new.reserve(cart_opt->size());
           nprocs_new.resize(cart_opt->size());
-          particle::load_t my_load[2] = { my_tot_load, intra->size() };
+          particle::load_t my_load[2] = { my_tot_load, intra.size() };
           auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
           nprocs_new = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
           new_ens_size = nprocs_new[cart_opt->rank()];
           for ( int i = 0; i < nproc_deficit.size(); ++i )
             nproc_deficit[i] -= loads_and_nprocs[2*i+1];
         }
-        intra.broadcast(&new_ens_size, 1, ens_opt->chief);
+        intra.broadcast(ens_opt->chief, &new_ens_size, 1);
         if ( intra.rank() >= new_ens_size ) is_leaving = true;
       }
     }
@@ -376,20 +375,20 @@ namespace aperture {
         if ( itc_opt ) {
           const auto& itc = *itc_opt;
 
-          for ( auto[sp, ptcs] : particles ) {
+          for ( auto&[sp, ptcs] : particles ) {
             if (is_leaving) {
               for ( int i = 0; i < itc.size(); ++i ) {
                 int root = (itc.rank() == i) ? MPI_ROOT : MPI_PROC_NULL;
-                relinguish_data( ptcs, itc, root );
+                impl::relinguish_data( ptcs, itc, root );
               }
             } else {
               for ( int i = 0; i < itc.remote_size(); ++i )
-                relinguish_data( ptcs, itc, i );
+                impl::relinguish_data( ptcs, itc, i );
             }
           }
 
           if ( is_leaving ) {
-            for ( auto[sp, ptcs] : particles ) ptcs = {}; // clear out particles
+            for ( auto&[sp, ptcs] : particles ) ptcs = {}; // clear out particles
             ens_opt.reset(); // CRUCIAL!!
           }
         }
@@ -403,11 +402,12 @@ namespace aperture {
       std::optional<unsigned int> new_label;
       bool is_replica = ens_opt && !cart_opt;
       auto prmy_idle_comm = std::get<0>( impl::bifurcate( mpi::world, is_replica ) );
-      if ( is_replica ) new_label.emplace(ens_opt->label);
+      if ( is_replica ) new_label.emplace(ens_opt->label());
       else {
         bool is_idle = !ens_opt;
         auto[comm, job_market] = impl::bifurcate( prmy_idle_comm, is_idle );
-        std::optional<unsigned int> cur_label {ens_opt ? ens_opt->label : nullptr };
+        std::optional<unsigned int> cur_label;
+        if ( ens_opt ) cur_label.emplace( ens_opt->label() );
         new_label = impl::assign_labels( *job_market, nproc_deficit, cur_label );
       }
       auto new_ens_intra_opt = mpi::world.split( new_label, mpi::world.rank() );
@@ -418,7 +418,7 @@ namespace aperture {
 
     { // Step 4. Perform a complete rebalance on all ensembles together
       if ( ens_opt ) {
-        for ( auto[sp, ptcs] : particles )
+        for ( auto&[sp, ptcs] : particles )
           detailed_balance(ptcs, ens_opt->intra);
       }
     }
@@ -427,4 +427,21 @@ namespace aperture {
     }
 
   }
+}
+
+#include "traits.hpp"
+
+namespace aperture {
+  using namespace traits;
+  using T = real_t;
+  using state_t = ptc_state_t;
+
+  template
+  void detailed_balance<T, DPtc, state_t> ( particle::array<T, DPtc, state_t>& ptcs, const mpi::Comm& intra );
+
+  template
+  void dynamic_load_balance< T, DPtc, state_t, DGrid > ( particle::map<particle::array<T, DPtc, state_t>>& particles,
+                                                         std::optional<Ensemble<DGrid>>& ens_opt,
+                                                         const std::optional<mpi::CartComm>& cart_opt,
+                                                         unsigned int target_load );
 }

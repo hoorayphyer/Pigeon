@@ -99,16 +99,15 @@ namespace ofs {
                                            const mpi::CartComm& cart,
                                            const knl::Grid<double,DGrid>& local_grid,
                                            apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                           apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks,
                                            int guard
                                            ) : _cart(cart) {
     fuparams.dt = params.dt;
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
       fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
-      const auto& neighs = neigh_cart_ranks[i];
-      fuparams.neighbor_left[i] = neighs[LFT] ? *(neighs[LFT]) : NEIGHBOR_NULL;
-      fuparams.neighbor_right[i] = neighs[RGT] ? *(neighs[RGT]) : NEIGHBOR_NULL;
+      auto[ src, dest ] = cart.shift(i, 1);
+      fuparams.neighbor_left[i] = src ? *(src) : NEIGHBOR_NULL;
+      fuparams.neighbor_right[i] = dest ? *(dest) : NEIGHBOR_NULL;
     }
     for ( int i = DGrid; i < 3; ++i ) {
       fuparams.is_at_boundary[2*i] = true;

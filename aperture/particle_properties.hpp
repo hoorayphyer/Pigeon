@@ -34,7 +34,7 @@ namespace particle {
   charge_x<species::ion> = 1;
 }
 
-#include "../src/aperture/traits.hpp" // TODO this will break LAB
+#include "./traits.hpp" // TODO this will break LAB
 namespace particle {
   template <> constexpr unsigned int
   mass_x<species::ion> = traits::ion_mass;

@@ -10,8 +10,8 @@ public:
   virtual FieldBCType bcType() const = 0;
 };
 
-#include "boundaryconditions/FieldBC_coordinate.h"
-#include "boundaryconditions/FieldBC_damping.h"
-#include "boundaryconditions/FieldBC_rotating_conductor.h"
+#include "FieldBC_coordinate.h"
+#include "FieldBC_damping.h"
+#include "FieldBC_rotating_conductor.h"
 
 #endif // FIELDBC_H

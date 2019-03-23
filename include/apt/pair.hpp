@@ -4,10 +4,11 @@
 namespace apt {
   template < typename T >
   struct pair {
-    T _data[2];
+    T lft;
+    T rgt;
 
-    constexpr T operator[] ( bool lr ) const noexcept { return _data[lr];}
-    constexpr T& operator[] ( bool lr ) noexcept { return _data[lr];}
+    constexpr T operator[] ( bool lr ) const noexcept { return lr ? rgt : lft;}
+    constexpr T& operator[] ( bool lr ) noexcept { return lr ? rgt : lft;}
   };
 }
 

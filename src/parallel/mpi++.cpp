@@ -203,6 +203,7 @@ namespace mpi {
 // mpi cartesian
 namespace mpi {
   CartComm::CartComm( const Comm& comm, std::vector<int> dims, std::vector<bool> periodic ) {
+    // TODOL enforce same dimensionality through interface, for example, use std::vector<apt::pair>
     const int ndims = dims.size() < periodic.size() ? dims.size() : periodic.size();
 
     std::vector<int> periods(ndims);
@@ -228,27 +229,18 @@ namespace mpi {
     return rank;
   }
 
-  std::tuple<std::vector<int>, std::vector<int>>
-  CartComm::coords_dims () const {
+  std::tuple<std::vector<int>, std::vector<int>, std::vector<bool> >
+  CartComm::coords_dims_periodic() const {
     int ndims = 0;
     MPI_Cartdim_get( *this, &ndims );
     std::vector<int> coords (ndims);
     std::vector<int> dims(ndims);
     std::vector<int> is_per (ndims);
     MPI_Cart_get( *this, ndims, dims.data(), is_per.data(), coords.data() );
-    return make_tuple( coords, dims );
-  }
-
-  int CartComm::linear_coord() const {
-    int result = 0;
-    auto [coords, dims] = coords_dims();
-    result = coords[0];
-    for ( int i = 1; i < coords.size(); ++i ) {
-      result += coords[i] * dims[i-1];
-      dims[i] *= dims[i-1];
-    }
-
-    return result;
+    std::vector<bool> periodic(ndims);
+    for ( int i = 0; i < ndims; ++i )
+      periodic[i] = is_per[i];
+    return make_tuple( coords, dims, periodic );
   }
 
   apt::pair<std::optional<int>> CartComm::shift( int ith_dim, int disp ) const {

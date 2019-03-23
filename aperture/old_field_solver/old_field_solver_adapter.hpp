@@ -1,7 +1,7 @@
 #ifndef _OLD_FIELDUPDATER_ADAPTER_HPP_
 #define _OLD_FIELDUPDATER_ADAPTER_HPP_
 
-#include "../src/aperture/parameters.hpp"
+#include "../parameters.hpp"
 #include "field/field.hpp"
 #include <optional>
 
@@ -18,11 +18,12 @@ namespace ofs {
   public:
     using field_type = field::Field<double,3,DGrid>;
 
+
+    // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
     OldFieldUpdater( const Params<double>& params,
                      const mpi::CartComm& cart,
                      const knl::Grid<double,DGrid>& local_grid,
                      apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                     apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks,
                      int guard
                      );
 

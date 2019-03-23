@@ -65,6 +65,9 @@ namespace mpi {
 
     std::optional<Comm> split ( const Group& sub_group ) const;
     std::optional<Comm> split ( std::optional<unsigned int> color, int key ) const;
+    inline std::optional<Comm> split ( std::optional<unsigned int> color ) const {
+      return split(std::move(color), rank());
+    }
   };
 
 }
@@ -80,10 +83,8 @@ namespace mpi {
       return rank2coords( rank());
     }
 
-    std::tuple<std::vector<int>, std::vector<int>>
-    coords_dims() const;
-
-    int linear_coord() const;
+    std::tuple<std::vector<int>, std::vector<int>, std::vector<bool>>
+    coords_dims_periodic() const;
 
     // Sending in the `ith_dim` by `disp`, returns [ src_rank, dest_rank ]
     apt::pair<std::optional<int>> shift(int ith_dim, int disp = 1 ) const;

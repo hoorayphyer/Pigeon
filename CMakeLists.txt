@@ -34,9 +34,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_find_package" )
 #   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 # endif()
 
-find_package(MPI)
-find_package(Silo REQUIRED)
 set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
 add_subdirectory(src)
+add_subdirectory(aperture)
 add_subdirectory(tests)

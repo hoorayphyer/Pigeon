@@ -12,6 +12,8 @@
 !aperture/
 !aperture/*.hpp
 !aperture/*.cpp
+!aperture/ensemble/
+!aperture/ensemble/*
 !aperture/old_field_solver/
 !aperture/old_field_solver/*
 !aperture/old_field_solver/boundaryconditions/
@@ -56,6 +58,7 @@
 !tests/
 !tests/CMakeLists.txt
 !tests/catch_main.cpp
+!tests/catch_main_mpi++.cpp
 !tests/apt
 !tests/apt/*
 !tests/aperture

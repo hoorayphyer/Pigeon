@@ -3,46 +3,15 @@
 
 #include "particle/species_predef.hpp"
 #include <unordered_map>
-#include <initializer_list>
 
 namespace particle {
 
   template < typename Val >
-  struct map {
-  private:
-    std::unordered_map<species, Val> _data;
-  public:
-    map () = default;
-
-    map ( std::initializer_list<species> list ) {
-      for ( auto sp : list ) _data.emplace( sp, {} );
-    }
-
-    template < typename U >
-    inline void add_if_not( species sp ) noexcept {
-      if ( _data.find(sp) != _data.end() )
-        _data.emplace( sp, {} );
-    }
-
-    inline Val& operator[] ( species sp ) noexcept {
-      return _data.at(sp);
-    }
-
-    inline const Val& operator[] ( species sp ) const noexcept {
-      return _data.at(sp);
-    }
+  struct map : std::unordered_map<particle::species, Val> {
+    using std::unordered_map<particle::species, Val>::unordered_map;
 
     inline bool has( species sp ) const noexcept {
-      return _data.find(sp) != _data.end();
-    }
-
-    // TODO
-    auto begin() noexcept {
-      
-    }
-
-    auto end() noexcept {
-      
+      return this->find(sp) != this->end();
     }
   };
 }

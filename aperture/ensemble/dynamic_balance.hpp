@@ -11,7 +11,6 @@ namespace mpi {
   struct CartComm;
 }
 
-
 namespace aperture {
   template < typename T, int DPtc, typename state_t >
   void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
