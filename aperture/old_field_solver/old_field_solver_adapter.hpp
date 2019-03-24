@@ -1,8 +1,8 @@
 #ifndef _OLD_FIELDUPDATER_ADAPTER_HPP_
 #define _OLD_FIELDUPDATER_ADAPTER_HPP_
 
-#include "../parameters.hpp"
 #include "field/field.hpp"
+#include "../abstract_field_updater.hpp"
 #include <optional>
 
 namespace mpi { struct CartComm; }
@@ -10,7 +10,7 @@ namespace mpi { struct CartComm; }
 namespace ofs {
   // only applicable in 2D log spherical
   template < int DGrid = 2 >
-  struct OldFieldUpdater {
+  struct OldFieldUpdater : aperture::AbstractFieldUpdater<double,DGrid> {
     static_assert( DGrid == 2 );
   private:
     const mpi::CartComm& _cart;
@@ -20,17 +20,15 @@ namespace ofs {
 
 
     // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
-    OldFieldUpdater( const Params<double>& params,
-                     const mpi::CartComm& cart,
-                     const knl::Grid<double,DGrid>& local_grid,
+    OldFieldUpdater( const mpi::CartComm& cart,
+                     const knl::Grid<double,DGrid,knl::grid1d::Clip>& local_grid,
                      apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                     int guard
-                     );
+                     int guard );
 
-    void operator() ( field_type& E,
-                      field_type& B,
-                      const field_type& J,
-                      typename field_type::element_type dt, int timestep );
+    virtual void operator() ( field_type& E,
+                              field_type& B,
+                              const field_type& J,
+                              double dt, int timestep ) override;
   };
 }
 

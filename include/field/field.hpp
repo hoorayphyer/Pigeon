@@ -47,11 +47,14 @@ namespace field {
     static constexpr int NDim = DField;
 
     Field( const Mesh<T,DGrid>& mesh ) : _mesh(mesh) {
-      for( auto& comp : _comps ) {
-        comp.resize( _mesh.size() );
-        for ( auto& elm : comp ) elm = static_cast<T>(0);
-        comp.shrink_to_fit();
-      }
+      int size = 1;
+      for ( int i = 0; i < DGrid; ++i ) size *= _mesh.extent(i);
+      apt::foreach<0,DGrid>
+        ( [size] ( auto comp ) { // TODOL semantics
+            comp.reserve( size );
+            comp.resize( size );
+            for ( auto& elm : comp ) elm = static_cast<T>(0);
+          }, _comps );
     }
 
     inline Field& set_offset( int component, const apt::array< offset_t, DGrid >& offset ) noexcept {

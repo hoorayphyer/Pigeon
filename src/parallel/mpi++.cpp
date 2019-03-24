@@ -20,13 +20,6 @@ namespace mpi {
     return MPI_COMM_NULL;
   }
 
-  Comm make_world() {
-    Comm comm;
-    comm.set_fallback_handle(MPI_COMM_WORLD);
-    return comm;
-  }
-  const Comm world = make_world();
-
   void initialize() {
     int is_initialized = 0;
     MPI_Initialized(&is_initialized);
@@ -198,6 +191,26 @@ namespace mpi {
     }
     return res;
   }
+}
+
+// mpi::world, mpi::self
+namespace mpi {
+  Comm make_world() {
+    Comm comm;
+    comm.set_fallback_handle(MPI_COMM_WORLD);
+    return comm;
+  }
+
+  const Comm world = make_world();
+
+  Comm make_self() {
+    Comm comm;
+    comm.set_fallback_handle(MPI_COMM_SELF);
+    return comm;
+  }
+
+  const Comm self = make_self();
+
 }
 
 // mpi cartesian

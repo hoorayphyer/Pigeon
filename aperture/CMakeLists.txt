@@ -72,8 +72,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
 # add_library(UserControl STATIC ${UserControl_src})
 
-# add_executable(aperture "main.cpp" "aperture.cpp")
-# target_link_libraries(aperture PRIVATE ${old_field_solver} ${aperture_particle_updater})
+add_executable(aperture "main.cpp")
+target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_balance mpipp_lib)
 
 # target_link_libraries(aperture AperLib UserControl)
 

@@ -95,13 +95,10 @@ namespace ofs {
   }
 
   template < int DGrid >
-  OldFieldUpdater<DGrid>::OldFieldUpdater( const Params<double>& params,
-                                           const mpi::CartComm& cart,
-                                           const knl::Grid<double,DGrid>& local_grid,
+  OldFieldUpdater<DGrid>::OldFieldUpdater( const mpi::CartComm& cart,
+                                           const knl::Grid<double,DGrid,knl::grid1d::Clip>& local_grid,
                                            apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                           int guard
-                                           ) : _cart(cart) {
-    fuparams.dt = params.dt;
+                                           int guard) : _cart(cart) {
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
       fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
@@ -151,7 +148,8 @@ namespace ofs {
   void OldFieldUpdater<DGrid>::operator() ( field_type& E,
                                             field_type& B,
                                             const field_type& J,
-                                            typename field_type::element_type dt, int timestep ) {
+                                            double dt, int timestep ) {
+    fuparams.dt = dt;
     // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,

@@ -7,7 +7,7 @@ namespace field {
   private:
     bool _val;
   public:
-    constexpr offset_t( bool val ) noexcept : _val(val) {}
+    constexpr offset_t( bool val = 0 ) noexcept : _val(val) {}
     constexpr offset_t( const offset_t& ) = default;
 
     constexpr operator bool() noexcept { return _val; }

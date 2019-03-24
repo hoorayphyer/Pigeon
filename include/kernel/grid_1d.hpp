@@ -39,12 +39,12 @@ namespace knl :: grid1d {
   public:
     friend class Expression<Whole<T>, T>;
     friend class Clip<T>;
-    constexpr Whole() noexcept: Whole( 0.0, 1.0, 0, 1 ) {}
+    constexpr Whole() noexcept: Whole( 0.0, 1.0, 1 ) {}
 
     constexpr Whole( T lower, T upper, int dim ) noexcept
-      : _dim(dim), _delta( (upper - lower) / dim ) {
-      _lo_rel = lower / _delta;
-    }
+      : _dim(dim),
+        _delta( (upper - lower) / dim ),
+        _lo_rel(lower / _delta) {}
 
     constexpr int dim() const noexcept { return _dim; }
     constexpr T delta() const noexcept { return _delta; }
@@ -58,23 +58,25 @@ namespace knl :: grid1d {
   private:
     const Whole<T>& _whole;
     int _anchor; // the cell in the super gridline
-    int _extent;
+    int _dim;
 
     constexpr T _lower_rel() const noexcept { return _whole._lower_rel() + _anchor; }
   public:
     friend class Expression<Clip<T>, T>;
 
-    constexpr Clip( const Whole<T>& whole, int anchor, int extent ) noexcept
-      : _whole(whole), _anchor(anchor), _extent(extent) {}
+    constexpr Clip( const Whole<T>& whole, int anchor, int dim ) noexcept
+      : _whole(whole), _anchor(anchor), _dim(dim) {}
 
-    constexpr int dim() const noexcept { return _extent; }
+    constexpr Clip( const Whole<T>& whole ) noexcept
+      : Clip( whole, 0, whole.dim() ) {}
+
+    constexpr int dim() const noexcept { return _dim; }
     constexpr T delta() const noexcept { return _whole.delta(); }
 
     constexpr int anchor() const noexcept { return _anchor; }
-    constexpr int extent() const noexcept { return _extent; }
 
     constexpr void set_anchor( int anchor ) noexcept { _anchor = anchor; }
-    constexpr void set_extent( int extent ) noexcept { _extent = extent; }
+    constexpr void set_dim( int dim ) noexcept { _dim = dim; }
   };
 }
 

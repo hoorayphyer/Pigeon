@@ -1,26 +1,6 @@
 #include "./ensemble.hpp"
 #include <stdexcept>
 
-namespace aperture {
-  std::optional<mpi::CartComm> create_primary_comm( std::vector<int> dims, std::vector<bool> periodic ) {
-    std::optional<mpi::CartComm> result;
-
-    int nprmy = 1;
-    for ( auto i : dims )
-      nprmy *= i;
-
-    if ( nprmy > mpi::world.size() )
-      throw std::invalid_argument("Size of the Cartesian topology exceeds the size of world!");
-
-    // simply use first few members in mpi::world as primaries
-    bool is_prmy = mpi::world.rank() < nprmy;
-    auto comm_tmp = mpi::world.split( {is_prmy} );
-    if ( is_prmy ) result.emplace( *comm_tmp, dims, periodic );
-
-    return result;
-  }
-}
-
 namespace impl {
   apt::pair< std::optional<mpi::InterComm> >
   link_neighbors( const mpi::Comm& intra,
@@ -57,6 +37,7 @@ namespace impl {
   }
 }
 
+// create_ensemble
 namespace aperture {
   template < int DGrid >
   std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart_comm, const std::optional<mpi::Comm>& intra_opt ) {
@@ -121,14 +102,25 @@ namespace aperture {
   }
 
   template < int DGrid >
+  std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart ) {
+    if ( !cart ) return {};
+    std::optional<mpi::Comm> intra_opt(mpi::self);
+    return create_ensemble<DGrid>( cart, intra_opt );
+  }
+}
+
+// accessors
+namespace aperture {
+  template < int DGrid >
   int Ensemble<DGrid>::label() const noexcept {
     int i = DGrid - 1;
-    int result = cart_coords[i--];
-    for ( ; i > -1; --i )
+    int result = cart_coords[i];
+    for ( --i; i > -1; --i )
       result = cart_coords[i] + result * cart_dims[i];
 
     return result;
   }
+
 
   template < int DGrid >
   apt::pair<bool> Ensemble<DGrid>::is_at_boundary( int ith_dim ) const noexcept {

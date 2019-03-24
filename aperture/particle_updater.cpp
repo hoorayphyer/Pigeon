@@ -1,9 +1,9 @@
-#include "./particle_updater.hpp"
+#include "particle_updater.hpp"
 #include "ensemble/ensemble.hpp"
 
 #include "particle/pusher.hpp"
 #include "particle/pair_producer.hpp"
-#include "./particle_properties.hpp"
+#include "particle_properties.hpp"
 #include "particle/migration.hpp"
 
 #include "field/field_shape_interplay.hpp"
@@ -16,82 +16,88 @@
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
 
-namespace aperture::impl {
-  template < particle::species sp, particle::PairScheme pair_scheme, knl::coordsys CS,
-             typename DynaVars_t, typename dJField, typename Migrators, typename Params_t, typename ShapeF, typename Rng, typename Borders >
-  void update_species( DynaVars_t& dvars, dJField& dJ, Migrators& migrators, const Params_t& params, const ShapeF& shapef, Rng& rng, const Borders& borders ) {
+namespace particle {
+  map<Properties> properties;
+}
+
+namespace aperture {
+  template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
+             particle::PairScheme pair_scheme, knl::coordsys CS >
+  template < bool IsCharged, bool IsRadiative >
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, pair_scheme, CS >
+  ::update_species( particle::array<Real,3,state_t>& sp_ptcs,
+                    particle::map<particle::array<Real,3,state_t>>& particles,
+                    Real dt, Real unit_e,
+                    const particle::Properties& prop,
+                    const field::Field<Real,3,DGrid>& E,
+                    const field::Field<Real,3,DGrid>& B,
+                    const apt::array< apt::pair<Real>, DGrid >& borders ) {
+    if ( sp_ptcs.size() == 0 ) return;
+
     using namespace particle;
-    if ( !dvars.particles.has(sp) ) return;
+    auto shapef = ShapeF();
+    auto charge_over_dt = prop.charge_x * unit_e / dt;
 
-    auto dt = params.dt;
-
-    auto charge_over_dt = charge_x<sp> * params.e / params.dt;
-    for ( auto& ptc : dvars[sp] ) { // TODOL check ptc is proxy
+    for ( auto& ptc : sp_ptcs ) { // TODOL check ptc is proxy
       if( ptc.is(flag::empty) ) continue;
 
-      if constexpr ( is_charged<sp> ) {
-          auto E = field::interpolate(dvars.E, ptc.q, shapef );
-          auto B = field::interpolate(dvars.E, ptc.q, shapef );
-          auto&& dp = update_p( ptc, dt, mass_x<sp>, E, B );
+      // TODOL should also check IsMassive
+      if constexpr ( IsCharged ) {
+          auto E_itpl = field::interpolate( E, ptc.q, shapef );
+          auto B_itpl = field::interpolate( B, ptc.q, shapef );
+          auto&& dp = update_p( ptc, dt, prop.mass_x, E_itpl, B_itpl );
 
           // TODOL make sure the newly added particles will not participate in the loop
-          if constexpr ( pair_scheme != PairScheme::Disabled && is_radiative<sp> ) {
-            auto Rc = calc_Rc( dt, ptc.p, std::move(dp) );
-            auto gamma = std::sqrt( is_massive<sp> + apt::sqabs(ptc.p) );
-            if ( !is_productive_lepton( ptc, gamma, Rc, rng ) )
-              goto end_of_pair_produce;
-
-            if constexpr ( pair_scheme == PairScheme::Photon ) {
-              produce_photons( std::back_inserter( dvars.photons ),
-                               ptc, gamma, Rc );
-              } else if ( pair_scheme == PairScheme::Instant ) {
-              instant_produce_pairs( std::back_inserter( dvars.electrons ),
-                                     std::back_inserter( dvars.positrons ),
-                                     ptc, gamma, Rc );
+          if constexpr ( IsRadiative ) {
+              // TODOL wrap into a factory of pair producer
+              if constexpr ( pair_scheme != PairScheme::Disabled ) {
+                  auto Rc = calc_Rc( dt, ptc.p, std::move(dp) );
+                  auto gamma = std::sqrt( (!prop.mass_x) + apt::sqabs(ptc.p) );
+                  if ( is_productive_lepton( ptc, gamma, Rc, _rng ) ) {
+                    if constexpr ( pair_scheme == PairScheme::Photon ) {
+                        produce_photons( std::back_inserter( particles[species::photon] ),
+                                         ptc, gamma, Rc );
+                      } else if ( pair_scheme == PairScheme::Instant ) {
+                      instant_produce_pairs( std::back_inserter( particles[species::electron] ),
+                                             std::back_inserter( particles[species::positron] ),
+                                             ptc, gamma, Rc );
+                    }
+                  }
+                }
             }
-          }
-          end_of_pair_produce:;
 
         }
-      else if ( sp == species::photon && pair_scheme == PairScheme::Photon ) {
-        photon_produce_pairs( std::back_inserter( dvars.electrons ),
-                              std::back_inserter( dvars.positrons ),
+      else if ( pair_scheme == PairScheme::Photon ) {
+        // TODO check is photon
+        photon_produce_pairs( std::back_inserter( particles[species::electron] ),
+                              std::back_inserter( particles[species::positron] ),
                               ptc );
       }
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
-      auto&& dq = update_q<CS>( ptc, dt, is_massive<sp> );
+      auto&& dq = update_q<CS>( ptc, dt, prop.mass_x );
       // TODOL pusher handle boundary condition. Is it needed?
-      if constexpr ( is_charged<sp> )
-                     dJ.deposit( charge_over_dt, ptc.q()-std::move(dq), ptc.q(), shapef ); // TODOL check the 2nd argument
+      if constexpr ( IsCharged )
+                     _dJ.deposit( charge_over_dt, ptc.q()-std::move(dq), ptc.q(), shapef ); // TODOL check the 2nd argument
 
-      if ( is_migrate( ptc.q(), borders ) ) {
-        migrators.emplace_back(std::move(ptc));
-      }
-
+      if ( is_migrate( ptc.q(), borders ) )
+        _migrators.emplace_back(std::move(ptc));
     }
   }
-
-  template < particle::PairScheme PS, knl::coordsys CS, int I = 0, typename... Args >
-  inline void iterate_species( Args&&... args ) {
-    if constexpr ( I == 4 ) return; // TODOL loop over all species. Would void_t help?
-    else {
-      // update_species<static_cast<species>(I), PS, CS>( std::forward<Args>(args)... );
-      return iterate_species<PS, CS, I+1>( std::forward<Args>(args)... );
-    }
-  }
-
 }
 
 namespace aperture {
+
   template < typename Real, int DGrid, int DPtc, typename state_t,
-             knl::shape Shape, particle::PairScheme pair_scheme, knl::coordsys CS
+             typename ShapeF,
+             particle::PairScheme pair_scheme, knl::coordsys CS
              >
-  void ParticleUpdater< Real, DGrid, DPtc, state_t, Shape, pair_scheme, CS >
-  ::operator() ( int timestep, DynaVars_t& dvars,
-                 const Params_t& params,
-                 const std::optional<mpi::CartComm>& cart,
-                 const Ensemble<DGrid>& ensemble ) {
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, pair_scheme, CS >
+  ::operator() ( field::Field<Real,3,DGrid>& J,
+                 particle::map<particle::array<Real,3,state_t>>& particles,
+                 const field::Field<Real,3,DGrid>& E,
+                 const field::Field<Real,3,DGrid>& B,
+                 Real dt, Real unit_e, int timestep ) {
     using namespace particle;
     // borders tell which particles will be migrated. These are simply the boundaries of the bulk grid
     apt::array< apt::pair<Real>, DGrid > borders;
@@ -99,37 +105,46 @@ namespace aperture {
       ( []( auto& b, const auto& g ) {
           b[LFT] = g.lower();
           b[RGT] = g.upper();
-        }, borders, dvars.E.mesh().bulk() );
+        }, borders, E.mesh().bulk() );
 
     _dJ.reset();
 
-    // TODOL reduce number of communications?
-    for ( int i = 0; i < 3; ++i )
-      ensemble.intra.broadcast( ensemble.chief, dvars.E[i].data().data(), dvars.E[i].data().size() );
-    for ( int i = 0; i < 3; ++i )
-      ensemble.intra.broadcast( ensemble.chief, dvars.B[i].data().data(), dvars.B[i].data().size() );
+    // TODO NOTE injection and annihilation are more like free sources and sinks of particles users control, in other words they fit the notion of particle boundary conditions. Do them outside of Updater. In contrast, pair creation is a physical process we model, so it is done inside the updater.
+    // inject_particles(); // TODO only coordinate space current is needed in implementing current regulated injection // TODO compatible with ensemble??
+    // TODOL annihilation will affect deposition // NOTE one can deposit in the end
+    // annihilate_mark_pairs( );
 
-    impl::iterate_species<pair_scheme, CS>( dvars, _dJ, _migrators, params,
-                                            knl::shapef_t<Shape>(), _rng, borders );
+    for ( auto&[ sp, ptcs ] : particles ) {
+      const particle::Properties& prop = properties.at(sp);
+      auto[ m_x, q_x, is_rad ] = prop;
+      // if ( q_x && is_rad )
+      //   update_species<true,true>( ptcs, particles, dt, unit_e, E, B, borders );
+      // else if ( q_x && !is_rad )
+      //   update_species<true,false>( ptcs, particles, dt, unit_e, E, B, borders );
+      // else
+      //   update_species<false,false>( ptcs, particles, dt, unit_e, E, B, borders );
+    }
 
-    migrate( _migrators, _intercomms, borders, timestep );
+    migrate( _migrators, _ensemble.inter, borders, timestep );
     for ( auto&& ptc : _migrators ) {
-      dvars.particles[ptc.template get<species>()].push_back( std::move(ptc) ); // TODOL check this
+      particles[ptc.template get<species>()].push_back( std::move(ptc) ); // TODOL check this
     }
     _migrators.resize(0);
 
-    _dJ.reduce( ensemble.chief, ensemble.intra );
+    _dJ.reduce( _ensemble.chief, _ensemble.intra );
 
-    if ( cart )
-      _dJ.integrate( *cart ); // TODO return the deposited J?
+    if ( _cart )
+      _dJ.integrate( *_cart );
+
+    // J = getJfromJmesh(_dJ); TODO
 
   }
 
 }
 
-#include "./traits.hpp"
+#include "traits.hpp"
 using namespace traits;
 namespace aperture {
-  template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, shape,
+  template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, knl::shapef_t<shape>,
                                   pair_produce_scheme, coordinate_system>;
 }

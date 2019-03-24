@@ -61,8 +61,6 @@ namespace mpi {
     Comm () = default;
     // Comm ( const Comm& super_comm, const Group& sub_group ); // TODO what if sub_group is empty?
 
-
-
     std::optional<Comm> split ( const Group& sub_group ) const;
     std::optional<Comm> split ( std::optional<unsigned int> color, int key ) const;
     inline std::optional<Comm> split ( std::optional<unsigned int> color ) const {
@@ -111,6 +109,7 @@ namespace mpi {
   void initialize();
   void finalize();
   extern const Comm world;
+  extern const Comm self;
 }
 
 

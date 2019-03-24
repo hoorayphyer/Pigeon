@@ -28,10 +28,12 @@ namespace aperture {
 }
 
 namespace aperture {
-  std::optional<mpi::CartComm> create_primary_comm ( std::vector<int> dims, std::vector<bool> periodic );
 
   template < int DGrid >
   std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
+
+  template < int DGrid >
+  std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart ); // create ensemble only consists of chief itself
 
 }
 

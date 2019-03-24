@@ -11,9 +11,7 @@ namespace knl {
     using element_type = T;
     static constexpr int NDim = DGrid;
 
-    // TODOH use DGrid as number of arguments. Or use factory?
-    constexpr Grid( const grid1d<T>& gl0, const grid1d<T>& gl1 ) noexcept
-      : apt::array< grid1d<T>, DGrid >{ gl0, gl1 } {}
+    using apt::array< grid1d<T>, DGrid >::array;
 
     constexpr apt::Index<DGrid> extent() const noexcept {
       apt::Index<DGrid> ext;
@@ -23,6 +21,20 @@ namespace knl {
     }
 
   };
+
+  template < typename T, int DGrid >
+  Grid<T,DGrid,grid1d::Clip> make_clip( const Grid<T,DGrid,grid1d::Whole>& grid ) {
+    static_assert( DGrid > 0 && DGrid < 4 );
+    // if constexpr ( DGrid == 1 )
+    //   return Grid<T,DGrid,grid1d::Clip>(grid[0]);
+    // else if ( DGrid == 2 )
+    // TODO TODO
+    // return Grid<T,DGrid,grid1d::Clip>{{ grid1d::Clip(grid[0]), grid1d::Clip(grid[1]) }};
+    // else
+    //   return Grid<T,DGrid,grid1d::Clip>(grid[0], grid[1], grid[2]);
+  }
+
+
 }
 
 #endif
