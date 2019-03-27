@@ -24,11 +24,15 @@ namespace mpi {
     int is_initialized = 0;
     MPI_Initialized(&is_initialized);
 
+    MPI_Type_commit(&mpi::MPI_CPARTICLE);
+
     if (!is_initialized)
       MPI_Init(NULL, NULL);
   }
 
   void finalize() {
+    MPI_Type_free( &mpi::MPI_CPARTICLE );
+
     int is_finalized = 0;
     MPI_Finalized(&is_finalized);
 
@@ -156,6 +160,9 @@ namespace mpi {
     result.reset(grp);
     return result;
   }
+
+  template struct CommAccessor<Comm>;
+  template struct CommAccessor<InterComm>;
 }
 
 // mpi::Comm
@@ -190,6 +197,10 @@ namespace mpi {
       delete comm;
     }
     return res;
+  }
+
+  std::optional<Comm> Comm::split ( std::optional<unsigned int> color ) const {
+    return split(std::move(color), rank());
   }
 }
 

@@ -6,54 +6,63 @@
 #include "kernel/coordsys_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "particle/pair_produce_predef.hpp"
+#include "particle/map.hpp"
+#include "particle/array.hpp"
 
+#include "kernel/grid.hpp"
 #include "particle/c_particle.hpp"
-#include "field/field_shape_interplay.hpp"
+#include "field/mesh_shape_interplay.hpp"
 
 #include "utility/rng.hpp"
 #include "parallel/mpi++.hpp"
 
-#include "dynamic_variables.hpp"
-#include "parameters.hpp"
-
-namespace particle { struct Properties; }
-
 namespace aperture {
   template < int > struct Ensemble;
+}
+
+namespace particle {
+  struct Properties;
 
   // TODO this template parameter list is ugly. Maybe use Policy, for injection, for pair_creation?
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             particle::PairScheme pair_scheme, knl::coordsys CS >
-  class ParticleUpdater : public AbstractParticleUpdater<Real, DGrid, state_t>{
+             typename Real_dJ,
+             PairScheme pair_scheme, knl::coordsys CS >
+  class ParticleUpdater : public aperture::AbstractParticleUpdater<Real, DGrid, state_t>{
   private:
-    field::dJ_Field< long double, 3, DGrid > _dJ; // TODO long double is hard coded
-    std::vector<particle::cParticle<Real, DPtc, state_t>> _migrators;
+    const knl::Grid< Real, DGrid >& _localgrid;
+    field::Standard_dJ_Field< Real_dJ, 3, DGrid > _dJ;
+    std::vector<cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
     const std::optional<mpi::CartComm>& _cart;
-    const Ensemble<DGrid>& _ensemble;
+    const aperture::Ensemble<DGrid>& _ensemble;
 
-    template < bool IsCharged, bool IsRadiative >
-    void update_species( particle::array<Real,3,state_t>& sp_ptcs,
-                         particle::map<particle::array<Real,3,state_t>>& particles,
+    template < bool IsCharged >
+    void update_species( array<Real,3,state_t>& sp_ptcs,
                          Real dt, Real unit_e,
-                         const particle::Properties& prop,
+                         const Properties& prop,
                          const field::Field<Real,3,DGrid>& E,
                          const field::Field<Real,3,DGrid>& B,
-                         const apt::array< apt::pair<Real>, DGrid >& borders );
-
-
-
+                         const apt::array< apt::pair<Real>, DGrid >& borders);
 
   public:
-    ParticleUpdater( const knl::Grid< Real, DGrid, knl::grid1d::Clip >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const Ensemble<DGrid>& ensemble );
+    ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const aperture::Ensemble<DGrid>& ensemble );
 
     virtual void operator() ( field::Field<Real,3,DGrid>& J,
-                              particle::map<particle::array<Real,3,state_t>>& particles,
+                              map<array<Real,3,state_t>>& particles,
                               const field::Field<Real,3,DGrid>& E,
                               const field::Field<Real,3,DGrid>& B,
+                              const apt::array< apt::pair<Real>, DGrid >& borders,
                               Real dt,Real unit_e, int timestep ) override;
   };
 
+}
+
+#include "traits.hpp"
+#include "kernel/shapef.hpp"
+namespace aperture {
+  using namespace traits;
+  template < typename Real, int DGrid, typename state_t >
+  using ParticleUpdater = particle::ParticleUpdater<Real, DGrid, 3, state_t, knl::shapef_t<shape>, real_dj_t, pair_produce_scheme, coordinate_system >;
 }
 
 #endif

@@ -1,4 +1,4 @@
-#include "./ensemble.hpp"
+#include "ensemble.hpp"
 #include <stdexcept>
 
 namespace impl {
@@ -140,6 +140,11 @@ namespace aperture {
 #include "traits.hpp"
 namespace aperture {
   using namespace traits;
+  template struct Ensemble<DGrid>;
+
   template
   std::optional<Ensemble<DGrid>> create_ensemble<DGrid>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
+
+  template
+  std::optional<Ensemble<DGrid>> create_ensemble<DGrid>( const std::optional<mpi::CartComm>& cart );
 }

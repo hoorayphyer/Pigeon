@@ -96,7 +96,7 @@ namespace ofs {
 
   template < int DGrid >
   OldFieldUpdater<DGrid>::OldFieldUpdater( const mpi::CartComm& cart,
-                                           const knl::Grid<double,DGrid,knl::grid1d::Clip>& local_grid,
+                                           const knl::Grid<double,DGrid>& local_grid,
                                            apt::array< apt::pair<bool>, DGrid > is_at_boundary,
                                            int guard) : _cart(cart) {
     for ( int i = 0; i < DGrid; ++i ) {

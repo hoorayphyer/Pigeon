@@ -3,6 +3,7 @@
 
 #include "apt/vec_expression.hpp"
 #include "apt/type_traits.hpp"
+#include <cmath>
 
 namespace apt {
 
@@ -10,7 +11,7 @@ namespace apt {
 
   template < BinaryOps Op, typename E1, typename E2,
              typename T = most_precise_t< element_t<E1>, element_t<E2> > >
-  struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T, false> {
+  struct FCompWise_Vec_Vec : public VecExpression<FCompWise_Vec_Vec<Op,E1,E2,T>, T> {
   private:
     const E1& _e1;
     const E2& _e2;
@@ -32,7 +33,7 @@ namespace apt {
 
   template < BinaryOps Op, typename E, typename Real,
              typename T = most_precise_t< element_t<E>, Real > >
-  struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T, false> {
+  struct FCompWise_Vec_Sca : public VecExpression<FCompWise_Vec_Sca<Op,E,Real,T>, T> {
   private:
     const E& _e;
     const Real& _t;
@@ -84,39 +85,11 @@ namespace {
   vec_def_op(-, SUB);
   vec_def_op(*, MUL);
   vec_def_op(/, DIV);
-
-  template <typename E1, typename E2 >
-  constexpr E1& operator+= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
-    apt::foreach<0, E1::NDim>
-      ( []( auto& x, const auto& y ) noexcept { x += y; }, v1, v2 );
-    return static_cast<E1&>(v1);
-  }
-
-  template <typename E1, typename E2 >
-  constexpr E1& operator-= ( apt::VecExpression<E1>& v1, const apt::VecExpression<E2>& v2 ) noexcept {
-    apt::foreach<0, E1::NDim>
-      ( []( auto& x, const auto& y ) noexcept { x -= y; }, v1, v2 );
-    return static_cast<E1&>(v1);
-  }
-
-  template <typename E, typename Real = typename E::element_type>
-  constexpr E& operator*= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
-    apt::foreach<0, E::NDim>
-      ( [&t]( auto& x ) noexcept { x *= t; }, v );
-    return static_cast<E&>(v);
-  }
-
-  template <typename E, typename Real = typename E::element_type>
-  constexpr E& operator/= ( apt::VecExpression<E>& v, const Real& t ) noexcept {
-    apt::foreach<0, E::NDim>
-      ( [&t]( auto& x ) noexcept { x /= t; }, v );
-    return static_cast<E&>(v);
-  }
 }
 
 namespace apt {
   template <typename E1, typename E2, typename T = typename E1::element_type>
-  struct VecCross : public VecExpression<VecCross<E1,E2,T>, T, false> {
+  struct VecCross : public VecExpression<VecCross<E1,E2,T>, T> {
   private:
     const E1& _e1;
     const E2& _e2;
@@ -139,7 +112,6 @@ namespace apt {
   }
 }
 
-#include <cmath>
 namespace apt {
   template < typename E1, typename E2, int I = 0 >
   constexpr auto dot ( const VecExpression<E1>& v1, const VecExpression<E2>& v2 ) noexcept {

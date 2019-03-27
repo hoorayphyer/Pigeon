@@ -6,15 +6,13 @@
 #include "apt/pair.hpp"
 #include <vector>
 
-namespace std {
-  template < class > class optional;
-}
+namespace std { template < class > class optional; }
 
 namespace mpi { struct InterComm; }
 
 namespace particle {
   template < typename Vec, int DGrid, typename T >
-  bool is_migrate( const apt::VecExpression<Vec>& q,
+  bool is_migrate( const apt::VecExpression<Vec,T>& q,
                    const apt::array< apt::pair<T>, DGrid>& borders ) noexcept;
 
   template < typename T, int DPtc, typename state_t, int DGrid >

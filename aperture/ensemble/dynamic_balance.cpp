@@ -313,14 +313,14 @@ namespace aperture {
       int tag = 147;
       if ( impl::balance_code::send == instr[0] ) {
         position -= num;
-        for ( int j = 0; j < num; ++j ) buffer[j] = ptcs[position + j];
+        for ( int j = 0; j < num; ++j ) buffer[j] = std::move(ptcs[position + j]);
         reqs[i] = intra.Isend( other_rank, tag, buffer.data(), num );
       } else {
         // TODOL double check if using Irecv/Isend would cause race condition?
         // NOTE: using Irecv here causes hanging behavior on some platforms. So we use recv.
         intra.recv( other_rank, tag, buffer.data(), num );
         ptcs.resize(ptcs.size() + num);
-        for ( int j = 0; j < num; ++j ) ptcs[position + j] = buffer[j];
+        for ( int j = 0; j < num; ++j ) ptcs[position + j] = std::move(buffer[j]);
         position += num;
       }
     }
@@ -351,7 +351,7 @@ namespace aperture {
         }
 
         const auto& intra = ens_opt -> intra;
-        intra.template reduce< mpi::by::SUM, mpi::IN_PLACE >( ens_opt->chief, &my_tot_load, 1 );
+        intra.template reduce< mpi::IN_PLACE >( mpi::by::SUM, ens_opt->chief, &my_tot_load, 1 );
         int new_ens_size = 0;
         if ( cart_opt ) {
           auto& nprocs_new = nproc_deficit;

@@ -1,17 +1,105 @@
 #ifndef  _KNL_GRID_HPP_
 #define  _KNL_GRID_HPP_
 
-#include "kernel/grid_1d.hpp"
 #include "apt/array.hpp"
 #include "apt/index.hpp"
 
+// NOTE convention: the zero of all indices exposed to users start at the first cell in BULK. In other words, guard cells have indices outside [0, dim_of_bulk). Guard is important only when converting from vectorial to linear index, which can be encapsulated in a dedicated function
+
+// guard, indent are controlled by fields directly, where they are collectively called margin cells.
+
+// namespace knl {
+//   template < typename T >
+//   struct SuperGrid1D {
+//   private:
+//     int _dim;
+//     T _delta;
+//     T _lower;
+
+//   public:
+//     constexpr SuperGrid1D() noexcept: SuperGrid1D( 0.0, 1.0, 1 ) {}
+
+//     constexpr SuperGrid1D( T lower, T upper, int dim ) noexcept
+//       : _dim(dim),
+//         _delta( (upper - lower) / dim ),
+//         _lower(lower) {}
+
+//     constexpr int dim() const noexcept { return _dim; }
+//     constexpr T delta() const noexcept { return _delta; }
+
+//     constexpr T lower() const noexcept { return _lower; }
+//     constexpr T upper() const noexcept { return absc(dim()); }
+
+//     // abscissa
+//     constexpr T absc( int i, T shift_from_lb = 0.0 ) const noexcept {
+//       return  _lower + delta() * ( i + shift_from_lb );
+//     }
+//   };
+
+// }
+
+// namespace knl {
+//   template < typename T >
+//   struct SubGrid1D {
+//   private:
+//     const SuperGrid1D<T>& _supergrid;
+//     int _anchor; // the cell in the super gridline
+//     int _dim;
+
+//   public:
+//     constexpr SubGrid1D( const SuperGrid1D<T>& supergrid, int anchor, int dim ) noexcept
+//       : _supergrid(supergrid), _anchor(anchor), _dim(dim) {}
+
+//     constexpr int dim() const noexcept { return _dim; }
+//     constexpr T delta() const noexcept { return _supergrid.delta(); }
+
+//     constexpr T lower() const noexcept { return _supergrid.absc(_anchor); }
+//     constexpr T upper() const noexcept { return _supergrid.absc(_anchor + _dim); }
+//   };
+// }
+
 namespace knl {
-  template < typename T, int DGrid, template < typename > class grid1d = grid1d::Whole >
-  struct Grid : public apt::array< grid1d<T>, DGrid > {
+  template < typename T >
+  struct Grid1D {
+  private:
+    int _dim;
+    T _delta;
+    T _lower;
+
+  public:
+    constexpr Grid1D() noexcept: Grid1D( 0.0, 1.0, 1 ) {}
+
+    constexpr Grid1D( T lower, T upper, int dim ) noexcept
+      : _dim(dim),
+        _delta( (upper - lower) / dim ),
+        _lower(lower) {}
+
+    constexpr int dim() const noexcept { return _dim; }
+    constexpr T delta() const noexcept { return _delta; }
+
+    constexpr T lower() const noexcept { return _lower; }
+    constexpr T upper() const noexcept { return absc(dim()); }
+
+    // abscissa
+    constexpr T absc( int i, T shift_from_lb = 0.0 ) const noexcept {
+      return  _lower + delta() * ( i + shift_from_lb );
+    }
+
+    constexpr void clip( int i_start, int extent ) noexcept {
+      _lower = absc( i_start );
+      _dim = extent;
+    }
+  };
+
+}
+
+namespace knl {
+  template < typename T, int DGrid >
+  struct Grid : public apt::array< Grid1D<T>, DGrid > {
     using element_type = T;
     static constexpr int NDim = DGrid;
 
-    using apt::array< grid1d<T>, DGrid >::array;
+    using apt::array< Grid1D<T>, DGrid >::array;
 
     constexpr apt::Index<DGrid> extent() const noexcept {
       apt::Index<DGrid> ext;
@@ -19,22 +107,7 @@ namespace knl {
         ext[i] = (*this)[i].dim();
       return ext;
     }
-
   };
-
-  template < typename T, int DGrid >
-  Grid<T,DGrid,grid1d::Clip> make_clip( const Grid<T,DGrid,grid1d::Whole>& grid ) {
-    static_assert( DGrid > 0 && DGrid < 4 );
-    // if constexpr ( DGrid == 1 )
-    //   return Grid<T,DGrid,grid1d::Clip>(grid[0]);
-    // else if ( DGrid == 2 )
-    // TODO TODO
-    // return Grid<T,DGrid,grid1d::Clip>{{ grid1d::Clip(grid[0]), grid1d::Clip(grid[1]) }};
-    // else
-    //   return Grid<T,DGrid,grid1d::Clip>(grid[0], grid[1], grid[2]);
-  }
-
-
 }
 
 #endif

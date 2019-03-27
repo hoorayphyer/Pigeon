@@ -1,52 +1,57 @@
 #ifndef _APT_VEC_EXPRESSION_HPP_
 #define _APT_VEC_EXPRESSION_HPP_
+#include "apt/foreach.hpp"
 
 namespace apt {
-
   template <typename E,
-            typename T = typename E::element_type,
-            bool is_lvalue = E::is_lvalue>
-  class VecExpression;
-
-  template <typename E, typename T>
-  class VecExpression<E,T,false> {
+            typename Real = typename E::element_type >
+  class VecExpression {
   public:
     static constexpr int NDim = E::NDim;
-    using element_type = T;
-    static constexpr bool is_lvalue = false;
+    using element_type = Real;
 
-    constexpr T operator[] ( int i ) const noexcept {
+    constexpr Real operator[] ( int i ) const noexcept {
       return static_cast<const E&>(*this)[i];
     }
 
-  };
-
-  template <typename E, typename T>
-  class VecExpression<E,T,true> {
-  public:
-    static constexpr int NDim = E::NDim;
-    using element_type = T;
-    static constexpr bool is_lvalue = true;
-
-    constexpr T operator[] ( int i ) const noexcept {
-      return static_cast<const E&>(*this)[i];
-    }
-
-    constexpr T& operator[] ( int i ) noexcept {
-      return static_cast<E&>(*this)[i];
-    }
   };
 }
 
-#include "apt/foreach.hpp"
+namespace apt {
+  template <typename Vec> struct VecModAssign;
 
-namespace std{
-  // TODO can this work on vVec?
-  template < typename E1, typename T1, typename E2, typename T2 >
-  void swap ( apt::VecExpression<E1,T1>& a, apt::VecExpression<E2,T2>& b ) noexcept {
-    apt::foreach<0, E1::NDim>
-      ( []( auto& x, auto& y ) noexcept { std::swap(x,y); }, a, b );
-  }
+  template <typename E1, typename Real>
+  struct VecModAssign< VecExpression<E1,Real> > {
+  private:
+    constexpr auto& self() noexcept { return static_cast<E1&>(*this); };
+  public:
+    template < typename E2 >
+    constexpr E1& operator+= ( const apt::VecExpression<E2>& v2 ) noexcept {
+      apt::foreach<0, E1::NDim>
+        ( []( auto& x, const auto& y ) noexcept { x += y; }, self(), v2 );
+      return self();
+    }
+
+    template < typename E2 >
+    constexpr E1& operator-= ( const apt::VecExpression<E2>& v2 ) noexcept {
+      apt::foreach<0, E1::NDim>
+        ( []( auto& x, const auto& y ) noexcept { x -= y; }, self(), v2 );
+      return self();
+    }
+
+    constexpr E1& operator*= ( Real t ) noexcept {
+      apt::foreach<0, E1::NDim>
+        ( [&t]( auto& x ) noexcept { x *= t; }, self() );
+      return self();
+    }
+
+    constexpr E1& operator/= ( Real t ) noexcept {
+      apt::foreach<0, E1::NDim>
+        ( [&t]( auto& x ) noexcept { x /= t; }, self() );
+      return self();
+    }
+  };
+
 }
 
 #endif

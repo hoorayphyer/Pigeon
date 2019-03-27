@@ -4,29 +4,26 @@
 #include "abstract_field_updater.hpp"
 #include "abstract_particle_updater.hpp"
 #include "kernel/grid.hpp"
-#include "kernel/shapef.hpp"
 
 #include "old_field_solver/old_field_solver_adapter.hpp"
 #include "particle_updater.hpp"
 
 #include "ensemble/dynamic_balance.hpp"
 
-#include "traits.hpp"
 #include <memory>
-
-namespace aperture::tmp {
-  using namespace traits;
-  template < typename Real, int DGrid, typename state_t >
-  using PtcUpdater = ParticleUpdater<Real, DGrid, 3, state_t, knl::shapef_t<shape>, pair_produce_scheme, coordinate_system >;
-}
 
 namespace aperture {
   template < typename Real, int DGrid, typename state_t >
   struct Aperture {
   private:
+    const knl::Grid< Real, DGrid >& _supergrid;
+    const int _guard;
     std::optional<mpi::CartComm> _cart_opt;
+    util::Rng<Real> _rng;
+
+    knl::Grid< Real, DGrid > _grid;
     std::optional<Ensemble<DGrid>> _ens_opt;
-    knl::Grid< Real, DGrid, knl::grid1d::Clip > _grid;
+    apt::array< apt::pair<Real>, DGrid > _borders; // borders tell which particles will be migrated. These are simply the boundaries of the bulk grid
 
     field::Field<Real, 3, DGrid> _E;
     field::Field<Real, 3, DGrid> _B;
@@ -39,19 +36,32 @@ namespace aperture {
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
 
-  public:
-    Aperture( const std::optional<mpi::CartComm>& cart_opt, const knl::Grid< Real, DGrid >& supergrid, int guard )
-      : _cart_opt(cart_opt), _grid(knl::make_clip(supergrid)), _E({_grid, guard}), _B({_grid, guard}), _J({_grid, guard}) {
-      // TODO check local grid constructor. Set anchor and dim
+    void refresh( const Ensemble<DGrid>& ens ) {
+      for ( int i = 0; i < DGrid; ++i ) {
+        int dim = _supergrid[i].dim() / ens.cart_dims[i];
+        _grid[i] = _supergrid[i];
+        _grid[i].clip( ens.cart_coords[i] * dim, dim );
+        _E = { {_grid.extent(), _guard} };
+        _B = { {_grid.extent(), _guard} };
+        _J = { {_grid.extent(), _guard} };
+        _borders[i][LFT] = _grid[i].lower();
+        _borders[i][RGT] = _grid[i].upper();
+      }
 
-      // create cart and ensemble, set local grid anchor
+      if ( _cart_opt )
+        _field_update.reset(new ofs::OldFieldUpdater<>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
+      _ptc_update.reset(new ParticleUpdater<Real, DGrid, state_t>( _grid, _rng, _cart_opt, ens ) );
+    }
+
+  public:
+    Aperture( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng ) : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt), _rng(std::move(rng))
+    {
+      _grid = supergrid;
       _ens_opt = create_ensemble<DGrid>(cart_opt);
       if ( !_ens_opt ) return;
+
       const auto& ens = *_ens_opt;
-      if ( _cart_opt )
-        _field_update.reset(new ofs::OldFieldUpdater<>( *_cart_opt, _grid, ens.is_at_boundary(), guard ) );
-      util::Rng<Real> rng; // TODO set seed
-      _ptc_update.reset(new tmp::PtcUpdater<Real, DGrid, state_t>( _grid, rng, _cart_opt, ens ) );
+      refresh(ens);
     }
 
     void evolve( int timestep, Real dt, Real unit_e ) {
@@ -66,7 +76,7 @@ namespace aperture {
 
         // if ( false )
         //   sort_particles();
-        (*_ptc_update)( _J, _particles, _E, _B, dt, unit_e, timestep );
+        (*_ptc_update)( _J, _particles, _E, _B, _borders, dt, unit_e, timestep );
       }
 
       if (false) {
@@ -74,9 +84,15 @@ namespace aperture {
         // TODO export_data();
         if ( false ) {
           // TODO has a few hyper parameters
-          // TODO also update localgrid, and maybe fieldupdater and ptcupdater as well
           // TODO touch create is not multinode safe even buffer is used
+          std::optional<int> old_label;
+          if ( _ens_opt ) old_label.emplace(_ens_opt->label());
+
           dynamic_load_balance( _particles, _ens_opt, _cart_opt, 100000 );
+
+          std::optional<int> new_label;
+          if ( _ens_opt ) new_label.emplace(_ens_opt->label());
+          if ( old_label != new_label ) refresh(*_ens_opt); // TODO check label comparison
         }
       }
 

@@ -2,7 +2,6 @@
 #define  _FIELD_OFFSET_HPP_
 
 namespace field {
-
   struct offset_t {
   private:
     bool _val;
@@ -10,10 +9,7 @@ namespace field {
     constexpr offset_t( bool val = 0 ) noexcept : _val(val) {}
     constexpr offset_t( const offset_t& ) = default;
 
-    constexpr operator bool() noexcept { return _val; }
-
-    template < typename T >
-    constexpr operator T() noexcept { return static_cast<T>( 0.5 * _val ); }
+    constexpr operator double() const noexcept { return static_cast<double>( 0.5 * _val ); }
 
     constexpr bool operator== ( offset_t other ) const noexcept {
       return _val == other._val;

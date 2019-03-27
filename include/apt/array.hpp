@@ -10,7 +10,7 @@ namespace apt {
     static constexpr int NDim = D;
 
     // TODOL bound checks.
-    constexpr T operator[] ( int i ) const noexcept { return _data[i]; }
+    constexpr const T& operator[] ( int i ) const noexcept { return _data[i]; }
     constexpr T& operator[] ( int i ) noexcept { return _data[i]; }
 
     bool operator== ( const array& other ) const noexcept {

@@ -1,6 +1,5 @@
-#include "field/field_shape_interplay.hpp"
+#include "field/mesh_shape_interplay.hpp"
 #include "apt/block.hpp"
-#include "apt/vec.hpp"
 
 // Also see current_deposition.cpp
 
@@ -46,7 +45,7 @@ namespace field::impl {
               _wgt[2] = _shapef( I[2] + _sep_b[2] );
             }
         };
-      update_wgt();
+      update_wgt(I);
       apt::foreach<0,DGrid>
         ( [&result]( auto w ){ result *= w; }, _wgt );
       return result;
@@ -56,26 +55,24 @@ namespace field::impl {
 
 namespace field {
 
-  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
-                                    const LocType& q_abs,
+                                    const apt::array<T,DGrid>& q_std,
                                     const ShapeF& shapef ) {
     apt::Vec<T, DField> result;
-    const auto& grid = field.mesh().bulk();
     constexpr auto supp = ShapeF::support;
-    apt::array<T, DGrid> loc {}; // location at which to interpolate field
-
-    apt::foreach<0,DGrid>
-      ( []( auto& l, auto q, const auto& g ){
-          l = ( q - g.lower() ) / g.delta();
-        }, loc, q_abs, grid );
 
     apt::foreach<0,DField>
       ( [&] ( auto& res, const auto& comp ) {
           res = 0.0;
-          auto wf = WeightFinder( loc, comp.offset, shapef );
+          auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
 
-          for ( const auto& I : apt::Block( apt::Index<DGrid>{ supp, supp, supp } ) )
+          constexpr apt::Index<DGrid> ext
+            ( [supp](){
+                apt::Index<DGrid> res;
+                for ( int i = 0; i < DGrid; ++i ) res[i] = supp;
+                return res;}() );
+          for ( const auto& I : apt::Block(ext) )
             res += comp( wf.I_b() + I ) * wf.weight(I);
 
         }, result, field );
@@ -87,24 +84,23 @@ namespace field {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid, typename LocType, typename ShapeF >
+  template < typename T, int DField, int DGrid, typename ShapeF >
   void deposit ( Field<T,DField,DGrid>& field,
                  apt::Vec<T, DField> variable,
-                 const LocType& q_abs,
+                 const apt::array<T, DGrid>& q_std,
                  const ShapeF& shapef ) {
-    const auto& grid = field.mesh().bulk();
     constexpr auto supp = ShapeF::support;
-    apt::array<T, DGrid> loc {}; // location at which to interpolate field
 
-    apt::foreach<0,DGrid>
-      ( []( auto& l, auto q, const auto& g ){
-          l = ( q - g.lower() ) / g.delta();
-        }, loc, q_abs, grid );
+    constexpr apt::Index<DGrid> ext
+      ( [supp](){
+          apt::Index<DGrid> res;
+          for ( int i = 0; i < DGrid; ++i ) res[i] = supp;
+          return res;}() );
 
     apt::foreach<0,DField>
       ( [&] ( const auto& var, auto comp ) { // TODOL comp is proxy, it breaks semantics
-          auto wf = WeightFinder( loc, comp.offset, shapef );
-          for ( const auto& I : apt::Block( apt::Index<DGrid>{ supp, supp, supp } ) )
+          auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
+          for ( const auto& I : apt::Block( ext ) )
             comp( wf.I_b() + I ) += var * wf.weight(I);
         }, variable, field );
 

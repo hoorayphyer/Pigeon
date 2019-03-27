@@ -42,26 +42,26 @@ namespace apt {
       auto res = *this;
       ++(*this);
       return res;
-    };
+    }
 
     constexpr reference operator*() noexcept { return _ijk; }
   };
 }
 
 namespace apt {
-  template < typename Extent >
+  template < int D >
   struct Block {
   private:
-    Extent _extent{};
+    apt::Index<D> _extent{};
 
   public:
-    constexpr Block( Extent extent ) noexcept : _extent(std::move(extent)) {}
+    constexpr Block( apt::Index<D> extent ) noexcept : _extent(std::move(extent)) {}
 
-    constexpr auto begin() const noexcept { return BlockIterator<Extent::NDim>(_extent);}
+    constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
 
     constexpr auto end() const noexcept {
       auto res = _extent;
-      apt::foreach<1,Extent::NDim> ( [](auto& x){ --x; }, res );
+      apt::foreach<1,D> ( [](auto& x){ --x; }, res );
       return res;
     }
 

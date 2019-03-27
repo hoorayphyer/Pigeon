@@ -8,24 +8,31 @@
 // NOTE virtual vector, or a vector proxy
 namespace apt {
   namespace impl {
-    template < typename T, int N > struct ref_tuple;
-    template < typename T > struct ref_tuple<T,0> { using type = std::tuple<>; };
-    template < typename T > struct ref_tuple<T,1> { using type = std::tuple<T&>; };
-    template < typename T > struct ref_tuple<T,2> { using type = std::tuple<T&,T&>; };
-    template < typename T > struct ref_tuple<T,3> { using type = std::tuple<T&,T&,T&>; };
     template < typename T, int N >
-    using ref_tuple_t = typename ref_tuple<T,N>::type;
+    struct ref_tuple_sequence {
+      static_assert( N >= 0 );
+      using type = decltype( std::tuple_cat( std::declval<std::tuple<T&>>(), std::declval<typename ref_tuple_sequence<T,N-1>::type>() ) );
+    };
+
+    template < typename T >
+    struct ref_tuple_sequence<T,0> {
+      using type = std::tuple<>;
+    };
+
   }
+  template < typename T, int N = 1 >
+  using ref_tuple = typename impl::ref_tuple_sequence<T,N>::type;
+
+}
+
+namespace apt {
 
   template < typename T, int N >
-  struct vVec : public VecExpression<vVec<T,N>, T, true> {
+  struct vVec : public VecExpression<vVec<T,N>, T>,
+                public VecModAssign< VecExpression<vVec<T,N>, T> > {
   private:
-    using tuple_type = impl::ref_tuple_t<T,N>;
+    using tuple_type = ref_tuple<T,N>;
     tuple_type _v;
-
-    template < typename E, std::size_t... I >
-    constexpr vVec( VecExpression<E>&& vec, std::index_sequence<I...> ) noexcept
-      : _v( vec[I]... ) {}
 
     template < std::size_t... I >
     constexpr vVec( array<T,N>& arr, std::index_sequence<I...> ) noexcept
@@ -53,7 +60,7 @@ namespace apt {
 
     template < typename... U >
     constexpr vVec( U&... u ) noexcept
-      : _v(std::tie(u...)) {};
+      : _v(u...) { static_assert(sizeof...(U) == NDim); };
 
     constexpr vVec( array<T,N>& arr ) noexcept
       : vVec( arr, std::make_index_sequence<N>{} ) {}
@@ -63,12 +70,10 @@ namespace apt {
 
     constexpr vVec( vVec&& vec ) noexcept = default;
 
-      // : vVec( std::move(vec), std::make_index_sequence<E::NDim>{} ) {}
-
     vVec() = delete;
     vVec( const vVec& ) = delete; // because it breaks copy sematics
 
-    constexpr vVec& operator= ( const vVec& vec ) noexcept {
+    constexpr vVec& operator= ( vVec& vec ) noexcept {
       _v = vec._v;
       return *this;
     }

@@ -4,7 +4,6 @@
 #include "particle/particle_expression.hpp"
 #include "apt/foreach.hpp"
 #include "apt/array.hpp"
-#include "parallel/mpi_datatype.hpp"
 
 namespace particle {
   // for communication
@@ -39,18 +38,17 @@ namespace particle {
       ptc.set(flag::empty);
     }
 
+    template < typename E >
+    cParticle& operator= ( PtcExpression<E>&& ptc ) noexcept {
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
+      std::swap( _s, ptc.state() );
+      ptc.set(flag::empty);
+
+      return *this;
+    }
+
   };
 }
-
-namespace mpi {
-  extern MPI_Datatype MPI_CPARTICLE;
-
-  template < typename T, int DPtc, typename state_t >
-  constexpr MPI_Datatype datatype( const particle::cParticle<T,DPtc,state_t>* ) noexcept {
-    return MPI_CPARTICLE;
-  }
-
-}
-
 
 #endif

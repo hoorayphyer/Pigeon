@@ -21,6 +21,4 @@ namespace particle {
 
 }
 
-
-
 #endif

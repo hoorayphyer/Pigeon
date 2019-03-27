@@ -1,4 +1,4 @@
-#include "field/field_shape_interplay.hpp"
+#include "field/mesh_shape_interplay.hpp"
 #include "field/communication.hpp"
 #include "apt/block.hpp"
 #include "apt/vec.hpp"
@@ -58,10 +58,9 @@ namespace field :: impl {
   // - the contributing cells in the native grid are [ int(q - sf.r) + 1,  int(q + sf.r) + 1 )
   // - index_original = index_native + ( q - int(q) >= 0.5 )
   // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
-  template < typename Vec_q0_abs, typename Vec_q1_abs, typename Grid, typename ShapeF >
-  constexpr auto set_up_for_depositing_dJ( const Vec_q0_abs& q0_abs, const Vec_q1_abs& q1_abs, const Grid& grid, const ShapeF& ) {
-    constexpr int DGrid = apt::ndim_v<Grid>;
-    using T = apt::most_precise_t<apt::element_t<Vec_q0_abs>, apt::element_t<Vec_q1_abs>>;
+  template < int DGrid, typename Vec_q0, typename Vec_q1, typename ShapeF >
+  constexpr auto set_up_for_depositing_dJ( const Vec_q0& q0_std, const Vec_q1& q1_std, const ShapeF& ) {
+    using T = apt::most_precise_t<apt::element_t<Vec_q0>, apt::element_t<Vec_q1>>;
     apt::Index<DGrid> I_b;
     apt::Index<DGrid> extent;
     apt::array<T, DGrid> sep0_b; // separation 0 is defined to be i_cell_beginning - q0_ptc
@@ -69,12 +68,11 @@ namespace field :: impl {
 
     apt::foreach<0, DGrid>
       ( [] ( auto& i_b, auto& ext, auto& sp0, auto& sp1,
-             auto qmin, auto qmax, const auto& g1d )
+             auto qmin, auto qmax )
         noexcept {
-          // initially, qmin = q0_abs, qmax = q1_abs. Find dq_abs = q1_abs - q0_abs and store it in qmax
+          // initially, qmin = q0_std, qmax = q1_std. Find dq_nat = q1_std - q0_std and store it in qmax
           qmax -= qmin;
-          qmax /= g1d.delta();
-          qmin = ( qmin - g1d.lower() ) / g1d.delta() - 0.5;
+          qmin -= 0.5;
           // now, qmin = q0_native, qmax = dq_native.
           sp0 = - qmin;
           sp1 = sp0 - qmax;
@@ -85,8 +83,7 @@ namespace field :: impl {
           sp0 += i_b;
           sp1 += i_b;
         },
-        I_b, extent, sep0_b, sep1_b,
-        q0_abs, q1_abs, grid );
+        I_b, extent, sep0_b, sep1_b, q0_std, q1_std );
 
     return std::make_tuple( I_b, extent, sep0_b, sep1_b );
   }
@@ -95,9 +92,8 @@ namespace field :: impl {
 
 namespace field {
   template < typename T, int DField, int DGrid >
-  dJ_Field<T,DField,DGrid>::dJ_Field( const Mesh<T,DGrid>& mesh )
+  Standard_dJ_Field<T,DField,DGrid>::Standard_dJ_Field( const Mesh<DGrid>& mesh )
     : _data(mesh) {
-    // TODO need shape support + 1
     // enforce offset
     apt::array< offset_t, DGrid > offset{};
     apt::foreach<0,DGrid>
@@ -108,20 +104,20 @@ namespace field {
 
   template < typename T, int DField, int DGrid >
   template < typename Vec_q0, typename Vec_q1, typename ShapeF >
-  void dJ_Field<T,DField,DGrid>::deposit ( T charge_over_dt,
-                                           const apt::VecExpression<Vec_q0>& q0_abs,
-                                           const apt::VecExpression<Vec_q1>& q1_abs,
+  void Standard_dJ_Field<T,DField,DGrid>::deposit ( T charge_over_dt,
+                                           const apt::VecExpression<Vec_q0>& q0_std,
+                                           const apt::VecExpression<Vec_q1>& q1_std,
                                            const ShapeF& shapef ) {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
     // NOTE q0 and q1 are switched positions so that the deposited is the time reversal of dJ, or TdJ. The reason for this is elaborated in integrate.
     // NOTE: we use -dq here, so the deposited is TdJ ( time reversal of dJ ). This reversal will be cancelled by a reversed integration in integrate_TdJ due to our choice of indexing.
-    const auto[I_b, extent, sep0_b, sep1_b] = set_up_for_depositing_dJ( q1_abs, q0_abs, _data.mesh().bulk(), shapef );
+    const auto[I_b, extent, sep0_b, sep1_b] = impl::set_up_for_depositing_dJ<DGrid>( q1_std, q0_std, shapef );
 
     for ( const auto& I : apt::Block(extent) ) {
       auto W = esirkepov::calcW( I, sep0_b, sep1_b, shapef );
-      if constexpr ( DGrid == 2 ) W[2] *= (q1_abs[2] - q0_abs[2]); // NOTE here the forward time dq is used because there is no integration on dJ[2] in 2D case. TODO check
+      if constexpr ( DGrid == 2 ) W[2] *= (q1_std[2] - q0_std[2]); // NOTE here the forward time dq is used because there is no integration on dJ[2] in 2D case. TODO check
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
         ( [&]( auto& dj, auto w ) { dj(I_b + I) += w * charge_over_dt; } , _data, W );
     }
@@ -139,16 +135,16 @@ namespace field {
 
 namespace field {
   template < typename T, int DField, int DGrid >
-  void dJ_Field<T,DField,DGrid>::reduce( int chief, const mpi::Comm& intra ) {
+  void Standard_dJ_Field<T,DField,DGrid>::reduce( int chief, const mpi::Comm& intra ) {
     // TODO NOTE one can use one chunk of memory for Jmesh so that only one pass of reduce is needed ?
     for ( int i = 0; i < DField; ++i )
-      intra.reduce<mpi::by::SUM, mpi::IN_PLACE>( chief, _data[i].data().data(),  _data[i].data().size() );
+      intra.reduce<mpi::IN_PLACE>( mpi::by::SUM, chief, _data[i].data().data(),  _data[i].data().size() );
   }
 }
 
 namespace field {
   template < typename T, int DField, int DGrid >
-  const Field<T,DField,DGrid>& dJ_Field<T,DField,DGrid>::integrate( const mpi::CartComm& cart ) {
+  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid>::integrate( const mpi::CartComm& cart ) {
     // NOTE
     // - we assum TdJ is offset at MIDWAY in all directions
     // - the boundary conditions are J =0 at both ends in a direcction
@@ -162,28 +158,24 @@ namespace field {
     const auto& mesh = TdJ.mesh();
     for ( int i_dim = 0; i_dim < 3; ++i_dim ) {
       apt::Index<DGrid> I_b = mesh.origin();
-      auto ext_trans = mesh.extent();
-      ext_trans[i_dim] = 1;
-
-      auto& comp = TdJ[i_dim]; // TODOL semantics
+      auto comp = TdJ[i_dim]; // TODOL semantics
 
       // get range of cells whose J can be found locally. This covers ( J[guard-1], J[bulk_dim - guard] ].
-      int iback_b = mesh.bulk()[i_dim].dim() - mesh.guard();
+      int iback_b = mesh.extent()[i_dim] - 3 * mesh.guard();
 
       // locally scan
-      for ( auto I : apt::Block(ext_trans) ) {
-        I += I_b;
+      for ( auto transI : ProjBlock( mesh, i_dim, I_b, mesh.extent() ) ) {
         // first, store TdJ[bulk_dim - guard] and find J[bulk_dim - guard]. Set TdJ[-1] = 0 to avoid corrupting the stored value during merging guard cells
-        std::swap( comp(iback_b), comp( iback_b + mesh.guard() - 1 ) );
-        std::swap( comp(-1), comp( -mesh.guard() ) );
-        comp( - mesh.guard() ) = 0.0; // TODO fix this
+        std::swap( comp(iback_b, transI ), comp( iback_b + mesh.guard() - 1, transI ) );
+        std::swap( comp(-1, transI), comp( -mesh.guard(), transI ) );
+        comp( - mesh.guard(), transI ) = 0.0;
 
-        for ( int i = iback_b + 1; i < iback_b + 2 * mesh().guard; ++i )
-          comp( iback_b ) += comp( i );
+        for ( int i = iback_b + 1; i < iback_b + 2 * mesh.guard(); ++i )
+          comp( iback_b, transI ) += comp( i, transI );
 
         // then, perform scan
         for ( int i = iback_b - 1; i > mesh.guard() - 1; --i ) // NOTE --i
-          comp( i ) += comp( i+1 );
+          comp( i, transI ) += comp( i+1, transI );
       }
     }
 
@@ -192,32 +184,30 @@ namespace field {
     // boundaries
     for ( int i_dim = 0; i_dim < 3; ++i_dim ) {
       apt::Index<DGrid> I_b{};
-      auto ext_trans = mesh.bulk().extent();
-      ext_trans[i_dim] = 1;
+      auto ext_bulk = mesh.extent();
+      // trim to bulk
+      apt::foreach<0,DGrid>
+        ([g=mesh.guard()]( auto& ext ){
+           ext -= 2*g;
+         }, ext_bulk );
+      int iback = ext_bulk[i_dim] - 1;
 
-      auto& comp = TdJ[i_dim]; // TODOL semantics
-      int iback = mesh.bulk()[i_dim].dim() - 1;
+      auto comp = TdJ[i_dim]; // TODOL semantics
 
-      for ( auto I : apt::Block(ext_trans) ) {
+      for ( auto transI : ProjBlock( mesh, i_dim, {}, ext_bulk ) ) {
         // finish lower end
-        for ( int i = mesh.guar() - 1; i > -1; --i ) // NOTE --i
-          comp( i ) += comp( i+1 );
+        for ( int i = mesh.guard() - 1; i > -1; --i ) // NOTE --i
+          comp( i, transI ) += comp( i+1, transI );
 
         // finish upper end
         // first find J[bulk_dim - 1]
         for ( int i = iback - mesh.guard() + 1; i < iback; ++i )
-          comp( iback ) += comp( i );
+          comp( iback, transI ) += comp( i, transI );
 
         for ( int i = iback - 1; i > iback - mesh.guard() + 1; --i ) // NOTE ++i
-          comp( i ) += comp( i+1 );
+          comp( i, transI ) += comp( i+1, transI );
       }
     }
-
-    apt::foreach<0, DGrid> // NOTE it's DGrid not DField
-      ( [&]( auto comp, const auto& g ) { // comp is proxy
-          auto tmp = -g.delta();
-          for ( auto& elm : comp.data() ) elm *= tmp;
-        }, TdJ, mesh.bulk() );
 
     return TdJ;
   }

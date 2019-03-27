@@ -8,9 +8,16 @@ namespace mpi {
   MPI_Datatype datatype(Type* = nullptr) noexcept;
 
   template <typename T>
-  MPI_Datatype datatype(const T&) noexcept {
+  constexpr MPI_Datatype datatype(const T&) noexcept {
     return datatype((T*)0);
   }
+
+  template <typename T>
+  constexpr MPI_Datatype datatype(const T*) noexcept {
+    return datatype((T*)0);
+  }
+
+  extern MPI_Datatype MPI_CPARTICLE;
 }
 
 #endif

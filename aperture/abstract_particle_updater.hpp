@@ -12,6 +12,7 @@ namespace aperture {
                               particle::map<particle::array<Real,3,state_t>>& particles,
                               const field::Field<Real,3,DGrid>& E,
                               const field::Field<Real,3,DGrid>& B,
+                              const apt::array< apt::pair<Real>, DGrid >& borders,
                               Real dt,Real unit_e, int timestep ) = 0;
   };
 }

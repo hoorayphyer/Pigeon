@@ -18,18 +18,18 @@ namespace field {
       auto f_Ib_send =
         [&mesh] ( int ith_dim, bool is_send_to_right ) {
           if constexpr ( Policy<T>::send_mode == bulk_to_guard ) {
-              return is_send_to_right ? ( mesh.bulk()[ith_dim].dim() - mesh.guard() ) : 0;
+              return is_send_to_right ? ( mesh.bulk_dim(ith_dim) - mesh.guard() ) : 0;
             } else {
-            return is_send_to_right ? ( mesh.bulk()[ith_dim].dim()  ) : - mesh.guard();
+            return is_send_to_right ? ( mesh.bulk_dim(ith_dim)  ) : - mesh.guard();
           }
         };
 
       auto f_Ib_recv =
         [&mesh] ( int ith_dim, bool is_send_to_right ) {
           if constexpr ( Policy<T>::send_mode == bulk_to_guard ) {
-              return is_send_to_right ? - mesh.guard() : mesh.bulk()[ith_dim].dim();
+              return is_send_to_right ? - mesh.guard() : mesh.bulk_dim(ith_dim);
             } else {
-            return is_send_to_right ? 0 : ( mesh.bulk()[ith_dim].dim() - mesh.guard() );
+            return is_send_to_right ? 0 : ( mesh.bulk_dim(ith_dim) - mesh.guard() );
           }
         };
 
@@ -57,7 +57,7 @@ namespace field {
             auto itr_s = send_buf.begin();
             I_b[i_grid] = f_Ib_send( i_grid, lr_send );
             apt::foreach<0,DField>
-              ( [&]( auto& comp ) {
+              ( [&]( auto comp ) { // TODOL semantics
                   for ( const auto& I : apt::Block(extent) )
                     Policy<T>::to_send_buf( *(itr_s++), comp(I_b + I) );
                 }, field );
@@ -72,7 +72,7 @@ namespace field {
             auto itr_r = recv_buf.cbegin();
             I_b[i_grid] = f_Ib_recv( i_grid, lr_send );
             apt::foreach<0,DField>
-              ( [&]( auto& comp ) {
+              ( [&]( auto comp ) { // TODOL semantics
                   for ( const auto& I : apt::Block(extent) )
                     Policy<T>::from_recv_buf( comp(I_b + I), *(itr_r++) );
                 }, field );

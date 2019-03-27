@@ -6,7 +6,8 @@
 
 namespace apt {
   template < typename T, int N >
-  struct Vec : public VecExpression<Vec<T,N>, T, true> {
+  struct Vec : public VecExpression<Vec<T,N>, T>,
+               public VecModAssign< VecExpression<Vec<T,N>, T> > {
   private:
     array<T,N> _v{}; // NOTE {} here performs zero initialization.
 

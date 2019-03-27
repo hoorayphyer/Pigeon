@@ -2,6 +2,7 @@
 #define _OLD_FIELDUPDATER_ADAPTER_HPP_
 
 #include "field/field.hpp"
+#include "kernel/grid.hpp"
 #include "../abstract_field_updater.hpp"
 #include <optional>
 
@@ -21,7 +22,7 @@ namespace ofs {
 
     // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
     OldFieldUpdater( const mpi::CartComm& cart,
-                     const knl::Grid<double,DGrid,knl::grid1d::Clip>& local_grid,
+                     const knl::Grid<double,DGrid>& local_grid,
                      apt::array< apt::pair<bool>, DGrid > is_at_boundary,
                      int guard );
 

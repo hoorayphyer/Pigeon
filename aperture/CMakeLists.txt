@@ -27,9 +27,9 @@ set( LINK_MPIPP TRUE )
 #TODO precede particle/.cpp with lab/.cpp
 function(module_gen category name)
   set(THIS_MODULE_NAME "${category}_${name}_module")
-  add_library( ${THIS_MODULE_NAME} STATIC )
+  add_library( ${THIS_MODULE_NAME} STATIC ${CMAKE_SOURCE_DIR}/aperture/${category}_${name}.cpp )
   target_include_directories(${THIS_MODULE_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
-  target_sources(${THIS_MODULE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src/${category}/${name}.cpp)
+  target_include_directories(${THIS_MODULE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
   if( ${ARGC} GREATER 2 )
     if ( ${ARGV2} )
@@ -37,15 +37,17 @@ function(module_gen category name)
     endif()
   endif()
 
-  if( "${catetory}" STREQUAL "particle" )
-    target_link_libraries(aperture_particle_updater PRIVATE ${THIS_MODULE_NAME})
-  endif()
-
+  # if( "${category}" STREQUAL "particle" )
+  target_link_libraries(aperture_particle_updater PRIVATE ${THIS_MODULE_NAME})
+  # elseif( "${category}" STREQUAL "field" )
+  #   target_link_libraries(aperture_field_updater PRIVATE ${THIS_MODULE_NAME})
+  # endif()
 endfunction()
 
-module_gen(field field_shape_interplay)
-module_gen(field current_deposition LINK_MPIPP)
 module_gen(field communication LINK_MPIPP)
+module_gen(field mesh_shape_interplay)
+module_gen(field current_deposition LINK_MPIPP)
+target_link_libraries(field_current_deposition_module PRIVATE field_communication_module)
 
 module_gen(particle migration LINK_MPIPP)
 module_gen(particle pair_producer)
@@ -74,7 +76,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 
 add_executable(aperture "main.cpp")
 target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_balance mpipp_lib)
+target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
 
 # target_link_libraries(aperture AperLib UserControl)
 

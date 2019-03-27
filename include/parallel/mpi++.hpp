@@ -1,7 +1,8 @@
 #ifndef  _MPI_XX_HPP_
 #define  _MPI_XX_HPP_
 
-#include "parallel/mpi_communication.hpp"
+#include "parallel/mpi_p2p.hpp"
+#include "parallel/mpi_collective.hpp"
 #include "apt/pair.hpp"
 
 namespace mpi {
@@ -53,7 +54,6 @@ namespace mpi {
   void comm_free ( MPI_Comm* p );
   MPI_Comm comm_null();
 
-  // a simple communicator that manages a shared memory.
   struct Comm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
                 public CommAccessor<Comm>,
                 public P2P_Comm<Comm>,
@@ -63,9 +63,7 @@ namespace mpi {
 
     std::optional<Comm> split ( const Group& sub_group ) const;
     std::optional<Comm> split ( std::optional<unsigned int> color, int key ) const;
-    inline std::optional<Comm> split ( std::optional<unsigned int> color ) const {
-      return split(std::move(color), rank());
-    }
+    std::optional<Comm> split ( std::optional<unsigned int> color ) const;
   };
 
 }
@@ -94,7 +92,7 @@ namespace mpi {
   struct InterComm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
                      public CommAccessor<InterComm>,
                      public P2P_Comm<InterComm>,
-                     public Collective_Comm<InterComm,true> {
+                     public Collective_Comm<InterComm> {
     InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag );
 
     // when peer_comm is known to all

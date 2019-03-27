@@ -39,10 +39,6 @@ namespace particle {
 
     vParticle() = delete;
     vParticle( const vParticle& ) = delete;
-    template < typename E >
-    vParticle( const PtcExpression<E>& ) = delete;
-    template < typename E >
-    vParticle( PtcExpression<E>&& ) = delete;
 
     template < typename E >
     constexpr vParticle& operator= ( const PtcExpression<E>& ptc ) noexcept {

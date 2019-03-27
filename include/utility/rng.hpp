@@ -3,14 +3,13 @@
 
 #include <random>
 
-// TODO use template ?
 namespace util {
   template < typename T>
   class Rng {
   private:
-    std::default_random_engine _engine;
-    std::uniform_real_distribution<T> _uniform_dist;
-    std::normal_distribution<T> _gaussian_dist;
+    std::default_random_engine _engine{};
+    std::uniform_real_distribution<T> _uniform_dist{};
+    std::normal_distribution<T> _gaussian_dist{};
 
   public:
     inline void set_seed( unsigned long int seed ) {

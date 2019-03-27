@@ -1,5 +1,5 @@
 find_package(MPI)
-add_library(mpipp_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_communication.cpp" "parallel/mpi_datatype.cpp")
+add_library(mpipp_lib STATIC "parallel/mpi++.cpp" "parallel/mpi_request.cpp" "parallel/mpi_datatype.cpp" "parallel/mpi_p2p.cpp" "parallel/mpi_collective.cpp")
 target_include_directories(mpipp_lib PUBLIC ${MPI_INCLUDE_PATH} ${CMAKE_SOURCE_DIR}/include )
 target_link_libraries(mpipp_lib PRIVATE ${MPI_LIBRARIES})
 set_target_properties(mpipp_lib PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")

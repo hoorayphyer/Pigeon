@@ -1,8 +1,6 @@
 #include "io/silo++.cpp"
 #include "io/silo_optlist.cpp"
-#include "parallel/mpi_datatype.cpp"
-#include "parallel/mpi++.cpp"
-#include "parallel/mpi_communication.cpp"
+#include "parallel/mpi++.hpp"
 #include "catch2/catch.hpp"
 #include <unistd.h>
 

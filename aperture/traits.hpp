@@ -32,7 +32,7 @@ namespace traits {
 
   constexpr unsigned int ion_mass = 5;
 
-  using deposit_j_t = long double;
+  using real_dj_t = long double;
 };
 
 #endif

@@ -46,7 +46,7 @@ test_gen(kernel coordinate) # TODO slight mismatched in phi
 
 test_gen(parallel mpi++ catch_main_mpipp) # TODO larger tests
 
-test_gen(field field_shape_interplay) # TODO
+test_gen(field mesh_shape_interplay) # TODO
 test_gen(field current_deposition catch_main_mpipp)
 
 test_gen(io silo++ catch_main_mpipp)

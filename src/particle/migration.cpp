@@ -106,7 +106,7 @@ namespace particle :: impl {
 
 namespace particle {
   template < typename Vec, int DGrid, typename T >
-  bool is_migrate( const apt::VecExpression<Vec>& q,
+  bool is_migrate( const apt::VecExpression<Vec,T>& q,
                    const apt::array< apt::pair<T>, DGrid>& borders ) noexcept {
     bool res = false;
     apt::foreach<0,DGrid>

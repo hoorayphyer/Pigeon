@@ -4,6 +4,7 @@
 #include "kernel/coordsys_predef.hpp"
 #include "apt/numeric.hpp"
 #include "apt/vec.hpp"
+#include "apt/virtual_vec.hpp"
 
 inline constexpr
 long double PI_CONST =3.141592653589793238462643383279502884197169399375105820974944592307816406286L;
@@ -28,7 +29,7 @@ namespace knl {
     static inline T hhh ( T x1, T x2, T x3 ) { return 1.0; }
 
     template < class X, class V, typename T >
-    static inline auto geodesic_move( apt::VecExpression<X>& x, const apt::VecExpression<V>& v, const T& dt ) {
+    static inline auto geodesic_move( X& x, const apt::VecExpression<V>& v, const T& dt ) {
       apt::Vec<decltype(v[0] * dt), apt::ndim_v<V>> dx = v * dt;
       x += dx;
       return dx;
@@ -59,7 +60,7 @@ namespace knl {
     }
 
     template < class X, class V, typename T >
-    static inline auto geodesic_move( apt::VecExpression<X,T>& x, apt::VecExpression<V,T>& v, const T& dt ) {
+    static inline auto geodesic_move( X& x, apt::VecExpression<V,T>& v, const T& dt ) {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       constexpr T PI = PI_CONST;

@@ -10,7 +10,7 @@ namespace particle {
   dp_t update_p( PtcExpression<Ptc>& ptc, T dt, unsigned int mass_x,
                  const apt::VecExpression<Field>& E, const apt::VecExpression<Field>& B );
 
-  template < species sp, knl::coordsys CS, typename dq_t, typename Ptc, typename T >
+  template < knl::coordsys CS, typename dq_t, typename Ptc, typename T >
   dq_t update_q( PtcExpression<Ptc>& ptc, T dt, bool is_massive );
 }
 

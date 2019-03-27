@@ -25,6 +25,14 @@ namespace field {
       return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
+    inline T& operator() ( int i_bulk_normal, const typename Mesh_t::TransIndex& transI ) {
+      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk_normal, transI) ];
+    }
+
+    inline T operator() ( int i_bulk_normal, const typename Mesh_t::TransIndex& transI ) const {
+      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk_normal, transI) ];
+    }
+
     inline auto offset() const noexcept { return _offset; }
 
     inline const auto& data() const noexcept { return _data; }
@@ -39,16 +47,18 @@ namespace field {
   struct Field {
   private:
     apt::array < std::vector<T>, DField > _comps;
-    Mesh<T,DGrid> _mesh;
+    Mesh<DGrid> _mesh;
     apt::array< apt::array< offset_t, DGrid >, DField > _offset;
 
   public:
     using element_type = T;
     static constexpr int NDim = DField;
 
-    Field( const Mesh<T,DGrid>& mesh ) : _mesh(mesh) {
+    Field() = default;
+
+    Field( const Mesh<DGrid>& mesh ) : _mesh(mesh) {
       int size = 1;
-      for ( int i = 0; i < DGrid; ++i ) size *= _mesh.extent(i);
+      for ( int i = 0; i < DGrid; ++i ) size *= _mesh.extent()[i];
       apt::foreach<0,DGrid>
         ( [size] ( auto comp ) { // TODOL semantics
             comp.reserve( size );
@@ -64,12 +74,12 @@ namespace field {
     inline const auto& mesh() const { return _mesh;}
 
     inline const auto operator[] ( int i ) const noexcept {
-      return Component< const std::vector<T>, Mesh<T,DGrid>, apt::array<offset_t, DGrid> >
+      return Component< const std::vector<T>, Mesh<DGrid>, apt::array<offset_t, DGrid> >
         ( _comps[i], _mesh, _offset[i] );
     }
 
     inline auto operator[] ( int i ) noexcept {
-      return Component< std::vector<T>, Mesh<T,DGrid>, apt::array<offset_t, DGrid> >
+      return Component< std::vector<T>, Mesh<DGrid>, apt::array<offset_t, DGrid> >
         ( _comps[i], _mesh, _offset[i] );
     }
 
