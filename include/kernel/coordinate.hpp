@@ -60,7 +60,7 @@ namespace knl {
     }
 
     template < class X, class V, typename T >
-    static inline auto geodesic_move( X& x, apt::VecExpression<V,T>& v, const T& dt ) {
+    static inline auto geodesic_move( X& x, V& v, const T& dt ) {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       constexpr T PI = PI_CONST;
