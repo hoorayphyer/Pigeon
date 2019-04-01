@@ -182,7 +182,7 @@ namespace mpi {
   INSTANTIATE_MPI_COLLECTIVE(long double);
 }
 
-#include "mpi_cparticle.hpp"
+#include "mpi_cparticle.cpp"
 namespace mpi {
   INSTANTIATE_MPI_COLLECTIVE(cPtc_t);
 }

@@ -34,7 +34,7 @@ namespace mpi {
   MPI_Datatype datatype<long double>(long double*) noexcept { return MPI_LONG_DOUBLE; }
 }
 
-#include "mpi_cparticle.hpp"
+#include "mpi_cparticle.cpp"
 #include <vector>
 namespace mpi {
   MPI_Datatype MPI_CPARTICLE =
