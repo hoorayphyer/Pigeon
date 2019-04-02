@@ -57,6 +57,7 @@
 
 !tests/
 !tests/CMakeLists.txt
+!tests/all_in_one.hpp
 !tests/catch_main.cpp
 !tests/catch_main_mpi++.cpp
 !tests/apt

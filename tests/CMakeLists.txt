@@ -19,6 +19,7 @@ function(test_gen category name)
   add_executable( ${test_target} "${category}/test_${name}.cpp")
   target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/include")
   target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+  target_include_directories(${test_target} PRIVATE "${CMAKE_SOURCE_DIR}/tests")
 
   target_link_libraries(${test_target} PRIVATE ${link_main})
   set_target_properties( ${test_target}
@@ -32,33 +33,35 @@ function(test_gen category name)
 endfunction()
 
 # TODO all uses of std::abs in the code, see if anywhere std::labs should be used
-test_gen(apt array)
-test_gen(apt pair)
-test_gen(apt "foreach")
-test_gen(apt block)
-test_gen(apt vec)
-test_gen(apt virtual_vec)
-test_gen(apt numeric)
-test_gen(apt handle)
+# test_gen(apt array)
+# test_gen(apt pair)
+# test_gen(apt "foreach")
+# test_gen(apt block)
+# test_gen(apt vec)
+# test_gen(apt virtual_vec)
+# test_gen(apt numeric)
+# test_gen(apt handle)
 
-test_gen(kernel coordinate) # TODO slight mismatched in phi
+# test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
 test_gen(parallel mpi++ catch_main_mpipp) # TODO larger tests
 
-test_gen(field mesh_shape_interplay) # TODO
-test_gen(field current_deposition catch_main_mpipp)
+test_gen(field mesh)
+# test_gen(field mesh_shape_interplay) # TODO
+# test_gen(field communication catch_main_mpipp)
+# test_gen(field current_deposition catch_main_mpipp)
 
-test_gen(io silo++ catch_main_mpipp)
-target_link_libraries( test_io_silo++ PRIVATE silo_lib )
+# test_gen(io silo++ catch_main_mpipp)
+# target_link_libraries( test_io_silo++ PRIVATE silo_lib )
 
-test_gen(particle state)
+# test_gen(particle state)
 # test_gen(particle particle) # TODO some tests on this are in particle_array
 # test_gen(particle virtual_particle) # TODO
 # test_gen(particle c_particle) # TODO
-test_gen(particle array)
+# test_gen(particle array)
 
-test_gen(particle pusher)
+# test_gen(particle pusher)
 # test_gen(particle migration catch_main_mpipp) # TODO
 # test_gen(particle pair_producer)# TODO
 

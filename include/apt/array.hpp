@@ -13,11 +13,15 @@ namespace apt {
     constexpr const T& operator[] ( int i ) const noexcept { return _data[i]; }
     constexpr T& operator[] ( int i ) noexcept { return _data[i]; }
 
-    bool operator== ( const array& other ) const noexcept {
+    constexpr bool operator== ( const array& other ) const noexcept {
       bool res = true;
       for ( int i = 0; i < D; ++i )
         res &= ( _data[i] == other[i] );
       return res;
+    }
+
+    constexpr bool operator!= ( const array& other ) const noexcept {
+      return !( *this == other );
     }
 
     constexpr T* data() noexcept { return _data;}

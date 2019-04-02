@@ -25,12 +25,12 @@ namespace field {
       return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
-    inline T& operator() ( int i_bulk_normal, const typename Mesh_t::TransIndex& transI ) {
-      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk_normal, transI) ];
+    inline T& operator[] ( int i ) {
+      return _data[i];
     }
 
-    inline T operator() ( int i_bulk_normal, const typename Mesh_t::TransIndex& transI ) const {
-      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk_normal, transI) ];
+    inline T operator[] ( int i ) const {
+      return _data[i];
     }
 
     inline auto offset() const noexcept { return _offset; }

@@ -1,12 +1,8 @@
 #include <iostream>
 #include "aperture/dynamic_balance.cpp"
-#include "parallel/mpi_datatype.cpp"
-#include "parallel/mpi++.cpp"
-#include "parallel/mpi_communication.cpp"
+#include "parallel/mpi++.hpp"
 #include "catch2/catch.hpp"
-#include <random>
-#include <ctime>
-#include <cmath>
+#include "all_in_one.hpp"
 #include <algorithm> // std::min, std::max
 
 using namespace aperture;

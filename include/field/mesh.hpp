@@ -24,14 +24,75 @@ namespace field {
         ( [&guard]( auto& ext ) { ext += 2 * guard; }, _extent );
     }
 
-    struct TransIndex {
+    struct ProjBlock {
     private:
-      int _transindex = 0;
-      int _stride_normal = 1;
+      const Mesh<D>& _mesh;
+      int _stride_normal_in_mesh;
+      apt::Index<D> _transIb_bulk;
+      apt::Block<D> _block;
+
+      constexpr ProjBlock( const Mesh<D>& mesh, int ith_dim, apt::Index<D> I_bulk_begin, apt::Index<D> extent )
+        : _mesh(mesh),
+          _stride_normal_in_mesh(mesh.stride(ith_dim)),
+          _transIb_bulk( [&I_bulk_begin, ith_dim](){ I_bulk_begin[ith_dim] = 0; return std::move(I_bulk_begin);}() ),
+          _block( [&extent, ith_dim](){ extent[ith_dim] = 1; return std::move(extent); }() ) {}
     public:
-      constexpr TransIndex( int transindex, int stride_normal ) noexcept
-        : _transindex(transindex), _stride_normal(stride_normal) {}
       friend class Mesh<D>;
+
+      struct TransIndex {
+        const int transindex;
+        const int stride_normal;
+
+        constexpr int operator|( int i_bulk_normal ) const noexcept {
+          return i_bulk_normal * stride_normal  + transindex;
+        }
+      };
+
+      struct ProjBlockIterator {
+      private:
+        apt::BlockIterator<D> _bitr;
+        const ProjBlock& _pb;
+
+      public:
+        using difference_type = void;
+        using value_type = void;
+        using reference = TransIndex;
+        using pointer = void;
+        using iterator_category = std::forward_iterator_tag;
+
+        constexpr ProjBlockIterator( apt::BlockIterator<D> bitr, const ProjBlock& projblock ) noexcept
+          : _bitr(std::move(bitr)), _pb( projblock ) {}
+
+        constexpr bool operator!= ( const apt::Index<D>& idx ) const noexcept {
+          return _bitr != idx;
+        }
+
+        constexpr ProjBlockIterator& operator++() noexcept {
+          ++_bitr;
+          return *this;
+        }
+
+        constexpr ProjBlockIterator operator++(int) noexcept {
+          auto res = *this;
+          ++(*this);
+          return res;
+        }
+
+        constexpr reference operator*() noexcept {
+          // NOTE linearized_index automatically absorbs guard * stride_normal into transindex
+          return { _pb._mesh.linearized_index_of_whole_mesh(*( _bitr ) + _pb._transIb_bulk), _pb._stride_normal_in_mesh };
+        }
+      };
+
+      friend class ProjBlockIterator;
+
+      constexpr auto begin() const noexcept {
+        return ProjBlockIterator( _block.begin(), *this );
+      };
+
+      constexpr auto end() const noexcept {
+        return _block.end();
+      }
     };
 
     constexpr int linearized_index_of_whole_mesh( const apt::Index<NDim>& i_bulk ) const noexcept {
@@ -45,9 +106,10 @@ namespace field {
       return I;
     }
 
-    constexpr int linearized_index_of_whole_mesh( int i_normal, const TransIndex& transI ) const noexcept {
-      return (i_normal + _guard) * transI._stride_normal  + transI._transindex;
+    constexpr auto project( int ith_dim, apt::Index<D> I_bulk_begin, apt::Index<D> extent ) const noexcept {
+      return ProjBlock( *this, std::move(ith_dim), std::move(I_bulk_begin), std::move(extent) );;
     }
+
 
     // constexpr const auto& margin() const noexcept { return _margin; }
     constexpr int guard() const noexcept { return _guard; }
@@ -67,82 +129,17 @@ namespace field {
     constexpr const auto& extent() const noexcept { return _extent; }
 
     constexpr auto bulk_dim( int ith_dim ) const noexcept {
+      // TODOL check bounds
       return _extent[ith_dim] - 2 * _guard;
     }
 
     constexpr auto stride( int ith_dim ) const noexcept {
+      // TODOL check bounds
       if ( 0 == ith_dim ) return 1;
       else return _extent[ith_dim - 1] * stride( ith_dim - 1 );
     }
 
   };
 }
-
-namespace field {
-  template < int D >
-  struct ProjBlock {
-  private:
-    const Mesh<D>& _mesh;
-    int _stride_normal_in_mesh;
-    apt::Index<D> _transIb_bulk;
-    apt::Block<D> _block;
-
-  public:
-    constexpr ProjBlock( const Mesh<D>& mesh, int ith_dim, apt::Index<D> I_bulk_begin, apt::Index<D> extent )
-      : _mesh(mesh),
-        _stride_normal_in_mesh(mesh.stride(ith_dim)),
-        _transIb_bulk( [&I_bulk_begin, ith_dim](){ I_bulk_begin[ith_dim] = 0; return std::move(I_bulk_begin);}() ),
-        _block( [&extent, ith_dim](){ extent[ith_dim] = 1; return std::move(extent); }() ) {}
-
-    struct ProjBlockIterator {
-    private:
-      apt::BlockIterator<D> _bitr;
-      const ProjBlock& _pb;
-
-    public:
-      using difference_type = void;
-      using value_type = void;
-      using reference = typename Mesh<D>::TransIndex;
-      using pointer = void;
-      using iterator_category = std::forward_iterator_tag;
-
-      constexpr ProjBlockIterator( apt::BlockIterator<D> bitr, const ProjBlock& projblock ) noexcept
-        : _bitr(std::move(bitr)), _pb( projblock ) {}
-
-      constexpr bool operator!= ( const apt::Index<D>& idx ) const noexcept {
-        return _bitr != idx;
-      }
-
-      constexpr ProjBlockIterator& operator++() noexcept {
-        ++_bitr;
-        return *this;
-      }
-
-      constexpr ProjBlockIterator operator++(int) noexcept {
-        auto res = *this;
-        ++(*this);
-        return res;
-      }
-
-      constexpr reference operator*() noexcept {
-         return { _pb._mesh.linearized_index_of_whole_mesh(*( _bitr ) + _pb._transIb_bulk), _pb._stride_normal_in_mesh };
-      }
-    };
-
-    friend class ProjBlockIterator;
-
-
-    constexpr auto begin() const noexcept {
-      return ProjBlockIterator( _block.begin(), *this );
-    };
-
-    constexpr auto end() const noexcept {
-      return _block.end();
-    }
-  };
-
-
-}
-
 
 #endif

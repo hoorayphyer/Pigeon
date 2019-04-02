@@ -164,18 +164,18 @@ namespace field {
       int iback_b = mesh.extent()[i_dim] - 3 * mesh.guard();
 
       // locally scan
-      for ( auto transI : ProjBlock( mesh, i_dim, I_b, mesh.extent() ) ) {
+      for ( auto trI : mesh.project( i_dim, I_b, mesh.extent() ) ) {
         // first, store TdJ[bulk_dim - guard] and find J[bulk_dim - guard]. Set TdJ[-1] = 0 to avoid corrupting the stored value during merging guard cells
-        std::swap( comp(iback_b, transI ), comp( iback_b + mesh.guard() - 1, transI ) );
-        std::swap( comp(-1, transI), comp( -mesh.guard(), transI ) );
-        comp( - mesh.guard(), transI ) = 0.0;
+        std::swap( comp[ trI | iback_b ], comp[ trI | iback_b + mesh.guard() - 1 ] );
+        std::swap( comp[ trI | -1 ], comp[ trI | -mesh.guard() ] );
+        comp[ trI | - mesh.guard() ] = 0.0;
 
         for ( int i = iback_b + 1; i < iback_b + 2 * mesh.guard(); ++i )
-          comp( iback_b, transI ) += comp( i, transI );
+          comp[ trI | iback_b ] += comp[ trI | i ];
 
         // then, perform scan
         for ( int i = iback_b - 1; i > mesh.guard() - 1; --i ) // NOTE --i
-          comp( i, transI ) += comp( i+1, transI );
+          comp[ trI | i ] += comp[ trI | i+1 ];
       }
     }
 
@@ -194,18 +194,18 @@ namespace field {
 
       auto comp = TdJ[i_dim]; // TODOL semantics
 
-      for ( auto transI : ProjBlock( mesh, i_dim, {}, ext_bulk ) ) {
+      for ( auto trI : mesh.project( i_dim, {}, ext_bulk ) ) {
         // finish lower end
         for ( int i = mesh.guard() - 1; i > -1; --i ) // NOTE --i
-          comp( i, transI ) += comp( i+1, transI );
+          comp[ trI | i ] += comp[ trI | i+1 ];
 
         // finish upper end
         // first find J[bulk_dim - 1]
         for ( int i = iback - mesh.guard() + 1; i < iback; ++i )
-          comp( iback, transI ) += comp( i, transI );
+          comp[ trI | iback ] += comp[ trI | i ];
 
         for ( int i = iback - 1; i > iback - mesh.guard() + 1; --i ) // NOTE ++i
-          comp( i, transI ) += comp( i+1, transI );
+          comp[ trI | i ] += comp[ trI | i+1 ];
       }
     }
 
