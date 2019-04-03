@@ -41,6 +41,7 @@ namespace mpi {
   template < typename T >
   Request P2P_Comm<Comm>::Isend( int dest_rank, int tag, const T* send_buf, int send_count, SendMode mode ) const {
     Request req;
+    req.reset( new MPI_Request );
     (*(pick_send<true>(mode))) ( send_buf, send_count, datatype<T>(), dest_rank, tag, _comm(), req );
 
     return req;
@@ -62,6 +63,7 @@ namespace mpi {
   template < typename T >
   Request P2P_Comm<Comm>::Irecv(int source_rank, int tag, T* recv_buf, int recv_count_max ) const {
     Request req;
+    req.reset( new MPI_Request );
     MPI_Irecv( recv_buf, recv_count_max, datatype<T>(), source_rank, tag, _comm(), req );
     return req;
   }

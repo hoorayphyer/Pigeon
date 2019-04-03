@@ -10,6 +10,7 @@ namespace mpi {
   MPI_Request request_null();
   using Request = apt::Handle<MPI_Request, request_free, request_null >;
 
+  // NOTE requests will be reset when finished waiting
   void wait( Request& req );
   void waitall( std::vector<Request>& reqs );
 

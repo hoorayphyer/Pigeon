@@ -61,7 +61,8 @@ namespace mpi {
     Comm () = default;
     // Comm ( const Comm& super_comm, const Group& sub_group ); // TODO what if sub_group is empty?
 
-    std::optional<Comm> split ( const Group& sub_group ) const;
+    // TODOL turned off just because of no use in the code
+    // std::optional<Comm> split ( const Group& sub_group ) const;
     std::optional<Comm> split ( std::optional<unsigned int> color, int key ) const;
     std::optional<Comm> split ( std::optional<unsigned int> color ) const;
   };
@@ -94,9 +95,6 @@ namespace mpi {
                      public P2P_Comm<InterComm>,
                      public Collective_Comm<InterComm> {
     InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag );
-
-    // when peer_comm is known to all
-    InterComm( const Comm& local_comm, int local_leader, const Comm& peer_comm, int remote_leader, int tag );
 
     int remote_size() const;
     Group remote_group() const;

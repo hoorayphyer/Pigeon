@@ -4,13 +4,13 @@
 using namespace mpi;
 
 SCENARIO("World", "[parallel][mpi]") {
-  if ( world.size() == 2 ) {
+  if ( world.size() >= 2 ) {
     int myrank = world.rank();
     // std::cout << "world size = " << world.size() << " ," << myrank << std::endl;
     if ( 0 == myrank ) {
       int msg = 147;
       world.send( 1, 22, &msg );
-    } else {
+    } else if ( 1 == myrank) {
       int msg;
       world.recv( 0, 22, &msg, 1 );
       REQUIRE( msg == 147 );
@@ -18,39 +18,39 @@ SCENARIO("World", "[parallel][mpi]") {
   }
 }
 
-SCENARIO("Group", "[parallel][mpi]") {
-  auto grp_world = world.group();
-  SECTION("Constructors") {
-    WHEN("Default") {
-      Group grp;
-      REQUIRE( MPI_UNDEFINED == grp.rank() );
-      REQUIRE( 0 == grp.size() );
-    }
+// SCENARIO("Group", "[parallel][mpi]") {
+//   auto grp_world = world.group();
+//   SECTION("Constructors") {
+//     WHEN("Default") {
+//       Group grp;
+//       REQUIRE( MPI_UNDEFINED == grp.rank() );
+//       REQUIRE( 0 == grp.size() );
+//     }
 
-    WHEN("From MPI_WORLD_GROUP") {
-      AND_WHEN("no duplicates") {
-      }
-      AND_WHEN("there are duplicates") {
-      }
-    }
-  }
+//     WHEN("From MPI_WORLD_GROUP") {
+//       AND_WHEN("no duplicates") {
+//       }
+//       AND_WHEN("there are duplicates") {
+//       }
+//     }
+//   }
 
-  SECTION("Operations") {
+//   SECTION("Operations") {
 
-  }
+//   }
 
-}
+// }
 
 SCENARIO("Comm", "[parallel][mpi]") {
-  auto comm_opt = world.split( world.group() );
+  auto comm_opt = world.split( true );
   REQUIRE( comm_opt );
   auto& comm = *comm_opt;
-  if ( world.size() == 2 ) {
+  if ( world.size() >= 2 ) {
     int myrank = comm.rank();
     if ( 0 == myrank ) {
       int msg = 147;
       comm.send( 1, 22, &msg );
-    } else {
+    } else if ( 1 == myrank ) {
       int msg;
       comm.recv( 0, 22, &msg, 1 );
       REQUIRE( 147 == msg );
@@ -81,23 +81,68 @@ SCENARIO("Comm", "[parallel][mpi]") {
 // #undef TestType
 // }
 
-// SCENARIO("intra P2P communications", "[parallel][mpi]") {}
+// TODO Edge case: send recv to self
+SCENARIO("intra P2P communications", "[parallel][mpi]") {
+  SECTION("Nonblocking") {
+
+    if ( world.size() >= 2 ) {
+
+      SECTION("one sided communication, test on wait") {
+        if ( world.rank() == 0 ) {
+          int send_msg = 351;
+          Request req = world.Isend( 1, 147, &send_msg, 1 );
+          wait(req);
+        } else if ( world.rank() == 1 ) {
+          int recv_msg;
+          Request req = world.Irecv( 0, 147, &recv_msg, 1 );
+          wait(req);
+          REQUIRE( recv_msg == 351 );
+        }
+        world.barrier();
+      }
+
+      SECTION("double sided communication, test on waitall") {
+        if ( world.rank() < 2 ) {
+          std::vector<Request> reqs(2); // NOTE reqs[2] will stay null
+          int myrank = world.rank();
+          int send_msg = myrank + 147;
+          reqs[0] = world.Isend( 1 - myrank, 147, &send_msg, 1 );
+          int recv_msg = -1;
+          reqs[1] = world.Irecv( 1 - myrank, 147, &recv_msg, 1 );
+          waitall(reqs);
+          REQUIRE( send_msg == myrank + 147 );
+          REQUIRE( recv_msg == 1 - myrank + 147 );
+        }
+        world.barrier();
+      }
+
+      SECTION("test wait on null requests") {
+        if ( world.rank() == 0  ) {
+          Request req;
+          wait(req);
+
+          std::vector<Request> reqs(2);
+          waitall(reqs);
+        }
+      }
+    }
+  }
+}
 
 // SCENARIO("intra collective communications", "[parallel][mpi]") {}
 
 SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
-  if ( world.size() == 2 ) {
+  if ( world.size() >= 2 ) {
     SECTION("each comm has one member") {
       int myrank = world.rank();
-      auto local_opt = world.split(Group({myrank}));
+      auto local_opt = world.split( {myrank} );
       REQUIRE(local_opt);
       auto& local = *local_opt;
-      std::optional<Comm> peer_comm(world);
-      InterComm inter( local, 0, peer_comm, 1-myrank, 147 );
+      InterComm inter( local, 0, {world}, 1-myrank, 147 );
       if ( 0 == myrank ) {
         int msg = 147;
         inter.send( 0, 22, &msg, 1 );
-      } else {
+      } else if ( 1 == myrank ) {
         int msg;
         inter.recv( 0, 22, &msg, 1 );
         REQUIRE(msg == 147);

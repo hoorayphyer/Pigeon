@@ -175,18 +175,18 @@ namespace mpi {
   //   reset(comm);
   // }
 
-  std::optional<Comm> Comm::split ( const Group& sub_group ) const {
-    std::optional<Comm> res;
-    auto* comm = new MPI_Comm;
-    MPI_Comm_create(*this, sub_group, comm );
-    if ( *comm != MPI_COMM_NULL ) {
-      res.emplace();
-      res->reset(comm);
-    } else {
-      delete comm;
-    }
-    return res;
-  }
+  // std::optional<Comm> Comm::split ( const Group& sub_group ) const {
+  //   std::optional<Comm> res;
+  //   auto* comm = new MPI_Comm;
+  //   MPI_Comm_create(*this, sub_group, comm );
+  //   if ( *comm != MPI_COMM_NULL ) {
+  //     res.emplace();
+  //     res->reset(comm);
+  //   } else {
+  //     delete comm;
+  //   }
+  //   return res;
+  // }
 
   std::optional<Comm> Comm::split ( std::optional<unsigned int> color, int key ) const {
     std::optional<Comm> res;
@@ -210,7 +210,7 @@ namespace mpi {
 namespace mpi {
   Comm make_world() {
     Comm comm;
-    comm.set_fallback_handle(MPI_COMM_WORLD);
+    comm.set_fallback(MPI_COMM_WORLD);
     return comm;
   }
 
@@ -218,7 +218,7 @@ namespace mpi {
 
   Comm make_self() {
     Comm comm;
-    comm.set_fallback_handle(MPI_COMM_SELF);
+    comm.set_fallback(MPI_COMM_SELF);
     return comm;
   }
 
@@ -286,12 +286,6 @@ namespace mpi {
     auto* comm = new MPI_Comm;
     auto pc = ( local_comm.rank() == local_leader ) ? (*peer_comm) : MPI_COMM_NULL;
     MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, comm );
-    reset( comm );
-  }
-
-  InterComm::InterComm( const Comm& local_comm, int local_leader, const mpi::Comm& peer_comm, int remote_leader, int tag ) {
-    auto* comm = new MPI_Comm;
-    MPI_Intercomm_create( local_comm, local_leader, peer_comm, remote_leader, tag, comm );
     reset( comm );
   }
 

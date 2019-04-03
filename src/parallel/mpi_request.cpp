@@ -1,4 +1,8 @@
 #include "parallel/mpi_request.hpp"
+// RATIONALE it turns out that MPI_Wait, MPI_Waitall also manage allocation of MPI_Requests, which will interfere with apt::Handle. We want the finished mpi::Requests will be reset. In order to do that, each mpi::Request will be assigned MPI_REQUEST_NULL to avoid deallocation during reset.
+
+// TODO MPI_Cancel still needs deallocation
+// TODO persistent requests are not taken care of in wait
 
 namespace mpi {
   void request_free ( MPI_Request* p ) {
@@ -11,21 +15,31 @@ namespace mpi {
   }
 
   void wait( Request& request ) {
-    // MPI_Status status;
-    // MPI_Wait( &request, &status );
-    // return status;
+    if ( !request ) return;
+    MPI_Request raw = request;
     MPI_Wait( request, MPI_STATUS_IGNORE );
+    if ( MPI_REQUEST_NULL == raw ) {
+      MPI_Request* p = request;
+      (*p) = MPI_REQUEST_NULL;
+      request.reset();
+    }
   }
 
-  void waitall( std::vector<Request>& requests ) {
-    MPI_Request* p = new MPI_Request [ requests.size() ];
-    for ( int i = 0; i < requests.size(); ++i )
-      p[i] = requests[i];
-    // std::vector<MPI_Status> statuses(requests.size());
-    // MPI_Waitall( requests.size(), requests.data(), statuses.data() );
-    // return statuses;
-    MPI_Waitall( requests.size(), p, MPI_STATUSES_IGNORE );
-    delete [] p;
+  void waitall( std::vector<Request>& reqs ) {
+    std::vector<MPI_Request> raw_reqs;
+    raw_reqs.reserve(reqs.size());
+    for ( int i = 0; i < reqs.size(); ++i ) {
+      raw_reqs.push_back( reqs[i] ? reqs[i] : MPI_REQUEST_NULL );
+    }
+
+    MPI_Waitall( raw_reqs.size(), raw_reqs.data(), MPI_STATUSES_IGNORE );
+    for ( int i = 0; i < reqs.size(); ++i ) {
+      if ( raw_reqs[i] == MPI_REQUEST_NULL && reqs[i] ) {
+        MPI_Request* p = reqs[i];
+        (*p) = MPI_REQUEST_NULL;
+        reqs[i].reset();
+      }
+    }
   }
 
   void cancel( Request& req ) {

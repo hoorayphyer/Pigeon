@@ -39,101 +39,104 @@ std::tuple<int,int> region_begin_extent ( int region_coord, int mesh_ext, int g 
   }
 }
 
-constexpr int g = 1; // guard
-constexpr auto mesh = Mesh<2>( {2, 2}, g );
+// TODO test merge guard
+// WHEN("merge guard") {
+    //   // only guard cells nonzero values
+    //   for ( int i = 0; i < VF::NDim; ++i ) {
+    //     double val = field_value( my_coords, i );
+    //     for( auto& x : vf[i].data() ) x = val;
+    //     for( auto I_bulk : apt::Block<2>({ mesh.bulk_dim(0), mesh.bulk_dim(1) }) ) {
+    //       vf[i](I_bulk) = 0.0;
+    //     }
+    //   }
 
-SCENARIO("1x1", "[field][mpi]") {
-  std::vector<int> dims = {1,1};
-  auto cart_opt = make_cart( dims, {false, false} );
-  if ( cart_opt ) {
-    const auto& cart = *cart_opt;
+    //   merge_guard_cells_into_bulk(vf, cart);
 
-    const auto my_coords = cart.coords();
-    VF vf( mesh );
+    //   apt::Index<2> Ib;
+    //   apt::Index<2> ext;
+    //   apt::Index<2> region;
+    //   // region[ith_dim] can be -1, 0, 1, corresponding to in left guard, in bulk, in right guard
+    //   for ( region[1] = -1; region[1] < 2; ++region[1] ) {
+    //     std::tie(Ib[1], ext[1]) = region_begin_extent( region[1], mesh.extent()[1], g );
+    //     for ( region[0] = -1; region[0] < 2; ++region[0] ) {
+    //       std::tie(Ib[0], ext[0]) = region_begin_extent( region[0], mesh.extent()[0], g );
+    //       auto neigh = my_coords;
+    //       neigh[0] += region[0];
+    //       neigh[1] += region[1];
 
-    WHEN("sync guard, which should do nothing in this case") {
-      // only bulk has nonzero values
-      for ( int i = 0; i < VF::NDim; ++i ) {
-        double val = field_value( my_coords, i );
-        for( auto I_bulk : apt::Block<2>({ mesh.bulk_dim(0), mesh.bulk_dim(1) }) ) {
-          vf[i](I_bulk) = val;
-        }
-      }
+    //       bool at_bdry = false;
+    //       for ( int i = 0; i < 2; ++i ) {
+    //         if ( 0 == region[i] ) continue;
+    //         at_bdry = ( at_bdry || !(cart.shift(i,1)[ 1 == region[i] ]) );
+    //       }
 
-      sync_guard_cells_from_bulk(vf, cart);
+    //       // TODO fix these. It has more cases than sync
+    //       // for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
+    //       //   double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
+    //       //   CAPTURE( i_fld_dim, Ib, ext, region, at_bdry );
+    //       //   for ( auto I : apt::Block( ext ) ) {
+    //       //     REQUIRE( vf[i_fld_dim](I + Ib) == region_val );
+    //       //   }
+    //       // }
+    //     }
+    //   }
+    // }
 
-      apt::Index<2> Ib;
-      apt::Index<2> ext;
-      apt::Index<2> region;
-      // region[ith_dim] can be -1, 0, 1, corresponding to in left guard, in bulk, in right guard
-      for ( region[1] = -1; region[1] < 2; ++region[1] ) {
-        std::tie(Ib[1], ext[1]) = region_begin_extent( region[1], mesh.extent()[1], g );
-        for ( region[0] = -1; region[0] < 2; ++region[0] ) {
-          std::tie(Ib[0], ext[0]) = region_begin_extent( region[0], mesh.extent()[0], g );
-          auto neigh = my_coords;
-          neigh[0] += region[0];
-          neigh[1] += region[1];
 
-          bool at_bdry = false;
-          for ( int i = 0; i < 2; ++i ) {
-            if ( 0 == region[i] ) continue;
-            at_bdry = ( at_bdry || !(cart.shift(i,1)[ 1 == region[i] ]) );
-          }
+void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
+  const auto my_coords = cart.coords();
+  VF vf( mesh );
 
-          for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
-            double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
-            CAPTURE( i_fld_dim, Ib, ext, region, at_bdry );
-            for ( auto I : apt::Block( ext ) ) {
-              REQUIRE( vf[i_fld_dim](I + Ib) == region_val );
-            }
-          }
-        }
-      }
+  // only bulk has nonzero values
+  for ( int i = 0; i < VF::NDim; ++i ) {
+    double val = field_value( my_coords, i );
+    for( auto I_bulk : apt::Block<2>({ mesh.bulk_dim(0), mesh.bulk_dim(1) }) ) {
+      vf[i](I_bulk) = val;
     }
+  }
 
-    WHEN("merge guard") {
-      // only guard cells nonzero values
-      for ( int i = 0; i < VF::NDim; ++i ) {
-        double val = field_value( my_coords, i );
-        for( auto& x : vf[i].data() ) x = val;
-        for( auto I_bulk : apt::Block<2>({ mesh.bulk_dim(0), mesh.bulk_dim(1) }) ) {
-          vf[i](I_bulk) = 0.0;
-        }
+  sync_guard_cells_from_bulk(vf, cart);
+
+  apt::Index<2> Ib;
+  apt::Index<2> ext;
+  apt::Index<2> region;
+  // region[ith_dim] can be -1, 0, 1, corresponding to in left guard, in bulk, in right guard
+  for ( region[1] = -1; region[1] < 2; ++region[1] ) {
+    std::tie(Ib[1], ext[1]) = region_begin_extent( region[1], mesh.extent()[1], mesh.guard() );
+    for ( region[0] = -1; region[0] < 2; ++region[0] ) {
+      std::tie(Ib[0], ext[0]) = region_begin_extent( region[0], mesh.extent()[0], mesh.guard() );
+      auto neigh = my_coords;
+      neigh[0] += region[0];
+      neigh[1] += region[1];
+
+      bool at_bdry = false;
+      for ( int i = 0; i < 2; ++i ) {
+        if ( 0 == region[i] ) continue;
+        at_bdry = ( at_bdry || !(cart.shift(i,1)[ 1 == region[i] ]) );
       }
 
-      merge_guard_cells_into_bulk(vf, cart);
-
-      apt::Index<2> Ib;
-      apt::Index<2> ext;
-      apt::Index<2> region;
-      // region[ith_dim] can be -1, 0, 1, corresponding to in left guard, in bulk, in right guard
-      for ( region[1] = -1; region[1] < 2; ++region[1] ) {
-        std::tie(Ib[1], ext[1]) = region_begin_extent( region[1], mesh.extent()[1], g );
-        for ( region[0] = -1; region[0] < 2; ++region[0] ) {
-          std::tie(Ib[0], ext[0]) = region_begin_extent( region[0], mesh.extent()[0], g );
-          auto neigh = my_coords;
-          neigh[0] += region[0];
-          neigh[1] += region[1];
-
-          bool at_bdry = false;
-          for ( int i = 0; i < 2; ++i ) {
-            if ( 0 == region[i] ) continue;
-            at_bdry = ( at_bdry || !(cart.shift(i,1)[ 1 == region[i] ]) );
-          }
-
-          // TODO fix these. It has more cases than sync
-          // for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
-          //   double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
-          //   CAPTURE( i_fld_dim, Ib, ext, region, at_bdry );
-          //   for ( auto I : apt::Block( ext ) ) {
-          //     REQUIRE( vf[i_fld_dim](I + Ib) == region_val );
-          //   }
-          // }
+      for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
+        double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
+        CAPTURE( i_fld_dim, Ib, ext, region, at_bdry );
+        for ( auto I : apt::Block( ext ) ) {
+          REQUIRE( vf[i_fld_dim](I + Ib) == region_val );
         }
       }
     }
   }
 
+}
+
+constexpr int g = 1; // guard
+constexpr auto mesh = Mesh<2>( {4, 4}, g );
+
+SCENARIO("1x1", "[field][mpi]") {
+  auto cart_opt = make_cart( {1, 1}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard, which should do nothing in this case") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
   mpi::world.barrier();
 }
 
@@ -147,18 +150,63 @@ SCENARIO("1x1", "[field][mpi]") {
 
 // }
 
-// SCENARIO("2x1", "[field][mpi]") {
+SCENARIO("2x1", "[field][mpi]") {
+  auto cart_opt = make_cart( {2, 1}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
+}
 
-// }
+SCENARIO("1x2", "[field][mpi]") {
+  auto cart_opt = make_cart( {1, 2}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
 
-// SCENARIO("1x2", "[field][mpi]") {
+}
 
-// }
+SCENARIO("2x2", "[field][mpi]") {
+  auto cart_opt = make_cart( {2, 2}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
+}
 
-// SCENARIO("2x2", "[field][mpi]") {
+SCENARIO("4x4", "[field][mpi]") {
+  auto cart_opt = make_cart( {4, 4}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
+}
 
-// }
+SCENARIO("8x8", "[field][mpi]") {
+  auto cart_opt = make_cart( {8, 8}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
+}
 
-// SCENARIO("3x3", "[field][mpi]") {
-
-// }
+SCENARIO("16x16", "[field][mpi]") {
+  auto cart_opt = make_cart( {16, 16}, {false, false} );
+  if ( cart_opt ) {
+    WHEN("sync guard") {
+      test_sync_guard(mesh, *cart_opt);
+    }
+  }
+  mpi::world.barrier();
+}

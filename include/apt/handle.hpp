@@ -19,15 +19,18 @@ namespace apt {
 
     inline void reset() {
       _ptr.reset();
-      _fallback = _default;
     }
 
     inline void reset( RawHdl* raw_handle ) {
       _ptr.reset( raw_handle, Deleter );
     }
 
-    inline void set_fallback_handle( RawHdl fallback ) {
+    inline void set_fallback( RawHdl fallback ) {
       _fallback = fallback;
+    }
+
+    inline void reset_fallback() {
+      _fallback = _default;
     }
 
     operator RawHdl () const noexcept {
@@ -36,6 +39,10 @@ namespace apt {
 
     operator RawHdl* () const noexcept {
       return _ptr.get();
+    }
+
+    operator bool() const noexcept {
+      return static_cast<bool>(_ptr);
     }
 
     long use_count() const noexcept { return _ptr.use_count(); }
