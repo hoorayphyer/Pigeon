@@ -37,34 +37,35 @@ namespace mpi {
 #include "mpi_cparticle.cpp"
 #include <vector>
 namespace mpi {
-  MPI_Datatype MPI_CPARTICLE =
-    [] () {
-      std::vector<cPtc_t> ptcs(2);
-      constexpr int numBlocks = 3;
-      MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(), datatype<ptc_state_t>() };
-      int blocklen[numBlocks] = { DPtc, DPtc, 1 };
-      MPI_Aint disp[numBlocks];
+  MPI_Datatype MPI_CPARTICLE = MPI_DATATYPE_NULL;
 
-      MPI_Get_address( &(ptcs[0].q()), disp );
-      MPI_Get_address( &(ptcs[0].p()), disp+1 );
-      MPI_Get_address( &(ptcs[0].state()), disp+2 );
+  MPI_Datatype create_MPI_CPARTICLE () {
+    std::vector<cPtc_t> ptcs(2);
+    constexpr int numBlocks = 3;
+    MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(), datatype<ptc_state_t>() };
+    int blocklen[numBlocks] = { DPtc, DPtc, 1 };
+    MPI_Aint disp[numBlocks];
 
-      auto base = disp[0];
-      for ( int i = 0; i < numBlocks; ++i )
-        disp[i] = MPI_Aint_diff( disp[i], base );
+    MPI_Get_address( &(ptcs[0].q()), disp );
+    MPI_Get_address( &(ptcs[0].p()), disp+1 );
+    MPI_Get_address( &(ptcs[0].state()), disp+2 );
 
-      // first create a tmp type
-      MPI_Datatype mdt_tmp;
-      MPI_Type_create_struct( numBlocks, blocklen, disp, type, &mdt_tmp );
-      // adjust in case of mysterious compiler padding
-      MPI_Aint sizeofentry;
-      MPI_Get_address( ptcs.data() + 1, &sizeofentry );
-      sizeofentry = MPI_Aint_diff(sizeofentry, base);
+    auto base = disp[0];
+    for ( int i = 0; i < numBlocks; ++i )
+      disp[i] = MPI_Aint_diff( disp[i], base );
 
-      MPI_Datatype mdt_ptc;
-      MPI_Type_create_resized(mdt_tmp, 0, sizeofentry, &mdt_ptc);
-      return mdt_ptc;
-    }();
+    // first create a tmp type
+    MPI_Datatype mdt_tmp;
+    MPI_Type_create_struct( numBlocks, blocklen, disp, type, &mdt_tmp );
+    // adjust in case of mysterious compiler padding
+    MPI_Aint sizeofentry;
+    MPI_Get_address( ptcs.data() + 1, &sizeofentry );
+    sizeofentry = MPI_Aint_diff(sizeofentry, base);
+
+    MPI_Datatype mdt_ptc;
+    MPI_Type_create_resized(mdt_tmp, 0, sizeofentry, &mdt_ptc);
+    return mdt_ptc;
+  }
 
   template <>
   MPI_Datatype datatype<cPtc_t>(cPtc_t*) noexcept { return MPI_CPARTICLE; }

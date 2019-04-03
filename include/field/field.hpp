@@ -59,8 +59,8 @@ namespace field {
     Field( const Mesh<DGrid>& mesh ) : _mesh(mesh) {
       int size = 1;
       for ( int i = 0; i < DGrid; ++i ) size *= _mesh.extent()[i];
-      apt::foreach<0,DGrid>
-        ( [size] ( auto comp ) { // TODOL semantics
+      apt::foreach<0,DField>
+        ( [size] ( auto& comp ) {
             comp.reserve( size );
             comp.resize( size );
             for ( auto& elm : comp ) elm = static_cast<T>(0);

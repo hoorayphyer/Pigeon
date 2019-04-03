@@ -24,14 +24,16 @@ namespace mpi {
     int is_initialized = 0;
     MPI_Initialized(&is_initialized);
 
-    MPI_Type_commit(&mpi::MPI_CPARTICLE);
-
     if (!is_initialized)
       MPI_Init(NULL, NULL);
+
+    MPI_CPARTICLE = create_MPI_CPARTICLE();
+
+    MPI_Type_commit(&MPI_CPARTICLE);
   }
 
   void finalize() {
-    MPI_Type_free( &mpi::MPI_CPARTICLE );
+    MPI_Type_free( &MPI_CPARTICLE );
 
     int is_finalized = 0;
     MPI_Finalized(&is_finalized);

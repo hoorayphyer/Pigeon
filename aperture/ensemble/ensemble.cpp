@@ -84,7 +84,7 @@ namespace aperture {
       }
     }
 
-    intra.broadcast( ens.chief, buf.data(), buf.size() );
+    intra.broadcast( ens.chief, buf.begin(), buf.size() );
 
     if ( !cart_comm ) {
       ens.chief_cart_rank = buf[0];

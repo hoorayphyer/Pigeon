@@ -18,6 +18,7 @@ namespace mpi {
   }
 
   extern MPI_Datatype MPI_CPARTICLE;
+  MPI_Datatype create_MPI_CPARTICLE ();
 }
 
 #endif

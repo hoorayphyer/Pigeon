@@ -24,10 +24,13 @@ namespace apt {
       return !( *this == other );
     }
 
-    constexpr T* data() noexcept { return _data;}
-    constexpr const T* data() const noexcept { return _data;}
+    constexpr T* begin() noexcept { return _data;}
+    constexpr const T* begin() const noexcept { return _data;}
+
+    constexpr const T* end() const noexcept { return _data + D;}
 
     constexpr int size() const noexcept { return NDim; }
+
   };
 
   // a C-array is not allowed to have size 0

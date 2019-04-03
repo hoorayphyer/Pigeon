@@ -49,7 +49,7 @@ test_gen(parallel mpi++ catch_main_mpipp) # TODO larger tests
 
 test_gen(field mesh)
 # test_gen(field mesh_shape_interplay) # TODO
-# test_gen(field communication catch_main_mpipp)
+test_gen(field communication catch_main_mpipp)
 # test_gen(field current_deposition catch_main_mpipp)
 
 # test_gen(io silo++ catch_main_mpipp)

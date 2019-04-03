@@ -25,15 +25,18 @@ namespace apt {
       return _ijk != idx;
     }
 
+    // NOTE separating ++ ijk and ijk %= _extent is the key to make iteration stoppable
     constexpr BlockIterator& operator++() noexcept {
-      ( ++ (_ijk[0]) ) %= _extent[0];
+      ++ (_ijk[0]);
       if constexpr ( D > 1 ) {
+          _ijk[0] %= _extent[0];
           if ( 0 != _ijk[0] ) return *this;
-          else ( ++ (_ijk[1]) ) %= _extent[1];
+          else ++ (_ijk[1]);
         }
       if constexpr ( D > 2 ) {
+          _ijk[1] %= _extent[1];
           if ( 0 != _ijk[1]) return *this;
-          else ( ++ (_ijk[2]) ) %= _extent[2];
+          else ++ (_ijk[2]);
         }
       return *this;
     }
@@ -60,8 +63,8 @@ namespace apt {
     constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
 
     constexpr auto end() const noexcept {
-      auto res = _extent;
-      apt::foreach<1,D> ( [](auto& x){ --x; }, res );
+      apt::Index<D> res;
+      res[D-1] = _extent[D-1];
       return res;
     }
 

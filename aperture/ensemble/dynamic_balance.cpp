@@ -6,7 +6,7 @@
 
 namespace aperture::impl {
   auto bifurcate( const mpi::Comm& parent, bool color ) {
-    mpi::Comm child ( *(parent.split(color, parent.rank())) );
+    mpi::Comm child ( *(parent.split(color)) );
     std::optional<mpi::InterComm> itc;
     if ( child.size() == parent.size() ) return std::make_tuple( child, itc );
 
@@ -410,7 +410,7 @@ namespace aperture {
         if ( ens_opt ) cur_label.emplace( ens_opt->label() );
         new_label = impl::assign_labels( *job_market, nproc_deficit, cur_label );
       }
-      auto new_ens_intra_opt = mpi::world.split( new_label, mpi::world.rank() );
+      auto new_ens_intra_opt = mpi::world.split( new_label );
 
       auto new_ens_opt = create_ensemble<DGrid>( cart_opt, new_ens_intra_opt );
       ens_opt.swap(new_ens_opt);

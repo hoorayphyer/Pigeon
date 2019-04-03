@@ -18,7 +18,7 @@ namespace mpi {
     }
 
   public:
-    void barrier() const;
+    void barrier(const char* = "") const; // NOTE const char* is mainly for labeling barriers for users
 
     template < bool In_Place = false, typename T >
     std::optional<std::vector<T>>

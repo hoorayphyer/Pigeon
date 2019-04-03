@@ -18,7 +18,7 @@ namespace mpi::impl {
 
 namespace mpi {
   template < typename Comm >
-  void Collective_Comm<Comm>::barrier() const {
+  void Collective_Comm<Comm>::barrier(const char*) const {
     MPI_Barrier( _comm() );
   }
 
@@ -174,12 +174,15 @@ namespace mpi {
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(Comm, _TYPE_);      \
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(InterComm, _TYPE_)
 
+
   INSTANTIATE_MPI_COLLECTIVE(char);
   INSTANTIATE_MPI_COLLECTIVE(int);
   INSTANTIATE_MPI_COLLECTIVE(unsigned int);
   INSTANTIATE_MPI_COLLECTIVE(float);
   INSTANTIATE_MPI_COLLECTIVE(double);
   INSTANTIATE_MPI_COLLECTIVE(long double);
+  template void Collective_Comm<Comm>::barrier(const char*) const;
+  template void Collective_Comm<InterComm>::barrier(const char*) const;
 }
 
 #include "mpi_cparticle.cpp"

@@ -97,10 +97,9 @@ namespace field {
 
     constexpr int linearized_index_of_whole_mesh( const apt::Index<NDim>& i_bulk ) const noexcept {
       // TODO check bounds on i_bulk???
-      int i = NDim - 1;
-      // int I = i_bulk[i] + _margin[i][0] + _guard;
-      int I = i_bulk[i] + _guard;
-      for ( --i; i > -1; --i )
+      // int I = i_bulk[NDim-1] + _margin[NDim-1][0] + _guard;
+      int I = i_bulk[NDim-1] + _guard; // TODO check RVO conditions
+      for ( int i = NDim - 2; i > -1; --i )
         // I = ( i_bulk[i] + _margin[i][0] + _guard ) + I * _extent[i];
         I = ( i_bulk[i] + _guard ) + I * _extent[i];
       return I;
