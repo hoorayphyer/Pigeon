@@ -42,15 +42,17 @@ endfunction()
 # test_gen(apt numeric)
 # test_gen(apt handle)
 
+# TODO all mpi test modules should have larger tests
+
 # test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
-test_gen(parallel mpi++ catch_main_mpipp) # TODO larger tests
+test_gen(parallel mpi++ catch_main_mpipp) # DONE
 
-test_gen(field mesh)
+# test_gen(field mesh) # DONE
 # test_gen(field mesh_shape_interplay) # TODO
-test_gen(field communication catch_main_mpipp)
-# test_gen(field current_deposition catch_main_mpipp)
+# test_gen(field communication catch_main_mpipp) # DONE
+# test_gen(field current_deposition catch_main_mpipp) # TODO
 
 # test_gen(io silo++ catch_main_mpipp)
 # target_link_libraries( test_io_silo++ PRIVATE silo_lib )

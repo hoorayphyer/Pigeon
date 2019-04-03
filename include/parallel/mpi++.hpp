@@ -83,7 +83,7 @@ namespace mpi {
     std::tuple<std::vector<int>, std::vector<int>, std::vector<bool>>
     coords_dims_periodic() const;
 
-    // Sending in the `ith_dim` by `disp`, returns [ src_rank, dest_rank ]
+    // Sending in the `ith_dim` by `disp`, returns [ src_rank, dest_rank ]. If disp = 0, both src_rank and dest_rank will be self
     apt::pair<std::optional<int>> shift(int ith_dim, int disp = 1 ) const;
   };
 
