@@ -28,7 +28,7 @@ namespace apt {
       foreach<0,N>( [](auto& a, const auto& b){ a = b;}, _v, vec);
     }
 
-    constexpr T operator[] ( int i ) const noexcept {
+    constexpr const T& operator[] ( int i ) const noexcept {
       return _v[i];
     }
 

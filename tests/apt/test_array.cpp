@@ -12,3 +12,14 @@ SCENARIO("array comparison", "[apt]") {
   REQUIRE_FALSE( x == y );
   REQUIRE( x == z );
 }
+
+SCENARIO("range loop", "[apt]") {
+  array<int,6> x{ 3, 4, 7, 5, 6, 2 };
+  auto z (x);
+
+  int i = 0;
+  for ( const auto& elm : x ) {
+    REQUIRE( elm == z[i++] );
+  }
+  REQUIRE( i == x.size() );
+}

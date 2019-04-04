@@ -4,8 +4,6 @@
 #include "particle/c_particle.hpp"
 #include "catch2/catch.hpp"
 
-// TODO test particle array resize
-
 using namespace particle;
 using ptc_array = array<double,3,unsigned long long>;
 using Ptc = Particle<double,3,unsigned long long>;
@@ -128,4 +126,62 @@ SCENARIO("array back inserter", "[particle]") {
 
   REQUIRE( ptc.is(species::ion) );
   REQUIRE( ptc.is(flag::secondary) );
+}
+
+SCENARIO("array erase", "[particle]") {
+  ptc_array arr;
+  Ptc ptc0 ( Vec(15,6,73), Vec(20,-3,-5), species::ion, flag::secondary );
+  for ( int i = 0; i < 50; ++i )
+    arr.push_back(ptc0);
+  THEN("erase will mark particles as empty but array size is unchanged yet") {
+    WHEN("erase range is normal") {
+      for ( int i = 10; i < 20; ++i )
+        REQUIRE_FALSE( arr[i].is(flag::empty) );
+
+      arr.erase( 10, 20 );
+
+      for ( int i = 10; i < 20; ++i )
+        REQUIRE( arr[i].is(flag::empty) );
+      REQUIRE( arr.size() == 50 );
+    }
+
+    WHEN("erase range is inverted") {
+      for ( int i = 40; i > 30; --i )
+        REQUIRE_FALSE( arr[i].is(flag::empty) );
+
+      arr.erase( 40, 30 );
+
+      for ( int i = 40; i > 30; --i )
+        REQUIRE( arr[i].is(flag::empty) );
+      REQUIRE( arr.size() == 50 );
+    }
+
+    AND_THEN("automatic off-bound protection") {
+      arr.erase( 40, 6000 );
+      REQUIRE( arr.size() == 50 );
+    }
+  }
+}
+
+SCENARIO("array resize", "[particle]") {
+  ptc_array arr;
+  Ptc ptc0 ( Vec(15,6,73), Vec(20,-3,-5), species::ion, flag::secondary );
+  for ( int i = 0; i < 50; ++i )
+    arr.push_back(ptc0);
+
+  WHEN("resize to shrink") {
+    arr.resize( 30 );
+    REQUIRE(arr.size() == 30 );
+  }
+
+  WHEN("resize to expand") {
+    arr.resize( 80 );
+    REQUIRE(arr.size() == 80 );
+    for ( int i = 0; i < 50; ++i )
+      REQUIRE_FALSE( arr[i].is(flag::empty) );
+
+    for ( int i = 50; i < 80; ++i )
+      REQUIRE( arr[i].is(flag::empty) );
+  }
+
 }

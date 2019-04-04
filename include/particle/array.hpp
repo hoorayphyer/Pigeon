@@ -90,7 +90,7 @@ namespace particle {
     }
 
     // NOTE from is inclusive, to is exclusive. from can be larger than to.
-    void erase( int from, int to );
+    void erase( unsigned int from, unsigned int to );
 
     void resize(std::size_t size);
   };

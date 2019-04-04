@@ -42,7 +42,7 @@ namespace apt {
     using element_type = T;
     static constexpr int NDim = N;
 
-    constexpr T operator[] ( int i ) const noexcept {
+    constexpr const T& operator[] ( int i ) const noexcept {
       if ( 0 == i ) return std::get<0>(_v);
       if constexpr ( NDim > 1 )
                      if ( 1 == i ) return std::get<1>(_v);

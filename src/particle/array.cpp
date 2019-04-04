@@ -2,7 +2,7 @@
 
 namespace particle {
   template < typename T, int DPtc, typename state_t >
-  void array<T, DPtc, state_t>::erase( int from, int to ) {
+  void array<T, DPtc, state_t>::erase( unsigned int from, unsigned int to ) {
     auto min = []( auto a, auto b ) noexcept {
                  return ( a < b ) ? a : b; };
     if ( from > to ) {

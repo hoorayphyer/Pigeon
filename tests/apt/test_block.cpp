@@ -9,7 +9,7 @@ SCENARIO("Block", "[apt]") {
   Block block{ Index<3>{ N[0], N[1], N[2] }};
   auto itr = block.begin();
   auto end = block.end();
-  REQUIRE( end == Index<3>{ N[0], N[1]-1, N[2]-1 } );
+  REQUIRE( end == Index<3>{ 0, 0, N[2] } );
 
   for ( int k = 0; k < N[2]; ++k )
     for ( int j = 0; j < N[1]; ++j )
