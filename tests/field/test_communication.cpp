@@ -3,7 +3,6 @@
 #include "parallel/mpi++.hpp"
 #include <algorithm> // for std::min
 
-// NOTE Notation: XxYxZ is the cartesian partition. Each one of X,Y,Z can be positive ( meaning nonperiodic ) or negative ( meaning periodic ).
 // RATIONALE each node has a field::Field<int,3,2>, whose bulk is filled with its linearized cartesian carcoordinate.
 // TODOL test on DGrid = 3
 using namespace field;
@@ -15,19 +14,6 @@ double field_value( const std::vector<int>& coords, int comp ) {
   for ( int i = 0; i < coords.size(); ++i )
     res += coords[i] * std::exp( ( comp + 1.0 ) / ( i + 1.0 ) );
   return res;
-}
-
-auto make_cart( std::vector<int> dims, std::vector<bool> periodic ) {
-  std::optional<mpi::CartComm> cart;
-  int size = 1;
-  for ( auto x : dims ) size *= x;
-  if ( mpi::world.size() >= size ) {
-    auto comm = mpi::world.split( (mpi::world.rank() < size) );
-    if ( mpi::world.rank() < size )
-      cart.emplace( *comm, dims, periodic );
-  }
-
-  return cart;
 }
 
 void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
@@ -183,106 +169,45 @@ void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
 }
 
 
-SCENARIO("test sync guard on nonperiodic cartesian topology", "[field][mpi]") {
-constexpr auto mesh = Mesh<2>( {4, 4}, 1 );
-  WHEN("1x1") {
-    auto cart_opt = make_cart( {1, 1}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("2x1") {
-    auto cart_opt = make_cart( {2, 1}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("1x2") {
-    auto cart_opt = make_cart( {1, 2}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("2x2") {
-    auto cart_opt = make_cart( {2, 2}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("4x4") {
-    auto cart_opt = make_cart( {4, 4}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("8x8") {
-    auto cart_opt = make_cart( {8, 8}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("16x16") {
-    auto cart_opt = make_cart( {16, 16}, {false, false} );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-}
-
-SCENARIO("test sync guard on cartesian topology involving periodic boundary", "[field][mpi]") {
-  // TODOL
-}
-
-SCENARIO("test merge guard on nonperiodic cartesian topology", "[field][mpi]") {
+// NOTE Notation: XxYxZ is the cartesian partition. Each one of X,Y,Z can be positive ( meaning nonperiodic ) or negative ( meaning periodic ).
+TEMPLATE_TEST_CASE("test nonperiodic cartesian topology", "[field][mpi]"
+                   , (aio::IndexType<1,1>)
+                   , (aio::IndexType<2,1>)
+                   , (aio::IndexType<1,2>)
+                   , (aio::IndexType<2,2>)
+                   , (aio::IndexType<4,4>)
+                   , (aio::IndexType<8,8>)
+                   , (aio::IndexType<16,16>)
+                   ) {
   constexpr auto mesh = Mesh<2>( {4, 4}, 1 );
   THEN("left and right deposited areas should not overlap") {
     for ( int i = 0; i < 2; ++i )
       REQUIRE( mesh.extent()[i] >= 4 * mesh.guard() );
   }
-  WHEN("1x1") {
-    auto cart_opt = make_cart( {1, 1}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
+
+  std::vector<int> cart_dims;
+  std::vector<bool> periodic;
+  for ( auto i : TestType::get() ) {
+    bool is_neg = (i < 0);
+    cart_dims.push_back( is_neg ? -i : i );
+    periodic.push_back( is_neg );
   }
 
-  WHEN("2x1") {
-    auto cart_opt = make_cart( {2, 1}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
+  // TODOL somehow using same cart_opt across sync and merge tests cause the program to crash
+  WHEN("syncing guard") {
+    auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
+    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
   }
 
-  WHEN("1x2") {
-    auto cart_opt = make_cart( {1, 2}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
+  mpi::world.barrier();
+  WHEN("merging guard") {
+    auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
+    if ( cart_opt) test_merge_guard(mesh, *cart_opt);
   }
+  mpi::world.barrier();
 
-  WHEN("2x2") {
-    auto cart_opt = make_cart( {2, 2}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("4x4") {
-    auto cart_opt = make_cart( {4, 4}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("8x8") {
-    auto cart_opt = make_cart( {8, 8}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
-
-  WHEN("16x16") {
-    auto cart_opt = make_cart( {16, 16}, {false, false} );
-    if ( cart_opt ) test_merge_guard(mesh, *cart_opt);
-    mpi::world.barrier();
-  }
 }
 
-SCENARIO("test merge guard on cartesian topology involving periodic boundary", "[field][mpi]") {
+SCENARIO("test on cartesian topology involving periodic boundary", "[field][mpi]") {
   // TODOL
 }
-
-

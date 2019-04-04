@@ -69,6 +69,7 @@ namespace field {
 
     inline Field& set_offset( int component, const apt::array< offset_t, DGrid >& offset ) noexcept {
       _offset[component] = offset;
+      return *this;
     }
 
     inline const auto& mesh() const { return _mesh;}

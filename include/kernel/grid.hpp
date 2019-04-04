@@ -95,19 +95,15 @@ namespace knl {
 
 namespace knl {
   template < typename T, int DGrid >
-  struct Grid : public apt::array< Grid1D<T>, DGrid > {
-    using element_type = T;
-    static constexpr int NDim = DGrid;
+  using Grid = apt::array< Grid1D<T>, DGrid >;
 
-    using apt::array< Grid1D<T>, DGrid >::array;
-
-    constexpr apt::Index<DGrid> extent() const noexcept {
-      apt::Index<DGrid> ext;
-      for ( int i = 0; i < DGrid; ++i )
-        ext[i] = (*this)[i].dim();
-      return ext;
-    }
-  };
+  template < typename T, int DGrid >
+  constexpr apt::Index<DGrid> dims(const Grid<T,DGrid>& grid) noexcept {
+    apt::Index<DGrid> ext;
+    for ( int i = 0; i < DGrid; ++i )
+      ext[i] = grid[i].dim();
+    return ext;
+  }
 }
 
 #endif

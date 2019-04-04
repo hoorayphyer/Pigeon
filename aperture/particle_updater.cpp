@@ -49,7 +49,7 @@ namespace particle {
   ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const aperture::Ensemble<DGrid>& ensemble )
     : _localgrid(localgrid),
-      _dJ( { localgrid.extent(), ShapeF::support / 2 + 1 } ), // TODO check consistency of s/2 + 1 with deposit range, especially when support is odd
+      _dJ( { knl::dims(localgrid), ShapeF::support / 2 + 1 } ), // TODO check consistency of s/2 + 1 with deposit range, especially when support is odd
       _rng(rng), _cart(cart), _ensemble(ensemble) {}
 }
 

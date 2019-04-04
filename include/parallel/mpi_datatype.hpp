@@ -1,7 +1,7 @@
 #ifndef  _MPI_DATATYPE_HPP_
 #define  _MPI_DATATYPE_HPP_
 
-typedef struct ompi_datatype_t *MPI_Datatype;
+#include <mpi.h>
 
 namespace mpi {
   template <typename Type>

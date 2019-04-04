@@ -37,13 +37,14 @@ namespace aperture {
     // PairCreationTracker pairCreationTracker;
 
     void refresh( const Ensemble<DGrid>& ens ) {
+      field::Mesh<2> mesh ( knl::dims(_grid), _guard );
       for ( int i = 0; i < DGrid; ++i ) {
         int dim = _supergrid[i].dim() / ens.cart_dims[i];
         _grid[i] = _supergrid[i];
         _grid[i].clip( ens.cart_coords[i] * dim, dim );
-        _E = { {_grid.extent(), _guard} };
-        _B = { {_grid.extent(), _guard} };
-        _J = { {_grid.extent(), _guard} };
+        _E = { mesh };
+        _B = { mesh };
+        _J = { mesh };
         _borders[i][LFT] = _grid[i].lower();
         _borders[i][RGT] = _grid[i].upper();
       }

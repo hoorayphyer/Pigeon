@@ -18,4 +18,31 @@ namespace aio {
   using unif_real = std::uniform_real_distribution<T>;
 }
 
+namespace mpi { struct CartComm; }
+
+namespace aio {
+
+  template < typename CartComm = mpi::CartComm, typename WorldComm  >
+  auto make_cart( std::vector<int> dims, std::vector<bool> periodic, const WorldComm& world ) {
+    std::optional<CartComm> cart;
+    int size = 1;
+    for ( auto x : dims ) size *= x;
+    if ( world.size() >= size ) {
+      auto comm = world.split( (world.rank() < size) );
+      if ( world.rank() < size )
+        cart.emplace( *comm, dims, periodic );
+    }
+
+    return cart;
+  }
+}
+
+#include <array>
+namespace aio {
+  template < int... I>
+  struct IndexType {
+    constexpr static std::array<int, sizeof...(I)> get() noexcept {return {I...};}
+  };
+}
+
 #endif
