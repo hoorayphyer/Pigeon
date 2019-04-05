@@ -1,5 +1,5 @@
+#include "all_in_one.hpp"
 #include "parallel/mpi++.hpp"
-#include "catch2/catch.hpp"
 
 using namespace mpi;
 
@@ -81,10 +81,8 @@ SCENARIO("Comm", "[parallel][mpi]") {
 // #undef TestType
 // }
 
-// TODO Edge case: send recv to self
 SCENARIO("intra P2P communications", "[parallel][mpi]") {
   SECTION("Nonblocking") {
-
     if ( world.size() >= 2 ) {
 
       SECTION("one sided communication, test on wait") {
@@ -103,7 +101,7 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
 
       SECTION("double sided communication, test on waitall") {
         if ( world.rank() < 2 ) {
-          std::vector<Request> reqs(2); // NOTE reqs[2] will stay null
+          std::vector<Request> reqs(2);
           int myrank = world.rank();
           int send_msg = myrank + 147;
           reqs[0] = world.Isend( 1 - myrank, 147, &send_msg, 1 );
@@ -150,4 +148,17 @@ SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
     }
   }
 
+}
+
+SCENARIO("cartesian communicator", "[parallel][mpi]") {
+  WHEN("1x1 and periodic") {
+    CartComm cart( self, {1,1}, {true, true} );
+    for ( int i = 0; i < 2; ++i ) {
+      auto[src_rank, dest_rank] = cart.shift(i,1);
+      REQUIRE(src_rank);
+      REQUIRE(dest_rank);
+      REQUIRE(*src_rank == 0 );
+      REQUIRE(*dest_rank == 0 );
+    }
+  }
 }

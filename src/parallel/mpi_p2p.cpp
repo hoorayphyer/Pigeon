@@ -1,4 +1,5 @@
 #include "parallel/mpi++.hpp"
+// TODOL Edge case: send recv to self. Both blocking and nonblocking are for communication between different processes
 
 namespace mpi {
   template < typename Comm >

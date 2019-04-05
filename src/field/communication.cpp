@@ -49,34 +49,50 @@ namespace field {
         for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
 
           auto [ src, dest ] = comm.shift( i_grid, lr_send ? 1 : -1 );
-
-          std::vector<mpi::Request> reqs(2);
-          // copy all components into one buffer
-          if ( dest ) {
-            send_buf.resize( ext_size * DField );
-            auto itr_s = send_buf.begin();
+          // Edge case: cart dim = 1 with periodic boundaries
+          if ( src && (*src == comm.rank()) ) { // NOTE check on dest is not needed
+            // use I_b for I_b_send
+            auto I_b_recv = I_b;
             I_b[i_grid] = f_Ib_send( i_grid, lr_send );
+            I_b_recv[i_grid] = f_Ib_recv( i_grid, lr_send );
             apt::foreach<0,DField>
               ( [&]( auto comp ) { // TODOL semantics
-                  for ( const auto& I : apt::Block(extent) )
-                    Policy<T>::to_send_buf( *(itr_s++), comp(I_b + I) );
+                  for ( const auto& I : apt::Block(extent) ) {
+                    T buf{}; // This is needed to accommodate merge_guard
+                    Policy<T>::to_send_buf( buf, comp(I_b + I) );
+                    Policy<T>::from_recv_buf( comp(I_b_recv + I), buf );
+                  }
                 }, field );
-            reqs[0] = comm.Isend( *dest, 924, send_buf.data(), send_buf.size() );
+          } else {
+            std::vector<mpi::Request> reqs(2);
+            // copy all components into one buffer
+            if ( dest ) {
+              send_buf.resize( ext_size * DField );
+              auto itr_s = send_buf.begin();
+              I_b[i_grid] = f_Ib_send( i_grid, lr_send );
+              apt::foreach<0,DField>
+                ( [&]( auto comp ) { // TODOL semantics
+                    for ( const auto& I : apt::Block(extent) )
+                      Policy<T>::to_send_buf( *(itr_s++), comp(I_b + I) );
+                  }, field );
+              reqs[0] = comm.Isend( *dest, 924, send_buf.data(), send_buf.size() );
+            }
+            if ( src ) {
+              recv_buf.resize( ext_size * DField );
+              reqs[1] = comm.Irecv( *src, 924, recv_buf.data(), recv_buf.size() );
+            }
+            mpi::waitall(reqs);
+            if ( src ) {
+              auto itr_r = recv_buf.cbegin();
+              I_b[i_grid] = f_Ib_recv( i_grid, lr_send );
+              apt::foreach<0,DField>
+                ( [&]( auto comp ) { // TODOL semantics
+                    for ( const auto& I : apt::Block(extent) )
+                      Policy<T>::from_recv_buf( comp(I_b + I), *(itr_r++) );
+                  }, field );
+            }
           }
-          if ( src ) {
-            recv_buf.resize( ext_size * DField );
-            reqs[1] = comm.Irecv( *src, 924, recv_buf.data(), recv_buf.size() );
-          }
-          mpi::waitall(reqs);
-          if ( src ) {
-            auto itr_r = recv_buf.cbegin();
-            I_b[i_grid] = f_Ib_recv( i_grid, lr_send );
-            apt::foreach<0,DField>
-              ( [&]( auto comp ) { // TODOL semantics
-                  for ( const auto& I : apt::Block(extent) )
-                    Policy<T>::from_recv_buf( comp(I_b + I), *(itr_r++) );
-                }, field );
-          }
+
         }
         // restroe
         I_b[i_grid] = I_b_orig;
