@@ -21,7 +21,7 @@ namespace field::impl {
       apt::foreach<0,DGrid>
         ( []( auto& i_b, auto& s_b, auto l, const auto& ofs ){
             l -= ofs; // now l is the native grid index
-            i_b = int(l - ShapeF::support / 2.0) + 1; // i_b is native
+            i_b = int(l - ShapeF::support() / 2.0) + 1; // i_b is native
             s_b = i_b - l;
             i_b += (( ofs == MIDWAY ) && ( l - static_cast<int>(l) >= ofs )); // i_b now is with respect to original grid
           }, _I_b, _sep_b, loc, offset );
@@ -60,7 +60,7 @@ namespace field {
                                     const apt::array<T,DGrid>& q_std,
                                     const ShapeF& shapef ) {
     apt::Vec<T, DField> result;
-    constexpr auto supp = ShapeF::support;
+    constexpr auto supp = ShapeF::support();
 
     apt::foreach<0,DField>
       ( [&] ( auto& res, const auto& comp ) {
@@ -89,7 +89,7 @@ namespace field {
                  apt::Vec<T, DField> variable,
                  const apt::array<T, DGrid>& q_std,
                  const ShapeF& shapef ) {
-    constexpr auto supp = ShapeF::support;
+    constexpr auto supp = ShapeF::support();
 
     constexpr apt::Index<DGrid> ext
       ( [supp](){

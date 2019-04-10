@@ -20,14 +20,14 @@
 #   message("${Yellow}No lab is invoked.${ColorReset}")
 # endif()
 
-add_library(aperture_particle_updater STATIC "particle_updater.cpp")
+add_library(aperture_particle_updater SHARED "particle_updater.cpp")
 target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR}/include)
 set( LINK_MPIPP TRUE )
 
 #TODO precede particle/.cpp with lab/.cpp
 function(module_gen category name)
   set(THIS_MODULE_NAME "${category}_${name}_module")
-  add_library( ${THIS_MODULE_NAME} STATIC ${CMAKE_SOURCE_DIR}/aperture/${category}_${name}.cpp )
+  add_library( ${THIS_MODULE_NAME} SHARED ${CMAKE_SOURCE_DIR}/aperture/${category}_${name}.cpp )
   target_include_directories(${THIS_MODULE_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
   target_include_directories(${THIS_MODULE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
@@ -72,11 +72,12 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 #   set(UserControl_src "UserControl.cpp")
 # endif()
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
-# add_library(UserControl STATIC ${UserControl_src})
+# add_library(UserControl SHARED ${UserControl_src})
 
-add_executable(aperture "main.cpp")
-target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
+# TODO DSO missing error
+# add_executable(aperture "main.cpp")
+# target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
+# target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
 
 # target_link_libraries(aperture AperLib UserControl)
 

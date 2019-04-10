@@ -72,7 +72,7 @@ namespace field {
       return *this;
     }
 
-    inline const auto& mesh() const { return _mesh;}
+    inline const auto& mesh() const noexcept { return _mesh;}
 
     inline const auto operator[] ( int i ) const noexcept {
       return Component< const std::vector<T>, Mesh<DGrid>, apt::array<offset_t, DGrid> >

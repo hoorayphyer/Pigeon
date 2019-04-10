@@ -49,7 +49,7 @@ namespace particle {
   ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const aperture::Ensemble<DGrid>& ensemble )
     : _localgrid(localgrid),
-      _dJ( { knl::dims(localgrid), ShapeF::support / 2 + 1 } ), // TODO check consistency of s/2 + 1 with deposit range, especially when support is odd
+      _dJ( knl::dims(localgrid), ShapeF() ),
       _rng(rng), _cart(cart), _ensemble(ensemble) {}
 }
 
@@ -198,7 +198,7 @@ namespace particle {
       //   // TODOL pusher handle boundary condition. Is it needed?
       //   if constexpr ( IsCharged )
       //                  _dJ.deposit( charge_over_dt, std::move(q0_std),
-      //                               std::move(q1_std), shapef ); // TODOL check the 2nd argument
+      //                               std::move(q1_std) ); // TODOL check the 2nd argument
       // }
 
       if ( is_migrate( ptc.q(), borders ) )
@@ -255,10 +255,10 @@ namespace particle {
     if ( _cart ) {
       auto& Jmesh = _dJ.integrate( *_cart );
 
-      // rescale dJ back to real grid delta
+      // rescale Jmesh back to real grid delta
       apt::foreach<0, DGrid> // NOTE it's DGrid not DField
         ( [&]( auto comp, const auto& g ) { // comp is proxy
-            auto tmp = -g.delta();
+            auto tmp = g.delta();
             for ( auto& elm : comp.data() ) elm *= tmp;
           }, Jmesh, _localgrid );
 

@@ -11,11 +11,26 @@ namespace aio {
   using eng_t = std::default_random_engine;
   auto now() { return std::time(0); }
 
+  template < typename T, template < typename > class Distribution >
+  class Dist : public Distribution<T> {
+  private:
+    eng_t _eng {now()};
+
+  public:
+    using Distribution<T>::Distribution;
+
+    inline void seed( std::size_t s ) { _eng.seed(s); }
+
+    inline T operator() () {
+      return static_cast<Distribution<T>&>(*this)(_eng);
+    }
+  };
+
   template < typename T = int >
-  using unif_int = std::uniform_int_distribution<T>; // [lower,upper]
+  using unif_int = Dist<T,std::uniform_int_distribution>; // [lower,upper]
 
   template < typename T = double >
-  using unif_real = std::uniform_real_distribution<T>;
+  using unif_real = Dist<T,std::uniform_real_distribution>;
 }
 
 namespace mpi { struct CartComm; }

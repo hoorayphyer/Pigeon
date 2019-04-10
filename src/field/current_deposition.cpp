@@ -6,94 +6,53 @@
 #include "parallel/mpi++.hpp"
 #include <tuple>
 
-namespace esirkepov {
-  template < typename T >
-  inline T Wesir_2D( T sx0, T sx1, T sy0, T sy1 ) noexcept {
-    return ( ( 2 * sx1 + sx0 ) * sy1 + ( sx1 + 2 * sx0 ) * sy0 ) / 6.0;
-  }
-
-  template < typename T >
-  inline T Wesir( T sx0, T sx1, T sy0, T sy1, T sz0, T sz1 ) noexcept {
-    return (sx1 - sx0) * Wesir_2D(sy0, sy1, sz0, sz1);
-  }
-
-  template < typename T, int DGrid, typename ShapeF >
-  constexpr apt::array<T,3> calcW( const apt::Index<DGrid>& index,
-                                   const apt::array<T, DGrid>& sep0_b,
-                                   const apt::array<T, DGrid>& sep1_b,
-                                   const ShapeF& shapef ) noexcept {
-    T W[3]{};
-
-    // TODOL use normalization?? er ci xing zheng ze hua
-    T s0[DGrid]{};
-    T s1[DGrid]{};
-
-    auto f_calc_s0s1
-      = [&shapef] ( auto& s0_i, auto& s1_i, auto i, auto sep0_i, auto sep1_i ) {
-          s0_i = shapef( i + sep0_i );
-          s1_i = shapef( i + sep1_i );
-        };
-
-    apt::foreach<0,DGrid>( f_calc_s0s1, s0, s1, index, sep0_b, sep1_b );
-
-    if constexpr ( DGrid == 2 ) {
-        W[0] = Wesir( s0[0], s1[0], s0[1], s1[1], 1.0, 1.0 );
-        W[1] = Wesir( s0[1], s1[1], 1.0, 1.0, s0[0], s1[0] );
-        W[2] = Wesir( 0.0, 1.0, s0[0], s1[0], s0[1], s1[1] );
-      } else {
-      W[0] = Wesir( s0[0], s1[0], s0[1], s1[1], s0[2], s1[2] );
-      W[1] = Wesir( s0[1], s1[1], s0[2], s1[2], s0[0], s1[0] );
-      W[2] = Wesir( s0[2], s1[2], s0[0], s1[0], s0[1], s1[1] );
-    }
-
-    return {{ W[0], W[1], W[2] }};
-  }
-
-}
-
 namespace field :: impl {
+  // RATIONALE Due to the MIDWAY offset of dJ field, we define the NATIVE grid te be one shifted to the right by half spacing from the standard grid, therefore q_nat = q_std - 0.5. By design, dJ[i] is INSITU on the native grid.
+  // The contributed cells in the native grid are [ INT_FLOOR( q_nat_min - sf.r) + 1,  INT_FLOOR( q_nat_max + sf.r) + 1 ). These are also the correct cell numbers in the standard grid
+  // Now we have q0_std and q1_std, the final range of contributed cells is the union of individual ones
 
-  // RATIONALE: assume the offset = 0.5 in the dimension. The native grid is one offset by 0.5 with respect to the original one.
-  // - q is relative position in the native grid. q starts at 0.0
-  // - the contributing cells in the native grid are [ int(q - sf.r) + 1,  int(q + sf.r) + 1 )
-  // - index_original = index_native + ( q - int(q) >= 0.5 )
-  // Now we have q0 and q1, the final range of contributing cells is the union of individual ones
   template < int DGrid, typename Vec_q0, typename Vec_q1, typename ShapeF >
-  constexpr auto set_up_for_depositing_dJ( const Vec_q0& q0_std, const Vec_q1& q1_std, const ShapeF& ) {
+  constexpr auto deposit_range( const Vec_q0& q0_std, const Vec_q1& q1_std, const ShapeF& ) {
+    static_assert( ShapeF::support() > 0 );
     using T = apt::most_precise_t<apt::element_t<Vec_q0>, apt::element_t<Vec_q1>>;
-    apt::Index<DGrid> I_b;
+    apt::Index<DGrid> I_b; // index of the first contributed cell in the standard grid
     apt::Index<DGrid> extent;
-    apt::array<T, DGrid> sep0_b; // separation 0 is defined to be i_cell_beginning - q0_ptc
-    apt::array<T, DGrid> sep1_b;
 
     apt::foreach<0, DGrid>
-      ( [] ( auto& i_b, auto& ext, auto& sp0, auto& sp1,
-             auto qmin, auto qmax )
+      ( [] ( auto& i_b, auto& ext, auto a, auto b )
         noexcept {
-          // initially, qmin = q0_std, qmax = q1_std. Find dq_nat = q1_std - q0_std and store it in qmax
-          qmax -= qmin;
-          qmin -= 0.5;
-          // now, qmin = q0_native, qmax = dq_native.
-          sp0 = - qmin;
-          sp1 = sp0 - qmax;
-          qmin += ( ( qmax < 0 ? qmax : 0.0 ) - ShapeF::support / 2.0 );
-          qmax = qmin + qmax * ( (qmax > 0.0) - ( qmax < 0.0) ) + ShapeF::support;
-          i_b = int( qmin ) + 1 ;
-          ext = int( qmax ) + 1 - i_b;
-          sp0 += i_b;
-          sp1 += i_b;
-        },
-        I_b, extent, sep0_b, sep1_b, q0_std, q1_std );
+          // initially, a = q0_std, b = q1_std.
+          b -= a;
+          a -= 0.5;
+          // now, a = q0_nat, b = dq_nat.
+          a += ( b < 0 ? b : 0.0 );
+          b = a + b * ( (b > 0.0) - ( b < 0.0) );
+          // now a = min(q0_nat, q1_nat), b = max(q0_nat,q1_nat)
 
-    return std::make_tuple( I_b, extent, sep0_b, sep1_b );
+          // function of support = 1, jumps at support boundaries. The following assumes a left continuous convention, i.e. S(x) = lim S(x - \epsilon). In other words, nontrivial influence is only for left-open-right-closed ranges. It has to do with int(0) = 0.
+          static_assert( ShapeF::support() > 1); // TODOL
+
+          auto int_flr =
+            []( T q ) noexcept {
+              // Since min(q0_std) = 0.0 by design, min(q_nat) = -1 - r - 0.5, so q_nat + ( support + 3 ) / 2.0 >= 0. We will simply use (support + 1) as the shift
+              constexpr auto shift = 1 + ShapeF::support();
+              return int(q+shift) - shift; };
+
+          i_b = int_flr( a - ShapeF::support() / 2.0 ) + 1 ;
+          ext = int_flr( b + ShapeF::support() / 2.0 ) + 1 - i_b;
+        },
+        I_b, extent, q0_std, q1_std );
+
+    return std::make_tuple( I_b, extent );
   }
 
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid >
-  Standard_dJ_Field<T,DField,DGrid>::Standard_dJ_Field( const Mesh<DGrid>& mesh )
-    : _data(mesh) {
+  template < typename T, int DField, int DGrid, typename ShapeF >
+  Standard_dJ_Field<T,DField,DGrid,ShapeF>::Standard_dJ_Field( apt::Index<DGrid> bulk_extent, const ShapeF& shapef )
+    // NOTE minimum needed number of guards on one side is ( supp + 1 ) / 2 + 1
+    : _data({ std::move(bulk_extent), ( ShapeF::support() + 3 ) / 2 }) {
     // enforce offset
     apt::array< offset_t, DGrid > offset{};
     apt::foreach<0,DGrid>
@@ -102,31 +61,54 @@ namespace field {
       _data.set_offset( i, offset );
   }
 
-  template < typename T, int DField, int DGrid >
-  template < typename Vec_q0, typename Vec_q1, typename ShapeF >
-  void Standard_dJ_Field<T,DField,DGrid>::deposit ( T charge_over_dt,
+  template < typename T >
+  constexpr T Wesir( T sx0, T sx1, T sy0 = 1.0, T sy1 = 1.0 ) noexcept {
+    return ( ( 2 * sx1 + sx0 ) * sy1 + ( sx1 + 2 * sx0 ) * sy0 ) / 6.0;
+  }
+
+
+  template < typename T, int DField, int DGrid, typename ShapeF >
+  template < typename Vec_q0, typename Vec_q1 >
+  void Standard_dJ_Field<T,DField,DGrid,ShapeF>::deposit ( T charge_over_dt,
                                            const apt::VecExpression<Vec_q0>& q0_std,
-                                           const apt::VecExpression<Vec_q1>& q1_std,
-                                           const ShapeF& shapef ) {
+                                           const apt::VecExpression<Vec_q1>& q1_std ) {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
-    // NOTE q0 and q1 are switched positions so that the deposited is the time reversal of dJ, or TdJ. The reason for this is elaborated in integrate.
-    // NOTE: we use -dq here, so the deposited is TdJ ( time reversal of dJ ). This reversal will be cancelled by a reversed integration in integrate_TdJ due to our choice of indexing.
-    const auto[I_b, extent, sep0_b, sep1_b] = impl::set_up_for_depositing_dJ<DGrid>( q1_std, q0_std, shapef );
+    constexpr auto shapef = ShapeF();
+    const auto[I_b, extent] = impl::deposit_range<DGrid>( q0_std, q1_std, shapef );
 
-    for ( const auto& I : apt::Block(extent) ) {
-      auto W = esirkepov::calcW( I, sep0_b, sep1_b, shapef );
-      if constexpr ( DGrid == 2 ) W[2] *= (q1_std[2] - q0_std[2]); // NOTE here the forward time dq is used because there is no integration on dJ[2] in 2D case. TODO check
+    apt::array<T,3> W{};
+    apt::array<T,DGrid> s0{};
+    apt::array<T,DGrid> s1{};
+
+    for ( auto I : apt::Block(extent) ) {
+      I += I_b;
+      // TODOL use normalization?? er ci xing zheng ze hua
+      apt::foreach<0,DGrid>
+        ( [&shapef]( auto& s, int i, auto q ) noexcept {
+            s = shapef(i + 0.5 - q);
+          }, s0, I, q0_std );
+
+      apt::foreach<0,DGrid>
+        ( [&shapef]( auto& s, int i, auto q ) noexcept {
+            s = shapef(i + 0.5 - q);
+          }, s1, I, q1_std );
+
+      if constexpr ( DGrid == 2 ) {
+          W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1] );
+          W[1] = ( s1[1] - s0[1] ) * Wesir( s0[0], s1[0] );
+          W[2] = (q1_std[2] - q0_std[2]) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+        } else {
+        W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1], s0[2], s1[2] );
+        W[1] = ( s1[1] - s0[1] ) * Wesir( s0[2], s1[2], s0[0], s1[0] );
+        W[2] = ( s1[2] - s0[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+      }
+
+
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
-        ( [&]( auto& dj, auto w ) { dj(I_b + I) += w * charge_over_dt; } , _data, W );
+        ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _data, W ); // TODOL semantics on dj
     }
-
-    // NOTE in eq.36 in Esirkepov, V_z is really del_z / dt, where del_z should
-    // be interpretted as the COORDINATE displacement of the particle and dt is
-    // the timestep. It is wrong to use the physical velcocity v_ptc_z here,
-    // which is what we did before in LogSpherical where there was always a
-    // confusion about where to base the v_ptc_z.
 
     return;
   }
@@ -134,81 +116,29 @@ namespace field {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid >
-  void Standard_dJ_Field<T,DField,DGrid>::reduce( int chief, const mpi::Comm& intra ) {
-    // TODO NOTE one can use one chunk of memory for Jmesh so that only one pass of reduce is needed ?
+  template < typename T, int DField, int DGrid, typename ShapeF >
+  void Standard_dJ_Field<T,DField,DGrid,ShapeF>::reduce( int chief, const mpi::Comm& intra ) {
+    // TODO Opimize communication. Use persistent and buffer? NOTE one can use one chunk of memory for Jmesh so that only one pass of reduce is needed ?
     for ( int i = 0; i < DField; ++i )
       intra.reduce<mpi::IN_PLACE>( mpi::by::SUM, chief, _data[i].data().data(),  _data[i].data().size() );
   }
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid >
-  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid>::integrate( const mpi::CartComm& cart ) {
-    // NOTE
-    // - we assum TdJ is offset at MIDWAY in all directions
-    // - the boundary conditions are J =0 at both ends in a direcction
-    // - reminder: TdJ here is the time reversal of dJ
-    // - reminder: indexing is such that 0 corresponds to the first cell in bulk
-    // - reminder: guard on dJ is shape::support / 2 + 1
-    // NOTE By convention of our indexing, J[i+1] = J[i] + dJ[i] = J[i] - TdJ[i], which is not in-place doable. So we use J[i] = J[i+1] + TdJ[i], i.e. we integrate from upper bound backwards. Given the boundary conditions, J[bulk_dim - guard] can be found locally. From there, one can find all J_i down through J[guard]. NOTE J[guard] can be found two ways, they should be consistent thanks to charge conservation of Esirkepov algorithm. See below for how to leverage this on achieving complete in-place integration.
-    // NOTE: After merging cells, TdJ values in those untreated cells are also ready. In the lower end, one can continue J[i] = J[i+1] + TdJ[i] in place. However, at the upper end, one will need J[i+1] = J[i] - TdJ[i], which breaks inplace-ness. More importantly, the TdJ value of the very first cell ( call this cell FB ) counted from the back is overwritten with the J[FB], but the original TdJ[FB] is needed again to find J[FB + 1] = J[FB] - TdJ[FB]. Luckily charge conservation makes some information redundant. One can find that TdJ[-1] is not needed during merging cells ( because J[0] is found from J[1] + TdJ[0], while J[-1], which resides on the neighboring process, is found from J[-2] - TdJ[-2] ). So we will use it to store J[FB] at the appropriate time.
-    auto& TdJ = _data;
+  template < typename T, int DField, int DGrid, typename ShapeF >
+  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid,ShapeF>::integrate( const mpi::CartComm& cart ) {
+    auto& dJ = _data;
 
-    const auto& mesh = TdJ.mesh();
-    for ( int i_dim = 0; i_dim < 3; ++i_dim ) {
-      apt::Index<DGrid> I_b = mesh.origin();
-      auto comp = TdJ[i_dim]; // TODOL semantics
-
-      // get range of cells whose J can be found locally. This covers ( J[guard-1], J[bulk_dim - guard] ].
-      int iback_b = mesh.extent()[i_dim] - 3 * mesh.guard();
-
-      // locally scan
-      for ( auto trI : mesh.project( i_dim, I_b, mesh.extent() ) ) {
-        // first, store TdJ[bulk_dim - guard] and find J[bulk_dim - guard]. Set TdJ[-1] = 0 to avoid corrupting the stored value during merging guard cells
-        std::swap( comp[ trI | iback_b ], comp[ trI | iback_b + mesh.guard() - 1 ] );
-        std::swap( comp[ trI | -1 ], comp[ trI | -mesh.guard() ] );
-        comp[ trI | - mesh.guard() ] = 0.0;
-
-        for ( int i = iback_b + 1; i < iback_b + 2 * mesh.guard(); ++i )
-          comp[ trI | iback_b ] += comp[ trI | i ];
-
-        // then, perform scan
-        for ( int i = iback_b - 1; i > mesh.guard() - 1; --i ) // NOTE --i
-          comp[ trI | i ] += comp[ trI | i+1 ];
+    const auto& mesh = dJ.mesh();
+    for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) { // NOTE it is DGrid not DField
+      auto comp = dJ[i_dim]; // TODOL semantics
+      for ( auto trI : mesh.project( i_dim, mesh.origin(), mesh.extent() ) ) {
+        for ( int n = mesh.bulk_dim(i_dim) + mesh.guard() - 2; n > -mesh.guard() - 1; --n )
+          comp[trI | n] += comp[trI | n+1];
       }
     }
 
-    field::merge_guard_cells_into_bulk( TdJ, cart );
-
-    // boundaries
-    for ( int i_dim = 0; i_dim < 3; ++i_dim ) {
-      apt::Index<DGrid> I_b{};
-      auto ext_bulk = mesh.extent();
-      // trim to bulk
-      apt::foreach<0,DGrid>
-        ([g=mesh.guard()]( auto& ext ){
-           ext -= 2*g;
-         }, ext_bulk );
-      int iback = ext_bulk[i_dim] - 1;
-
-      auto comp = TdJ[i_dim]; // TODOL semantics
-
-      for ( auto trI : mesh.project( i_dim, {}, ext_bulk ) ) {
-        // finish lower end
-        for ( int i = mesh.guard() - 1; i > -1; --i ) // NOTE --i
-          comp[ trI | i ] += comp[ trI | i+1 ];
-
-        // finish upper end
-        // first find J[bulk_dim - 1]
-        for ( int i = iback - mesh.guard() + 1; i < iback; ++i )
-          comp[ trI | iback ] += comp[ trI | i ];
-
-        for ( int i = iback - 1; i > iback - mesh.guard() + 1; --i ) // NOTE ++i
-          comp[ trI | i ] += comp[ trI | i+1 ];
-      }
-    }
-
-    return TdJ;
+    field::merge_guard_cells_into_bulk( dJ, cart );
+    return dJ;
   }
 }

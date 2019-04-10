@@ -1,6 +1,7 @@
 #include "field/current_deposition.cpp"
+#include "kernel/shapef.hpp"
 #include "traits.hpp"
 namespace field {
   using namespace traits;
-  template class Standard_dJ_Field< real_dj_t, 3, DGrid >;
+  template class Standard_dJ_Field< real_dj_t, 3, DGrid, knl::shapef_t<shape> >;
 }

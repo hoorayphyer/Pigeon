@@ -1,8 +1,8 @@
 set(CMAKE_CXX_FLAGS "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC") # -Wmissing-braces
-add_library(catch_main STATIC "catch_main.cpp")
+add_library(catch_main SHARED "catch_main.cpp")
 target_include_directories(catch_main PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
 
-add_library(catch_main_mpipp STATIC "catch_main_mpi++.cpp")
+add_library(catch_main_mpipp SHARED "catch_main_mpi++.cpp")
 target_include_directories(catch_main_mpipp PRIVATE "${CMAKE_SOURCE_DIR}/include")
 target_include_directories(catch_main_mpipp PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
 target_link_libraries(catch_main_mpipp PRIVATE mpipp_lib)
@@ -34,6 +34,7 @@ endfunction()
 
 # TODO all uses of std::abs in the code, see if anywhere std::labs should be used
 # TODO all mpi test modules should have larger tests
+# TODO apt particle has newer modules
 
 # test_gen(apt array) # DONE
 # test_gen(apt pair) # DONE
@@ -50,10 +51,11 @@ endfunction()
 
 # test_gen(parallel mpi++ catch_main_mpipp) # DONE
 
+# test_gen(field field) # DONE
 # test_gen(field mesh) # DONE
 # test_gen(field mesh_shape_interplay) # TODO
 # test_gen(field communication catch_main_mpipp) # DONE
-# test_gen(field current_deposition catch_main_mpipp) # TODO
+# test_gen(field current_deposition catch_main_mpipp) # DONE
 
 # test_gen(io silo++ catch_main_mpipp)
 # target_link_libraries( test_io_silo++ PRIVATE silo_lib )

@@ -30,7 +30,7 @@ namespace particle {
   class ParticleUpdater : public aperture::AbstractParticleUpdater<Real, DGrid, state_t>{
   private:
     const knl::Grid< Real, DGrid >& _localgrid;
-    field::Standard_dJ_Field< Real_dJ, 3, DGrid > _dJ;
+    field::Standard_dJ_Field< Real_dJ, 3, DGrid, ShapeF > _dJ;
     std::vector<cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
     const std::optional<mpi::CartComm>& _cart;

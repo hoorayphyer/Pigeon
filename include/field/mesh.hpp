@@ -36,6 +36,7 @@ namespace field {
           _stride_normal_in_mesh(mesh.stride(ith_dim)),
           _transIb_bulk( [&I_bulk_begin, ith_dim](){ I_bulk_begin[ith_dim] = 0; return std::move(I_bulk_begin);}() ),
           _block( [&extent, ith_dim](){ extent[ith_dim] = 1; return std::move(extent); }() ) {}
+
     public:
       friend class Mesh<D>;
 
@@ -105,6 +106,7 @@ namespace field {
       return I;
     }
 
+    // NOTE I_bulk_begin[ith_dim] is not significant
     constexpr auto project( int ith_dim, apt::Index<D> I_bulk_begin, apt::Index<D> extent ) const noexcept {
       return ProjBlock( *this, std::move(ith_dim), std::move(I_bulk_begin), std::move(extent) );;
     }
@@ -121,10 +123,6 @@ namespace field {
       return origin;
     }
 
-    // constexpr int extent( int ith_dim ) const noexcept { // full extent of the mesh
-    //   return _bulk[ith_dim].dim() + _margin[ith_dim][0] + _margin[ith_dim][1] + 2 * _guard;
-    // }
-
     constexpr const auto& extent() const noexcept { return _extent; }
 
     constexpr auto bulk_dim( int ith_dim ) const noexcept {
@@ -137,6 +135,16 @@ namespace field {
       if ( 0 == ith_dim ) return 1;
       else return _extent[ith_dim - 1] * stride( ith_dim - 1 );
     }
+
+    // // TODOL this potentially will introduce subtle bugs when using trI from the full mesh. Naturally the goal here is to have a mesh that is 1 dim short. But such a mesh doesn't work well with trI from the full mesh. One solution is to provide trI to int by subtracting g * stride_normal
+    // auto squeeze( int ith_dim ) const noexcept {
+    //   // TODOL check bounds
+    //   apt::Index<NDim> bulk;
+    //   for ( int i = 0; i < NDim; ++i ) bulk[i] = bulk_dim(i);
+    //   bulk[ith_dim] = 1;
+    //   // NOTE guard is still kept in the squeezed direction to conserve transindex compatibility
+    //   return Mesh( bulk, guard() );
+    // }
 
   };
 }
