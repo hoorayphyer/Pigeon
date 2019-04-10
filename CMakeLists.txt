@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.13)
 project (Aperture)
 enable_testing()
 message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
@@ -37,5 +37,5 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_find_package" )
 set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
 add_subdirectory(src)
-add_subdirectory(aperture)
+# add_subdirectory(aperture)
 add_subdirectory(tests)

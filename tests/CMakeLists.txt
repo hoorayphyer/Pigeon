@@ -5,7 +5,7 @@ target_include_directories(catch_main PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch
 add_library(catch_main_mpipp SHARED "catch_main_mpi++.cpp")
 target_include_directories(catch_main_mpipp PRIVATE "${CMAKE_SOURCE_DIR}/include")
 target_include_directories(catch_main_mpipp PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
-target_link_libraries(catch_main_mpipp PRIVATE mpipp_lib)
+target_link_libraries(catch_main_mpipp PUBLIC mpipp_lib)
 
 function(test_gen category name)
   if ( ${ARGC} GREATER 2 )
@@ -49,13 +49,13 @@ endfunction()
 # test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
-# test_gen(parallel mpi++ catch_main_mpipp) # DONE
+test_gen(parallel mpi++ catch_main_mpipp) # DONE
 
 # test_gen(field field) # DONE
 # test_gen(field mesh) # DONE
 # test_gen(field mesh_shape_interplay) # TODO
 # test_gen(field communication catch_main_mpipp) # DONE
-# test_gen(field current_deposition catch_main_mpipp) # DONE
+# test_gen(field current_deposition catch_main_mpipp) # DONE # TODOL test reduce
 
 # test_gen(io silo++ catch_main_mpipp)
 # target_link_libraries( test_io_silo++ PRIVATE silo_lib )

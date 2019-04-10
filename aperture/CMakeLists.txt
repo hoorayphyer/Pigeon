@@ -74,10 +74,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
 # add_library(UserControl SHARED ${UserControl_src})
 
-# TODO DSO missing error
-# add_executable(aperture "main.cpp")
-# target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
-# target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
+add_executable(aperture "main.cpp")
+target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
 
 # target_link_libraries(aperture AperLib UserControl)
 
