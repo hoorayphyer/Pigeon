@@ -39,6 +39,15 @@ namespace particle {
     }
 
     template < typename E >
+    cParticle& operator= ( const PtcExpression<E>& ptc ) noexcept {
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ a = b;}, q(), ptc.q() );
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ a = b;}, p(), ptc.p() );
+      _s = ptc.state();
+
+      return *this;
+    }
+
+    template < typename E >
     cParticle& operator= ( PtcExpression<E>&& ptc ) noexcept {
       apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
       apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
@@ -46,6 +55,12 @@ namespace particle {
       ptc.set(flag::empty);
 
       return *this;
+    }
+
+    constexpr void swap( cParticle& other ) noexcept {
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), other.q() );
+      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), other.p() );
+      std::swap( _s, other.state() );
     }
 
   };

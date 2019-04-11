@@ -12,19 +12,24 @@ namespace particle :: impl {
     constexpr int C = 1;
     constexpr int R = 2;
 
-    // ec points to end of ccc.., el points to end of lll..., and er points to the reverse end of ...rrr.
-    // the upshot: ccc.. will be [0, ic), lll... will be [ic, ilr+1), rrr... will be [ilr+1, buffer.size()), edge case safe
-    int ec = 0, el = 0, er = buffer.size() - 1;
-    while ( el <= er ) {
+    // RATIONALE sort buffer into [CCC...LLL...RRR...)
+    // Let ec points to end of CCC.., or equivalently beginning of LLL...;
+    // Let el points to end of LLL...;
+    // Let rer points to the reverse end of ...RRR, i.e. all Rs will be (rer, buffer.size() )
+    // the upshot: ccc.. will be [0, ec), lll... will be [ec, el), rrr... will be [el, buffer.size()), edge case safe
+    int ec = 0, el = 0, rer = buffer.size() - 1;
+    // REQUIRE rer always points to a value different from R
+    while( rer > -1 && lcr( buffer[rer] ) == R ) --rer;
+
+    while ( el <= rer ) {
       switch ( lcr( buffer[el] ) ) {
-      case L : el++; break;
+      case L : ++el; break;
       case C :
-        if ( ec != el ) std::swap( buffer[el], buffer[ec] );
-        ec++; el++; break;
+        if ( ec != el ) buffer[el].swap( buffer[ec] );
+        ++ec; ++el; break;
       case R :
-        while ( el <= er && lcr( buffer[er] ) != R ) er--;
-        if ( er != el ) std::swap( buffer[el], buffer[er] );
-        er--;
+        buffer[el].swap( buffer[rer--] );
+        while ( el <= rer && lcr( buffer[rer] ) == R ) --rer;
         break;
       }
     }
@@ -105,32 +110,39 @@ namespace particle :: impl {
 }
 
 namespace particle {
-  template < typename Vec, int DGrid, typename T >
-  bool is_migrate( const apt::VecExpression<Vec,T>& q,
-                   const apt::array< apt::pair<T>, DGrid>& borders ) noexcept {
-    bool res = false;
-    apt::foreach<0,DGrid>
-      ( [&res]( const auto& x, const auto& bd ) noexcept {
-          res |= ( x < bd[0] || x > bd[1] );
-        }, q, borders );
-
-    return res;
-  }
-
   namespace impl {
+    template < typename T >
+    constexpr auto lcr( T q, T lb, T ub ) noexcept {
+      return ( q >= lb ) + ( q > ub );
+    }
+
     template < int I, typename T, int DPtc, typename state_t, int DGrid >
     inline void migrate( std::vector<cParticle<T,DPtc,state_t>>& buffer,
                          const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                          const apt::array< apt::pair<T>, DGrid >& borders,
                          unsigned int shift ) {
-      auto&& lcr =
+      auto&& lcrI =
         [&bd=borders[I]]( const auto& ptc ) noexcept {
-          return ( ptc.q()[I] >= bd[0] ) + ( ptc.q()[I] > bd[1] );
+          return lcr( ptc.q()[I],  bd[0], bd[1] );
         };
-      impl::migrate_1dim( buffer, intercomms[I], std::move(lcr), shift );
+      impl::migrate_1dim( buffer, intercomms[I], std::move(lcrI), shift );
       if constexpr ( I > 0 )
                      migrate<I-1>( buffer, intercomms, borders, shift );
     }
+  }
+
+
+  template < typename Vec, int DGrid, typename T >
+  bool is_migrate( const apt::VecExpression<Vec,T>& q,
+                   const apt::array< apt::pair<T>, DGrid>& borders ) noexcept {
+    // TODO for periodic boundary, q needs to modulo bulk length or maybe the supergrid length
+    bool res = false;
+    apt::foreach<0,DGrid>
+      ( [&res]( const auto& x, const auto& bd ) noexcept {
+          res = ( res | ( impl::lcr(x, bd[0], bd[1] ) != 1 ) );
+        }, q, borders );
+
+    return res;
   }
 
   template < typename T, int DPtc, typename state_t, int DGrid >

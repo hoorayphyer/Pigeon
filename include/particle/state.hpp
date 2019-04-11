@@ -31,7 +31,7 @@ namespace particle {
   template < std::size_t Pos, std::size_t N, typename T >
   constexpr auto getbits( const T& x ) noexcept {
     static_assert(std::is_unsigned_v<T>);
-    return ( x >> Pos ) & ~( ~0 << N );
+    return ( x >> Pos ) & ~( ~0u << N );
   }
 
   template < std::size_t Pos, std::size_t N,
@@ -39,8 +39,8 @@ namespace particle {
   constexpr void setbits( T& x, U y ) noexcept {
     static_assert(std::is_unsigned_v<T>);
     static_assert(std::is_unsigned_v<U>);
-    x &= ~( ~( ~0 << N ) << Pos );
-    x |= ( ( y &= ~( ~0 << N ) ) << Pos );
+    x &= ~( ~( ~0u << N ) << Pos );
+    x |= ( ( y &= ~( ~0u << N ) ) << Pos );
   }
 
   struct layout {

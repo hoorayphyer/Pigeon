@@ -121,9 +121,8 @@ namespace knl {
       }
 
       { // in this block we update x
+        // NOTE we don't normalize cyclic coordinates such as \phi in spherical. This operation is designated to mesh_shape_interplay
         x += dx;
-        // bring phi to [0, 2*PI)
-        x[2] -= 2 * PI * std::floor( x[2] / (2 * PI) );
       }
 
       return dx;
