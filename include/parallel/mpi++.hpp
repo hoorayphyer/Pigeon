@@ -74,7 +74,9 @@ namespace mpi {
     CartComm( const Comm& comm, std::vector<int> dims, std::vector<bool> periodic );
 
     std::vector<int> rank2coords ( int rank ) const;
-    int coords2rank( const std::vector<int>& coords ) const;
+
+    // coords will be automatically normalized in the case of periodic topology
+    std::optional<int> coords2rank( const std::vector<int>& coords ) const;
 
     inline std::vector<int> coords () const {
       return rank2coords( rank());

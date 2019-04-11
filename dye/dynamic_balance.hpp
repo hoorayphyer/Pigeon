@@ -1,5 +1,5 @@
-#ifndef _DYNAMIC_BALANCE_HPP_
-#define _DYNAMIC_BALANCE_HPP_
+#ifndef _DYE_DYNAMIC_BALANCE_HPP_
+#define _DYE_DYNAMIC_BALANCE_HPP_
 
 #include "particle/array.hpp"
 #include "particle/map.hpp"
@@ -11,7 +11,7 @@ namespace mpi {
   struct CartComm;
 }
 
-namespace aperture {
+namespace dye {
   template < typename T, int DPtc, typename state_t >
   void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
                           const mpi::Comm& intra );

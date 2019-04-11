@@ -1,5 +1,5 @@
 #include "particle_updater.hpp"
-#include "ensemble/ensemble.hpp"
+#include "dye/ensemble.hpp"
 
 #include "particle/pusher.hpp"
 #include "particle/pair_producer.hpp"

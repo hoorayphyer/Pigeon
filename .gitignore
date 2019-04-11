@@ -10,16 +10,18 @@
 !README.md
 
 !aperture/
+!aperture/CMakeLists.txt
 !aperture/*.hpp
 !aperture/*.cpp
-!aperture/ensemble/
-!aperture/ensemble/*
 !aperture/old_field_solver/
 !aperture/old_field_solver/*
 !aperture/old_field_solver/boundaryconditions/
 !aperture/old_field_solver/boundaryconditions/*
 !aperture/old_field_solver/multiarray/
 !aperture/old_field_solver/multiarray/*
+
+!dye/
+!dye/*
 
 !include/
 !include/**/*.hpp
@@ -64,6 +66,8 @@
 !tests/apt/*
 !tests/aperture
 !tests/aperture/*.cpp
+!tests/dye
+!tests/dye/*.cpp
 !tests/utility/
 !tests/utility/*.cpp
 !tests/io

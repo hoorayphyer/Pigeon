@@ -1,10 +1,10 @@
-#include "./dynamic_balance.hpp"
+#include "dynamic_balance.hpp"
 #include "parallel/mpi++.hpp"
 #include "particle/c_particle.hpp"
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
 #include "particle/load_type.hpp"
 
-namespace aperture::impl {
+namespace dye::impl {
   auto bifurcate( const mpi::Comm& parent, bool color ) {
     mpi::Comm child ( *(parent.split(color)) );
     std::optional<mpi::InterComm> itc;
@@ -34,7 +34,7 @@ namespace aperture::impl {
 }
 
 // calc_nprocs_new
-namespace aperture::impl {
+namespace dye::impl {
   void calc_new_nprocs_impl ( std::vector<int>& nproc, const std::vector<particle::load_t>& load, particle::load_t ave_load, const particle::load_t target_load ) {
     // nproc is valid to start with
     const unsigned int nens = nproc.size();
@@ -131,7 +131,7 @@ namespace aperture::impl {
 }
 
 // relinguish
-namespace aperture::impl {
+namespace dye::impl {
   template < typename T, int DPtc, typename state_t >
   void relinguish_data( particle::array<T, DPtc, state_t>& ptc_array,
                         const mpi::InterComm& itc, int root ) {
@@ -167,7 +167,7 @@ namespace aperture::impl {
 }
 
 // assign_labels
-namespace aperture::impl{
+namespace dye::impl{
   std::optional<int> assign_labels( const mpi::InterComm& job_market,
                                     const std::vector<int>& deficits,
                                     std::optional<int> cur_label ) {
@@ -216,7 +216,7 @@ namespace aperture::impl{
   };
 }
 
-namespace aperture::impl {
+namespace dye::impl {
   struct balance_code {
     static constexpr int send = 1;
     static constexpr int none = 0;
@@ -288,7 +288,7 @@ namespace aperture::impl {
 }
 
 // detailed balance
-namespace aperture {
+namespace dye {
   template < typename T, int DPtc, typename state_t >
   void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
                           const mpi::Comm& intra ) {
@@ -330,7 +330,7 @@ namespace aperture {
 }
 
 // dynamic_load_balance
-namespace aperture {
+namespace dye {
   template < typename T, int DPtc, typename state_t, int DGrid >
   void dynamic_load_balance( particle::map<particle::array<T, DPtc, state_t>>& particles,
                              std::optional<Ensemble<DGrid>>& ens_opt,
@@ -427,21 +427,4 @@ namespace aperture {
     }
 
   }
-}
-
-#include "traits.hpp"
-
-namespace aperture {
-  using namespace traits;
-  using T = real_t;
-  using state_t = ptc_state_t;
-
-  template
-  void detailed_balance<T, DPtc, state_t> ( particle::array<T, DPtc, state_t>& ptcs, const mpi::Comm& intra );
-
-  template
-  void dynamic_load_balance< T, DPtc, state_t, DGrid > ( particle::map<particle::array<T, DPtc, state_t>>& particles,
-                                                         std::optional<Ensemble<DGrid>>& ens_opt,
-                                                         const std::optional<mpi::CartComm>& cart_opt,
-                                                         unsigned int target_load );
 }

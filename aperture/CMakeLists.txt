@@ -21,7 +21,7 @@
 # endif()
 
 add_library(aperture_particle_updater SHARED "particle_updater.cpp")
-target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
 set( LINK_MPIPP TRUE )
 
 #TODO precede particle/.cpp with lab/.cpp
@@ -33,7 +33,7 @@ function(module_gen category name)
 
   if( ${ARGC} GREATER 2 )
     if ( ${ARGV2} )
-      target_link_libraries(${THIS_MODULE_NAME} PRIVATE mpipp_lib)
+      target_link_libraries(${THIS_MODULE_NAME} PRIVATE mpipp)
     endif()
   endif()
 
@@ -55,7 +55,6 @@ module_gen(particle pusher)
 module_gen(particle array)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 
 # TODO now src are scattered
 # # modify Aperture_src using
@@ -76,7 +75,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ensemble)
 
 add_executable(aperture "main.cpp")
 target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater aperture_dynamic_ensemble mpipp_lib)
+target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater dye mpipp)
 
 # target_link_libraries(aperture AperLib UserControl)
 

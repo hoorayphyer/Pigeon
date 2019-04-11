@@ -1,15 +1,15 @@
 #include "ensemble.hpp"
 #include <stdexcept>
 
-namespace impl {
+namespace dye::impl {
   apt::pair< std::optional<mpi::InterComm> >
   link_neighbors( const mpi::Comm& intra,
                   const std::optional<mpi::CartComm>& cart,
                   int ith_dim, int chief,
                   int cart_coord, int cart_dim, bool is_periodic ) {
     // NOTE InterComm constructor is blocking.
-    // Edge case: cart_dim == 1; TODO what if is_periodic? This will need a whole new type of communicator to do the work
-    if ( cart_dim == 1 && !is_periodic ) return {};
+    // Edge case: cart_dim == 1. If nonperiodic, nothing needs to be created. If periodic, since MPI intercommunicator doesn't allow overlapping of local and remote groups, just return no neighbors for now and make applications check for this case in practise. // TODOL periodicity
+    if ( cart_dim == 1 ) return {};
 
     apt::pair< std::optional<mpi::InterComm> > inter_comms;
 
@@ -19,18 +19,31 @@ namespace impl {
         return *(cart->shift( ith_dim, 1 ) [to_right]);
       };
 
-    // odd-even alternate
-    if ( cart_coord != cart_dim - 1 )
-      inter_comms[RGT].emplace( intra, chief, cart, remote_leader(RGT), 147 );
+    // odd-even alternate.
+    // Round One. Even to right except for the last, Odd to left
+    if ( cart_coord % 2 == 0 ) {
+      if ( cart_coord != cart_dim - 1 )
+        inter_comms[RGT].emplace( intra, chief, cart, remote_leader(RGT), 147 );
+    } else {
+      inter_comms[LFT].emplace( intra, chief, cart, remote_leader(LFT), 147 );
+    }
 
-    if ( cart_coord != 0 )
-      inter_comms[LFT].emplace( intra, chief, cart, remote_leader(LFT), 741 );
+    // Round Two. Even to left except for 0, Odd to right except for the last
 
+    if ( cart_coord % 2 == 0 ) {
+      if ( cart_coord != 0 )
+        inter_comms[LFT].emplace( intra, chief, cart, remote_leader(LFT), 741 );
+    } else {
+      if ( cart_coord != cart_dim - 1 )
+        inter_comms[RGT].emplace( intra, chief, cart, remote_leader(RGT), 741 );
+    }
+
+    // Connect head and tail if periodic
     if ( is_periodic ) {
       if ( cart_coord == 0 )
-        inter_comms[LFT].emplace( intra, chief, cart, remote_leader(LFT), 741 );
+        inter_comms[LFT].emplace( intra, chief, cart, remote_leader(LFT), 137 );
       else if ( cart_coord == cart_dim - 1 )
-        inter_comms[RGT].emplace( intra, chief, cart, remote_leader(RGT), 147 );
+        inter_comms[RGT].emplace( intra, chief, cart, remote_leader(RGT), 137 );
     }
 
     return inter_comms;
@@ -38,7 +51,7 @@ namespace impl {
 }
 
 // create_ensemble
-namespace aperture {
+namespace dye {
   template < int DGrid >
   std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart_comm, const std::optional<mpi::Comm>& intra_opt ) {
     std::optional<Ensemble<DGrid>> ens_opt;
@@ -110,7 +123,7 @@ namespace aperture {
 }
 
 // accessors
-namespace aperture {
+namespace dye {
   template < int DGrid >
   int Ensemble<DGrid>::label() const noexcept {
     int i = DGrid - 1;
@@ -122,6 +135,7 @@ namespace aperture {
   }
 
 
+  // TODO at_boundary should check cart_dim = 1 and periodic
   template < int DGrid >
   apt::pair<bool> Ensemble<DGrid>::is_at_boundary( int ith_dim ) const noexcept {
     return { !(inter[ith_dim][LFT]), !(inter[ith_dim][RGT]) };
@@ -137,14 +151,17 @@ namespace aperture {
 
 }
 
-#include "traits.hpp"
-namespace aperture {
-  using namespace traits;
-  template struct Ensemble<DGrid>;
+// instantiation
+namespace dye {
+  template
+  std::optional<Ensemble<2>> create_ensemble<2>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
 
   template
-  std::optional<Ensemble<DGrid>> create_ensemble<DGrid>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
+  std::optional<Ensemble<2>> create_ensemble<2>( const std::optional<mpi::CartComm>& cart );
 
   template
-  std::optional<Ensemble<DGrid>> create_ensemble<DGrid>( const std::optional<mpi::CartComm>& cart );
+  std::optional<Ensemble<3>> create_ensemble<3>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
+
+  template
+  std::optional<Ensemble<3>> create_ensemble<3>( const std::optional<mpi::CartComm>& cart );
 }

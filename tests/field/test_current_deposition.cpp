@@ -130,8 +130,11 @@ TEMPLATE_TEST_CASE("Testing dJ in 2D, each cell in bulk has some particles with 
   std::vector<int> cart_dims;
   std::vector<bool> periodic;
   for ( auto i : TestType::get() ) {
+    SECTION("require periodic topology") {
+      REQUIRE( i < 0 );
+    }
     cart_dims.push_back( i > 0 ? i : -i );
-    periodic.push_back( true );
+    periodic.push_back( i < 0 );
   }
 
   auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
@@ -240,6 +243,7 @@ TEMPLATE_TEST_CASE("Testing dJ in 2D, each cell in bulk has some particles with 
       const int Nptc_per_cell = 10;
 
       aio::unif_real<double> unif( -0.9999999, 0.9999999 );
+      unif.seed(aio::now() + mpi::world.rank());
 
       for ( int j = 0; j < bulk_dims[1]; ++j ) {
         for ( int i = 0; i < bulk_dims[0]; ++i ) {

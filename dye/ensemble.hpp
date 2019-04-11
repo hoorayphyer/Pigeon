@@ -1,10 +1,10 @@
-#ifndef  _ENSEMBLE_HPP_
-#define  _ENSEMBLE_HPP_
+#ifndef  _DYE_ENSEMBLE_HPP_
+#define  _DYE_ENSEMBLE_HPP_
 
 #include "parallel/mpi++.hpp"
 #include "apt/array.hpp"
 
-namespace aperture {
+namespace dye {
 
   // the following are ensemble specs, which will be stored on primary and be passed on to all replicas
   template < int DGrid >
@@ -27,7 +27,7 @@ namespace aperture {
 
 }
 
-namespace aperture {
+namespace dye {
 
   template < int DGrid >
   std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );

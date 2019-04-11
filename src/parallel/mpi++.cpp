@@ -249,10 +249,16 @@ namespace mpi {
     return coords;
   }
 
-  int CartComm::coords2rank( const std::vector<int>& coords ) const {
+  std::optional<int> CartComm::coords2rank( const std::vector<int>& coords ) const {
+    const auto[c,d,p] = coords_dims_periodic();
+    for ( int i = 0; i < p.size(); ++i ) {
+      if( !p[i] && ( coords[i] < 0 || coords[i] > d[i] - 1  ) )
+        return {};
+    }
+
     int rank = 0;
     MPI_Cart_rank( *this, coords.data(), &rank);
-    return rank;
+    return {rank};
   }
 
   std::tuple<std::vector<int>, std::vector<int>, std::vector<bool> >

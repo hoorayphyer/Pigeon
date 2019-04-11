@@ -6,4 +6,4 @@ target_sources(old_field_solver PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/FieldUpdater.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/FiniteDiff.cpp"
   "${CMAKE_SOURCE_DIR}/aperture/field_communication.cpp")
-target_link_libraries(old_field_solver PRIVATE mpipp_lib)
+target_link_libraries(old_field_solver PRIVATE mpipp)
