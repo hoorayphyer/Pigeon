@@ -4,7 +4,6 @@
 #include <memory>
 
 namespace particle :: impl {
-
   // NOTE Assume there is no empty particles.
   template < typename Buffer, typename F_LCR >
   auto lcr_sort( Buffer& buffer, const F_LCR& lcr ) noexcept {
@@ -37,11 +36,10 @@ namespace particle :: impl {
     return apt::array<const int, 3>{ ec, el, buffer.size() };
   }
 
-
-  template < typename Ptc, typename F_LCR >
+  template < typename Ptc, typename LCR_on_Ptc >
   void migrate_1dim ( std::vector<Ptc>& buffer,
                       const apt::pair<std::optional<mpi::InterComm>>& intercomms,
-                      const F_LCR& lcr, unsigned int shift ) {
+                      const LCR_on_Ptc& lcr, unsigned int shift ) {
     // sort order is center | left | right | empty. Returned are the delimiters between these catogories
     const auto begs = lcr_sort( buffer, lcr ); // begs = { begL, begR, begE_original };
 
@@ -110,47 +108,17 @@ namespace particle :: impl {
 }
 
 namespace particle {
-  namespace impl {
-    template < typename T >
-    constexpr auto lcr( T q, T lb, T ub ) noexcept {
-      return ( q >= lb ) + ( q > ub );
-    }
-
-    template < int I, typename T, int DPtc, typename state_t, int DGrid >
-    inline void migrate( std::vector<cParticle<T,DPtc,state_t>>& buffer,
-                         const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
-                         const apt::array< apt::pair<T>, DGrid >& borders,
-                         unsigned int shift ) {
-      auto&& lcrI =
-        [&bd=borders[I]]( const auto& ptc ) noexcept {
-          return lcr( ptc.q()[I],  bd[0], bd[1] );
-        };
-      impl::migrate_1dim( buffer, intercomms[I], std::move(lcrI), shift );
-      if constexpr ( I > 0 )
-                     migrate<I-1>( buffer, intercomms, borders, shift );
-    }
-  }
-
-
-  template < typename Vec, int DGrid, typename T >
-  bool is_migrate( const apt::VecExpression<Vec,T>& q,
-                   const apt::array< apt::pair<T>, DGrid>& borders ) noexcept {
-    // TODO for periodic boundary, q needs to modulo bulk length or maybe the supergrid length
-    bool res = false;
-    apt::foreach<0,DGrid>
-      ( [&res]( const auto& x, const auto& bd ) noexcept {
-          res = ( res | ( impl::lcr(x, bd[0], bd[1] ) != 1 ) );
-        }, q, borders );
-
-    return res;
-  }
-
-  template < typename T, int DPtc, typename state_t, int DGrid >
+  template < typename T, int DPtc, typename state_t, int DGrid, int I = DGrid-1 >
   void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
-                 const apt::array< apt::pair<T>, DGrid >& borders,
                  unsigned int pairing_shift ) {
-    impl::migrate<DGrid-1>( buffer, intercomms, borders, pairing_shift );
-  }
 
+    auto lcr = [](const auto& ptc) noexcept {
+                 return ( ptc.extra() % pow3(I+1) ) / pow3(I);
+               };
+
+    impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
+    if constexpr ( I > 0 )
+      migrate<T,DPtc,state_t,DGrid,I-1>( buffer, intercomms, pairing_shift );
+  }
 }

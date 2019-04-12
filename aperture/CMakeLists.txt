@@ -22,6 +22,7 @@
 
 add_library(aperture_particle_updater SHARED "particle_updater.cpp")
 target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(aperture_particle_updater PRIVATE dye)
 set( LINK_MPIPP TRUE )
 
 #TODO precede particle/.cpp with lab/.cpp

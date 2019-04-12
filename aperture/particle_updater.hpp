@@ -6,6 +6,7 @@
 #include "kernel/coordsys_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "particle/pair_produce_predef.hpp"
+#include "particle_properties.hpp"
 #include "particle/map.hpp"
 #include "particle/array.hpp"
 
@@ -16,13 +17,11 @@
 #include "utility/rng.hpp"
 #include "parallel/mpi++.hpp"
 
-namespace aperture {
+namespace dye {
   template < int > struct Ensemble;
 }
 
 namespace particle {
-  struct Properties;
-
   // TODO this template parameter list is ugly. Maybe use Policy, for injection, for pair_creation?
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
              typename Real_dJ,
@@ -34,7 +33,7 @@ namespace particle {
     std::vector<cParticle<Real, DPtc, state_t>> _migrators;
     util::Rng<Real> _rng;
     const std::optional<mpi::CartComm>& _cart;
-    const aperture::Ensemble<DGrid>& _ensemble;
+    const dye::Ensemble<DGrid>& _ensemble;
 
     template < bool IsCharged >
     void update_species( array<Real,3,state_t>& sp_ptcs,
@@ -42,10 +41,11 @@ namespace particle {
                          const Properties& prop,
                          const field::Field<Real,3,DGrid>& E,
                          const field::Field<Real,3,DGrid>& B,
-                         const apt::array< apt::pair<Real>, DGrid >& borders);
+                         const apt::array< apt::pair<Real>, DGrid >& borders
+                         );
 
   public:
-    ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const aperture::Ensemble<DGrid>& ensemble );
+    ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble );
 
     virtual void operator() ( field::Field<Real,3,DGrid>& J,
                               map<array<Real,3,state_t>>& particles,

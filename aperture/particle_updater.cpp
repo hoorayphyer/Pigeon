@@ -3,7 +3,6 @@
 
 #include "particle/pusher.hpp"
 #include "particle/pair_producer.hpp"
-#include "particle_properties.hpp"
 #include "particle/migration.hpp"
 
 #include "kernel/coordinate.hpp"
@@ -47,7 +46,7 @@ namespace particle {
              typename Real_dJ,
              particle::PairScheme pair_scheme, knl::coordsys CS >
   ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
-  ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const aperture::Ensemble<DGrid>& ensemble )
+  ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble )
     : _localgrid(localgrid),
       _dJ( knl::dims(localgrid), ShapeF() ),
       _rng(rng), _cart(cart), _ensemble(ensemble) {}
@@ -150,11 +149,17 @@ namespace particle {
                     const Properties& prop,
                     const field::Field<Real,3,DGrid>& E,
                     const field::Field<Real,3,DGrid>& B,
-                    const apt::array< apt::pair<Real>, DGrid >& borders ) {
+                    const apt::array< apt::pair<Real>, DGrid >& borders
+                    ) {
     if ( sp_ptcs.size() == 0 ) return;
 
     auto shapef = ShapeF();
     auto charge_over_dt = prop.charge_x * unit_e / dt;
+
+    auto migrate_dir =
+      []( auto q, auto lb, auto ub ) noexcept {
+        return ( q >= lb ) + ( q > ub );
+      };
 
     auto abs2std =
       [&grid=_localgrid]( const auto& qabs ) {
@@ -201,14 +206,20 @@ namespace particle {
       //                               std::move(q1_std) ); // TODOL check the 2nd argument
       // }
 
-      if ( is_migrate( ptc.q(), borders ) )
+      char mig_dir = 0;
+      for ( int i = 0; i < DGrid; ++i ) {
+        mig_dir += migrate_dir( ptc.q()[i], borders[i][LFT], borders[i][RGT] ) * pow3(i);
+      }
+
+      if ( mig_dir != (pow3(DGrid) - 1) / 2 ) {
         _migrators.emplace_back(std::move(ptc));
+        _migrators.back().extra() = mig_dir;
+      }
     }
   }
 }
 
 namespace particle {
-
   template < typename Real, int DGrid, int DPtc, typename state_t,
              typename ShapeF,
              typename Real_dJ,
@@ -244,7 +255,7 @@ namespace particle {
       // TODO put particles where they belong
     }
 
-    migrate( _migrators, _ensemble.inter, borders, timestep );
+    migrate( _migrators, _ensemble.inter, timestep );
     for ( auto&& ptc : _migrators ) {
       particles[ptc.template get<species>()].push_back( std::move(ptc) ); // TODOL check this
     }

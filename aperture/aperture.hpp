@@ -8,7 +8,7 @@
 #include "old_field_solver/old_field_solver_adapter.hpp"
 #include "particle_updater.hpp"
 
-#include "ensemble/dynamic_balance.hpp"
+#include "dye/dynamic_balance.hpp"
 
 #include <memory>
 
@@ -22,8 +22,8 @@ namespace aperture {
     util::Rng<Real> _rng;
 
     knl::Grid< Real, DGrid > _grid;
-    std::optional<Ensemble<DGrid>> _ens_opt;
-    apt::array< apt::pair<Real>, DGrid > _borders; // borders tell which particles will be migrated. These are simply the boundaries of the bulk grid
+    std::optional<dye::Ensemble<DGrid>> _ens_opt;
+    apt::array< apt::pair<Real>, DGrid > _borders;
 
     field::Field<Real, 3, DGrid> _E;
     field::Field<Real, 3, DGrid> _B;
@@ -36,7 +36,7 @@ namespace aperture {
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
 
-    void refresh( const Ensemble<DGrid>& ens ) {
+    void refresh( const dye::Ensemble<DGrid>& ens ) {
       field::Mesh<2> mesh ( knl::dims(_grid), _guard );
       for ( int i = 0; i < DGrid; ++i ) {
         int dim = _supergrid[i].dim() / ens.cart_dims[i];
@@ -45,8 +45,8 @@ namespace aperture {
         _E = { mesh };
         _B = { mesh };
         _J = { mesh };
-        _borders[i][LFT] = _grid[i].lower();
-        _borders[i][RGT] = _grid[i].upper();
+        // TODO cart_dim = 1 and periodic
+        _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
       if ( _cart_opt )
@@ -58,7 +58,7 @@ namespace aperture {
     Aperture( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng ) : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt), _rng(std::move(rng))
     {
       _grid = supergrid;
-      _ens_opt = create_ensemble<DGrid>(cart_opt);
+      _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
       if ( !_ens_opt ) return;
 
       const auto& ens = *_ens_opt;

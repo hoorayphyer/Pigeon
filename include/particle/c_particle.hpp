@@ -13,6 +13,7 @@ namespace particle {
     apt::array<T,DPtc> _q {};
     apt::array<T,DPtc> _p {};
     state_t _s {};
+    char _extra{}; // holds extra information on communication for example
 
   public:
     static constexpr int NDim = DPtc;
@@ -27,6 +28,9 @@ namespace particle {
 
     constexpr auto& state() noexcept { return _s; }
     constexpr const auto& state() const noexcept { return _s; }
+
+    constexpr auto& extra() noexcept { return _extra; }
+    constexpr const auto& extra() const noexcept { return _extra; }
 
     cParticle() = default;
 
@@ -57,10 +61,12 @@ namespace particle {
       return *this;
     }
 
+    // NOTE only swap handles _s_extra
     constexpr void swap( cParticle& other ) noexcept {
       apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), other.q() );
       apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), other.p() );
       std::swap( _s, other.state() );
+      std::swap( _extra, other._extra );
     }
 
   };

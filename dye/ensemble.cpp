@@ -153,11 +153,15 @@ namespace dye {
 
 // instantiation
 namespace dye {
+  template struct Ensemble<2>;
+
   template
   std::optional<Ensemble<2>> create_ensemble<2>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
 
   template
   std::optional<Ensemble<2>> create_ensemble<2>( const std::optional<mpi::CartComm>& cart );
+
+  template struct Ensemble<3>;
 
   template
   std::optional<Ensemble<3>> create_ensemble<3>( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );

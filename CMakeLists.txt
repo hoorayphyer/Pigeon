@@ -38,5 +38,5 @@ set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu+
 
 add_subdirectory(src)
 add_subdirectory(dye)
-# add_subdirectory(aperture)
+add_subdirectory(aperture)
 add_subdirectory(tests)

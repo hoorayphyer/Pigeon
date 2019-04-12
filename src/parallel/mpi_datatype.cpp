@@ -41,14 +41,15 @@ namespace mpi {
 
   MPI_Datatype create_MPI_CPARTICLE () {
     std::vector<cPtc_t> ptcs(2);
-    constexpr int numBlocks = 3;
-    MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(), datatype<ptc_state_t>() };
-    int blocklen[numBlocks] = { DPtc, DPtc, 1 };
+    constexpr int numBlocks = 4;
+    MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(), datatype<ptc_state_t>(), datatype<char>() };
+    int blocklen[numBlocks] = { DPtc, DPtc, 1, 1 };
     MPI_Aint disp[numBlocks];
 
     MPI_Get_address( &(ptcs[0].q()), disp );
     MPI_Get_address( &(ptcs[0].p()), disp+1 );
     MPI_Get_address( &(ptcs[0].state()), disp+2 );
+    MPI_Get_address( &(ptcs[0].extra()), disp+3 );
 
     auto base = disp[0];
     for ( int i = 0; i < numBlocks; ++i )
