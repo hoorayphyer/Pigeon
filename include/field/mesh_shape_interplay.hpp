@@ -17,11 +17,9 @@ namespace field {
   public:
     Standard_dJ_Field( apt::Index<DGrid> bulk_extent, const ShapeF& );
 
-    // TODO double check if calculation precision is promoted before assignment, basically at places where Kahan summation may be used
-    template < typename Vec_q0, typename Vec_q1 >
     void deposit ( T charge_over_dt,
-                   const apt::VecExpression<Vec_q0>& q0_std,
-                   const apt::VecExpression<Vec_q1>& q1_std );
+                   const apt::Vec<T,DField>& q0_std, // NOTE its DField, not DGrid
+                   const apt::Vec<T,DField>& q1_std );
 
     void reduce( int chief, const mpi::Comm& intra );
 

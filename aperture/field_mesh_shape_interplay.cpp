@@ -3,12 +3,9 @@
 
 #include "field/field.hpp"
 #include "apt/vec.hpp"
-#include "kernel/shapef.hpp"
 
 namespace field {
   using namespace traits;
-
-  using ShapeF = knl::shapef_t<shape>;
 
   // NOTE q_std refers to the same "standard" as above
   template apt::Vec<real_t, 3>

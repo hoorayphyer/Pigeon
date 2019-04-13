@@ -1,7 +1,7 @@
 #ifndef  _TRAITS_HPP_
 #define  _TRAITS_HPP_
 
-#include "kernel/shape_predef.hpp"
+#include "kernel/shapef.hpp"
 #include "particle/pair_produce_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "kernel/coordsys_predef.hpp"
@@ -9,6 +9,7 @@
 #include "apt/array.hpp"
 #include "apt/pair.hpp"
 
+// TODO group particle type info into one struct
 namespace traits {
   using real_t = double;
   using ptc_state_t = unsigned long long;
@@ -24,7 +25,7 @@ namespace traits {
 
   constexpr int guard = 1; // TODOL more useful is Order of field_solver and shape
 
-  constexpr auto shape = knl::shape::Cloud_In_Cell;
+  using ShapeF = knl::shapef_t<knl::shape::Cloud_In_Cell>;
 
   constexpr auto pair_produce_scheme = particle::PairScheme::Photon;
 

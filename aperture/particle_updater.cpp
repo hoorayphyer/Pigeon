@@ -1,7 +1,7 @@
 #include "particle_updater.hpp"
 #include "dye/ensemble.hpp"
 
-#include "particle/pusher.hpp"
+#include "particle/forces.hpp"
 #include "particle/pair_producer.hpp"
 #include "particle/migration.hpp"
 
@@ -39,8 +39,8 @@ namespace particle {
   //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
   //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
   // }
-
 }
+
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
              typename Real_dJ,
@@ -153,12 +153,41 @@ namespace particle {
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
+    using Ptc = decltype(sp_ptcs[0]);
+    std::vector<force::specs<Ptc>> specs {
+                                          { "lorentz", static_cast<Real>(prop.charge_x) / prop.mass_x },
+                                          { "landau0", 1000 },
+    };
+
+    auto update_p =
+      [specs=std::move(specs)]( auto&&... args ) {
+        for ( const auto& spec : specs ) {
+          auto f = force::Factory<Ptc>::create(spec.id);
+          f( std::forward<decltype(args)>(args)..., spec.param0 );
+        }
+      };
+
     auto shapef = ShapeF();
     auto charge_over_dt = prop.charge_x * unit_e / dt;
 
     auto migrate_dir =
       []( auto q, auto lb, auto ub ) noexcept {
         return ( q >= lb ) + ( q > ub );
+      };
+
+    auto update_q =
+      [is_massive=(prop.mass_x != 0)] ( auto& ptc, Real dt ) {
+        auto gamma = std::sqrt( is_massive + apt::sqabs(ptc.p()) );
+
+        if constexpr ( CS == knl::coordsys::Cartesian ) {
+            // a small optimization for Cartesian
+            return knl::coord<CS>::geodesic_move( ptc.q(), ptc.p(), dt / gamma );
+          } else {
+          apt::Vec<Real, DPtc> dq; // for RVO
+          dq = knl::coord<CS>::geodesic_move( ptc.q(), (ptc.p() /= gamma), dt );
+          ptc.p() *= gamma;
+          return dq;
+        }
       };
 
     auto abs2std =
@@ -180,7 +209,10 @@ namespace particle {
         auto q_std = abs2std( ptc.q() );
         auto E_itpl = field::interpolate( E, q_std, shapef );
         auto B_itpl = field::interpolate( B, q_std, shapef );
-        // auto&& dp = update_p<apt::Vec<Real,DPtc>>( ptc, dt, prop.mass_x, E_itpl, B_itpl );
+
+        apt::Vec<Real,DPtc> dp = ptc.p();
+        update_p( ptc, dt, E_itpl, B_itpl );
+        dp -= ptc.p();
         // Rc = calc_Rc<Real>( dt, ptc.p(), std::move(dp) );
       }
 
@@ -188,23 +220,23 @@ namespace particle {
       // pair_produce( std::back_inserter(sp_ptcs), ptc, Rc ); // use sp_ptcs temporarily to hold newly created particles if any
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
-      // auto&& dq = update_q<CS, apt::Vec<Real,DPtc>>( ptc, dt, prop.mass_x );
-      // {
-      //   auto abs2std_dJ =
-      //     [&grid=_localgrid]( apt::Vec<Real,DPtc> q1, auto dq ) {
-      //       apt::foreach<0,DGrid> // NOTE this is DGrid, not DPtc.
-      //         ( [](auto& q1, auto& q0, const auto& g){
-      //             q1 = ( q1 - g.lower() ) / g.delta();
-      //             q0 = q1 - q0 / g.delta();
-      //           }, q1, dq, grid );
-      //       return std::make_tuple(dq, q1); // NOTE the result is of DPtc
-      //     };
-      //   auto&&[ q0_std, q1_std ] = abs2std_dJ( ptc.q(), std::move(dq) );
-      //   // TODOL pusher handle boundary condition. Is it needed?
-      //   if constexpr ( IsCharged )
-      //                  _dJ.deposit( charge_over_dt, std::move(q0_std),
-      //                               std::move(q1_std) ); // TODOL check the 2nd argument
-      // }
+      auto&& dq = update_q( ptc, dt );
+      {
+        auto abs2std_dJ =
+          [&grid=_localgrid]( apt::Vec<Real,DPtc> q1, auto dq ) {
+            apt::foreach<0,DGrid> // NOTE this is DGrid, not DPtc.
+              ( [](auto& q1, auto& q0, const auto& g){
+                  q1 = ( q1 - g.lower() ) / g.delta();
+                  q0 = q1 - q0 / g.delta();
+                }, q1, dq, grid );
+            return std::make_tuple(dq, q1); // NOTE the result is of DPtc
+          };
+        auto&&[ q0_std, q1_std ] = abs2std_dJ( ptc.q(), std::move(dq) );
+        // TODOL pusher handle boundary condition. Is it needed?
+        if constexpr ( IsCharged )
+                       _dJ.deposit( charge_over_dt, std::move(q0_std),
+                                    std::move(q1_std) ); // TODOL check the 2nd argument
+      }
 
       char mig_dir = 0;
       for ( int i = 0; i < DGrid; ++i ) {
@@ -283,7 +315,6 @@ namespace particle {
 #include "traits.hpp"
 using namespace traits;
 namespace particle {
-  template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, knl::shapef_t<shape>,
-                                  real_dj_t,
-                                  pair_produce_scheme, coordinate_system>;
+  template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, ShapeF,
+                                  real_dj_t, pair_produce_scheme, coordinate_system>;
 }

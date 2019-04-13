@@ -50,7 +50,8 @@ namespace field :: impl {
 
 namespace field {
   template < typename T, int DField, int DGrid, typename ShapeF >
-  Standard_dJ_Field<T,DField,DGrid,ShapeF>::Standard_dJ_Field( apt::Index<DGrid> bulk_extent, const ShapeF& shapef )
+  Standard_dJ_Field<T,DField,DGrid,ShapeF>
+  ::Standard_dJ_Field( apt::Index<DGrid> bulk_extent, const ShapeF& shapef )
     // NOTE minimum needed number of guards on one side is ( supp + 1 ) / 2 + 1
     : _data({ std::move(bulk_extent), ( ShapeF::support() + 3 ) / 2 }) {
     // enforce offset
@@ -67,11 +68,10 @@ namespace field {
   }
 
 
+  // TODO double check if calculation precision is promoted before assignment, basically at places where Kahan summation may be used
   template < typename T, int DField, int DGrid, typename ShapeF >
-  template < typename Vec_q0, typename Vec_q1 >
-  void Standard_dJ_Field<T,DField,DGrid,ShapeF>::deposit ( T charge_over_dt,
-                                           const apt::VecExpression<Vec_q0>& q0_std,
-                                           const apt::VecExpression<Vec_q1>& q1_std ) {
+  void Standard_dJ_Field<T,DField,DGrid,ShapeF>
+  ::deposit ( T charge_over_dt, const apt::Vec<T,DField>& q0_std, const apt::Vec<T,DField>& q1_std ) {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
@@ -117,7 +117,8 @@ namespace field {
 
 namespace field {
   template < typename T, int DField, int DGrid, typename ShapeF >
-  void Standard_dJ_Field<T,DField,DGrid,ShapeF>::reduce( int chief, const mpi::Comm& intra ) {
+  void Standard_dJ_Field<T,DField,DGrid,ShapeF>
+  ::reduce( int chief, const mpi::Comm& intra ) {
     // TODO Opimize communication. Use persistent and buffer? NOTE one can use one chunk of memory for Jmesh so that only one pass of reduce is needed ?
     for ( int i = 0; i < DField; ++i )
       intra.reduce<mpi::IN_PLACE>( mpi::by::SUM, chief, _data[i].data().data(),  _data[i].data().size() );
@@ -126,7 +127,8 @@ namespace field {
 
 namespace field {
   template < typename T, int DField, int DGrid, typename ShapeF >
-  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid,ShapeF>::integrate( const mpi::CartComm& cart ) {
+  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid,ShapeF>
+  ::integrate( const mpi::CartComm& cart ) {
     auto& dJ = _data;
 
     const auto& mesh = dJ.mesh();

@@ -1,8 +1,17 @@
 #ifndef _KNL_SHAPEF_HPP_
 #define _KNL_SHAPEF_HPP_
 
-#include "kernel/shape_predef.hpp"
 #include <cmath>
+
+// value here denotes length of support
+namespace knl {
+  enum class shape : int {
+                          Nearest_Grid_Point = 1,
+                          Cloud_In_Cell = 2,
+                          Triangular_Cloud = 3,
+                          Piecewise_Cubic_Spline = 4
+  };
+}
 
 namespace knl {
   template < shape S >
@@ -19,7 +28,7 @@ namespace knl {
       else {
         dx = std::abs(dx);
         if constexpr ( shape::Cloud_In_Cell == S ) {
-          return std::max ( 1.0 - dx, 0.0 );
+            return std::max<T> ( 1.0 - dx, 0.0 );
         }
         else if ( shape::Triangular_Cloud == S ) {
           return

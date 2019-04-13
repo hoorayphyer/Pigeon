@@ -58,11 +58,10 @@ namespace particle {
 }
 
 #include "traits.hpp"
-#include "kernel/shapef.hpp"
 namespace aperture {
   using namespace traits;
   template < typename Real, int DGrid, typename state_t >
-  using ParticleUpdater = particle::ParticleUpdater<Real, DGrid, 3, state_t, knl::shapef_t<shape>, real_dj_t, pair_produce_scheme, coordinate_system >;
+  using ParticleUpdater = particle::ParticleUpdater<Real, DGrid, 3, state_t, ShapeF, real_dj_t, pair_produce_scheme, coordinate_system >;
 }
 
 #endif
