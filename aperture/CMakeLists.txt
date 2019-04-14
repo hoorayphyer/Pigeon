@@ -39,6 +39,7 @@ function(module_gen category name)
   endif()
 
   # if( "${category}" STREQUAL "particle" )
+  # TODO particle_updater links to everything
   target_link_libraries(aperture_particle_updater PRIVATE ${THIS_MODULE_NAME})
   # elseif( "${category}" STREQUAL "field" )
   #   target_link_libraries(aperture_field_updater PRIVATE ${THIS_MODULE_NAME})
@@ -51,8 +52,8 @@ module_gen(field current_deposition LINK_MPIPP)
 target_link_libraries(field_current_deposition_module PRIVATE field_communication_module)
 
 module_gen(particle migration LINK_MPIPP)
-module_gen(particle pair_producer)
-module_gen(particle pusher)
+module_gen(particle scattering)
+module_gen(particle forces)
 module_gen(particle array)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)

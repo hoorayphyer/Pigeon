@@ -2,43 +2,109 @@
 #include "dye/ensemble.hpp"
 
 #include "particle/forces.hpp"
-#include "particle/pair_producer.hpp"
+#include "particle/scattering.hpp"
 #include "particle/migration.hpp"
 
 #include "kernel/coordinate.hpp"
 
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
+#include <memory>
 
 namespace particle {
   map<Properties> properties;
+  template < class PtcArr >
+  map<std::unique_ptr<scat::Scat<PtcArr>>> scat_map;
 }
 
 namespace particle {
-  template < typename T, typename p_t, typename dp_t >
-  T calc_Rc( T dt, const apt::VecExpression<p_t>& p, const apt::VecExpression<dp_t>& dp ) noexcept {
-    // TODO don't use a uniform number for Rc
-    return 1.0;
-  }
+  template < class Ptc >
+  struct InZone : public scat::Eligible<Ptc> {
+    bool operator() ( const Ptc& ptc ) override {
+      return ptc.q()[0] < std::log(9.0);
+      // return _pane.in_productive_zone( ptc.q );
+    }
+  };
 
-  // float ParticlePusher::CalculateRc( Scalar dt, const Vec3<MOM_TYPE> &p, const Vec3<MOM_TYPE> &dp) const {
-  //   // find momentum at half time step
-  //   Vec3<MOM_TYPE> phalf( p + dp * 0.5 );
-  //   Vec3<MOM_TYPE> v( phalf / std::sqrt( 1.0 + phalf.dot(phalf) ) );
-  //   Scalar vv = v.dot( v );
-  //   Vec3<MOM_TYPE> a( dp / dt ); // a is for now force, will be converted to dv/dt
-  //   // convert a to dv/dt
-  //   a = ( a - v * ( v.dot(a) ) ) * std::sqrt( 1.0 - vv );
-  //   Scalar va = v.dot( a ); // get the real v dot a
-  //   return vv / std::max( std::sqrt( a.dot(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
-  // }
+  template < class Ptc >
+  struct CurvatureRadiate : public scat::Channel<Ptc> {
+    using T = typename Ptc::vec_type::element_type;
 
-  // float ParticlePusher::GetDipolarRc(const Scalar &r_sph, const Scalar &cos_th, const Scalar &phi) const {
-  //   Scalar sin_th = std::sqrt( 1.0 - cos_th * cos_th );
-  //   Scalar tmp1 = 1.0 + cos_th * cos_th;
-  //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
-  //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
-  // }
+    bool is_massive;
+    T gamma_off = 15.0;
+    T K_thr = 20;
+    // prob_fiducial = K_curv_em_rate * dt
+    T prob_fiducial = 0.1;
+
+    // float ParticlePusher::CalculateRc( Scalar dt, const Vec3<MOM_TYPE> &p, const Vec3<MOM_TYPE> &dp) const {
+    //   // find momentum at half time step
+    //   Vec3<MOM_TYPE> phalf( p + dp * 0.5 );
+    //   Vec3<MOM_TYPE> v( phalf / std::sqrt( 1.0 + phalf.dot(phalf) ) );
+    //   Scalar vv = v.dot( v );
+    //   Vec3<MOM_TYPE> a( dp / dt ); // a is for now force, will be converted to dv/dt
+    //   // convert a to dv/dt
+    //   a = ( a - v * ( v.dot(a) ) ) * std::sqrt( 1.0 - vv );
+    //   Scalar va = v.dot( a ); // get the real v dot a
+    //   return vv / std::max( std::sqrt( a.dot(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
+    // }
+
+    // float ParticlePusher::GetDipolarRc(const Scalar &r_sph, const Scalar &cos_th, const Scalar &phi) const {
+    //   Scalar sin_th = std::sqrt( 1.0 - cos_th * cos_th );
+    //   Scalar tmp1 = 1.0 + cos_th * cos_th;
+    //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
+    //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
+    // }
+
+    T (*calc_Rc) ( const Ptc& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt ) = nullptr;
+    T (*sample_E_ph) () = [](){ return 3.5;};
+
+    std::optional<T> operator() ( const Ptc& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt,
+                                  const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
+      T Rc = calc_Rc( ptc, dp, dt );
+      T gamma = std::sqrt( (is_massive) + apt::sqabs(ptc.p()) );
+
+      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < prob_fiducial * gamma  / Rc ) {
+        // return sampled energy
+        return {std::min( sample_E_ph(), gamma - 1.0) };
+      }
+      return {};
+
+    }
+  };
+
+  template < class Ptc >
+  struct MagneticConvert : public scat::Channel<Ptc> {
+    using T = typename Ptc::vec_type::element_type;
+    T B_thr = 1000;
+    T mfp = 0.2;
+
+    std::optional<T> operator() ( const Ptc& photon, const apt::Vec<T,Ptc::NDim>& dp, T dt,
+                                  const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
+      // prob_mag_conv = dt / mfp_mag_conv
+      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
+    }
+  };
+
+  template < class Ptc >
+  struct TwoPhotonCollide : public scat::Channel<Ptc> {
+    using T = typename Ptc::vec_type::element_type;
+    // TODO double check this implementation, it is not equivalent because the original one has some sort of gaussian in it. Use Monte Carlo
+    // inline T f_x ( T x ) {
+    //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
+    //   return std::sqrt( -2.0 * std::log(x) );
+    // }
+
+    T mfp = 5.0;
+
+    std::optional<T> operator() ( const Ptc& photon, const apt::Vec<T,Ptc::NDim>& dp, T dt,
+                                  const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
+      // prob_mag_conv = dt / mfp_ph_ph
+      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
+    }
+  };
+
+  // TODO after scattering newly created particles should be put back to where they belong
+  // TODO no scattering like ions
 }
 
 namespace particle {
@@ -49,94 +115,13 @@ namespace particle {
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble )
     : _localgrid(localgrid),
       _dJ( knl::dims(localgrid), ShapeF() ),
-      _rng(rng), _cart(cart), _ensemble(ensemble) {}
+      _rng(rng), _cart(cart), _ensemble(ensemble) {
+    // TODOL
+    using Ptc = vParticle<Real, DPtc, state_t>;
+    force::Factory<Ptc>::Register("lorentz", force::lorentz<Ptc>);
+    force::Factory<Ptc>::Register("landau0", force::landau0<Ptc>);
+  }
 }
-
-// {
-//   template < typename Ptc, typename T = typename Ptc::value_type >
-//     bool is_productive_lepton( const PtcExpression<Ptc>& ptc, const T& gamma,
-//                                const T& Rc, util::Rng<T>& rng ) noexcept;
-//   template < typename Ptc, typename T = typename Ptc::value_type >
-//     bool is_productive_photon( const PtcExpression<Ptc>& photon, const T& B2,
-//                                util::Rng<T>& rng ) noexcept;
-
-// namespace particle {
-//   template < typename Ptc, typename T >
-//   bool is_productive_lepton( const PtcExpression<Ptc>& ptc, const T& gamma,
-//                              const T& Rc, util::Rng<T>& rng ) noexcept {
-//     // TODO pane
-//     // return
-//     //   _pane.in_productive_zone( ptc.q ) &&
-//     //   gamma > _pane.gamma_off &&
-//     //   gamma > _pane.K_thr *  std::cbrt(Rc) &&
-//     //   // prob_fiducial = K_curv_em_rate * dt
-//     //   rng.uniform() < _pane.prob_fiducial * gamma  / Rc;
-//   }
-// }
-
-// namespace particle {
-//   namespace opacity {
-//     // prob_mag_conv = dt / mfp_mag_conv
-//     template < typename T >
-//     inline bool mag_conv( const T& B2, T randnum ) noexcept {
-//       // TODO pane
-//       // return B2 > _pane.B_magconv * _pane.B_magconv ? ( randnum < prob_mag_conv ) : false;
-//     }
-
-//     // template < typename T >
-//     // inline T f_x ( T x ) {
-//     //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
-//     //   return std::sqrt( -2.0 * std::log(x) );
-//     // }
-
-//     // prob_mag_conv = dt / mfp_ph_ph
-//     template < typename T >
-//     inline bool ph_ph( T randnum ) noexcept {
-//       // TODO double check this implementation, it is not equivalent because the original one has some sort of gaussian in it. Use Monte Carlo
-//       // TODO prob_ph_ph not defined
-//       // return randnum < prob_ph_ph;
-//     }
-//   }
-
-//   namespace particle {
-//     template < typename T >
-//     inline T sample_E_ph(const T& gamma, const T& Rc) {
-//       // TODO pane
-//       // return std::min(_pane.E_ph, gamma - 1.0);
-//     }
-
-//   }
-
-//   template < typename Ptc, typename T >
-//   bool is_productive_photon( const PtcExpression<Ptc>& photon, const T& B2,
-//                              util::Rng<T>& rng ) noexcept {
-//     return opacity::mag_conv(B2, rng.uniform() ) || opacity::ph_ph( rng.uniform() );
-//   }
-// }
-//   if constexpr ( IsCharged && IsRadiative ) {
-//       // TODOL wrap into a factory of pair producer
-//       if constexpr ( pair_scheme != PairScheme::Disabled ) {
-//           auto gamma = std::sqrt( (!prop.mass_x) + apt::sqabs(ptc.p()) );
-//           if ( is_productive_lepton( ptc, gamma, Rc, _rng ) ) {
-//             if constexpr ( pair_scheme == PairScheme::Photon ) {
-//                 produce_photons( std::back_inserter( particles[species::photon] ),
-//                                  ptc, gamma, Rc );
-//               } else if ( pair_scheme == PairScheme::Instant ) {
-//               instant_produce_pairs( std::back_inserter( particles[species::electron] ),
-//                                      std::back_inserter( particles[species::positron] ),
-//                                      ptc, gamma, Rc );
-//             }
-//           }
-//         }
-//     }
-//   else if ( pair_scheme == PairScheme::Photon ) {
-//     // TODO check is photon
-//     is_productive_photon;
-//     photon_produce_pairs( std::back_inserter( particles[species::electron] ),
-//                           std::back_inserter( particles[species::positron] ),
-//                           ptc );
-//   }
-// }
 
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,

@@ -18,6 +18,9 @@ namespace particle {
     static constexpr int DPtc = Dim_Ptc;
     using state_type = state_t;
 
+    using particle_type = vParticle< T, Dim_Ptc, state_t >;
+    using const_particle_type = vParticle< const T, Dim_Ptc, const state_t >;
+
     template < bool isConst >
     class iterator {
     private:
@@ -36,7 +39,7 @@ namespace particle {
       using iterator_category = std::random_access_iterator_tag;
       using difference_type = int;
       using value_type = void;
-      using reference = std::conditional_t<isConst, vParticle< const T, Dim_Ptc, const state_t >, vParticle< T, Dim_Ptc, state_t > >;
+      using reference = std::conditional_t<isConst, array::const_particle_type, array::particle_type >;
       using pointer = void;
 
       iterator( array_t& arr, int i ) noexcept : _array(arr), _index(i) {}
