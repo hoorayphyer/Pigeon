@@ -1,8 +1,9 @@
 #ifndef _PARTICLE_FORCES_HPP_
 #define _PARTICLE_FORCES_HPP_
 
-#include <string>
 #include "apt/vec.hpp"
+#include "particle/map.hpp"
+#include <vector>
 
 namespace particle::force {
   // TypeStruct for forces
@@ -23,20 +24,56 @@ namespace particle::force {
                              ts::Real<Ptc> param0 );
 }
 
-namespace particle::force {
-  using id_t = std::string;
+namespace particle {
+  template < class Ptc >
+  struct ForceGen;
+
+  namespace force {
+    template < class Ptc >
+    struct Force {
+    private:
+      using Real = typename Ptc::vec_type::element_type;
+
+      std::vector<force::force_t<Ptc>> _forces;
+      std::vector<Real> _params;
+
+    public:
+      friend class ForceGen<Ptc>;
+      // TODO turn these into unique_ptr and use deepcopy
+      void add ( force::force_t<Ptc> force, Real param ) {
+        _forces.push_back(force);
+        _params.push_back(param);
+      }
+    };
+  }
+
 
   template < class Ptc >
-  struct specs {
-    id_t id;
-    ts::Real<Ptc> param0;
-  };
+  struct ForceGen {
+  private:
+    using Real = typename Ptc::vec_type::element_type;
+    map<force::Force<Ptc>> _force_map;
 
-  template < class Ptc >
-  struct Factory {
-    static void Register( const id_t& id, force_t<Ptc> force );
-    static void Unregister( const id_t& id );
-    static force_t<Ptc> create( const id_t& id );
+  public:
+    void Register( species sp, force::Force<Ptc> force ) {
+      _force_map[sp] = std::move(force);
+    }
+
+    void Unregister( species sp ) {
+      _force_map.erase(sp);
+    }
+
+    inline auto operator() ( species sp ) noexcept {
+      // if sp doesn't exist, newly created item in the maps will automatically have zero elements
+      return [&forces = _force_map[sp]._forces,
+              &params = _force_map[sp]._params]
+        ( auto& ptc, auto&&... args ) {
+          for ( int i = 0; i < forces.size(); ++i ) {
+            (forces[i])( ptc, std::forward<decltype(args)>(args)..., params[i] );
+          }
+        };
+    }
+
   };
 }
 

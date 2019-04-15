@@ -14,19 +14,18 @@ namespace knl {
   template < coordsys Coord = coordsys::Cartesian >
   struct coord {
     template < int N, typename T >
-    static inline T h ( T x1, T x2, T x3 ) {
-      static_assert( N == 1 || N == 2 || N == 3, "h index out of bounds" );
+    static inline T h ( T = 0.0, T = 0.0, T = 0.0 ) {
       return 1.0;
     }
 
-    template < int NN, typename T >
-    static inline T hh ( T x1, T x2, T x3 ) {
-      static_assert( NN == 12 || NN == 23 || NN == 31, "hh index out of bounds");
+    template < int N, typename T >
+    static inline T hh ( T = 0.0, T = 0.0, T = 0.0 ) {
+      static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
       return 1.0;
     }
 
     template < typename T >
-    static inline T hhh ( T x1, T x2, T x3 ) { return 1.0; }
+    static inline T hhh ( T = 0.0, T = 0.0, T = 0.0 ) { return 1.0; }
 
     template < class X, class V, typename T >
     static inline void geodesic_move( X& x, const apt::VecExpression<V>& v, const T& dt ) {
@@ -38,23 +37,21 @@ namespace knl {
   template <>
   struct coord < coordsys::LogSpherical > {
     template < int N, typename T >
-    static inline T h ( T logr, T theta, T phi ) {
-      static_assert( N == 1 || N == 2 || N == 3, "h index out of bounds" );
-
-      if constexpr ( N == 3 ) return std::exp(logr) * std::sin(theta);
+    static inline T h ( T logr, T theta, T = 0.0 ) {
+      static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
+      if constexpr ( N == 2 ) return std::exp(logr) * std::sin(theta);
       else return std::exp(logr);
     }
 
-    template < int NN, typename T >
-    static inline T hh ( T logr, T theta, T phi ) {
-      static_assert( NN == 12 || NN == 23 || NN == 31, "hh index out of bounds");
-
-      if constexpr ( NN == 12 ) return std::exp( 2.0 * logr);
+    template < int N, typename T >
+    static inline T hh ( T logr, T theta, T = 0.0 ) {
+      static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
+      if constexpr ( N == 2 ) return std::exp( 2.0 * logr);
       else return std::exp( 2.0 * logr) * std::sin(theta);
     }
 
     template < typename T >
-    static inline T hhh ( T logr, T theta, T phi ) {
+    static inline T hhh ( T logr, T theta, T = 0.0 ) {
       return std::exp( 3.0 * logr ) * std::sin(theta);
     }
 

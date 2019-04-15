@@ -130,6 +130,13 @@ namespace field {
       return _extent[ith_dim] - 2 * _guard;
     }
 
+    constexpr apt::Index<D> bulk_extent() const noexcept {
+      apt::Index<D> res;
+      for ( int i = 0; i < D; ++i )
+        res[i] = bulk_dim(i);
+      return res;
+    }
+
     constexpr auto stride( int ith_dim ) const noexcept {
       // TODOL check bounds
       if ( 0 == ith_dim ) return 1;

@@ -1,26 +1,5 @@
 #include "particle/forces.hpp"
 #include "apt/numeric.hpp"
-#include <unordered_map>
-
-namespace particle::force {
-  template < typename Ptc >
-  std::unordered_map< id_t, force_t<Ptc> > map;
-
-  template < typename Ptc >
-  void Factory<Ptc>::Register( const id_t& id, force_t<Ptc> force ) {
-    map<Ptc>[id] = force;
-  }
-
-  template < typename Ptc >
-  void Factory<Ptc>::Unregister( const id_t& id ) {
-    map<Ptc>.erase(id);
-  }
-
-  template < typename Ptc >
-  force_t<Ptc> Factory<Ptc>::create( const id_t& id ) {
-    return map<Ptc>.at(id);
-  }
-}
 
 // TODO optimize use of intermediate variables
 namespace particle::force {

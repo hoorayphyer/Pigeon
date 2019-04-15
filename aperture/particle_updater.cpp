@@ -18,59 +18,59 @@ namespace particle {
 
   template < class PtcArr >
   ScatGen<PtcArr> scat_gen;
+
+  template < class Ptc >
+  ForceGen<Ptc> force_gen;
 }
 
+// TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
 namespace particle {
-  template < class Ptc >
-  struct InZone : public scat::Eligible<Ptc> {
-    bool operator() ( const Ptc& ptc ) override {
-      return ptc.q()[0] < std::log(9.0);
-      // return _pane.in_productive_zone( ptc.q );
-    }
-  };
-
   template < class Ptc >
   struct CurvatureRadiate : public scat::Channel<Ptc> {
     using T = typename Ptc::vec_type::element_type;
+    using Vec = apt::Vec<T,Ptc::NDim>;
 
-    bool is_massive;
-    T gamma_off = 15.0;
-    T K_thr = 20;
-    // prob_fiducial = K_curv_em_rate * dt
-    T prob_fiducial = 0.1;
+    constexpr T calc_Rc ( const Ptc& ptc, const Vec& dp, T dt, const Vec& B ) noexcept {
+      // qB / (\gamma m c) * dt < 2 \pi / 10
+      bool is_gyration_resolved =
+        std::sqrt( apt::sqabs(B) / ( (mass_x != 0) + apt::sqabs(ptc.p()) ) ) * abs_charge_x * dt / mass_x < (2 * std::acos(-1) / 10.0);
 
-    // float ParticlePusher::CalculateRc( Scalar dt, const Vec3<MOM_TYPE> &p, const Vec3<MOM_TYPE> &dp) const {
-    //   // find momentum at half time step
-    //   Vec3<MOM_TYPE> phalf( p + dp * 0.5 );
-    //   Vec3<MOM_TYPE> v( phalf / std::sqrt( 1.0 + phalf.dot(phalf) ) );
-    //   Scalar vv = v.dot( v );
-    //   Vec3<MOM_TYPE> a( dp / dt ); // a is for now force, will be converted to dv/dt
-    //   // convert a to dv/dt
-    //   a = ( a - v * ( v.dot(a) ) ) * std::sqrt( 1.0 - vv );
-    //   Scalar va = v.dot( a ); // get the real v dot a
-    //   return vv / std::max( std::sqrt( a.dot(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
-    // }
+      if ( is_gyration_resolved ) {
+        // find momentum at half time step
+        auto phalf = ptc.p() - dp * 0.5; // NOTE ptc.p() is already the updated p
+        auto v = phalf / std::sqrt( (mass_x != 0) + apt::sqabs(phalf) );
+        auto vv = apt::sqabs(v);
+        Vec a = dp / dt; // a is for now force, will be converted to dv/dt
+        // convert a to dv/dt
+        a = ( a - v * apt::dot(v,a) ) * std::sqrt( 1.0 - vv );
+        auto va = apt::dot(v,a); // get the real v dot a
+        return vv / std::max( std::sqrt( apt::sqabs(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
+      } else {
+        // Dipolar radius of curvature in LogSpherical
+        const auto& theta = ptc.q()[1];
+        auto tmp = 2.5 + 1.5 * std::cos( 2 * theta );
+        return std::exp(ptc.q()[0]) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
+      }
+    }
 
-    // float ParticlePusher::GetDipolarRc(const Scalar &r_sph, const Scalar &cos_th, const Scalar &phi) const {
-    //   Scalar sin_th = std::sqrt( 1.0 - cos_th * cos_th );
-    //   Scalar tmp1 = 1.0 + cos_th * cos_th;
-    //   Scalar tmp2 = 3.0 * tmp1 - 2.0;
-    //   return r_sph * tmp2 * std::sqrt(tmp2) / ( 3.0 * tmp1 * sin_th );
-    // }
+    constexpr T sample_E_ph() noexcept { return 3.5; }
 
-    T (*calc_Rc) ( const Ptc& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt ) = nullptr;
-    T (*sample_E_ph) () = [](){ return 3.5;};
+    unsigned int abs_charge_x{};
+    unsigned int mass_x{};
 
+    T K_thr{};
+    T gamma_off{};
+    T emission_rate{};
+
+    // return sampled energy if any
     std::optional<T> operator() ( const Ptc& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt,
                                   const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
-      T Rc = calc_Rc( ptc, dp, dt );
-      T gamma = std::sqrt( (is_massive) + apt::sqabs(ptc.p()) );
+      T Rc = calc_Rc( ptc, dp, dt, B );
+      T gamma = std::sqrt( (mass_x != 0) + apt::sqabs(ptc.p()) );
 
-      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < prob_fiducial * gamma  / Rc ) {
-        // return sampled energy
-        return {std::min( sample_E_ph(), gamma - 1.0) };
-      }
-      return {};
+      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < emission_rate * dt * gamma  / Rc ) {
+        return { std::min( sample_E_ph(), gamma - 1.0 ) };
+      } else return {};
 
     }
   };
@@ -78,8 +78,8 @@ namespace particle {
   template < class Ptc >
   struct MagneticConvert : public scat::Channel<Ptc> {
     using T = typename Ptc::vec_type::element_type;
-    T B_thr = 1000;
-    T mfp = 0.2;
+    T B_thr{};
+    T mfp{};
 
     std::optional<T> operator() ( const Ptc& photon, const apt::Vec<T,Ptc::NDim>& dp, T dt,
                                   const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
@@ -96,7 +96,7 @@ namespace particle {
     //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
     //   return std::sqrt( -2.0 * std::log(x) );
     // }
-    T mfp = 5.0;
+    T mfp{};
 
     std::optional<T> operator() ( const Ptc& photon, const apt::Vec<T,Ptc::NDim>& dp, T dt,
                                   const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) override {
@@ -105,6 +105,14 @@ namespace particle {
     }
   };
 
+
+  // LogSpherical
+  namespace force {
+    template < typename Ptc >
+    void gravity( Ptc& ptc, ts::Real<Ptc> dt, const ts::Vec<Ptc>& , const ts::Vec<Ptc>& , ts::Real<Ptc> g  ) noexcept {
+      ptc.p()[0] -= g * std::exp( - 2 * ptc.q()[0] ) * dt;
+    };
+  }
 }
 
 namespace particle {
@@ -115,29 +123,97 @@ namespace particle {
     : _localgrid(localgrid),
       _dJ( knl::dims(localgrid), ShapeF() ),
       _rng(rng), _cart(cart), _ensemble(ensemble) {
-    // TODOL
     using PtcArr = array<Real, DPtc, state_t>;
     using Ptc = typename PtcArr::particle_type;
-    force::Factory<Ptc>::Register("lorentz", force::lorentz<Ptc>);
-    force::Factory<Ptc>::Register("landau0", force::landau0<Ptc>);
+
+    Real mu0 = 60000.0;
+    {
+      Real landau0_B_thr = 0.1 * mu0;
+      using force_t = force::force_t<Ptc>;
+      {
+        auto sp = species::electron;
+        force::Force<Ptc> force;
+        const auto& prop = properties.at(sp);
+
+        force.add( force::template lorentz<Ptc>, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( force::gravity<Ptc>, 1.8 );
+        force.add( force::template landau0<Ptc>, landau0_B_thr );
+
+        force_gen<Ptc>.Register( sp, force );
+      }
+      {
+        auto sp = species::positron;
+        force::Force<Ptc> force;
+        const auto& prop = properties.at(sp);
+
+        force.add( force::template lorentz<Ptc>, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( force::gravity<Ptc>, 1.8 );
+        force.add( force::template landau0<Ptc>, landau0_B_thr );
+
+        force_gen<Ptc>.Register( sp, force );
+      }
+      {
+        auto sp = species::ion;
+        force::Force<Ptc> force;
+        const auto& prop = properties.at(sp);
+
+        force.add( force::template lorentz<Ptc>, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( force::gravity<Ptc>, 1.8 );
+        // force.add( force::template landau0<Ptc>, landau0_B_thr );
+
+        force_gen<Ptc>.Register( sp, force );
+      }
+    }
+
 
     {
       scat::RadiationFromCharges<false,PtcArr> ep_scat;
-      ep_scat.add(InZone<Ptc>{});
-      ep_scat.add(CurvatureRadiate<Ptc>{});
+
+      {
+        struct InZone : public scat::Eligible<Ptc> {
+          bool operator() ( const Ptc& ptc ) override {
+            return ptc.q()[0] < std::log(9.0);
+          }
+        };
+        ep_scat.add(InZone{});
+      }
+
+      {
+        CurvatureRadiate<Ptc> cr;
+        cr.abs_charge_x = 1u;
+        cr.mass_x = 1u;
+        cr.K_thr = 20.0;
+        cr.gamma_off = 15.0;
+        cr.emission_rate = 0.25;
+
+        ep_scat.add(cr);
+      }
 
       scat_gen<PtcArr>.Register( species::electron, ep_scat );
       scat_gen<PtcArr>.Register( species::positron, ep_scat );
     }
 
     {
-      scat::PhotonPairProduction<PtcArr>photon_scat;
-      photon_scat.add(InZone<Ptc>{});
-      photon_scat.add(MagneticConvert<Ptc>{});
-      photon_scat.add(TwoPhotonCollide<Ptc>{});
+      scat::PhotonPairProduction<PtcArr> photon_scat;
+      {
+        // TODOL are there any restrictions on where photons can or cannot produce pairs?
+        // photon_scat.add(InZone<Ptc>{});
+      }
+
+      {
+        MagneticConvert<Ptc> mc;
+        mc.B_thr = 1000.0;
+        mc.mfp = 0.2;
+        photon_scat.add(mc);
+      }
+      {
+        TwoPhotonCollide<Ptc> tc;
+        tc.mfp = 5.0;
+        photon_scat.add(tc);
+      }
+
       scat_gen<PtcArr>.Register( species::photon, photon_scat );
     }
-
 
   }
 }
@@ -160,20 +236,7 @@ namespace particle {
     using PtcArr = array<Real, DPtc, state_t>;
     using Ptc = typename PtcArr::particle_type;
 
-    std::vector<force::specs<Ptc>> specs {
-                                          { "lorentz", static_cast<Real>(prop.charge_x) / prop.mass_x },
-                                          { "landau0", 1000 },
-    };
-
-    auto update_p_opt = std::make_optional
-      ( [specs=std::move(specs)]( auto& ptc, auto&&... args ) {
-        for ( const auto& spec : specs ) {
-          auto f = force::Factory<Ptc>::create(spec.id);
-          f( ptc, std::forward<decltype(args)>(args)..., spec.param0 );
-        }
-      } );
-
-    if ( prop.charge_x == 0 ) update_p_opt.reset(); // TODOL maybe also check is_massive
+    auto update_p = force_gen<Ptc>(sp);
 
     auto* scat = scat_gen<PtcArr>(sp);
 
@@ -217,7 +280,7 @@ namespace particle {
         auto B_itpl = field::interpolate( B, q0_std, shapef );
 
         apt::Vec<Real,DPtc> dp = -ptc.p();
-        if ( update_p_opt ) (*update_p_opt)( ptc, dt, E_itpl, B_itpl );
+        update_p( ptc, dt, E_itpl, B_itpl );
         if ( scat ) {
           dp += ptc.p();
           (*scat)( std::back_inserter(sp_ptcs), ptc, std::move(dp), dt, B_itpl, _rng );
@@ -289,18 +352,41 @@ namespace particle {
     _dJ.reduce( _ensemble.chief, _ensemble.intra );
 
     if ( _cart ) {
-      auto& Jmesh = _dJ.integrate( *_cart );
+      const auto& Jmesh = _dJ.integrate( *_cart );
 
-      // rescale Jmesh back to real grid delta
-      apt::foreach<0, DGrid> // NOTE it's DGrid not DField
-        ( [&]( auto comp, const auto& g ) { // comp is proxy
-            auto tmp = g.delta();
-            for ( auto& elm : comp.data() ) elm *= tmp;
-          }, Jmesh, _localgrid );
+      { // get J from Jmesh NOTE one needs to rescale Jmesh back to real grid delta
+        const auto& mesh = J.mesh();
+        const auto& grid = _localgrid;
+        using coord_t = knl::coord<CS>;
 
-      // J = getJfromJmesh(_dJ); TODO coordinate system
+        for ( int iJ = 0; iJ < 3; ++iJ ) {
+          auto Jcomp = J[iJ]; // TODOL semantics;
+          auto Jmesh_comp = Jmesh[iJ]; // TODOL semantics;
+          const auto& offset = Jcomp.offset();
+
+          Real delta = iJ < DGrid ? grid[iJ].delta() : 1.0;
+
+          const decltype( coord_t::template h<0,Real> ) * scale = nullptr;
+          switch( iJ < DGrid ? iJ : -1 ) {
+          case 0 : scale = coord_t::template hh<0,Real>; break;
+          case 1 : scale = coord_t::template hh<1,Real>; break;
+          case 2 : scale = coord_t::template hh<2,Real>; break;
+          case -1 : scale = coord_t::template hhh<Real>; break;
+          default: scale = nullptr;
+          }
+
+          apt::array<Real,3> qs{};
+          for( const auto& I : apt::Block( mesh.bulk_extent() ) ) {
+            // TODOL also use iterator for qs generation
+            for ( int i = 0; i < DGrid; ++i )
+               qs[i] = grid[i].absc(I[i], offset[i]);
+
+            Jcomp(I) = Jmesh_comp(I) * delta / scale( qs[0], qs[1], qs[2] );
+          }
+        }
+      }
+
     }
-
   }
 
 }

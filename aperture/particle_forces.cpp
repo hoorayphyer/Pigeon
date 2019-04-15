@@ -6,7 +6,6 @@ using namespace traits;
 
 namespace particle::force {
   using Ptc = vParticle<real_t, DPtc, ptc_state_t>;
-  template struct Factory< Ptc >;
 
   template
   void lorentz<Ptc>( Ptc&, ts::Real<Ptc>, const ts::Vec<Ptc>&, const ts::Vec<Ptc>&, ts::Real<Ptc> );
