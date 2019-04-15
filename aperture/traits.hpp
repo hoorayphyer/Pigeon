@@ -2,7 +2,6 @@
 #define  _TRAITS_HPP_
 
 #include "kernel/shapef.hpp"
-#include "particle/pair_produce_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "kernel/coordsys_predef.hpp"
 
@@ -26,8 +25,6 @@ namespace traits {
   constexpr int guard = 1; // TODOL more useful is Order of field_solver and shape
 
   using ShapeF = knl::shapef_t<knl::shape::Cloud_In_Cell>;
-
-  constexpr auto pair_produce_scheme = particle::PairScheme::Photon;
 
   constexpr auto coordinate_system = knl::coordsys::Cartesian;
 

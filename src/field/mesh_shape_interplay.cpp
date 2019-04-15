@@ -1,19 +1,18 @@
 #include "field/mesh_shape_interplay.hpp"
 #include "apt/block.hpp"
 
-// Also see current_deposition.cpp
-
 namespace field::impl {
-  template < typename T, int DGrid, typename ShapeF >
+  template < typename T, int DGrid, int Dloc, typename ShapeF >
   struct WeightFinder {
   private:
+    static_assert(Dloc >= DGrid);
     apt::Index<DGrid> _I_b {};
     apt::array<T,DGrid> _sep_b {};
     apt::array<T,DGrid> _wgt {};
     const ShapeF& _shapef;
   public:
     // NOTE loc is the relative index
-    constexpr WeightFinder( const apt::array<T, DGrid>& loc,
+    constexpr WeightFinder( const apt::array<T, Dloc>& loc,
                             const apt::array< offset_t, DGrid >& offset,
                             const ShapeF& shapef ) noexcept
       : _shapef( shapef ) {
@@ -55,9 +54,9 @@ namespace field::impl {
 
 namespace field {
 
-  template < typename T, int DField, int DGrid, typename ShapeF >
+  template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
-                                    const apt::array<T,DGrid>& q_std,
+                                    const apt::array<T,Dq>& q_std,
                                     const ShapeF& shapef ) {
     apt::Vec<T, DField> result;
     constexpr auto supp = ShapeF::support();
@@ -84,10 +83,10 @@ namespace field {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid, typename ShapeF >
+  template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   void deposit ( Field<T,DField,DGrid>& field,
                  apt::Vec<T, DField> variable,
-                 const apt::array<T, DGrid>& q_std,
+                 const apt::array<T, Dq>& q_std,
                  const ShapeF& shapef ) {
     constexpr auto supp = ShapeF::support();
 

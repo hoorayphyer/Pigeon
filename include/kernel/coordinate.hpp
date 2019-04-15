@@ -29,10 +29,9 @@ namespace knl {
     static inline T hhh ( T x1, T x2, T x3 ) { return 1.0; }
 
     template < class X, class V, typename T >
-    static inline auto geodesic_move( X& x, const apt::VecExpression<V>& v, const T& dt ) {
+    static inline void geodesic_move( X& x, const apt::VecExpression<V>& v, const T& dt ) {
       apt::Vec<decltype(v[0] * dt), apt::ndim_v<V>> dx = v * dt;
       x += dx;
-      return dx;
     }
   };
 
@@ -60,7 +59,7 @@ namespace knl {
     }
 
     template < class X, class V, typename T >
-    static inline auto geodesic_move( X& x, V& v, const T& dt ) {
+    static inline void geodesic_move( X& x, V& v, const T& dt ) {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       constexpr T PI = PI_CONST;
@@ -125,7 +124,6 @@ namespace knl {
         x += dx;
       }
 
-      return dx;
     }
   };
 }

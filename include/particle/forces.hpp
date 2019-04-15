@@ -35,7 +35,7 @@ namespace particle::force {
   template < class Ptc >
   struct Factory {
     static void Register( const id_t& id, force_t<Ptc> force );
-    static void Unregister( const id_t& id, force_t<Ptc> force );
+    static void Unregister( const id_t& id );
     static force_t<Ptc> create( const id_t& id );
   };
 }

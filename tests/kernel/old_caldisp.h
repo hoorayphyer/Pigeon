@@ -165,10 +165,9 @@ struct ScalesLogSpherical {
 
 
 template < typename T >
-inline Vec3<T> logsph_geodesic_move_old ( Vec3<T>& x, Vec3<T>& v, T dt ) {
+inline void logsph_geodesic_move_old ( Vec3<T>& x, Vec3<T>& v, T dt ) {
   const T PI = 3.141592653589793238462643383279502884197169399375105820974944592307816406286L;
   static ScalesLogSpherical<T> _scales;
-  Vec3<T> dx;
   Vec3<T> x_new(x);
   _scales . PosToCartesian(x_new);
 
@@ -183,30 +182,27 @@ inline Vec3<T> logsph_geodesic_move_old ( Vec3<T>& x, Vec3<T>& v, T dt ) {
   if (x_new.z - x.z < -PI) x_new.z += 2.0 * PI;
 
   for ( int i = 0; i < 3; ++i ) {
-    dx[i] = ( x_new[i] - x[i] );
     x[i] = x_new[i];
   }
 
   // update momentum components under the new local coordinates.
   _scales . VectorFromCartesian( v, x_new );
-
-  return dx;
 }
 
-// wrapper from Vec3<T> to Vec<T,3>
-inline auto OLD_geodesic_move(Vec<double,3>& x, Vec<double,3>& v, const double& dt ) noexcept {
+inline void OLD_geodesic_move(Vec<double,3>& x, Vec<double,3>& v, const double& dt ) noexcept {
   Vec3<double> x_o, v_o;
+  // convert from the new Vec<T,3> to old Vec3<T>
   for ( int i = 0; i < 3; ++i ) {
     x_o[i] = x[i];
     v_o[i] = v[i];
   }
 
-  auto dx_o = logsph_geodesic_move_old( x_o, v_o, dt );
+  logsph_geodesic_move_old( x_o, v_o, dt );
 
+  // convert back
   for ( int i = 0; i < 3; ++i ) {
     x[i] = x_o[i];
     v[i] = v_o[i];
   }
 
-  return Vec<double,3>(dx_o[0], dx_o[1], dx_o[2]);
 }

@@ -49,3 +49,26 @@ namespace particle::scat {
 
   }
 }
+
+
+#include "particle/map.hpp"
+
+namespace particle {
+  template < class PtcArr >
+  map<std::unique_ptr<scat::Scat<PtcArr>>> scat_map;
+
+  template < class PtcArr >
+  void ScatGen<PtcArr>::Register( species sp, const scat::Scat<PtcArr>& scat ) {
+    scat_map<PtcArr>[sp].reset( new scat::Scat<PtcArr>(scat) ); // NOTE use copy constructor
+  }
+
+  template < class PtcArr >
+  void ScatGen<PtcArr>::Unregister( species sp ) {
+    scat_map<PtcArr>.erase(sp);
+  }
+
+  template < class PtcArr >
+  scat::Scat<PtcArr>* ScatGen<PtcArr>::operator() ( species sp ) {
+    return scat_map<PtcArr>.has(sp) ? scat_map<PtcArr>.at(sp).get() : nullptr;
+  }
+}

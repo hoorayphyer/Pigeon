@@ -5,14 +5,12 @@
 
 #include "kernel/coordsys_predef.hpp"
 #include "particle/species_predef.hpp"
-#include "particle/pair_produce_predef.hpp"
-#include "particle_properties.hpp"
 #include "particle/map.hpp"
 #include "particle/array.hpp"
 
 #include "kernel/grid.hpp"
 #include "particle/c_particle.hpp"
-#include "field/mesh_shape_interplay.hpp"
+#include "field/current_deposition.hpp"
 
 #include "utility/rng.hpp"
 #include "parallel/mpi++.hpp"
@@ -22,10 +20,8 @@ namespace dye {
 }
 
 namespace particle {
-  // TODO this template parameter list is ugly. Maybe use Policy, for injection, for pair_creation?
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             typename Real_dJ,
-             PairScheme pair_scheme, knl::coordsys CS >
+             typename Real_dJ, knl::coordsys CS >
   class ParticleUpdater : public aperture::AbstractParticleUpdater<Real, DGrid, state_t>{
   private:
     const knl::Grid< Real, DGrid >& _localgrid;
@@ -35,10 +31,9 @@ namespace particle {
     const std::optional<mpi::CartComm>& _cart;
     const dye::Ensemble<DGrid>& _ensemble;
 
-    template < bool IsCharged >
-    void update_species( array<Real,3,state_t>& sp_ptcs,
+    void update_species( species sp,
+                         array<Real,3,state_t>& sp_ptcs,
                          Real dt, Real unit_e,
-                         const Properties& prop,
                          const field::Field<Real,3,DGrid>& E,
                          const field::Field<Real,3,DGrid>& B,
                          const apt::array< apt::pair<Real>, DGrid >& borders
@@ -61,7 +56,7 @@ namespace particle {
 namespace aperture {
   using namespace traits;
   template < typename Real, int DGrid, typename state_t >
-  using ParticleUpdater = particle::ParticleUpdater<Real, DGrid, 3, state_t, ShapeF, real_dj_t, pair_produce_scheme, coordinate_system >;
+  using ParticleUpdater = particle::ParticleUpdater< Real, DGrid, 3, state_t, ShapeF, real_dj_t, coordinate_system >;
 }
 
 #endif

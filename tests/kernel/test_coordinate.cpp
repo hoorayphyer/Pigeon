@@ -18,10 +18,7 @@ SCENARIO("Cartesian", "[knl]") {
   Vec<double,3> v( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
   double dt = rng.uniform();
 
-  Vec<double,3> dx = Coord::geodesic_move( x, v, dt );
-  for ( int i = 0; i < 3; ++i )
-    REQUIRE( dx[i] == Approx( v[i] * dt));
-
+  Coord::geodesic_move( x, v, dt );
   for ( int i = 0; i < 3; ++i )
     REQUIRE( x[i] == Approx( v[i] * dt + x_old[i] ));
 }
@@ -49,9 +46,9 @@ SCENARIO("LogSpherical", "[knl]") {
       auto v = v_old;
       double dt = rng.uniform( 0.0, 0.1 );
 
-      Vec<double,3> dx = Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, v, dt );
 
-      CAPTURE( dt, x_old, v_old, x, v, dx );
+      CAPTURE( dt, x_old, v_old, x, v );
 
       REQUIRE( exp(x[0]) == Approx( v[0] * dt + exp(x_old[0]) ));
       REQUIRE( x[1] == Approx( x_old[1] ) );
@@ -59,10 +56,6 @@ SCENARIO("LogSpherical", "[knl]") {
 
       for ( int i = 0; i < 3; ++i )
         REQUIRE( v[i] == Approx(v_old[i]).margin(1e-12) );
-
-      REQUIRE( dx[0] == Approx( x[0] - x_old[0] ) );
-      REQUIRE( dx[1] == Approx( 0.0 ).margin(1e-12) );
-      REQUIRE( dx[2] == Approx( 0.0 ).margin(1e-12) );
     }
 
     WHEN("velocity is in meridional plane") {
@@ -74,7 +67,7 @@ SCENARIO("LogSpherical", "[knl]") {
       auto v = v_old;
       double dt = rng.uniform( 0.0, 0.1 );
 
-      Vec<double,3> dx = Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, v, dt );
 
       CAPTURE( dt, x_old, v_old, x, v );
 
@@ -109,7 +102,7 @@ SCENARIO("LogSpherical", "[knl]") {
       auto v = v_old;
       double dt = rng.uniform( 0.0, 0.1 );
 
-      Vec<double,3> dx = Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, v, dt );
 
       CAPTURE( dt, x_old, v_old, x, v );
 
@@ -154,17 +147,13 @@ SCENARIO("LogSpherical", "[knl]") {
 
       CAPTURE(dt, x1, v1);
 
-      Vec<double,3> dx1 = Coord::geodesic_move( x1, v1, dt );
-      Vec<double,3> dx2 = OLD_geodesic_move( x2, v2, dt );
+      Coord::geodesic_move( x1, v1, dt );
+      OLD_geodesic_move( x2, v2, dt );
 
-      CAPTURE(dx1, dx2);
       REQUIRE( x1[0] == Approx(x2[0]));
-      REQUIRE( dx1[0] == Approx(dx2[0]));
       REQUIRE( x1[1] == Approx(x2[1]));
-      REQUIRE( dx1[1] == Approx(dx2[1]));
 
       // REQUIRE( x1[2] == Approx(x2[2]));
-      // REQUIRE( dx1[2] == Approx(dx2[2]));
 
       // REQUIRE( v1[0] == Approx(v2[0]));
       // REQUIRE( v1[1] == Approx(v2[1]));
@@ -213,7 +202,7 @@ using namespace std::chrono;
 //       Vec<double,3> x( rdn[6*i + 0], rdn[6*i + 1], rdn[6*i + 2] );
 //       Vec<double,3> v( rdn[6*i + 3], rdn[6*i + 4], rdn[6*i + 5] );
 
-//       Vec<double,3> dx = Coord::geodesic_move( x, v, dt );
+//       Coord::geodesic_move( x, v, dt );
 //     }
 //     auto tf = high_resolution_clock::now();
 //     auto dur = duration_cast<milliseconds>(tf - ti);
@@ -227,7 +216,7 @@ using namespace std::chrono;
 //       Vec3<double> x( rdn[6*i + 0], rdn[6*i + 1], rdn[6*i + 2] );
 //       Vec3<double> v( rdn[6*i + 3], rdn[6*i + 4], rdn[6*i + 5] );
 
-//       Vec3<double> dx3 = logsph_geodesic_move_old( x, v, dt );
+//       logsph_geodesic_move_old( x, v, dt );
 //     }
 //     auto tf = high_resolution_clock::now();
 //     auto dur = duration_cast<milliseconds>(tf - ti);

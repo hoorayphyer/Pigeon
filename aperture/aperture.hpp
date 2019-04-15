@@ -45,7 +45,7 @@ namespace aperture {
         _E = { mesh };
         _B = { mesh };
         _J = { mesh };
-        // TODO cart_dim = 1 and periodic
+        // TODOL cart_dim = 1 and periodic
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
@@ -93,7 +93,7 @@ namespace aperture {
 
           std::optional<int> new_label;
           if ( _ens_opt ) new_label.emplace(_ens_opt->label());
-          if ( old_label != new_label ) refresh(*_ens_opt); // TODO check label comparison
+          if ( old_label != new_label ) refresh(*_ens_opt);
         }
       }
 

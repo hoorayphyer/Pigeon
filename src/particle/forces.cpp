@@ -12,7 +12,7 @@ namespace particle::force {
   }
 
   template < typename Ptc >
-  void Factory<Ptc>::Unregister( const id_t& id, force_t<Ptc> force ) {
+  void Factory<Ptc>::Unregister( const id_t& id ) {
     map<Ptc>.erase(id);
   }
 

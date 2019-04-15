@@ -59,32 +59,52 @@ namespace {
 #define vec_def_op(_OP_, _OP_NAME_)                                     \
   template <typename E1, typename E2>                                   \
   constexpr auto operator _OP_ (const apt::VecExpression<E1>& e1,       \
-                              const apt::VecExpression<E2>& e2)         \
+                                const apt::VecExpression<E2>& e2)       \
     noexcept {                                                          \
     return                                                              \
-      apt::FCompWise_Vec_Vec< apt::BinaryOps:: _OP_NAME_,               \
-                              apt::VecExpression<E1>,                   \
-                              apt::VecExpression<E2> > (e1, e2);        \
+      apt::FCompWise_Vec_Vec< apt::BinaryOps:: _OP_NAME_, E1, E2 >      \
+      ( static_cast<const E1&>(e1), static_cast<const E2&>(e2) );       \
   }                                                                     \
                                                                         \
   template <typename E, typename Real>                                  \
   constexpr std::enable_if_t< std::is_arithmetic_v<Real>,               \
                               apt::FCompWise_Vec_Sca                    \
                               <apt::BinaryOps::_OP_NAME_,               \
-                               apt::VecExpression<E>,                   \
-                               Real > >                                 \
+                               E, Real > >                              \
   operator _OP_ (const apt::VecExpression<E>& e, const Real& t)         \
     noexcept {                                                          \
-    return                                                              \
-      apt::FCompWise_Vec_Sca<apt::BinaryOps::_OP_NAME_,                 \
-                             apt::VecExpression<E>,                     \
-                             Real >(e, t);                              \
+    return { static_cast<const E&>(e), t };                             \
   }                                                                     \
 
   vec_def_op(+, ADD);
   vec_def_op(-, SUB);
   vec_def_op(*, MUL);
   vec_def_op(/, DIV);
+}
+
+namespace apt {
+  template < typename E, typename T = typename E::element_type >
+  struct VecNegative : public VecExpression<VecNegative<E,T>,T> {
+  private:
+    const E& _e;
+
+  public:
+    using element_type = T;
+    static constexpr int NDim = E::NDim;
+
+    constexpr VecNegative( const E& e ) noexcept : _e(e) {}
+
+    constexpr T operator[] ( int i ) const noexcept {
+      return -(_e[i]);
+    }
+  };
+}
+
+namespace {
+  template <typename E >
+  constexpr apt::VecNegative<E> operator-( const apt::VecExpression<E>& vec ) noexcept {
+    return { static_cast<const E&>(vec) };
+  }
 }
 
 namespace apt {

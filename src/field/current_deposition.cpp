@@ -1,20 +1,16 @@
-#include "field/mesh_shape_interplay.hpp"
+#include "field/current_deposition.hpp"
 #include "field/communication.hpp"
 #include "apt/block.hpp"
-#include "apt/vec.hpp"
-#include "apt/type_traits.hpp"
 #include "parallel/mpi++.hpp"
-#include <tuple>
 
 namespace field :: impl {
   // RATIONALE Due to the MIDWAY offset of dJ field, we define the NATIVE grid te be one shifted to the right by half spacing from the standard grid, therefore q_nat = q_std - 0.5. By design, dJ[i] is INSITU on the native grid.
   // The contributed cells in the native grid are [ INT_FLOOR( q_nat_min - sf.r) + 1,  INT_FLOOR( q_nat_max + sf.r) + 1 ). These are also the correct cell numbers in the standard grid
   // Now we have q0_std and q1_std, the final range of contributed cells is the union of individual ones
 
-  template < int DGrid, typename Vec_q0, typename Vec_q1, typename ShapeF >
-  constexpr auto deposit_range( const Vec_q0& q0_std, const Vec_q1& q1_std, const ShapeF& ) {
+  template < int DGrid, typename Tq, typename ShapeF >
+  constexpr auto deposit_range( const Tq& q0_std, const Tq& q1_std, const ShapeF& ) {
     static_assert( ShapeF::support() > 0 );
-    using T = apt::most_precise_t<apt::element_t<Vec_q0>, apt::element_t<Vec_q1>>;
     apt::Index<DGrid> I_b; // index of the first contributed cell in the standard grid
     apt::Index<DGrid> extent;
 
@@ -33,7 +29,7 @@ namespace field :: impl {
           static_assert( ShapeF::support() > 1); // TODOL
 
           auto int_flr =
-            []( T q ) noexcept {
+            []( auto q ) noexcept {
               // Since min(q0_std) = 0.0 by design, min(q_nat) = -1 - r - 0.5, so q_nat + ( support + 3 ) / 2.0 >= 0. We will simply use (support + 1) as the shift
               constexpr auto shift = 1 + ShapeF::support();
               return int(q+shift) - shift; };
@@ -43,7 +39,7 @@ namespace field :: impl {
         },
         I_b, extent, q0_std, q1_std );
 
-    return std::make_tuple( I_b, extent );
+    return apt::pair<decltype(I_b)>{ I_b, extent };
   }
 
 }
@@ -68,32 +64,30 @@ namespace field {
   }
 
 
-  // TODO double check if calculation precision is promoted before assignment, basically at places where Kahan summation may be used
   template < typename T, int DField, int DGrid, typename ShapeF >
+  template < typename U >
   void Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::deposit ( T charge_over_dt, const apt::Vec<T,DField>& q0_std, const apt::Vec<T,DField>& q1_std ) {
+  ::deposit ( U charge_over_dt, const apt::array<U,DField>& q0_std, const apt::array<U,DField>& q1_std ) {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
     constexpr auto shapef = ShapeF();
     const auto[I_b, extent] = impl::deposit_range<DGrid>( q0_std, q1_std, shapef );
 
-    apt::array<T,3> W{};
-    apt::array<T,DGrid> s0{};
-    apt::array<T,DGrid> s1{};
+    apt::array<U,3> W{};
+    apt::array<U,DGrid> s0{};
+    apt::array<U,DGrid> s1{};
+
+    auto calc_s =
+      [&shapef] ( auto& s, int i, auto q ) noexcept {
+        s = shapef(i + 0.5 - q);
+      };
 
     for ( auto I : apt::Block(extent) ) {
       I += I_b;
       // TODOL use normalization?? er ci xing zheng ze hua
-      apt::foreach<0,DGrid>
-        ( [&shapef]( auto& s, int i, auto q ) noexcept {
-            s = shapef(i + 0.5 - q);
-          }, s0, I, q0_std );
-
-      apt::foreach<0,DGrid>
-        ( [&shapef]( auto& s, int i, auto q ) noexcept {
-            s = shapef(i + 0.5 - q);
-          }, s1, I, q1_std );
+      apt::foreach<0,DGrid> ( calc_s, s0, I, q0_std );
+      apt::foreach<0,DGrid> ( calc_s, s1, I, q1_std );
 
       if constexpr ( DGrid == 2 ) {
           W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1] );
@@ -105,7 +99,7 @@ namespace field {
         W[2] = ( s1[2] - s0[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
       }
 
-
+      // NOTE: Before this line, there is no massive number of additions hence no loss of precision, which may only happen during the following +=. The fact that dj has higher precision takes care of all that.
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
         ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _data, W ); // TODOL semantics on dj
     }

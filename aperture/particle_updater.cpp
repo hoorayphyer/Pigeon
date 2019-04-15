@@ -1,6 +1,9 @@
 #include "particle_updater.hpp"
 #include "dye/ensemble.hpp"
 
+#include "field/mesh_shape_interplay.hpp"
+
+#include "particle_properties.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
 #include "particle/migration.hpp"
@@ -9,12 +12,12 @@
 
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
-#include <memory>
 
 namespace particle {
   map<Properties> properties;
+
   template < class PtcArr >
-  map<std::unique_ptr<scat::Scat<PtcArr>>> scat_map;
+  ScatGen<PtcArr> scat_gen;
 }
 
 namespace particle {
@@ -93,7 +96,6 @@ namespace particle {
     //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
     //   return std::sqrt( -2.0 * std::log(x) );
     // }
-
     T mfp = 5.0;
 
     std::optional<T> operator() ( const Ptc& photon, const apt::Vec<T,Ptc::NDim>& dp, T dt,
@@ -103,54 +105,77 @@ namespace particle {
     }
   };
 
-  // TODO after scattering newly created particles should be put back to where they belong
-  // TODO no scattering like ions
 }
 
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             typename Real_dJ,
-             particle::PairScheme pair_scheme, knl::coordsys CS >
-  ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
+             typename Real_dJ, knl::coordsys CS >
+  ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble )
     : _localgrid(localgrid),
       _dJ( knl::dims(localgrid), ShapeF() ),
       _rng(rng), _cart(cart), _ensemble(ensemble) {
     // TODOL
-    using Ptc = vParticle<Real, DPtc, state_t>;
+    using PtcArr = array<Real, DPtc, state_t>;
+    using Ptc = typename PtcArr::particle_type;
     force::Factory<Ptc>::Register("lorentz", force::lorentz<Ptc>);
     force::Factory<Ptc>::Register("landau0", force::landau0<Ptc>);
+
+    {
+      scat::RadiationFromCharges<false,PtcArr> ep_scat;
+      ep_scat.add(InZone<Ptc>{});
+      ep_scat.add(CurvatureRadiate<Ptc>{});
+
+      scat_gen<PtcArr>.Register( species::electron, ep_scat );
+      scat_gen<PtcArr>.Register( species::positron, ep_scat );
+    }
+
+    {
+      scat::PhotonPairProduction<PtcArr>photon_scat;
+      photon_scat.add(InZone<Ptc>{});
+      photon_scat.add(MagneticConvert<Ptc>{});
+      photon_scat.add(TwoPhotonCollide<Ptc>{});
+      scat_gen<PtcArr>.Register( species::photon, photon_scat );
+    }
+
+
   }
 }
 
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             typename Real_dJ,
-             PairScheme pair_scheme, knl::coordsys CS >
-  template < bool IsCharged >
-  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
-  ::update_species( array<Real,3,state_t>& sp_ptcs,
+             typename Real_dJ, knl::coordsys CS >
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
+  ::update_species( species sp,
+                    array<Real,3,state_t>& sp_ptcs,
                     Real dt, Real unit_e,
-                    const Properties& prop,
                     const field::Field<Real,3,DGrid>& E,
                     const field::Field<Real,3,DGrid>& B,
                     const apt::array< apt::pair<Real>, DGrid >& borders
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
-    using Ptc = decltype(sp_ptcs[0]);
+    const auto& prop = properties.at(sp);
+
+    using PtcArr = array<Real, DPtc, state_t>;
+    using Ptc = typename PtcArr::particle_type;
+
     std::vector<force::specs<Ptc>> specs {
                                           { "lorentz", static_cast<Real>(prop.charge_x) / prop.mass_x },
                                           { "landau0", 1000 },
     };
 
-    auto update_p =
-      [specs=std::move(specs)]( auto&&... args ) {
+    auto update_p_opt = std::make_optional
+      ( [specs=std::move(specs)]( auto& ptc, auto&&... args ) {
         for ( const auto& spec : specs ) {
           auto f = force::Factory<Ptc>::create(spec.id);
-          f( std::forward<decltype(args)>(args)..., spec.param0 );
+          f( ptc, std::forward<decltype(args)>(args)..., spec.param0 );
         }
-      };
+      } );
+
+    if ( prop.charge_x == 0 ) update_p_opt.reset(); // TODOL maybe also check is_massive
+
+    auto* scat = scat_gen<PtcArr>(sp);
 
     auto shapef = ShapeF();
     auto charge_over_dt = prop.charge_x * unit_e / dt;
@@ -166,19 +191,17 @@ namespace particle {
 
         if constexpr ( CS == knl::coordsys::Cartesian ) {
             // a small optimization for Cartesian
-            return knl::coord<CS>::geodesic_move( ptc.q(), ptc.p(), dt / gamma );
+            knl::coord<CS>::geodesic_move( ptc.q(), ptc.p(), dt / gamma );
           } else {
-          apt::Vec<Real, DPtc> dq; // for RVO
-          dq = knl::coord<CS>::geodesic_move( ptc.q(), (ptc.p() /= gamma), dt );
+          knl::coord<CS>::geodesic_move( ptc.q(), (ptc.p() /= gamma), dt );
           ptc.p() *= gamma;
-          return dq;
         }
       };
 
     auto abs2std =
       [&grid=_localgrid]( const auto& qabs ) {
-        apt::array<Real,DGrid> q_std;
-        apt::foreach<0,DGrid>
+        apt::array<Real,DPtc> q_std;
+        apt::foreach<0,DGrid> // NOTE DGrid instead of DPtc
           ( [](auto& q, auto q_abs, const auto& g ) noexcept {
               q = ( q_abs - g.lower() ) / g.delta();
             }, q_std, qabs, grid );
@@ -188,50 +211,37 @@ namespace particle {
     for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
       if( ptc.is(flag::empty) ) continue;
 
-      // TODOL should also check IsMassive
-      Real Rc{};
-      if constexpr ( IsCharged ) {
-        auto q_std = abs2std( ptc.q() );
-        auto E_itpl = field::interpolate( E, q_std, shapef );
-        auto B_itpl = field::interpolate( B, q_std, shapef );
-
-        apt::Vec<Real,DPtc> dp = ptc.p();
-        update_p( ptc, dt, E_itpl, B_itpl );
-        dp -= ptc.p();
-        // Rc = calc_Rc<Real>( dt, ptc.p(), std::move(dp) );
-      }
-
-      // TODO
-      // pair_produce( std::back_inserter(sp_ptcs), ptc, Rc ); // use sp_ptcs temporarily to hold newly created particles if any
-
-      // NOTE q is updated, starting from here, particles may be in the guard cells.
-      auto&& dq = update_q( ptc, dt );
       {
-        auto abs2std_dJ =
-          [&grid=_localgrid]( apt::Vec<Real,DPtc> q1, auto dq ) {
-            apt::foreach<0,DGrid> // NOTE this is DGrid, not DPtc.
-              ( [](auto& q1, auto& q0, const auto& g){
-                  q1 = ( q1 - g.lower() ) / g.delta();
-                  q0 = q1 - q0 / g.delta();
-                }, q1, dq, grid );
-            return std::make_tuple(dq, q1); // NOTE the result is of DPtc
-          };
-        auto&&[ q0_std, q1_std ] = abs2std_dJ( ptc.q(), std::move(dq) );
-        // TODOL pusher handle boundary condition. Is it needed?
-        if constexpr ( IsCharged )
-                       _dJ.deposit( charge_over_dt, std::move(q0_std),
-                                    std::move(q1_std) ); // TODOL check the 2nd argument
+        auto q0_std = abs2std( ptc.q() );
+        auto E_itpl = field::interpolate( E, q0_std, shapef );
+        auto B_itpl = field::interpolate( B, q0_std, shapef );
+
+        apt::Vec<Real,DPtc> dp = -ptc.p();
+        if ( update_p_opt ) (*update_p_opt)( ptc, dt, E_itpl, B_itpl );
+        if ( scat ) {
+          dp += ptc.p();
+          (*scat)( std::back_inserter(sp_ptcs), ptc, std::move(dp), dt, B_itpl, _rng );
+        }
+
+        // NOTE q is updated, starting from here, particles may be in the guard cells.
+        update_q( ptc, dt );
+        // TODO pusher handle boundary condition. Is it needed?
+        if ( prop.charge_x != 0 )
+          _dJ.deposit( charge_over_dt, q0_std, abs2std(ptc.q()) );
       }
 
-      char mig_dir = 0;
-      for ( int i = 0; i < DGrid; ++i ) {
-        mig_dir += migrate_dir( ptc.q()[i], borders[i][LFT], borders[i][RGT] ) * pow3(i);
+      {
+        char mig_dir = 0;
+        for ( int i = 0; i < DGrid; ++i ) {
+          mig_dir += migrate_dir( ptc.q()[i], borders[i][LFT], borders[i][RGT] ) * pow3(i);
+        }
+
+        if ( mig_dir != (pow3(DGrid) - 1) / 2 ) {
+          _migrators.emplace_back(std::move(ptc));
+          _migrators.back().extra() = mig_dir;
+        }
       }
 
-      if ( mig_dir != (pow3(DGrid) - 1) / 2 ) {
-        _migrators.emplace_back(std::move(ptc));
-        _migrators.back().extra() = mig_dir;
-      }
     }
   }
 }
@@ -240,9 +250,9 @@ namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t,
              typename ShapeF,
              typename Real_dJ,
-             PairScheme pair_scheme, knl::coordsys CS
+             knl::coordsys CS
              >
-  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, pair_scheme, CS >
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
   ::operator() ( field::Field<Real,3,DGrid>& J,
                  map<array<Real,3,state_t>>& particles,
                  const field::Field<Real,3,DGrid>& E,
@@ -258,23 +268,21 @@ namespace particle {
     // annihilate_mark_pairs( );
 
     for ( auto&[ sp, ptcs ] : particles ) {
-      const Properties& prop = properties.at(sp);
-      auto[ m_x, q_x, is_rad ] = prop;
-      // TODO
-      if ( q_x )
-        update_species<true>( ptcs, dt, unit_e, prop, E, B, borders );
-      else
-        update_species<false>( ptcs, dt, unit_e, prop, E, B, borders );
-      // else if ( q_x && !is_rad )
-      //   update_species<true,false>( ptcs, particles, dt, unit_e, E, B, borders );
-      // else
-      //   update_species<false,false>( ptcs, particles, dt, unit_e, E, B, borders );
-      // TODO put particles where they belong
+      const auto old_size = ptcs.size();
+      update_species( sp, ptcs, dt, unit_e, E, B, borders );
+
+      // Put particles where they belong after scattering
+      for ( auto i = old_size; i < ptcs.size(); ++i ) {
+        auto this_sp = ptcs[i].template get<species>();
+        if ( this_sp != sp ) {
+          particles[this_sp].push_back(std::move(ptcs[i]));
+        }
+      }
     }
 
     migrate( _migrators, _ensemble.inter, timestep );
     for ( auto&& ptc : _migrators ) {
-      particles[ptc.template get<species>()].push_back( std::move(ptc) ); // TODOL check this
+      particles[ptc.template get<species>()].push_back( std::move(ptc) );
     }
     _migrators.resize(0);
 
@@ -301,5 +309,5 @@ namespace particle {
 using namespace traits;
 namespace particle {
   template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, ShapeF,
-                                  real_dj_t, pair_produce_scheme, coordinate_system>;
+                                  real_dj_t, coordinate_system >;
 }
