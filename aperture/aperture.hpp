@@ -2,15 +2,23 @@
 #define  _APERTURE_HPP_
 
 #include "abstract_field_updater.hpp"
-#include "abstract_particle_updater.hpp"
 #include "kernel/grid.hpp"
 
 #include "old_field_solver/old_field_solver_adapter.hpp"
 #include "particle_updater.hpp"
+#include "field/communication.hpp"
 
 #include "dye/dynamic_balance.hpp"
 
 #include <memory>
+
+
+#include "traits.hpp"
+namespace aperture {
+  using namespace traits;
+  template < typename Real, int DGrid, typename state_t >
+  using ParticleUpdater = particle::ParticleUpdater< Real, DGrid, 3, state_t, ShapeF, real_dj_t, coordinate_system >;
+}
 
 namespace aperture {
   template < typename Real, int DGrid, typename state_t >
@@ -31,7 +39,7 @@ namespace aperture {
     particle::map<particle::array<Real,3,state_t>> _particles;
 
     std::unique_ptr<AbstractFieldUpdater<Real,DGrid>> _field_update;
-    std::unique_ptr<AbstractParticleUpdater<Real, DGrid, state_t>> _ptc_update;
+    std::unique_ptr<ParticleUpdater<Real, DGrid, state_t>> _ptc_update;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
@@ -68,6 +76,7 @@ namespace aperture {
     void evolve( int timestep, Real dt, Real unit_e ) {
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
+
         if ( _cart_opt ) (*_field_update)(_E, _B, _J, dt, timestep);
         // TODOL reduce number of communications?
         for ( int i = 0; i < 3; ++i )
@@ -77,7 +86,27 @@ namespace aperture {
 
         // if ( false )
         //   sort_particles();
-        (*_ptc_update)( _J, _particles, _E, _B, _borders, dt, unit_e, timestep );
+        auto& Jmesh = (*_ptc_update)( _particles, _E, _B, _borders, dt, unit_e, timestep );
+
+        // TODO Injection here
+
+        // TODOL Opimize communication. Use persistent and buffer? NOTE although probably not important, reduce might still cause loss of precision, so we perform reduce on Jmesh instead of first assignning Jmesh to _J then reducing on _J
+        for ( int i = 0; i < 3; ++i ) {
+          auto& buffer = Jmesh[i].data();
+          ens.intra.template reduce<mpi::IN_PLACE>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
+        }
+
+        if ( _cart_opt ) {
+          field::merge_guard_cells_into_bulk( Jmesh, *_cart_opt );
+          // Copy Jmesh into J NOTE this extra copy is because Jmesh might be in long double where _J is in double
+
+          const auto mesh_size = Jmesh.mesh().stride(DGrid);
+          for ( int iJ = 0; iJ < 3; ++iJ ) {
+            auto& dataJ = _J[iJ].data();
+            const auto& dataJmesh = Jmesh[iJ].data();
+            for ( int i = 0; i < mesh_size; ++i ) dataJ[i] = dataJmesh[i];
+          }
+        }
       }
 
       if (false) {

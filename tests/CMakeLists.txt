@@ -58,7 +58,7 @@ endfunction()
 # test_gen(field mesh) # DONE
 # test_gen(field mesh_shape_interplay) # TODO
 # test_gen(field communication mpipp) # DONE
-# test_gen(field current_deposition mpipp) # DONE # TODOL test reduce
+test_gen(field current_deposition) # DONE
 
 # test_gen(io silo++ mpipp silo_lib) # TODO
 

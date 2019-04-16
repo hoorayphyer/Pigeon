@@ -137,6 +137,7 @@ namespace field {
       return res;
     }
 
+    // NOTE stride can be used to extract total linear size of the mesh by passing ith_dim = DGrid
     constexpr auto stride( int ith_dim ) const noexcept {
       // TODOL check bounds
       if ( 0 == ith_dim ) return 1;

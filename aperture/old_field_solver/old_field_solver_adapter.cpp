@@ -50,6 +50,66 @@ void Rotating_Dipole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
   bdry.E3 = [=]( Scalar, Scalar, Scalar ) {return 0.0;};
 }
 
+void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
+  // static so that it can be used in lambda functions
+  static typename CoordToScales<CoordType::LOG_SPHERICAL>::type coord;
+
+  const auto dim = grid.dimension;
+
+  auto safe_divide =
+    [] ( auto& n, auto d ) {
+      if ( std::abs(d) > 1e-12 ) n /= d;
+      else n = 0.0; };
+
+  // define a function pointer.
+  Scalar (*h_func) ( std::array<Scalar,3> q ) = nullptr;
+
+  // FIXME TODO is the treatment also valid for 1D?
+  //FIXME is it necessary to check the following for comp >= dim?
+  // if( Coord == CoordType::LOG_SPHERICAL || Coord == CoordType::SPHERICAL
+  //     || Coord == CoordType::LOG_SPHERICAL_EV ) {
+  for ( int comp = 0; comp < dim; ++comp ) {
+    Index stagJ;
+    // NOTE only non-capture lambda can be assigned to function pointer
+    if ( comp < dim ) {
+      stagJ = GetStagProperty(FieldType::ETYPE, comp);
+      switch(comp) {
+      case 0 : h_func =
+          [] ( std::array<Scalar,3> q ) {
+            return coord.h2( q[0], q[1], q[2] ) * coord.h3( q[0], q[1], q[2] ); }; break;
+      case 1 : h_func =
+          [] ( std::array<Scalar,3> q ) {
+            return coord.h3( q[0], q[1], q[2] ) * coord.h1( q[0], q[1], q[2] ); }; break;
+      case 2 : h_func =
+          [] ( std::array<Scalar,3> q ) {
+            return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] ); }; break;
+      }
+    } else {
+      stagJ = Index(0, 0, 0);
+      h_func =
+        [] ( std::array<Scalar,3> q ) {
+          return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] )
+            * coord.h3( q[0], q[1], q[2] ); };
+    }
+
+    std::array<Scalar,3> q = { 0, 0, 0 };
+    for ( int k = grid.guard[2]; k < grid.dims[2] - grid.guard[2]; ++k ) {
+      q[2] = grid.pos( 2, k, stagJ[2] );
+      for ( int j = grid.guard[1]; j < grid.dims[1] - grid.guard[1]; ++j ) {
+        q[1] = grid.pos( 1, j, stagJ[1] );
+        for( int i = grid.guard[0]; i < grid.dims[0] - grid.guard[0]; ++i ) {
+          q[0] = grid.pos( 0, i, stagJ[0]);
+
+          // FIXME is it OK to leave out check on h_func(q) being nearly zero?
+          JField( comp, i, j, k ) /= h_func(q);
+        }
+      }
+    }
+  }
+
+  return;
+}
+
 namespace ofs {
   VectorField<Scalar> Efield;
   VectorField<Scalar> Bfield;
@@ -147,7 +207,7 @@ namespace ofs {
   template < int DGrid >
   void OldFieldUpdater<DGrid>::operator() ( field_type& E,
                                             field_type& B,
-                                            const field_type& J,
+                                            const field_type& Jmesh,
                                             double dt, int timestep ) {
     fuparams.dt = dt;
     // NOTE
@@ -157,9 +217,9 @@ namespace ofs {
     // 2) for staggered components (INSITU), indexing is field::Field[i] <-> VectorField[guard + i - 1];
 
     { // convert from new to old
+      const auto& grid = fuparams.grid;
       auto convert_from_new =
         [&]( auto& old_f, const auto& new_f ) {
-          const auto& grid = fuparams.grid;
           const auto& g = grid.guard;
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
@@ -174,12 +234,17 @@ namespace ofs {
         };
       convert_from_new( Efield, E );
       convert_from_new( Bfield, B );
-      convert_from_new( current, J );
-      // NOTE
-      // The new code will evolve Maxwell's equations with 4\pi. So `current` should first be multiplied by 4\pi
+      convert_from_new( current, Jmesh );
+
+      // NOTE two differences of new code
+      // 1. The new code will evolve Maxwell's equations with 4\pi. So `current` should first be multiplied by 4\pi
+      // 2. the new code passes in Jmesh, so conversion to real space current is needed
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
           current.ptr(c)[i] *= (4 * CONST_PI);
+
+      RestoreJToRealSpace(current, grid);
+      fc->SendGuardCells(current);
     }
 
     {

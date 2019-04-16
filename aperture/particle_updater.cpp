@@ -315,9 +315,9 @@ namespace particle {
              typename Real_dJ,
              knl::coordsys CS
              >
-  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
-  ::operator() ( field::Field<Real,3,DGrid>& J,
-                 map<array<Real,3,state_t>>& particles,
+  typename ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >::ReturnType
+  ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
+  ::operator() ( map<array<Real,3,state_t>>& particles,
                  const field::Field<Real,3,DGrid>& E,
                  const field::Field<Real,3,DGrid>& B,
                  const apt::array< apt::pair<Real>, DGrid >& borders,
@@ -349,44 +349,15 @@ namespace particle {
     }
     _migrators.resize(0);
 
-    _dJ.reduce( _ensemble.chief, _ensemble.intra );
+    auto& Jmesh = _dJ.integrate();
 
-    if ( _cart ) {
-      const auto& Jmesh = _dJ.integrate( *_cart );
-
-      { // get J from Jmesh NOTE one needs to rescale Jmesh back to real grid delta
-        const auto& mesh = J.mesh();
-        const auto& grid = _localgrid;
-        using coord_t = knl::coord<CS>;
-
-        for ( int iJ = 0; iJ < 3; ++iJ ) {
-          auto Jcomp = J[iJ]; // TODOL semantics;
-          auto Jmesh_comp = Jmesh[iJ]; // TODOL semantics;
-          const auto& offset = Jcomp.offset();
-
-          Real delta = iJ < DGrid ? grid[iJ].delta() : 1.0;
-
-          const decltype( coord_t::template h<0,Real> ) * scale = nullptr;
-          switch( iJ < DGrid ? iJ : -1 ) {
-          case 0 : scale = coord_t::template hh<0,Real>; break;
-          case 1 : scale = coord_t::template hh<1,Real>; break;
-          case 2 : scale = coord_t::template hh<2,Real>; break;
-          case -1 : scale = coord_t::template hhh<Real>; break;
-          default: scale = nullptr;
-          }
-
-          apt::array<Real,3> qs{};
-          for( const auto& I : apt::Block( mesh.bulk_extent() ) ) {
-            // TODOL also use iterator for qs generation
-            for ( int i = 0; i < DGrid; ++i )
-               qs[i] = grid[i].absc(I[i], offset[i]);
-
-            Jcomp(I) = Jmesh_comp(I) * delta / scale( qs[0], qs[1], qs[2] );
-          }
-        }
-      }
-
+    // NOTE rescale Jmesh back to real grid delta
+    for ( int i = 0; i < DGrid; ++i ) {
+      auto comp = Jmesh[i]; // TODOL semantics;
+      for ( auto& elm : comp.data() ) elm *= _localgrid[i].delta();
     }
+
+    return Jmesh;
   }
 
 }

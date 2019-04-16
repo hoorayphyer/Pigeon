@@ -1,8 +1,6 @@
 #ifndef  _PARTICLE_UPDATER_HPP_
 #define  _PARTICLE_UPDATER_HPP_
 
-#include "abstract_particle_updater.hpp"
-
 #include "kernel/coordsys_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "particle/map.hpp"
@@ -22,7 +20,7 @@ namespace dye {
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
              typename Real_dJ, knl::coordsys CS >
-  class ParticleUpdater : public aperture::AbstractParticleUpdater<Real, DGrid, state_t>{
+  class ParticleUpdater {
   private:
     const knl::Grid< Real, DGrid >& _localgrid;
     field::Standard_dJ_Field< Real_dJ, 3, DGrid, ShapeF > _dJ;
@@ -30,6 +28,8 @@ namespace particle {
     util::Rng<Real> _rng;
     const std::optional<mpi::CartComm>& _cart;
     const dye::Ensemble<DGrid>& _ensemble;
+
+    using ReturnType = decltype(_dJ.integrate());
 
     void update_species( species sp,
                          array<Real,3,state_t>& sp_ptcs,
@@ -42,21 +42,13 @@ namespace particle {
   public:
     ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble );
 
-    virtual void operator() ( field::Field<Real,3,DGrid>& J,
-                              map<array<Real,3,state_t>>& particles,
-                              const field::Field<Real,3,DGrid>& E,
-                              const field::Field<Real,3,DGrid>& B,
-                              const apt::array< apt::pair<Real>, DGrid >& borders,
-                              Real dt,Real unit_e, int timestep ) override;
+    ReturnType operator() ( map<array<Real,3,state_t>>& particles,
+                 const field::Field<Real,3,DGrid>& E,
+                 const field::Field<Real,3,DGrid>& B,
+                 const apt::array< apt::pair<Real>, DGrid >& borders,
+                 Real dt,Real unit_e, int timestep );
   };
 
-}
-
-#include "traits.hpp"
-namespace aperture {
-  using namespace traits;
-  template < typename Real, int DGrid, typename state_t >
-  using ParticleUpdater = particle::ParticleUpdater< Real, DGrid, 3, state_t, ShapeF, real_dj_t, coordinate_system >;
 }
 
 #endif

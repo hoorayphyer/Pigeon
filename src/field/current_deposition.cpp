@@ -1,7 +1,6 @@
 #include "field/current_deposition.hpp"
 #include "field/communication.hpp"
 #include "apt/block.hpp"
-#include "parallel/mpi++.hpp"
 
 namespace field :: impl {
   // RATIONALE Due to the MIDWAY offset of dJ field, we define the NATIVE grid te be one shifted to the right by half spacing from the standard grid, therefore q_nat = q_std - 0.5. By design, dJ[i] is INSITU on the native grid.
@@ -111,18 +110,8 @@ namespace field {
 
 namespace field {
   template < typename T, int DField, int DGrid, typename ShapeF >
-  void Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::reduce( int chief, const mpi::Comm& intra ) {
-    // TODO Opimize communication. Use persistent and buffer? NOTE one can use one chunk of memory for Jmesh so that only one pass of reduce is needed ?
-    for ( int i = 0; i < DField; ++i )
-      intra.reduce<mpi::IN_PLACE>( mpi::by::SUM, chief, _data[i].data().data(),  _data[i].data().size() );
-  }
-}
-
-namespace field {
-  template < typename T, int DField, int DGrid, typename ShapeF >
   Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::integrate( const mpi::CartComm& cart ) {
+  ::integrate() {
     auto& dJ = _data;
 
     const auto& mesh = dJ.mesh();
@@ -134,7 +123,6 @@ namespace field {
       }
     }
 
-    field::merge_guard_cells_into_bulk( dJ, cart );
     return dJ;
   }
 }

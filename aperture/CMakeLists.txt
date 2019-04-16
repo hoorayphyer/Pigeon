@@ -48,7 +48,7 @@ endfunction()
 
 module_gen(field communication LINK_MPIPP)
 module_gen(field mesh_shape_interplay)
-module_gen(field current_deposition LINK_MPIPP)
+module_gen(field current_deposition)
 target_link_libraries(field_current_deposition_module PRIVATE field_communication_module)
 
 module_gen(particle migration LINK_MPIPP)
