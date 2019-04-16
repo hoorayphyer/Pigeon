@@ -1,12 +1,10 @@
 #include "particle_updater.hpp"
-#include "dye/ensemble.hpp"
 
 #include "field/mesh_shape_interplay.hpp"
 
 #include "particle_properties.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
-#include "particle/migration.hpp"
 
 #include "kernel/coordinate.hpp"
 
@@ -119,10 +117,10 @@ namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
              typename Real_dJ, knl::coordsys CS >
   ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
-  ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const std::optional<mpi::CartComm>& cart, const dye::Ensemble<DGrid>& ensemble )
+  ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng )
     : _localgrid(localgrid),
       _dJ( knl::dims(localgrid), ShapeF() ),
-      _rng(rng), _cart(cart), _ensemble(ensemble) {
+      _rng(rng) {
     using PtcArr = array<Real, DPtc, state_t>;
     using Ptc = typename PtcArr::particle_type;
 
@@ -226,8 +224,7 @@ namespace particle {
                     array<Real,3,state_t>& sp_ptcs,
                     Real dt, Real unit_e,
                     const field::Field<Real,3,DGrid>& E,
-                    const field::Field<Real,3,DGrid>& B,
-                    const apt::array< apt::pair<Real>, DGrid >& borders
+                    const field::Field<Real,3,DGrid>& B
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
@@ -242,11 +239,6 @@ namespace particle {
 
     auto shapef = ShapeF();
     auto charge_over_dt = prop.charge_x * unit_e / dt;
-
-    auto migrate_dir =
-      []( auto q, auto lb, auto ub ) noexcept {
-        return ( q >= lb ) + ( q > ub );
-      };
 
     auto update_q =
       [is_massive=(prop.mass_x != 0)] ( auto& ptc, Real dt ) {
@@ -293,18 +285,6 @@ namespace particle {
           _dJ.deposit( charge_over_dt, q0_std, abs2std(ptc.q()) );
       }
 
-      {
-        char mig_dir = 0;
-        for ( int i = 0; i < DGrid; ++i ) {
-          mig_dir += migrate_dir( ptc.q()[i], borders[i][LFT], borders[i][RGT] ) * pow3(i);
-        }
-
-        if ( mig_dir != (pow3(DGrid) - 1) / 2 ) {
-          _migrators.emplace_back(std::move(ptc));
-          _migrators.back().extra() = mig_dir;
-        }
-      }
-
     }
   }
 }
@@ -320,19 +300,12 @@ namespace particle {
   ::operator() ( map<array<Real,3,state_t>>& particles,
                  const field::Field<Real,3,DGrid>& E,
                  const field::Field<Real,3,DGrid>& B,
-                 const apt::array< apt::pair<Real>, DGrid >& borders,
                  Real dt, Real unit_e, int timestep ) {
-
     _dJ.reset();
-
-    // TODO NOTE injection and annihilation are more like free sources and sinks of particles users control, in other words they fit the notion of particle boundary conditions. Do them outside of Updater. In contrast, pair creation is a physical process we model, so it is done inside the updater.
-    // inject_particles(); // TODO only coordinate space current is needed in implementing current regulated injection // TODO compatible with ensemble??
-    // TODOL annihilation will affect deposition // NOTE one can deposit in the end
-    // annihilate_mark_pairs( );
 
     for ( auto&[ sp, ptcs ] : particles ) {
       const auto old_size = ptcs.size();
-      update_species( sp, ptcs, dt, unit_e, E, B, borders );
+      update_species( sp, ptcs, dt, unit_e, E, B );
 
       // Put particles where they belong after scattering
       for ( auto i = old_size; i < ptcs.size(); ++i ) {
@@ -342,12 +315,6 @@ namespace particle {
         }
       }
     }
-
-    migrate( _migrators, _ensemble.inter, timestep );
-    for ( auto&& ptc : _migrators ) {
-      particles[ptc.template get<species>()].push_back( std::move(ptc) );
-    }
-    _migrators.resize(0);
 
     auto& Jmesh = _dJ.integrate();
 

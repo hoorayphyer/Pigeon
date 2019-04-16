@@ -134,11 +134,11 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
     // first every node initialize some particles out of borders. Then they share this information with neighbors for test purpose.
     std::vector<cPtc_t> mgr_buf;
 
-    aio::unif_int<int> unif( 0, pow3(DGrid) - 1 );
+    aio::unif_int<int> unif( 0, apt::pow3(DGrid) - 1 );
     unif.seed( aio::now() + mpi::world.rank() );
 
     int nptcs = 10000;
-    constexpr int N = pow3(DGrid);
+    constexpr int N = apt::pow3(DGrid);
     constexpr int CENTER = ( N - 1 ) / 2;
     apt::array<int, N> sendcount{};
     while( nptcs ) {

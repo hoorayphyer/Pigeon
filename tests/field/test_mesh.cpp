@@ -70,15 +70,15 @@ SCENARIO("Test ProjBlock and TransIndex", "[field][mesh]") {
 
 }
 
-SCENARIO("Test mesh squeeze", "[field][mesh]") {
-  constexpr int D = 2;
-  apt::Index<D> bulk_ext { 128, 256 };
-  Mesh mesh( bulk_ext, 1 );
-  auto mesh_sq0 = mesh.squeeze(0);
-  REQUIRE( mesh_sq0.extent()[0] == 1 + 2 * mesh.guard() );
-  REQUIRE( mesh_sq0.extent()[1] == mesh.extent()[1] );
+// SCENARIO("Test mesh squeeze", "[field][mesh]") {
+//   constexpr int D = 2;
+//   apt::Index<D> bulk_ext { 128, 256 };
+//   Mesh mesh( bulk_ext, 1 );
+//   auto mesh_sq0 = mesh.squeeze(0);
+//   REQUIRE( mesh_sq0.extent()[0] == 1 + 2 * mesh.guard() );
+//   REQUIRE( mesh_sq0.extent()[1] == mesh.extent()[1] );
 
-  auto mesh_sq1 = mesh.squeeze(1);
-  REQUIRE( mesh_sq1.extent()[1] == 1 + 2 * mesh.guard() );
-  REQUIRE( mesh_sq1.extent()[0] == mesh.extent()[0] );
-}
+//   auto mesh_sq1 = mesh.squeeze(1);
+//   REQUIRE( mesh_sq1.extent()[1] == 1 + 2 * mesh.guard() );
+//   REQUIRE( mesh_sq1.extent()[0] == mesh.extent()[0] );
+// }

@@ -6,16 +6,18 @@
 #include "apt/pair.hpp"
 #include <vector>
 
+namespace apt {
+  constexpr int pow3 ( int i ) noexcept {
+    if ( 0 == i ) return 1;
+    else return 3 * pow3( i-1 );
+  }
+}
+
 namespace std { template < class > class optional; }
 
 namespace mpi { struct InterComm; }
 
 namespace particle {
-
-  constexpr int pow3 ( int i ) noexcept {
-    if ( 0 == i ) return 1;
-    else return 3 * pow3( i-1 );
-  }
 
   template < typename T, int DPtc, typename state_t, int DGrid, int I = DGrid-1 >
   void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,

@@ -20,41 +20,30 @@
 #   message("${Yellow}No lab is invoked.${ColorReset}")
 # endif()
 
-add_library(aperture_particle_updater SHARED "particle_updater.cpp")
-target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture_particle_updater PRIVATE dye)
-set( LINK_MPIPP TRUE )
-
 #TODO precede particle/.cpp with lab/.cpp
 function(module_gen category name)
-  set(THIS_MODULE_NAME "${category}_${name}_module")
+  set(THIS_MODULE_NAME "${category}_${name}")
   add_library( ${THIS_MODULE_NAME} SHARED ${CMAKE_SOURCE_DIR}/aperture/${category}_${name}.cpp )
   target_include_directories(${THIS_MODULE_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
   target_include_directories(${THIS_MODULE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-  if( ${ARGC} GREATER 2 )
-    if ( ${ARGV2} )
-      target_link_libraries(${THIS_MODULE_NAME} PRIVATE mpipp)
-    endif()
-  endif()
-
-  # if( "${category}" STREQUAL "particle" )
-  # TODO particle_updater links to everything
-  target_link_libraries(aperture_particle_updater PRIVATE ${THIS_MODULE_NAME})
-  # elseif( "${category}" STREQUAL "field" )
-  #   target_link_libraries(aperture_field_updater PRIVATE ${THIS_MODULE_NAME})
-  # endif()
+  foreach( lib IN LISTS ARGN)
+    target_link_libraries(${THIS_MODULE_NAME} PRIVATE ${lib})
+  endforeach()
 endfunction()
 
-module_gen(field communication LINK_MPIPP)
+module_gen(field communication mpipp)
 module_gen(field mesh_shape_interplay)
 module_gen(field current_deposition)
-target_link_libraries(field_current_deposition_module PRIVATE field_communication_module)
 
-module_gen(particle migration LINK_MPIPP)
+module_gen(particle migration mpipp)
 module_gen(particle scattering)
 module_gen(particle forces)
 module_gen(particle array)
+
+add_library(aperture_particle_updater SHARED "particle_updater.cpp")
+target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(aperture_particle_updater PRIVATE particle_forces particle_scattering particle_array field_current_deposition field_mesh_shape_interplay)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 
@@ -76,8 +65,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 # add_library(UserControl SHARED ${UserControl_src})
 
 add_executable(aperture "main.cpp")
-target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater dye mpipp)
+target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater particle_migration dye mpipp)
 
 # target_link_libraries(aperture AperLib UserControl)
 

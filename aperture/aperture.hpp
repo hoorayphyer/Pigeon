@@ -10,8 +10,9 @@
 
 #include "dye/dynamic_balance.hpp"
 
-#include <memory>
+#include "particle/migration.hpp"
 
+#include <memory>
 
 #include "traits.hpp"
 namespace aperture {
@@ -41,6 +42,8 @@ namespace aperture {
     std::unique_ptr<AbstractFieldUpdater<Real,DGrid>> _field_update;
     std::unique_ptr<ParticleUpdater<Real, DGrid, state_t>> _ptc_update;
 
+    std::vector<particle::cParticle<Real, DPtc, state_t>> _migrators;
+
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
 
@@ -59,7 +62,7 @@ namespace aperture {
 
       if ( _cart_opt )
         _field_update.reset(new ofs::OldFieldUpdater<>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
-      _ptc_update.reset(new ParticleUpdater<Real, DGrid, state_t>( _grid, _rng, _cart_opt, ens ) );
+      _ptc_update.reset(new ParticleUpdater<Real, DGrid, state_t>( _grid, _rng ) );
     }
 
   public:
@@ -86,7 +89,34 @@ namespace aperture {
 
         // if ( false )
         //   sort_particles();
-        auto& Jmesh = (*_ptc_update)( _particles, _E, _B, _borders, dt, unit_e, timestep );
+        auto& Jmesh = (*_ptc_update)( _particles, _E, _B, dt, unit_e, timestep );
+
+        { // migration
+          auto migrate_dir =
+            []( auto q, auto lb, auto ub ) noexcept {
+              return ( q >= lb ) + ( q > ub );
+            };
+
+          for ( auto&[ sp, ptcs ] : _particles ) {
+            for ( auto ptc : ptcs ) { // TODOL semantics
+              char mig_dir = 0;
+              for ( int i = 0; i < DGrid; ++i ) {
+                mig_dir += migrate_dir( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
+              }
+
+              if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
+                _migrators.emplace_back(std::move(ptc));
+                _migrators.back().extra() = mig_dir;
+              }
+            }
+          }
+
+          particle::migrate( _migrators, ens.inter, timestep );
+          for ( auto&& ptc : _migrators ) {
+            _particles[ptc.template get<particle::species>()].push_back( std::move(ptc) );
+          }
+          _migrators.resize(0);
+        }
 
         // TODO Injection here
 
@@ -108,6 +138,12 @@ namespace aperture {
           }
         }
       }
+
+
+      // TODO NOTE injection and annihilation are more like free sources and sinks of particles users control, in other words they fit the notion of particle boundary conditions. Do them outside of Updater. In contrast, pair creation is a physical process we model, so it is done inside the updater.
+      // inject_particles(); // TODO only coordinate space current is needed in implementing current regulated injection // TODO compatible with ensemble??
+      // TODOL annihilation will affect deposition // NOTE one can deposit in the end
+      // annihilate_mark_pairs( );
 
       if (false) {
         // TODO check idle?

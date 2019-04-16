@@ -39,38 +39,37 @@ endfunction()
 # TODO all mpi test modules should have larger tests
 # TODO apt particle has newer modules
 
-# test_gen(apt array) # DONE
-# test_gen(apt pair) # DONE
-# test_gen(apt "foreach") # DONE
-# test_gen(apt block) # DONE
-# test_gen(apt vec) # DONE
+test_gen(apt array) # DONE
+test_gen(apt pair) # DONE
+test_gen(apt "foreach") # DONE
+test_gen(apt block) # DONE
+test_gen(apt vec) # DONE
 # test_gen(apt virtual_vec) # TODO
-# test_gen(apt numeric) # DONE
-# test_gen(apt handle) # DONE
+test_gen(apt numeric) # DONE
+test_gen(apt handle) # DONE
 
 
 # test_gen(kernel coordinate) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
-# test_gen(parallel mpi++ mpipp) # DONE
+test_gen(parallel mpi++ mpipp) # DONE
 
-# test_gen(field field) # DONE
-# test_gen(field mesh) # DONE
+test_gen(field field) # DONE
+test_gen(field mesh) # DONE
 # test_gen(field mesh_shape_interplay) # TODO
-# test_gen(field communication mpipp) # DONE
+test_gen(field communication mpipp) # DONE
 test_gen(field current_deposition) # DONE
 
 # test_gen(io silo++ mpipp silo_lib) # TODO
 
-# test_gen(particle state) # DONE
+test_gen(particle state) # DONE
 # test_gen(particle particle) # TODO some tests on this are in particle_array
 # test_gen(particle virtual_particle) # TODO
 # test_gen(particle c_particle) # TODO
-# test_gen(particle array) # DONE
+test_gen(particle array) # DONE
 
-# test_gen(particle pusher) # TODO
-# test_gen(particle pair_producer)# TODO
+test_gen(particle forces) # TODO
 test_gen(particle migration mpipp dye) # TODO
 
-test_gen(dye ensemble catch_main_mpipp dye) # TODO
+test_gen(dye ensemble mpipp dye) # TODO
 # test_gen(aperture dynamic_balance mpipp)

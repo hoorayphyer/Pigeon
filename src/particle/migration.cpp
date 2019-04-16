@@ -114,7 +114,7 @@ namespace particle {
                  unsigned int pairing_shift ) {
 
     auto lcr = [](const auto& ptc) noexcept {
-                 return ( ptc.extra() % pow3(I+1) ) / pow3(I);
+                 return ( ptc.extra() % apt::pow3(I+1) ) / apt::pow3(I);
                };
 
     impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
