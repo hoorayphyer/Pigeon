@@ -98,8 +98,6 @@ namespace particle {
     void resize(std::size_t size);
   };
 
-
-
 }
 
 namespace std {

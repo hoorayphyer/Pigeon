@@ -113,87 +113,68 @@ SCENARIO("Testing ShapeRange with 2D grid, deposited field has offsets 0.5, 0.5,
 }
 
 
-template < typename T, int DGrid, typename ShapeF >
-struct BrutalForce_dJ_Field {
-private:
-  Field<T,3,DGrid> _data;
-  const ShapeF& _shapef;
+// NOTE q0 and q1 are of type double regardlessly
+// J found by brutal force, which for each ptc, looping over all cells in J and deposit, then immediately integrate to find J
+template < typename RealJ, int DGrid, int DPtc, typename ShapeF >
+void direct_deposit( Field<RealJ,3,DGrid>& J,
+                     const ShapeF& shapef,
+                     const apt::array<double,DPtc>& q0_std,
+                     const apt::array<double,DPtc>& q1_std ) {
+  // simply loop over all cells including guard
+  const auto& mesh = J.mesh();
 
-public:
-  BrutalForce_dJ_Field( const Mesh<DGrid>& mesh, const ShapeF& shapef ) : _data(mesh), _shapef(shapef) {}
+  // use a "large enough" range to find contributing cells.
+  apt::Index<DGrid> Ib;
+  apt::Index<DGrid> ext;
 
-  // NOTE q0 and q1 are of type double regardlessly
-  // J found by brutal force, which for each ptc, looping over all cells in J and deposit, then immediately integrate to find J
-  template < int DPtc >
-  void deposit( const apt::array<double,DPtc>& q0_std, const apt::array<double,DPtc>& q1_std ) {
-    // simply loop over all cells including guard
-    const auto& mesh = _data.mesh();
+  auto int_flr =
+    []( auto q ) noexcept {
+      // Since min(q0_std) = 0.0 by design, min(q_nat) = -1 - r - 0.5, so q_nat + ( support + 3 ) / 2.0 >= 0. We will simply use (support + 1) as the shift
+      constexpr auto shift = 1 + ShapeF::support();
+      return int(q+shift) - shift; };
 
-    // use a "large enough" range to find contributing cells.
-    apt::Index<DGrid> Ib;
-    apt::Index<DGrid> ext;
+  for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
+    Ib[i_dim] = int_flr( std::min(q0_std[i_dim],q1_std[i_dim]) - 0.5 - ShapeF::support() / 2.0 ) - 1;
+    Ib[i_dim] = std::max(Ib[i_dim], -mesh.guard());
+    ext[i_dim] = int_flr( std::max(q0_std[i_dim],q1_std[i_dim]) - 0.5 + ShapeF::support() / 2.0 ) + 2;
+    ext[i_dim] = std::min(ext[i_dim], mesh.bulk_dim(i_dim) + mesh.guard() );
+    ext[i_dim] -= Ib[i_dim];
+  }
 
-    auto int_flr =
-      []( T q ) noexcept {
-        // Since min(q0_std) = 0.0 by design, min(q_nat) = -1 - r - 0.5, so q_nat + ( support + 3 ) / 2.0 >= 0. We will simply use (support + 1) as the shift
-        constexpr auto shift = 1 + ShapeF::support();
-        return int(q+shift) - shift; };
-
-    for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
-      Ib[i_dim] = int_flr( std::min(q0_std[i_dim],q1_std[i_dim]) - 0.5 - ShapeF::support() / 2.0 ) - 1;
-      Ib[i_dim] = std::max(Ib[i_dim], -mesh.guard());
-      ext[i_dim] = int_flr( std::max(q0_std[i_dim],q1_std[i_dim]) - 0.5 + ShapeF::support() / 2.0 ) + 2;
-      ext[i_dim] = std::min(ext[i_dim], mesh.bulk_dim(i_dim) + mesh.guard() );
-      ext[i_dim] -= Ib[i_dim];
+  apt::array<double,DGrid> s0, s1;
+  Field<RealJ,3,DGrid> W( {ext, 0} );
+  for( auto I : apt::Block(ext) ) {
+    for ( int i = 0; i < DGrid; ++i ) {
+      s0[i] = shapef( I[i] + Ib[i] + 0.5 - q0_std[i] );
+      s1[i] = shapef( I[i] + Ib[i] + 0.5 - q1_std[i] );
     }
 
-    apt::array<T,DGrid> s0, s1;
-    Field<long double,3,DGrid> W( {ext, 0} ); // use long double to ensure precision
-    for( auto I : apt::Block(ext) ) {
-      for ( int i = 0; i < DGrid; ++i ) {
-        s0[i] = _shapef( I[i] + Ib[i] + 0.5 - q0_std[i] );
-        s1[i] = _shapef( I[i] + Ib[i] + 0.5 - q1_std[i] );
-      }
-
-      if constexpr ( DGrid == 2 ) {
-          W[0](I) = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1], 1.0, 1.0 );
-          W[1](I) = ( s1[1] - s0[1] ) * Wesir( 1.0, 1.0, s0[0], s1[0] );
-          W[2](I) = ( q1_std[2] - q0_std[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
-        } else {
-        W[0](I) = ( s0[0] - s1[0] ) * Wesir( s0[1], s1[1], s0[2], s1[2] );
-        W[1](I) = ( s0[1] - s1[1] ) * Wesir( s0[2], s1[2], s0[0], s1[0] );
-        W[2](I) = ( s0[2] - s1[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
-      }
-    }
-
-    // integrate W right away
-    for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
-      for ( auto trI : W.mesh().project(i_dim, W.mesh().origin(), W.mesh().extent() ) ) {
-        // J[i+1] = J[i] - W[i], or J[i] = J[i+1] + W[i]. NOTE J is for this particle only
-        for ( int n = W.mesh().extent()[i_dim] - 2; n > W.mesh().origin()[i_dim]-1; --n )
-          W[i_dim][trI | n ] += W[i_dim][ trI | n+1 ];
-      }
-    }
-
-    // deposit
-    for( auto I : apt::Block(ext) ) {
-      for ( int i = 0; i < 3; ++i )
-        _data[i](I+Ib) += W[i](I);
+    if constexpr ( DGrid == 2 ) {
+        W[0](I) = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1], 1.0, 1.0 );
+        W[1](I) = ( s1[1] - s0[1] ) * Wesir( 1.0, 1.0, s0[0], s1[0] );
+        W[2](I) = ( q1_std[2] - q0_std[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+      } else {
+      W[0](I) = ( s0[0] - s1[0] ) * Wesir( s0[1], s1[1], s0[2], s1[2] );
+      W[1](I) = ( s0[1] - s1[1] ) * Wesir( s0[2], s1[2], s0[0], s1[0] );
+      W[2](I) = ( s0[2] - s1[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
     }
   }
 
-  auto& integrate() {
-    return _data;
+  // integrate W right away
+  for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
+    for ( auto trI : W.mesh().project(i_dim, W.mesh().origin(), W.mesh().extent() ) ) {
+      // J[i+1] = J[i] - W[i], or J[i] = J[i+1] + W[i]. NOTE J is for this particle only
+      for ( int n = W.mesh().extent()[i_dim] - 2; n > W.mesh().origin()[i_dim]-1; --n )
+        W[i_dim][trI | n ] += W[i_dim][ trI | n+1 ];
+    }
   }
 
-  inline void reset() {
-    apt::foreach<0, 3>
-      ( []( auto comp ) { //TODOL semantics
-          for ( auto& elm : comp.data() ) elm = 0.0;
-        }, _data );
+  // deposit
+  for( auto I : apt::Block(ext) ) {
+    for ( int i = 0; i < 3; ++i )
+      J[i](I+Ib) += W[i](I);
   }
-
-};
+}
 
 TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation BrutalForce_dJ_Field", "[field][mpi]"
                    , (aio::IndexType<4,4>)
@@ -218,11 +199,14 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
       REQUIRE( bulk_dims[i] >= 2 * ( (shapef.support() + 3) / 2 ) );
   }
 
-  Standard_dJ_Field<double, 3, DGrid, ShapeF> dJ(bulk_dims, shapef);
-  BrutalForce_dJ_Field<double,DGrid,ShapeF> dJ_bf(dJ.mesh(), shapef);
+  using RealJ = double;
+  constexpr auto guard = ( ShapeF::support() + 3 ) / 2;
 
-  dJ.reset();
-  dJ_bf.reset();
+  Field<RealJ, 3, DGrid> J_std( { bulk_dims, guard } );
+  Field<RealJ, 3, DGrid> J_direct( { bulk_dims, guard });
+
+  J_std.reset();
+  J_direct.reset();
 
   const int Nptc_per_cell = 10;
 
@@ -233,23 +217,22 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
       for ( int n = 0; n < Nptc_per_cell; ++n ) {
         apt::array<double,DPtc> q0 { i + std::abs(unif()), j + std::abs(unif()), unif() };
         apt::array<double,DPtc> q1 { q0[0] + unif(), q0[1] + unif(), unif() };
-        dJ.deposit( 1.0, q0, q1 );
-        dJ_bf.deposit(q0, q1 );
+        deposit( J_std, 1.0, shapef, q0, q1 );
+        direct_deposit(J_direct, shapef, q0, q1 );
       }
     }
   }
 
-  const auto& Jstd = dJ.integrate();
-  const auto& Jbf = dJ_bf.integrate();
+  integrate(J_std);
 
-  const auto mesh_size = Jstd.mesh().stride(DGrid);
+  const auto mesh_size = J_std.mesh().stride(DGrid);
 
   for ( int iJ = 0; iJ < 3; ++iJ ) {
-    const auto& j_std = Jstd[iJ].data();
-    const auto& j_bf = Jbf[iJ].data();
+    const auto& j_std = J_std[iJ].data();
+    const auto& j_direct = J_direct[iJ].data();
     for ( int i = 0; i < mesh_size; ++i ) {
-      CAPTURE( j_std[i] , j_bf[i] );
-      REQUIRE( j_std[i] == Approx(j_bf[i]).margin(1e-12) );
+      // CAPTURE( j_std[i] , j_direct[i] );
+      REQUIRE( j_std[i] == Approx(j_direct[i]).margin(1e-12) );
     }
   }
 }

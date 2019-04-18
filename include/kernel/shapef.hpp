@@ -16,7 +16,7 @@ namespace knl {
 namespace knl {
   template < shape S >
   struct shapef_t {
-    constexpr static const int support() noexcept {
+    constexpr static int support() noexcept {
       return static_cast<int>(S);
     }
 

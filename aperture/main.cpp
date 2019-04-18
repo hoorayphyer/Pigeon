@@ -47,11 +47,11 @@ int main() {
   util::Rng<real_t> rng{};
   rng.set_seed( timestep_begin + mpi::world.rank() );
 
-  using Aperture = Aperture< real_t, DGrid, ptc_state_t >;
-  Aperture aperture( supergrid, cart_opt, guard, rng );
+  using Aperture = Aperture< real_t, DGrid, ptc_state_t, real_j_t >;
+  Aperture aperture( supergrid, cart_opt, guard, rng, unit_e );
 
   for ( int ts = timestep_begin; ts < timestep_begin + total_timesteps; ++ts ) {
-    aperture.evolve( ts, dt, unit_e );
+    aperture.evolve( ts, dt );
   }
 
   mpi::finalize();

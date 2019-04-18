@@ -11,6 +11,8 @@ namespace field {
 
     constexpr operator double() const noexcept { return static_cast<double>( 0.5 * _val ); }
 
+    constexpr offset_t operator!() const noexcept { return {!_val}; }
+
     constexpr bool operator== ( offset_t other ) const noexcept {
       return _val == other._val;
     }

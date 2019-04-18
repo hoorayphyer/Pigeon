@@ -7,24 +7,25 @@
 #include "particle/array.hpp"
 
 #include "kernel/grid.hpp"
-#include "field/current_deposition.hpp"
 
 #include "utility/rng.hpp"
 
+namespace field {
+  template < typename, int, int > struct Field;
+}
+
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             typename Real_dJ, knl::coordsys CS >
+             typename RealJ, knl::coordsys CS >
   class ParticleUpdater {
   private:
     const knl::Grid< Real, DGrid >& _localgrid;
-    field::Standard_dJ_Field< Real_dJ, 3, DGrid, ShapeF > _dJ;
     util::Rng<Real> _rng;
-
-    using ReturnType = decltype(_dJ.integrate());
 
     void update_species( species sp,
                          array<Real,3,state_t>& sp_ptcs,
-                         Real dt, Real unit_e,
+                         field::Field<RealJ,3,DGrid>& J,
+                         Real dt,
                          const field::Field<Real,3,DGrid>& E,
                          const field::Field<Real,3,DGrid>& B
                          );
@@ -32,10 +33,11 @@ namespace particle {
   public:
     ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng );
 
-    ReturnType operator() ( map<array<Real,3,state_t>>& particles,
-                 const field::Field<Real,3,DGrid>& E,
-                 const field::Field<Real,3,DGrid>& B,
-                 Real dt,Real unit_e, int timestep );
+    void operator() ( map<array<Real,3,state_t>>& particles,
+                      field::Field<RealJ,3,DGrid>& J,
+                      const field::Field<Real,3,DGrid>& E,
+                      const field::Field<Real,3,DGrid>& B,
+                      Real dt, int timestep );
   };
 
 }

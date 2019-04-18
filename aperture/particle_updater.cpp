@@ -1,6 +1,7 @@
 #include "particle_updater.hpp"
 
 #include "field/mesh_shape_interplay.hpp"
+#include "field/current_deposition.hpp"
 
 #include "particle_properties.hpp"
 #include "particle/forces.hpp"
@@ -118,9 +119,7 @@ namespace particle {
              typename Real_dJ, knl::coordsys CS >
   ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng )
-    : _localgrid(localgrid),
-      _dJ( knl::dims(localgrid), ShapeF() ),
-      _rng(rng) {
+    : _localgrid(localgrid), _rng(rng) {
     using PtcArr = array<Real, DPtc, state_t>;
     using Ptc = typename PtcArr::particle_type;
 
@@ -218,11 +217,12 @@ namespace particle {
 
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t, typename ShapeF,
-             typename Real_dJ, knl::coordsys CS >
-  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
+             typename RealJ, knl::coordsys CS >
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, RealJ, CS >
   ::update_species( species sp,
                     array<Real,3,state_t>& sp_ptcs,
-                    Real dt, Real unit_e,
+                    field::Field<RealJ,3,DGrid>& J,
+                    Real dt,
                     const field::Field<Real,3,DGrid>& E,
                     const field::Field<Real,3,DGrid>& B
                     ) {
@@ -237,8 +237,8 @@ namespace particle {
 
     auto* scat = scat_gen<PtcArr>(sp);
 
-    auto shapef = ShapeF();
-    auto charge_over_dt = prop.charge_x * unit_e / dt;
+    constexpr auto shapef = ShapeF();
+    auto charge_over_dt = static_cast<Real>(prop.charge_x) / dt;
 
     auto update_q =
       [is_massive=(prop.mass_x != 0)] ( auto& ptc, Real dt ) {
@@ -282,7 +282,7 @@ namespace particle {
         update_q( ptc, dt );
         // TODO pusher handle boundary condition. Is it needed?
         if ( prop.charge_x != 0 )
-          _dJ.deposit( charge_over_dt, q0_std, abs2std(ptc.q()) );
+          deposit( J, charge_over_dt, shapef, q0_std, abs2std(ptc.q()) );
       }
 
     }
@@ -292,20 +292,19 @@ namespace particle {
 namespace particle {
   template < typename Real, int DGrid, int DPtc, typename state_t,
              typename ShapeF,
-             typename Real_dJ,
+             typename RealJ,
              knl::coordsys CS
              >
-  typename ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >::ReturnType
-  ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, Real_dJ, CS >
+  void ParticleUpdater< Real, DGrid, DPtc, state_t, ShapeF, RealJ, CS >
   ::operator() ( map<array<Real,3,state_t>>& particles,
+                 field::Field<RealJ,3,DGrid>& J,
                  const field::Field<Real,3,DGrid>& E,
                  const field::Field<Real,3,DGrid>& B,
-                 Real dt, Real unit_e, int timestep ) {
-    _dJ.reset();
+                 Real dt, int timestep ) {
 
     for ( auto&[ sp, ptcs ] : particles ) {
       const auto old_size = ptcs.size();
-      update_species( sp, ptcs, dt, unit_e, E, B );
+      update_species( sp, ptcs, J, dt, E, B );
 
       // Put particles where they belong after scattering
       for ( auto i = old_size; i < ptcs.size(); ++i ) {
@@ -316,15 +315,14 @@ namespace particle {
       }
     }
 
-    auto& Jmesh = _dJ.integrate();
+    integrate(J);
 
     // NOTE rescale Jmesh back to real grid delta
     for ( int i = 0; i < DGrid; ++i ) {
-      auto comp = Jmesh[i]; // TODOL semantics;
+      auto comp = J[i]; // TODOL semantics;
       for ( auto& elm : comp.data() ) elm *= _localgrid[i].delta();
     }
 
-    return Jmesh;
   }
 
 }
@@ -333,5 +331,5 @@ namespace particle {
 using namespace traits;
 namespace particle {
   template class ParticleUpdater< real_t, DGrid, DPtc, ptc_state_t, ShapeF,
-                                  real_dj_t, coordinate_system >;
+                                  real_j_t, coordinate_system >;
 }

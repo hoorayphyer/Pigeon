@@ -155,10 +155,11 @@ namespace ofs {
   }
 
   template < int DGrid >
-  OldFieldUpdater<DGrid>::OldFieldUpdater( const mpi::CartComm& cart,
+  OldFieldUpdater<DGrid>::OldFieldUpdater( double unit_e,
+                                           const mpi::CartComm& cart,
                                            const knl::Grid<double,DGrid>& local_grid,
                                            apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                           int guard) : _cart(cart) {
+                                           int guard ) : _cart(cart), _unit_e(unit_e) {
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
       fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
@@ -207,7 +208,7 @@ namespace ofs {
   template < int DGrid >
   void OldFieldUpdater<DGrid>::operator() ( field_type& E,
                                             field_type& B,
-                                            const field_type& Jmesh,
+                                            const J_type& Jmesh,
                                             double dt, int timestep ) {
     fuparams.dt = dt;
     // NOTE
@@ -236,12 +237,13 @@ namespace ofs {
       convert_from_new( Bfield, B );
       convert_from_new( current, Jmesh );
 
-      // NOTE two differences of new code
+      // NOTE differences of new code
       // 1. The new code will evolve Maxwell's equations with 4\pi. So `current` should first be multiplied by 4\pi
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
+      // 3. Jmesh needs to be multiplied by unit_e
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= (4 * CONST_PI);
+          current.ptr(c)[i] *= (4 * CONST_PI * _unit_e);
 
       RestoreJToRealSpace(current, grid);
       fc->SendGuardCells(current);

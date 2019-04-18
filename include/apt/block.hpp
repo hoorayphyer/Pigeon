@@ -63,7 +63,7 @@ namespace apt {
     constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
 
     constexpr auto end() const noexcept {
-      apt::Index<D> res;
+      apt::Index<D> res{};
       res[D-1] = _extent[D-1];
       return res;
     }

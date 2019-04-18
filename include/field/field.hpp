@@ -84,6 +84,14 @@ namespace field {
         ( _comps[i], _mesh, _offset[i] );
     }
 
+    inline void reset() {
+      apt::foreach<0, DField>
+        ( []( auto& comp ) {
+            for ( auto& elm : comp ) elm = 0.0;
+          }, _comps );
+    }
+
+
   };
 }
 

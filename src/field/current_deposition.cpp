@@ -44,33 +44,20 @@ namespace field :: impl {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid, typename ShapeF >
-  Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::Standard_dJ_Field( apt::Index<DGrid> bulk_extent, const ShapeF& shapef )
-    // NOTE minimum needed number of guards on one side is ( supp + 1 ) / 2 + 1
-    : _data({ std::move(bulk_extent), ( ShapeF::support() + 3 ) / 2 }) {
-    // enforce offset
-    apt::array< offset_t, DGrid > offset{};
-    apt::foreach<0,DGrid>
-      ( []( auto& ofs ){ ofs = MIDWAY; }, offset );
-    for ( int i = 0; i < DField; ++i )
-      _data.set_offset( i, offset );
-  }
-
   template < typename T >
   constexpr T Wesir( T sx0, T sx1, T sy0 = 1.0, T sy1 = 1.0 ) noexcept {
     return ( ( 2 * sx1 + sx0 ) * sy1 + ( sx1 + 2 * sx0 ) * sy0 ) / 6.0;
   }
 
-
-  template < typename T, int DField, int DGrid, typename ShapeF >
-  template < typename U >
-  void Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::deposit ( U charge_over_dt, const apt::array<U,DField>& q0_std, const apt::array<U,DField>& q1_std ) {
+  template < typename RealJ, int DField, int DGrid, typename ShapeF, typename U >
+  void deposit ( Field<RealJ,DField,DGrid>& _J,
+                 U charge_over_dt,
+                 const ShapeF& shapef,
+                 const apt::array<U,DField>& q0_std,
+                 const apt::array<U,DField>& q1_std ) {
     static_assert( DField == 3 );
     static_assert( DGrid > 1 && DGrid < 4 );
 
-    constexpr auto shapef = ShapeF();
     const auto[I_b, extent] = impl::deposit_range<DGrid>( q0_std, q1_std, shapef );
 
     apt::array<U,3> W{};
@@ -100,7 +87,7 @@ namespace field {
 
       // NOTE: Before this line, there is no massive number of additions hence no loss of precision, which may only happen during the following +=. The fact that dj has higher precision takes care of all that.
       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
-        ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _data, W ); // TODOL semantics on dj
+        ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _J, W ); // TODOL semantics on dj
     }
 
     return;
@@ -109,20 +96,15 @@ namespace field {
 }
 
 namespace field {
-  template < typename T, int DField, int DGrid, typename ShapeF >
-  Field<T,DField,DGrid>& Standard_dJ_Field<T,DField,DGrid,ShapeF>
-  ::integrate() {
-    auto& dJ = _data;
-
-    const auto& mesh = dJ.mesh();
+  template < typename RealJ, int DField, int DGrid >
+  void integrate( Field<RealJ,DField,DGrid>& J ) {
+    const auto& mesh = J.mesh();
     for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) { // NOTE it is DGrid not DField
-      auto comp = dJ[i_dim]; // TODOL semantics
+      auto comp = J[i_dim]; // TODOL semantics
       for ( auto trI : mesh.project( i_dim, mesh.origin(), mesh.extent() ) ) {
         for ( int n = mesh.bulk_dim(i_dim) + mesh.guard() - 2; n > -mesh.guard() - 1; --n )
           comp[trI | n] += comp[trI | n+1];
       }
     }
-
-    return dJ;
   }
 }
