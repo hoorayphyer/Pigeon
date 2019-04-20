@@ -132,10 +132,10 @@ namespace dye::impl {
 
 // relinguish
 namespace dye::impl {
-  template < typename T, int DPtc, typename state_t >
-  void relinguish_data( particle::array<T, DPtc, state_t>& ptc_array,
+  template < typename T, template < typename > class PtcSpecs >
+  void relinguish_data( particle::array<T, PtcSpecs>& ptc_array,
                         const mpi::InterComm& itc, int root ) {
-    std::vector<particle::cParticle<T,DPtc,state_t>> buf;
+    std::vector<particle::cParticle<T,PtcSpecs>> buf;
     int count = 0;
     if ( root == MPI_ROOT ) {
       const auto size = ptc_array.size();
@@ -289,8 +289,8 @@ namespace dye::impl {
 
 // detailed balance
 namespace dye {
-  template < typename T, int DPtc, typename state_t >
-  void detailed_balance ( particle::array<T, DPtc, state_t>& ptcs,
+  template < typename T, template < typename > class PtcSpecs >
+  void detailed_balance ( particle::array<T, PtcSpecs>& ptcs,
                           const mpi::Comm& intra ) {
     particle::load_t my_load = ptcs.size();
     auto loads = intra.allgather(&my_load, 1);
@@ -304,7 +304,7 @@ namespace dye {
 
     std::vector<mpi::Request> reqs(num_comms);
 
-    std::vector<particle::cParticle<T,DPtc,state_t>> buffer;
+    std::vector<particle::cParticle<T,PtcSpecs>> buffer;
 
     for ( int i = 0; i < num_comms; ++i ) {
       int other_rank = instr[ 2 * i + 1 ];
@@ -331,8 +331,8 @@ namespace dye {
 
 // dynamic_load_balance
 namespace dye {
-  template < typename T, int DPtc, typename state_t, int DGrid >
-  void dynamic_load_balance( particle::map<particle::array<T, DPtc, state_t>>& particles,
+  template < typename T, template < typename > class PtcSpecs, int DGrid >
+  void dynamic_load_balance( particle::map<particle::array<T, PtcSpecs>>& particles,
                              std::optional<Ensemble<DGrid>>& ens_opt,
                              const std::optional<mpi::CartComm>& cart_opt,
                              unsigned int target_load ) {

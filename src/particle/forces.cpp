@@ -3,9 +3,9 @@
 
 // TODO optimize use of intermediate variables
 namespace particle::force {
-  template < typename Ptc >
-  void lorentz( Ptc& ptc, ts::Real<Ptc> dt, const ts::Vec<Ptc>& E, const ts::Vec<Ptc>& B, ts::Real<Ptc> q_over_m  ) {
-    using Vec = ts::Vec<Ptc>;
+  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
+  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const Vec<T,PtcSpecs>& E, const Vec<T,PtcSpecs>& B, T q_over_m  ) {
+    using Vec = Vec<T,PtcSpecs>;
     // lambda = 0.5 * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
     dt *= 0.5 * q_over_m; // repurpose dt for lambda
 
@@ -22,22 +22,4 @@ namespace particle::force {
     auto s = 1.0 / ( 1.0 + inv_gamma2 * tt );
     ptc.p() = ( upr + tau * ( ut * inv_gamma2 ) + apt::cross(upr, tau) * std::sqrt(inv_gamma2) ) * s;
   }
-
-  // when B is strong enough, damp the perpendicular component of momentum
-  template < typename Ptc >
-  void landau0( Ptc& ptc, ts::Real<Ptc> dt, const ts::Vec<Ptc>& E, const ts::Vec<Ptc>& B, ts::Real<Ptc> B2_thr  ) {
-    if ( apt::sqabs(B) < B2_thr ) return;
-
-    auto EB2 = apt::dot(E,B);
-    EB2 = EB2 * EB2;
-    auto B2_E2 = apt::sqabs(B) - apt::sqabs(E);
-    // calculate E'^2
-    auto Ep2 = 2 * EB2 / ( std::sqrt(B2_E2 * B2_E2 + 4 * EB2) + B2_E2 );
-    auto beta_ExB = apt::cross(E,B) / ( apt::sqabs(B) + Ep2);
-    // find B' modulo gamma_ExB
-    auto Bp = B - apt::cross( beta_ExB, E);
-    // obtain the momentum with perpendicular components damped
-    ptc.p() = Bp * ( apt::dot( ptc.p(), Bp ) / apt::sqabs(Bp) );
-    ptc.p() += beta_ExB * std::sqrt( ( 1.0 + apt::sqabs(ptc.p()) ) / ( 1.0 - apt::sqabs(beta_ExB) ) );
-  };
 }

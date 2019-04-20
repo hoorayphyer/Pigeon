@@ -1,8 +1,8 @@
 #include "ensemble/dynamic_balance.cpp"
-#include "traits.hpp"
+#include "pic.hpp"
 
 namespace dye {
-  using namespace traits;
+  using namespace pic;
   using T = real_t;
   using state_t = ptc_state_t;
 

@@ -56,7 +56,7 @@ namespace aio {
 namespace aio {
   template < int... I>
   struct IndexType {
-    constexpr static std::array<int, sizeof...(I)> get() noexcept {return {I...};}
+    constexpr static apt::array<int, sizeof...(I)> get() noexcept {return {I...};}
   };
 }
 

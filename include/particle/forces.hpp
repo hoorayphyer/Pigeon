@@ -3,44 +3,38 @@
 
 #include "apt/vec.hpp"
 #include "particle/map.hpp"
+#include "particle/virtual_particle.hpp"
 #include <vector>
 
 namespace particle::force {
-  // TypeStruct for forces
-  namespace ts {
-    template < class Ptc >
-    using Real = typename Ptc::vec_type::element_type;
-
-    template < class Ptc >
-    using Vec = apt::Vec<Real<Ptc>,Ptc::NDim>;
-  };
+  template < typename T, template < typename > class PtcSpecs >
+  using Vec = apt::Vec<T, PtcSpecs<T>::Dim>;
 
   // NOTE currently we assume all forces have at most one free param
-  template < class Ptc >
-  using force_t = void (*) ( Ptc& ptc,
-                             ts::Real<Ptc> dt,
-                             const ts::Vec<Ptc>& E,
-                             const ts::Vec<Ptc>& B,
-                             ts::Real<Ptc> param0 );
+  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
+  using force_t = void (*) ( Ptc_t<T,PtcSpecs>& ptc,
+                             T dt,
+                             const Vec<T,PtcSpecs>& E,
+                             const Vec<T,PtcSpecs>& B,
+                             T param0 );
 }
 
 namespace particle {
-  template < class Ptc >
+  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
   struct ForceGen;
 
   namespace force {
-    template < class Ptc >
+    template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
     struct Force {
     private:
-      using Real = typename Ptc::vec_type::element_type;
 
-      std::vector<force::force_t<Ptc>> _forces;
-      std::vector<Real> _params;
+      std::vector<force_t<T,PtcSpecs,Ptc_t>> _forces;
+      std::vector<T> _params;
 
     public:
-      friend class ForceGen<Ptc>;
+      friend class ForceGen<T,PtcSpecs, Ptc_t>;
       // TODO turn these into unique_ptr and use deepcopy
-      void add ( force::force_t<Ptc> force, Real param ) {
+      void add ( force::force_t<T,PtcSpecs,Ptc_t> force, T param ) {
         _forces.push_back(force);
         _params.push_back(param);
       }
@@ -48,14 +42,13 @@ namespace particle {
   }
 
 
-  template < class Ptc >
+  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
   struct ForceGen {
   private:
-    using Real = typename Ptc::vec_type::element_type;
-    map<force::Force<Ptc>> _force_map;
+    map<force::Force<T,PtcSpecs,Ptc_t>> _force_map;
 
   public:
-    void Register( species sp, force::Force<Ptc> force ) {
+    void Register( species sp, force::Force<T,PtcSpecs,Ptc_t> force ) {
       _force_map[sp] = std::move(force);
     }
 
@@ -78,12 +71,8 @@ namespace particle {
 }
 
 namespace particle::force {
-  template < typename Ptc >
-  void lorentz( Ptc& ptc, ts::Real<Ptc> dt, const ts::Vec<Ptc>& E, const ts::Vec<Ptc>& B, ts::Real<Ptc> q_over_m  );
-
-  // when B is strong enough, damp the perpendicular component of momentum
-  template < typename Ptc >
-  void landau0( Ptc& ptc, ts::Real<Ptc> dt, const ts::Vec<Ptc>& E, const ts::Vec<Ptc>& B, ts::Real<Ptc> B2_thr  );
+  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
+  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const Vec<T,PtcSpecs>& E, const Vec<T,PtcSpecs>& B, T q_over_m  );
 }
 
 

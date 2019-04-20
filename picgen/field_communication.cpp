@@ -1,7 +1,7 @@
 #include "field/communication.cpp"
-#include "traits.hpp"
+#include "pic.hpp"
 
-using namespace traits;
+using namespace pic;
 
 namespace field {
   template

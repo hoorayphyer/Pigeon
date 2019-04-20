@@ -1,5 +1,9 @@
 # NOTE since all implementation cpp is separated from the instantiation cpp, just include the directory of src/ in Lab to achieve the automatic shadow that was impossible to achieve before
 
+if(NOT TARGET picgen)
+  include(${CMAKE_SOURCE_DIR}/hooray/CMakeLists.txt) #TODO use the actual lab root
+endif()
+
 # if(LAB_ROOT_DIR)
 #   include("${LAB_ROOT_DIR}/src/CMakeLists.txt")
 #   include_directories(BEFORE "${LAB_ROOT_DIR}/include")
@@ -23,10 +27,11 @@
 #TODO precede particle/.cpp with lab/.cpp
 function(module_gen category name)
   set(THIS_MODULE_NAME "${category}_${name}")
-  add_library( ${THIS_MODULE_NAME} SHARED ${CMAKE_SOURCE_DIR}/aperture/${category}_${name}.cpp )
+  add_library( ${THIS_MODULE_NAME} SHARED ${CMAKE_SOURCE_DIR}/picgen/${category}_${name}.cpp )
   target_include_directories(${THIS_MODULE_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
   target_include_directories(${THIS_MODULE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+  target_link_libraries(${THIS_MODULE_NAME} PRIVATE picgen)
   foreach( lib IN LISTS ARGN)
     target_link_libraries(${THIS_MODULE_NAME} PRIVATE ${lib})
   endforeach()
@@ -41,9 +46,9 @@ module_gen(particle scattering)
 module_gen(particle forces)
 module_gen(particle array)
 
-add_library(aperture_particle_updater SHARED "particle_updater.cpp")
-target_include_directories(aperture_particle_updater PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture_particle_updater PRIVATE particle_forces particle_scattering particle_array field_current_deposition field_mesh_shape_interplay)
+add_library(particle_updater SHARED "particle_updater.cpp")
+target_include_directories(particle_updater PUBLIC ${CMAKE_SOURCE_DIR}/include )
+target_link_libraries(particle_updater PRIVATE particle_forces particle_scattering particle_array field_current_deposition field_mesh_shape_interplay picgen)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 
@@ -64,9 +69,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 # list(APPEND UserControl_src "UserControlTemplates.cpp")
 # add_library(UserControl SHARED ${UserControl_src})
 
-add_executable(aperture "main.cpp")
-target_include_directories(aperture PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(aperture PRIVATE old_field_solver aperture_particle_updater particle_migration dye mpipp)
+add_executable(pic "main.cpp")
+target_include_directories(pic PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include )
+target_link_libraries(pic PRIVATE old_field_solver particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen)
 
 # target_link_libraries(aperture AperLib UserControl)
 

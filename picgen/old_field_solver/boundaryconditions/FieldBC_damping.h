@@ -89,7 +89,10 @@ public:
     // if ( proxy.isReadDampingBg ) {
     //   ReadFromSnapshot(proxy);
     // } else {
-      InitBackground( Efield_bg, Bfield_bg );
+
+    // TODO InitBackground is needed
+      // InitBackground( Efield_bg, Bfield_bg );
+
     // }
 
   }

@@ -6,20 +6,20 @@
 #include <vector>
 
 namespace particle {
-  template < typename T, int Dim_Ptc, typename state_t >
+  template < typename T, template < typename > class Specs >
   struct array {
   private:
-    apt::array<std::vector<T>, Dim_Ptc> _q;
-    apt::array<std::vector<T>, Dim_Ptc> _p;
-    std::vector<state_t> _state;
+    apt::array<std::vector<T>, Specs<T>::Dim> _q;
+    apt::array<std::vector<T>, Specs<T>::Dim> _p;
+    std::vector<typename Specs<T>::state_type> _state;
 
   public:
     using value_type = T;
-    static constexpr int DPtc = Dim_Ptc;
-    using state_type = state_t;
+    static constexpr int DPtc = Specs<T>::Dim;
 
-    using particle_type = vParticle< T, Dim_Ptc, state_t >;
-    using const_particle_type = vParticle< const T, Dim_Ptc, const state_t >;
+    using particle_type = vParticle< T, Specs >;
+
+    using const_particle_type = vParticle< const T, Specs >;
 
     template < bool isConst >
     class iterator {
@@ -101,13 +101,13 @@ namespace particle {
 }
 
 namespace std {
-  template < typename T, int DPtc, typename state_t >
-  class back_insert_iterator<particle::array<T,DPtc, state_t>> {
+  template < typename T, template <typename> class Specs  >
+  class back_insert_iterator<particle::array<T,Specs>> {
   private:
-    particle::array<T,DPtc,state_t>& _arr;
+    particle::array<T,Specs>& _arr;
     int _index;
 
-    using self_type = back_insert_iterator<particle::array<T,DPtc, state_t>>;
+    using self_type = back_insert_iterator<particle::array<T,Specs>>;
   public:
     using iterator_category = std::output_iterator_tag;
     using difference_type = void;
@@ -115,7 +115,7 @@ namespace std {
     using reference = void;
     using pointer = void;
 
-    explicit back_insert_iterator( particle::array<T,DPtc, state_t>& arr ) noexcept : _arr(arr) {}
+    explicit back_insert_iterator( particle::array<T,Specs>& arr ) noexcept : _arr(arr) {}
 
     template < typename Ptc >
     self_type& operator= ( Ptc&& ptc ) {

@@ -18,9 +18,10 @@ namespace std { template < class > class optional; }
 namespace mpi { struct InterComm; }
 
 namespace particle {
-
-  template < typename T, int DPtc, typename state_t, int DGrid, int I = DGrid-1 >
-  void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
+  template < typename Real,
+             template < typename > class PtcSpecs,
+             int DGrid, int I = DGrid-1 >
+  void migrate ( std::vector<cParticle< Real, PtcSpecs >>& buffer,
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  unsigned int pairing_shift );
   // NOTE pairing_shift is to help achieve amortized load balancing during intercommunication. This value needs to be synchronized across at least all active processes ( preferrably all processes to avoid future sync. ) Using timestep is a good choice.

@@ -4,7 +4,7 @@
 #define VECTOR_DIM 3
 #define CONST_PI 3.14159265358979323846
 #define EPS 1.0e-12
-#define NUM_BOUNDARIES 6
+#define NUM_BOUNDARIES 4
 
 #define NEIGHBOR_NULL -1
 

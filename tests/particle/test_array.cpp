@@ -1,15 +1,15 @@
+#include "all_in_one.hpp"
 #include "particle/array.cpp"
 #include "particle/particle.hpp"
 #include "particle/virtual_particle.hpp"
 #include "particle/c_particle.hpp"
-#include "catch2/catch.hpp"
 
 using namespace particle;
-using ptc_array = array<double,3,unsigned long long>;
-using Ptc = Particle<double,3,unsigned long long>;
-using vPtc = vParticle<double,3,unsigned long long>;
-using cPtc = cParticle<double,3,unsigned long long>;
-using Vec = apt::Vec<double,3>;
+using ptc_array = array<double,Specs>;
+using Ptc = Particle<double,Specs>;
+using vPtc = vParticle<double,Specs>;
+using cPtc = cParticle<double,Specs>;
+using Vec = apt::Vec<double,Specs<double>::Dim>;
 
 SCENARIO("array push_back and iterator", "[particle]") {
   ptc_array arr;

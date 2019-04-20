@@ -12,13 +12,10 @@
 #include <cmath>
 #include <memory>
 
-inline auto FT_SpinUp ( Scalar t_start, Scalar duration ) {
-  return [t_start, duration](Scalar t) {
-           Scalar t_diff = t - t_start;
-           if ( t_diff < 0.0 ) return 0.0;
-           else if (t_diff < duration ) return  t_diff / duration;
-           else return 1.0;
-         };
+#include "gen.hpp"
+
+inline auto FT_SpinUp (Scalar t) noexcept {
+  return std::min(t / pic::spinup_duration, 1.0);
 }
 
 void Rotating_Monopole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
@@ -56,18 +53,9 @@ void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
 
   const auto dim = grid.dimension;
 
-  auto safe_divide =
-    [] ( auto& n, auto d ) {
-      if ( std::abs(d) > 1e-12 ) n /= d;
-      else n = 0.0; };
-
   // define a function pointer.
   Scalar (*h_func) ( std::array<Scalar,3> q ) = nullptr;
 
-  // FIXME TODO is the treatment also valid for 1D?
-  //FIXME is it necessary to check the following for comp >= dim?
-  // if( Coord == CoordType::LOG_SPHERICAL || Coord == CoordType::SPHERICAL
-  //     || Coord == CoordType::LOG_SPHERICAL_EV ) {
   for ( int comp = 0; comp < dim; ++comp ) {
     Index stagJ;
     // NOTE only non-capture lambda can be assigned to function pointer
@@ -101,7 +89,10 @@ void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
           q[0] = grid.pos( 0, i, stagJ[0]);
 
           // FIXME is it OK to leave out check on h_func(q) being nearly zero?
-          JField( comp, i, j, k ) /= h_func(q);
+          if ( std::abs(h_func(q)) > 1e-12 )
+            JField( comp, i, j, k ) /= h_func(q);
+          else
+            JField( comp, i, j, k ) = 0.0;
         }
       }
     }
@@ -124,20 +115,15 @@ namespace ofs {
   // Set field BCs for rotating conductor in 2D log spherical coordinates with a damping layer
   template < typename FBCs >
   void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard ) {
-    Scalar mu0 = 100.0;
-    Scalar omega_max = 1.0 / 6.0;
-
-    int magnetic_pole = 2; // 1 for mono-, 2 for di-
-    int spinup_duration = 10.0;
     // field BC, specialized for pulsar
     { auto& fbc = fieldBC[LOWER_1];
       fbc.type = FieldBCType::ROTATING_CONDUCTOR;
       fbc.indent = 5;
-      fbc.ft = FT_SpinUp(0.0, spinup_duration);
-      if ( magnetic_pole == 1 )
-        Rotating_Monopole_LogSph( fbc, mu0, omega_max );
-      else if ( magnetic_pole == 2 )
-        Rotating_Dipole_LogSph( fbc, mu0, omega_max );
+      fbc.ft = FT_SpinUp;
+      if ( pic::ofs::magnetic_pole == 1 )
+        Rotating_Monopole_LogSph( fbc, pic::mu0, pic::omega_max );
+      else if ( pic::ofs::magnetic_pole == 2 )
+        Rotating_Dipole_LogSph( fbc, pic::mu0, pic::omega_max );
     }
     { auto& fbc = fieldBC[UPPER_1];
       fbc.type = FieldBCType::DAMPING;

@@ -6,6 +6,25 @@
 
 namespace apt {
   template < int D >
+  struct BlockIteratorEnd {
+  private:
+    apt::Index<D> _end{};
+
+  public:
+    constexpr BlockIteratorEnd( const Index<D>& extent ) noexcept {
+      // deal with empty or invalid block
+      for ( int i = 0; i < D; ++i ) {
+        if ( extent[i] < 1 ) return;
+      }
+      _end[D-1] = extent[D-1];
+    }
+
+    constexpr bool operator != ( const Index<D>& ijk ) const noexcept {
+      return ijk != _end;
+    }
+  };
+
+  template < int D >
   struct BlockIterator {
   private:
     Index<D> _ijk{};
@@ -21,8 +40,8 @@ namespace apt {
     constexpr BlockIterator( const Index<D>& extent ) noexcept
       : _extent( extent ) {}
 
-    constexpr bool operator!= ( const Index<D>& idx ) const noexcept {
-      return _ijk != idx;
+    constexpr bool operator!= ( const BlockIteratorEnd<D>& end ) const noexcept {
+      return end != _ijk;
     }
 
     // NOTE separating ++ ijk and ijk %= _extent is the key to make iteration stoppable
@@ -62,11 +81,7 @@ namespace apt {
 
     constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
 
-    constexpr auto end() const noexcept {
-      apt::Index<D> res{};
-      res[D-1] = _extent[D-1];
-      return res;
-    }
+    constexpr auto end() const noexcept { return BlockIteratorEnd<D>(_extent); }
 
   };
 }

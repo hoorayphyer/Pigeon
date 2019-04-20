@@ -7,38 +7,31 @@
 #include <memory>
 #include "utility/rng.hpp"
 
-namespace particle::scat::ts {
-  template < class PtcArr >
-  using Ptc = typename PtcArr::particle_type;
-
-  template < class PtcArr >
-  using T = typename PtcArr::value_type;
-}
-
 namespace particle::scat {
-  template < class Ptc >
+  template < typename T, template < typename > class PtcSpecs >
+  using Ptc_t = typename array<T,PtcSpecs>::particle_type;
+
+  template < typename T, template < typename > class PtcSpecs >
   struct Eligible {
-    virtual bool operator() ( const Ptc& ) { return true; }
+    virtual bool operator() ( const Ptc_t<T,PtcSpecs>& ) { return true; }
   };
 
-  template < class Ptc >
+  template < typename T, template < typename > class PtcSpecs >
   struct Channel {
-    using T = typename Ptc::vec_type::element_type;
-    virtual std::optional<T> operator() ( const Ptc& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt, const apt::Vec<T,Ptc::NDim>& B, util::Rng<T>& rng ) { return {}; }
+    virtual std::optional<T> operator() ( const Ptc_t<T,PtcSpecs>& ptc, const apt::Vec<T,PtcSpecs<T>::Dim>& dp, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& B, util::Rng<T>& rng ) { return {}; }
   };
 
-  template < class PtcArr >
+  template < typename T, template < typename > class PtcSpecs >
   struct Scat {
   protected:
-    using Ptc = ts::Ptc<PtcArr>;
-    using T = typename Ptc::vec_type::element_type;
+    using Ptc = Ptc_t<T,PtcSpecs>;
 
   private:
-    std::vector<std::unique_ptr<Eligible<Ptc>>> _eligs;
-    std::vector<std::unique_ptr<Channel<Ptc>>> _channels;
+    std::vector<std::unique_ptr<Eligible<T,PtcSpecs>>> _eligs;
+    std::vector<std::unique_ptr<Channel<T,PtcSpecs>>> _channels;
 
-    virtual void impl ( std::back_insert_iterator<PtcArr> itr,
-                        ts::Ptc<PtcArr>& ptc, ts::T<PtcArr> param0 ) {};
+    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
+                        Ptc& ptc, T param0 ) {};
 
   public:
     Scat() = default;
@@ -47,28 +40,28 @@ namespace particle::scat {
       _eligs.resize( other._eligs.size() );
       for ( int i = 0; i < _eligs.size(); ++i ) {
         if ( other._eligs[i] )
-          _eligs[i].reset( new Eligible<Ptc>( *other._eligs[i] ) );
+          _eligs[i].reset( new Eligible( *other._eligs[i] ) );
       }
       _channels.resize( other._channels.size() );
       for ( int i = 0; i < _channels.size(); ++i ) {
         if ( other._channels[i] )
-          _channels[i].reset( new Channel<Ptc>( *other._channels[i] ) );
+          _channels[i].reset( new Channel( *other._channels[i] ) );
       }
     }
 
 
-    Scat& add( const Eligible<Ptc>& elig ) {
-      _eligs.emplace_back( new Eligible<Ptc>(elig) );
+    Scat& add( const Eligible<T,PtcSpecs>& elig ) {
+      _eligs.emplace_back( new Eligible(elig) );
       return *this;
     }
 
-    Scat& add( const Channel<Ptc>& channel ) {
-      _channels.emplace_back( new Channel<Ptc>(channel) );
+    Scat& add( const Channel<T,PtcSpecs>& channel ) {
+      _channels.emplace_back( new Channel(channel) );
       return *this;
     }
 
-    void operator() ( std::back_insert_iterator<PtcArr> itr,
-                      ts::Ptc<PtcArr>& ptc, const apt::Vec<T,Ptc::NDim>& dp, T dt, const apt::Vec<T,Ptc::NDim>& B, util::Rng<ts::T<PtcArr>>& rng ) {
+    void operator() ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
+                      Ptc& ptc, const apt::Vec<T,PtcSpecs<T>::Dim>& dp, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& B, util::Rng<T>& rng ) {
       for ( const auto& elig : _eligs ) if ( !(*elig)(ptc) ) return;
       for ( const auto& chnl : _channels ) {
         if ( auto param = (*chnl)(ptc, dp, dt, B, rng) ) {
@@ -83,29 +76,29 @@ namespace particle::scat {
 }
 
 namespace particle::scat {
-  template < bool Instant, class PtcArr >
-  class RadiationFromCharges : public Scat<PtcArr> {
-    virtual void impl ( std::back_insert_iterator<PtcArr> itr,
-                        ts::Ptc<PtcArr>& ptc, ts::T<PtcArr> param0 ) override;
+  template < bool Instant, typename T, template < typename > class PtcSpecs >
+  class RadiationFromCharges : public Scat<T,PtcSpecs> {
+    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
+                        Ptc_t<T,PtcSpecs>& ptc, T param0 ) override;
   public:
-    using Scat<PtcArr>::Scat;
+    using Scat<T,PtcSpecs>::Scat;
   };
 
-  template < class PtcArr >
-  class PhotonPairProduction : public Scat<PtcArr> {
-    virtual void impl ( std::back_insert_iterator<PtcArr> itr,
-                        ts::Ptc<PtcArr>& photon, ts::T<PtcArr> ) override;
+  template < typename T, template < typename > class PtcSpecs >
+  class PhotonPairProduction : public Scat<T,PtcSpecs> {
+    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
+                        Ptc_t<T,PtcSpecs>& photon, T ) override;
   public:
-    using Scat<PtcArr>::Scat;
+    using Scat<T,PtcSpecs>::Scat;
   };
 }
 
 namespace particle {
-  template < class PtcArr >
+  template < typename T, template < typename > class PtcSpecs >
   struct ScatGen {
-    void Register( species sp, const scat::Scat<PtcArr>& scat );
+    void Register( species sp, const scat::Scat<T,PtcSpecs>& scat );
     void Unregister( species sp );
-    scat::Scat<PtcArr>* operator() ( species sp );
+    scat::Scat<T,PtcSpecs>* operator() ( species sp );
   };
 }
 

@@ -1,8 +1,8 @@
 #include "particle/array.hpp"
 
 namespace particle {
-  template < typename T, int DPtc, typename state_t >
-  void array<T, DPtc, state_t>::erase( unsigned int from, unsigned int to ) {
+  template < typename T, template < typename > class Specs >
+  void array<T, Specs>::erase( unsigned int from, unsigned int to ) {
     auto min = []( auto a, auto b ) noexcept {
                  return ( a < b ) ? a : b; };
     if ( from > to ) {
@@ -15,8 +15,8 @@ namespace particle {
       (*this)[i].set(flag::empty);
   }
 
-  template < typename T, int DPtc, typename state_t >
-  void array<T, DPtc, state_t>::resize(std::size_t size) {
+  template < typename T, template < typename > class Specs >
+  void array<T, Specs>::resize(std::size_t size) {
     const auto old_size = _state.size();
     for ( int i = 0; i < DPtc; ++i ) {
       _q[i].resize( size, {} );

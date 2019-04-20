@@ -7,6 +7,10 @@ target_include_directories(catch_main_mpipp PRIVATE "${CMAKE_SOURCE_DIR}/include
 target_include_directories(catch_main_mpipp PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees/Catch2/single_include)
 target_link_libraries(catch_main_mpipp PRIVATE mpipp)
 
+if(NOT TARGET picgen)
+  include(${CMAKE_SOURCE_DIR}/hooray/CMakeLists.txt) #TODO use the actual lab root
+endif()
+
 function(test_gen category name)
   set(test_target "test_${category}_${name}")
 
@@ -23,7 +27,7 @@ function(test_gen category name)
       set(link_main catch_main_mpipp)
     endif()
   endforeach()
-  target_link_libraries(${test_target} PRIVATE ${link_main})
+  target_link_libraries(${test_target} PRIVATE ${link_main} picgen)
 
   set_target_properties( ${test_target}
     PROPERTIES
@@ -69,7 +73,7 @@ test_gen(particle state) # DONE
 test_gen(particle array) # DONE
 
 test_gen(particle forces) # TODO
-test_gen(particle migration mpipp dye) # TODO
+# test_gen(particle migration mpipp dye) # TODO cParticle type
 
 test_gen(dye ensemble mpipp dye) # TODO
 # test_gen(aperture dynamic_balance mpipp)

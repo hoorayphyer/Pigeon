@@ -1,9 +1,9 @@
-#ifndef  _APERTURE_ABSTRACT_FIELD_UPDATER_HPP_
-#define  _APERTURE_ABSTRACT_FIELD_UPDATER_HPP_
+#ifndef  _ABSTRACT_FIELD_UPDATER_HPP_
+#define  _ABSTRACT_FIELD_UPDATER_HPP_
 
 #include "field/field.hpp"
 
-namespace aperture {
+namespace pic {
   template < typename Real, int DGrid, typename RealJ >
   struct AbstractFieldUpdater {
     virtual void operator() ( field::Field<Real,3,DGrid>& E,

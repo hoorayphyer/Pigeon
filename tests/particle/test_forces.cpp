@@ -155,7 +155,7 @@ SCENARIO("Test against old Vay Pusher") {
 
     auto p_old = old_vay::lorentz( q_over_m * dt, p, E, B );
 
-    Particle<double,3,unsigned long long> ptc;
+    Particle<double,Specs> ptc;
     ptc.p() = p;
     force::lorentz( ptc, dt, E, B, q_over_m );
     for ( int i = 0; i < 3; ++i ) {

@@ -42,8 +42,9 @@ namespace mpi {
   MPI_Datatype create_MPI_CPARTICLE () {
     std::vector<cPtc_t> ptcs(2);
     constexpr int numBlocks = 4;
-    MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(), datatype<ptc_state_t>(), datatype<char>() };
-    int blocklen[numBlocks] = { DPtc, DPtc, 1, 1 };
+    MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(),
+                                     datatype<typename particle::Specs<real_t>::state_type>(), datatype<char>() };
+    int blocklen[numBlocks] = { particle::Specs<real_t>::Dim, particle::Specs<real_t>::Dim, 1, 1 };
     MPI_Aint disp[numBlocks];
 
     MPI_Get_address( &(ptcs[0].q()), disp );

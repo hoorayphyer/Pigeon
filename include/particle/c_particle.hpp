@@ -7,17 +7,19 @@
 
 namespace particle {
   // for communication
-  template < typename T, int DPtc, typename state_t >
-  class cParticle : public PtcExpression<cParticle<T,DPtc,state_t>, apt::array<T,DPtc>, state_t> {
+  template < typename T, template < typename > class Specs >
+  class cParticle : public PtcExpression< cParticle<T, Specs>, apt::array<T,Specs<T>::Dim>, typename Specs<T>::state_type > {
   private:
-    apt::array<T,DPtc> _q {};
-    apt::array<T,DPtc> _p {};
+    using state_t = typename Specs<T>::state_type;
+
+    apt::array<T,Specs<T>::Dim> _q {};
+    apt::array<T,Specs<T>::Dim> _p {};
     state_t _s {};
     char _extra{}; // holds extra information on communication for example
 
   public:
-    static constexpr int NDim = DPtc;
-    using vec_type = apt::array<T,DPtc>;
+    static constexpr int NDim = Specs<T>::Dim;
+    using vec_type = apt::array<T,Specs<T>::Dim>;
     using state_type = state_t;
 
     constexpr vec_type& q() noexcept { return _q; }
@@ -36,16 +38,16 @@ namespace particle {
 
     template < typename E >
     cParticle( PtcExpression<E>&& ptc ) noexcept {
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
       ptc.set(flag::empty);
     }
 
     template < typename E >
     cParticle& operator= ( const PtcExpression<E>& ptc ) noexcept {
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ a = b;}, q(), ptc.q() );
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ a = b;}, p(), ptc.p() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ a = b;}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ a = b;}, p(), ptc.p() );
       _s = ptc.state();
 
       return *this;
@@ -53,8 +55,8 @@ namespace particle {
 
     template < typename E >
     cParticle& operator= ( PtcExpression<E>&& ptc ) noexcept {
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
       ptc.set(flag::empty);
 
@@ -63,8 +65,8 @@ namespace particle {
 
     // NOTE only swap handles _s_extra
     constexpr void swap( cParticle& other ) noexcept {
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, q(), other.q() );
-      apt::foreach<0,DPtc>([](auto& a, auto& b){ std::swap(a,b);}, p(), other.p() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), other.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), other.p() );
       std::swap( _s, other.state() );
       std::swap( _extra, other._extra );
     }

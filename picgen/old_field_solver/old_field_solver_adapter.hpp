@@ -6,15 +6,15 @@
 #include "../abstract_field_updater.hpp"
 #include <optional>
 
-#include "../traits.hpp"
+#include "pic.hpp"
 
 namespace mpi { struct CartComm; }
 
 namespace ofs {
-  using RealJ = traits::real_j_t;
+  using RealJ = pic::real_j_t;
   // only applicable in 2D log spherical
   template < int DGrid = 2 >
-  struct OldFieldUpdater : aperture::AbstractFieldUpdater<double,DGrid,RealJ> {
+  struct OldFieldUpdater : pic::AbstractFieldUpdater<double,DGrid,RealJ> {
     static_assert( DGrid == 2 );
   private:
     const mpi::CartComm& _cart;
@@ -23,7 +23,6 @@ namespace ofs {
   public:
     using field_type = field::Field<double,3,DGrid>;
     using J_type = field::Field<RealJ,3,DGrid>;
-
 
     // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
     OldFieldUpdater( const double unit_e,

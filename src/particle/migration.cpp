@@ -108,8 +108,10 @@ namespace particle :: impl {
 }
 
 namespace particle {
-  template < typename T, int DPtc, typename state_t, int DGrid, int I = DGrid-1 >
-  void migrate ( std::vector<cParticle<T,DPtc,state_t>>& buffer,
+  template < typename Real,
+             template < typename > class PtcSpecs,
+             int DGrid, int I = DGrid-1 >
+  void migrate ( std::vector<cParticle< Real, PtcSpecs >>& buffer,
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  unsigned int pairing_shift ) {
 
@@ -119,6 +121,6 @@ namespace particle {
 
     impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
     if constexpr ( I > 0 )
-      migrate<T,DPtc,state_t,DGrid,I-1>( buffer, intercomms, pairing_shift );
+      migrate<Real,PtcSpecs,DGrid,I-1>( buffer, intercomms, pairing_shift );
   }
 }

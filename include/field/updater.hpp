@@ -4,8 +4,6 @@
 #include "kernel/coordinate.hpp"
 
 
-// TODO double check the new staggering
-// TODO check 4\pi in J. This may resulting decreasing particle charge e
 namespace field {
   template < typename Real, knl::coordsys_t CS >
   class Updater {

@@ -147,6 +147,7 @@ namespace dye {
     apt::array< apt::pair<bool>, DGrid > res;
     for ( int i = 0; i < DGrid; ++i )
       res[i] = is_at_boundary(i);
+    return res;
   }
 
 }

@@ -3,20 +3,21 @@
 
 #include "particle/particle_expression.hpp"
 #include "apt/virtual_vec.hpp"
+#include "pic.hpp"
 
 namespace particle {
-  template < typename T, int DPtc, typename state_t >
-  struct vParticle : public PtcExpression< vParticle<T, DPtc, state_t>, apt::vVec<T,DPtc>, state_t > {
+  template < typename T, template < typename > class Specs >
+  struct vParticle : public PtcExpression< vParticle<T, Specs>, apt::vVec<T,Specs<T>::Dim>, typename Specs<T>::state_type > {
   private:
-    static_assert( 8 * sizeof( state_t) >= 64 );
+    using state_t = typename Specs<T>::state_type;
 
-    apt::vVec<T, DPtc> _q;
-    apt::vVec<T, DPtc> _p;
+    apt::vVec<T, Specs<T>::Dim> _q;
+    apt::vVec<T, Specs<T>::Dim> _p;
     state_t& _state;
 
   public:
-    static constexpr int NDim = DPtc;
-    using vec_type = apt::vVec<T, DPtc>;
+    static constexpr int NDim = Specs<T>::Dim;
+    using vec_type = apt::vVec<T, Specs<T>::Dim>;
     using state_type = state_t;
 
     constexpr auto& q() noexcept { return _q; }
