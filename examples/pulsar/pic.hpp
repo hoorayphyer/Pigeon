@@ -2,7 +2,7 @@
 #define _PIC_HPP_
 
 #include "kernel/shapef.hpp"
-#include "kernel/coordsys_predef.hpp"
+#include "kernel/curvilinear.hpp"
 #include "apt/type_traits.hpp"
 
 namespace particle {
@@ -24,7 +24,7 @@ namespace pic {
 
   using ShapeF = knl::shapef_t<knl::shape::Cloud_In_Cell>;
 
-  constexpr auto coordinate_system = knl::coordsys::Cartesian;
+  using Metric = knl::coord<knl::coordsys::Cartesian>;
 
   using real_j_t = long double;
 

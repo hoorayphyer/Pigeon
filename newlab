@@ -13,7 +13,6 @@ if [ $? -ne 0 ]; then
 fi
 
 cd $name
-Lab_Path=$(pwd)
 
 # create delrun
 printf "%s\n" \
@@ -38,25 +37,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# create default stuff
-mkdir build include lib src
-if [ $? -ne 0 ]; then
-    echo "Lab $name incomplete. Code 0003"
-    exit 1
-fi
+# # create default stuff
+# mkdir build include lib src
+# if [ $? -ne 0 ]; then
+#     echo "Lab $name incomplete. Code 0003"
+#     exit 1
+# fi
 
-printf "%s\n" \
-       "set(LAB_SHADOWS \"\")"\
-       "set(LAB_NAME \"$name\")"\
-       "list(APPEND LAB_SHADOWS \"UserControl.cpp\")"\
-       > src/CMakeLists.txt
+# printf "%s\n" \
+#        "set(LAB_SHADOWS \"\")"\
+#        "set(LAB_NAME \"$name\")"\
+#        "list(APPEND LAB_SHADOWS \"UserControl.cpp\")"\
+#        > src/CMakeLists.txt
 
-cp ../src/UserControl.cpp src/
-
-if [ $? -ne 0 ]; then
-    echo "Lab $name incomplete. Code 0004"
-    exit 1
-fi
+# if [ $? -ne 0 ]; then
+#     echo "Lab $name incomplete. Code 0004"
+#     exit 1
+# fi
 
 echo -e "\e[1mLab $name\e[0m is successfully created."
-echo -e "Add \e[2m-LAB_DIR=$Lab_Path\e[0m in cmake to activate."

@@ -1,13 +1,24 @@
-#ifndef  _KNL_COORDINATE_HPP_
-#define  _KNL_COORDINATE_HPP_
+#ifndef  _KNL_CURVILINEAR_HPP_
+#define  _KNL_CURVILINEAR_HPP_
 
-#include "kernel/coordsys_predef.hpp"
 #include "apt/numeric.hpp"
 #include "apt/vec.hpp"
 #include "apt/virtual_vec.hpp"
 
 inline constexpr
 long double PI_CONST =3.141592653589793238462643383279502884197169399375105820974944592307816406286L;
+
+namespace knl {
+  enum class coordsys : unsigned char
+    {
+     Cartesian = 0,
+     Cylindrical,
+     Spherical,
+     LogSpherical,
+     LogSphericalEV,
+    };
+}
+
 
 namespace knl {
 
@@ -27,10 +38,10 @@ namespace knl {
     template < typename T >
     static inline T hhh ( T = 0.0, T = 0.0, T = 0.0 ) { return 1.0; }
 
-    template < class X, class V, typename T >
-    static inline void geodesic_move( X& x, const apt::VecExpression<V>& v, const T& dt ) {
-      apt::Vec<decltype(v[0] * dt), apt::ndim_v<V>> dx = v * dt;
-      x += dx;
+    template < class X, class P, typename T >
+    static inline void geodesic_move( X& x, const apt::VecExpression<P>& p, T dt, bool is_massive ) noexcept {
+      dt /= std::sqrt( is_massive + apt::sqabs(p) );
+      x += p * dt;
     }
   };
 
@@ -55,13 +66,14 @@ namespace knl {
       return std::exp( 3.0 * logr ) * std::sin(theta);
     }
 
-    template < class X, class V, typename T >
-    static inline void geodesic_move( X& x, V& v, const T& dt ) {
+    template < class X, class P, typename T >
+    static inline void geodesic_move( X& x, P& p, T dt, bool is_massive ) noexcept {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
 
       constexpr T PI = PI_CONST;
+      auto gamma = std::sqrt( is_massive + apt::sqabs(p) );
       // dx is the return value and meanwhile it serves as a temporary
-      apt::Vec<T, apt::ndim_v<V>> dx = v * dt;
+      apt::Vec<T, apt::ndim_v<P>> dx = p * (dt / gamma);
 
       auto& dlogr = dx[0];
       auto& dtheta = dx[1];
@@ -105,15 +117,15 @@ namespace knl {
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
         rot.set_angle( theta - PI / 2.0 );
-        rot.rotate( v[0], v[1] );
+        rot.rotate( p[0], p[1] );
 
         // then rotate in r-phi plane. Location is rotated by dphi, so velocity components are rotated -dphi
         rot.set_angle( -dphi );
-        rot.rotate( v[0], v[2] );
+        rot.rotate( p[0], p[2] );
 
         // last rotate in r-theta plane to new location. Location is rotated by theta_new - PI/2, so velocity components are rotated by PI/2 - theta_new
         rot.set_angle( PI / 2.0 - theta - dtheta );
-        rot.rotate( v[0], v[1] );
+        rot.rotate( p[0], p[1] );
       }
 
       { // in this block we update x

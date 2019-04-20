@@ -4,8 +4,6 @@
 #include "field/mesh_shape_interplay.hpp"
 #include "field/current_deposition.hpp"
 
-#include "kernel/coordinate.hpp"
-
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
 
@@ -19,8 +17,10 @@ namespace particle {
              typename Real,
              template < typename > class PtcSpecs,
              typename ShapeF,
-             typename Real_dJ, knl::coordsys CS >
-  ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, Real_dJ, CS >
+             typename RealJ,
+             typename Metric
+             >
+  ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng )
     : _localgrid(localgrid), _rng(rng) {
     set_up<Real>(); // TODO
@@ -32,8 +32,10 @@ namespace particle {
              typename Real,
              template < typename > class PtcSpecs,
              typename ShapeF,
-             typename RealJ, knl::coordsys CS >
-  void ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, CS >
+             typename RealJ,
+             typename Metric
+             >
+  void ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
   ::update_species( species sp,
                     array<Real,PtcSpecs>& sp_ptcs,
                     field::Field<RealJ,3,DGrid>& J,
@@ -56,15 +58,7 @@ namespace particle {
 
     auto update_q =
       [is_massive=(prop.mass_x != 0)] ( auto& ptc, Real dt ) {
-        auto gamma = std::sqrt( is_massive + apt::sqabs(ptc.p()) );
-
-        if constexpr ( CS == knl::coordsys::Cartesian ) {
-            // a small optimization for Cartesian
-            knl::coord<CS>::geodesic_move( ptc.q(), ptc.p(), dt / gamma );
-          } else {
-          knl::coord<CS>::geodesic_move( ptc.q(), (ptc.p() /= gamma), dt );
-          ptc.p() *= gamma;
-        }
+        Metric::geodesic_move( ptc.q(), ptc.p(), dt, is_massive );
       };
 
     auto abs2std =
@@ -109,8 +103,8 @@ namespace particle {
              template < typename > class PtcSpecs,
              typename ShapeF,
              typename RealJ,
-             knl::coordsys CS >
-  void ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, CS >
+             typename Metric >
+  void ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
   ::operator() ( map<array<Real,PtcSpecs>>& particles,
                  field::Field<RealJ,3,DGrid>& J,
                  const field::Field<Real,3,DGrid>& E,
@@ -145,5 +139,5 @@ namespace particle {
 #include "pic.hpp"
 using namespace pic;
 namespace particle {
-  template class ParticleUpdater< DGrid, real_t, Specs, ShapeF, real_j_t, coordinate_system >;
+  template class ParticleUpdater< DGrid, real_t, Specs, ShapeF, real_j_t, Metric >;
 }

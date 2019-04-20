@@ -27,7 +27,7 @@ function(test_gen category name)
 
   set_target_properties( ${test_target}
     PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../test_bin"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin"
     )
 
   add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
@@ -49,7 +49,7 @@ test_gen(apt numeric) # DONE
 test_gen(apt handle) # DONE
 
 
-# test_gen(kernel coordinate) # TODO slight mismatched in phi
+# test_gen(kernel curvilinear) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
 test_gen(parallel mpi++ mpipp) # DONE

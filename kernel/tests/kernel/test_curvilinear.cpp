@@ -1,5 +1,5 @@
 #include <iostream>
-#include "kernel/coordinate.hpp"
+#include "kernel/curvilinear.hpp"
 #include "apt/vec.hpp"
 #include "apt/print.hpp"
 #include "catch2/catch.hpp"

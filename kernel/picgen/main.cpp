@@ -39,7 +39,7 @@ int main() {
     util::Rng<real_t> rng{};
     rng.set_seed( timestep_begin + mpi::world.rank() );
 
-    using PIC = PIC< DGrid, real_t, particle::Specs, ShapeF, real_j_t, coordinate_system >;
+    using PIC = PIC< DGrid, real_t, particle::Specs, ShapeF, real_j_t, Metric >;
     PIC simulation( supergrid, cart_opt, guard, rng, unit_e );
 
     for ( int ts = timestep_begin; ts < timestep_begin + total_timesteps; ++ts ) {

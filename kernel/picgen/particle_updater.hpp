@@ -1,7 +1,6 @@
 #ifndef  _PARTICLE_UPDATER_HPP_
 #define  _PARTICLE_UPDATER_HPP_
 
-#include "kernel/coordsys_predef.hpp"
 #include "particle/species_predef.hpp"
 #include "particle/map.hpp"
 #include "particle/array.hpp"
@@ -20,7 +19,7 @@ namespace particle {
              template < typename > class PtcSpecs,
              typename ShapeF,
              typename RealJ,
-             knl::coordsys CS >
+             typename Metric >
   class ParticleUpdater {
   private:
     const knl::Grid< Real, DGrid >& _localgrid;

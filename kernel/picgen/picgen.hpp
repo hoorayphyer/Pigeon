@@ -22,7 +22,7 @@ namespace pic {
              template < typename > class PtcSpecs,
              typename ShapeF,
              typename RealJ,
-             knl::coordsys CS >
+             typename Metric >
   struct PIC {
   private:
     const knl::Grid< Real, DGrid >& _supergrid;
@@ -40,7 +40,7 @@ namespace pic {
     particle::map<particle::array<Real, PtcSpecs>> _particles;
 
     std::unique_ptr<AbstractFieldUpdater<Real,DGrid,RealJ>> _field_update;
-    std::unique_ptr<particle::ParticleUpdater<DGrid,Real,PtcSpecs,ShapeF,RealJ,CS>> _ptc_update;
+    std::unique_ptr<particle::ParticleUpdater<DGrid,Real,PtcSpecs,ShapeF,RealJ,Metric>> _ptc_update;
 
     std::vector<particle::cParticle<Real, PtcSpecs>> _migrators;
 
@@ -90,7 +90,7 @@ namespace pic {
       ens.is_at_boundary();
       if ( _cart_opt )
         _field_update.reset(new ::ofs::OldFieldUpdater<>( unit_e, *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
-      _ptc_update.reset(new particle::ParticleUpdater<DGrid, Real, PtcSpecs, ShapeF, RealJ, CS>( _grid, _rng ) );
+      _ptc_update.reset(new particle::ParticleUpdater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng ) );
     }
 
   public:

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project (Pulsar)
+project () # specify your project name
 enable_testing()
 message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
 
