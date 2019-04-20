@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project (Aperture)
+project (Pigeon)
 enable_testing()
 message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
 
@@ -22,8 +22,6 @@ set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu+
 
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
 # set(CMAKE_CXX_COMPILER "g++")
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_find_package" )
 
 
 # if(LAB_ROOT_DIR)

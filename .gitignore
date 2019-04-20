@@ -52,6 +52,7 @@
 !src/utility/*.cpp
 !src/io/
 !src/io/*.cpp
+!src/io/FindSilo.cmake
 !src/parallel/
 !src/parallel/*.cpp
 !src/particle/
@@ -81,17 +82,11 @@
 !tests/field/
 !tests/field/*.cpp
 
-!tools/
-!tools/**/*
-
-!cmake/Modules
-!cmake/Modules/**
-
 !LICENSE
 
-!python/
-python/*
-!python/scripts/
-!python/scripts/**/*.py
-python/scripts/siloReader.py
-python/scripts/snapshotReader.py
+# !python/
+# python/*
+# !python/scripts/
+# !python/scripts/**/*.py
+# python/scripts/siloReader.py
+# python/scripts/snapshotReader.py

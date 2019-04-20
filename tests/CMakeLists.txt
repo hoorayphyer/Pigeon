@@ -8,7 +8,7 @@ target_include_directories(catch_main_mpipp PUBLIC ${CMAKE_SOURCE_DIR}/.subtrees
 target_link_libraries(catch_main_mpipp PRIVATE mpipp)
 
 if(NOT TARGET picgen)
-  include(${CMAKE_SOURCE_DIR}/hooray/CMakeLists.txt) #TODO use the actual lab root
+  include(${CMAKE_SOURCE_DIR}/pulsar/CMakeLists.txt) #TODO use the actual lab root
 endif()
 
 function(test_gen category name)

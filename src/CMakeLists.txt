@@ -8,6 +8,8 @@ target_link_libraries(mpipp PRIVATE picgen) # TODO
 separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # a workaround since findMPI doesn't provide this yet
 target_link_options(mpipp PUBLIC ${MPI_CXX_LINK_OPTIONS})
 
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/io" )
 find_package(Silo REQUIRED)
 add_library(silo_lib SHARED "io/silo++.cpp" "io/silo_optlist.cpp" "io/silo_operations.cpp")
 target_include_directories(silo_lib PRIVATE ${Silo_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/include )

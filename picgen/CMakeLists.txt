@@ -1,7 +1,7 @@
 # NOTE since all implementation cpp is separated from the instantiation cpp, just include the directory of src/ in Lab to achieve the automatic shadow that was impossible to achieve before
 
 if(NOT TARGET picgen)
-  include(${CMAKE_SOURCE_DIR}/hooray/CMakeLists.txt) #TODO use the actual lab root
+  include(${CMAKE_SOURCE_DIR}/pulsar/CMakeLists.txt) #TODO use the actual lab root
 endif()
 
 # if(LAB_ROOT_DIR)
