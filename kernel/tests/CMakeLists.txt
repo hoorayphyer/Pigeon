@@ -1,10 +1,10 @@
 set(CMAKE_CXX_FLAGS "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC") # -Wmissing-braces
 add_library(catch_main SHARED "catch_main.cpp")
-target_include_directories(catch_main PUBLIC ${KERNEL_DIR}/.subtrees/Catch2/single_include)
+target_include_directories(catch_main PUBLIC ${KERNEL_DIR}/../.subtrees/Catch2/single_include)
 
 add_library(catch_main_mpipp SHARED "catch_main_mpi++.cpp")
 target_include_directories(catch_main_mpipp PRIVATE "${KERNEL_DIR}/include")
-target_include_directories(catch_main_mpipp PUBLIC ${KERNEL_DIR}/.subtrees/Catch2/single_include)
+target_include_directories(catch_main_mpipp PUBLIC ${KERNEL_DIR}/../.subtrees/Catch2/single_include)
 target_link_libraries(catch_main_mpipp PRIVATE mpipp)
 
 function(test_gen category name)
