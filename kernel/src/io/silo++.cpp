@@ -48,8 +48,6 @@ namespace silo :: pmpio {
     }
   }
 
-  int num_files = 2;
-
   void* createCb( const char * fname, const char * dname, void * udata ) {
     DBfile * dbFile = DBCreate( fname, traits::create_mode, traits::create_target, NULL, traits::filetype );
     if ( dbFile ) {
@@ -75,7 +73,7 @@ namespace silo :: pmpio {
 
   // TODO check file existence
   template< Mode mode >
-  file_t open(  std::string dirname, const mpi::Comm& comm ) {
+  file_t open( std::string filename, std::string dirname, const mpi::Comm& comm, int num_files ) {
     file_t dbfile;
 
     constexpr int mpi_tag = 147;
@@ -84,17 +82,13 @@ namespace silo :: pmpio {
 
     PMPIO_baton_t* baton_h = PMPIO_Init( num_files, pmpio_mode, comm, mpi_tag, createCb, openCb, PMPIO_DefaultClose, NULL );
 
-    auto filename = dirname + std::to_string( PMPIO_GroupRank( baton_h, comm.rank() ) )+".silo";
-    auto silo_dname = "proc" + std::to_string( comm.rank() );
-
-    DBfile* file_h = (DBfile*) PMPIO_WaitForBaton( baton_h, filename.c_str(), silo_dname.c_str() );
+    DBfile* file_h = (DBfile*) PMPIO_WaitForBaton( baton_h, filename.c_str(), dirname.c_str() );
     dbfile.reset( new PmpioDBfileHandle{ baton_h, file_h } );
 
     return dbfile;
   }
 
-
-  template file_t open<Mode::Read>(  std::string dirname, const mpi::Comm& comm );
-  template file_t open<Mode::Write>(  std::string dirname, const mpi::Comm& comm );
+  template file_t open<Mode::Read>( std::string, std::string, const mpi::Comm&, int );
+  template file_t open<Mode::Write>( std::string, std::string, const mpi::Comm&, int );
 
 }

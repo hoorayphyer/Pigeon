@@ -17,6 +17,9 @@
 !dye/
 !dye/*
 
+!data_exporter/
+!data_exporter/*
+
 !include/
 !include/**/*.hpp
 !include/apt/

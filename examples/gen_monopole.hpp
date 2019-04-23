@@ -9,10 +9,10 @@
 #include "field/field.hpp"
 
 #include "particle/map.hpp"
+#include "particle/array.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
 #include "particle/particle.hpp"
-#include "particle/array.hpp"
 
 #include "pic.hpp"
 
@@ -21,6 +21,7 @@ namespace particle {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
     bool is_radiative = false; // TODO move this to scattering
+    const char* name  = "";
   };
 }
 
@@ -168,10 +169,10 @@ namespace particle {
     {
       // TODO initialize properties at a different place
       // TODO move out
-      properties[species::electron] = {1,-1,true};
-      properties[species::positron] = {1,1,true};
-      properties[species::ion] = { 5, 1, false};
-      properties[species::photon] = { 0, 0, true };
+      properties[species::electron] = {1,-1,true,"electron"};
+      properties[species::positron] = {1,1,true,"positron"};
+      properties[species::ion] = { 5, 1, false,"ion"};
+      properties[species::photon] = { 0, 0, true,"photon" };
     }
 
     {

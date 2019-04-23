@@ -130,7 +130,7 @@ namespace field {
       return _extent[ith_dim] - 2 * _guard;
     }
 
-    constexpr apt::Index<D> bulk_extent() const noexcept {
+    constexpr apt::Index<D> bulk_dims() const noexcept {
       apt::Index<D> res;
       for ( int i = 0; i < D; ++i )
         res[i] = bulk_dim(i);

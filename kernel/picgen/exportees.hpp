@@ -3,7 +3,6 @@
 
 #include "io/exportee.hpp"
 #include "particle/array.hpp"
-#include "traits.hpp"
 
 namespace aperture {
   struct FldComp : FieldBasedExportee {

@@ -1,9 +1,6 @@
 #include "field/mesh_shape_interplay.cpp"
 #include "pic.hpp"
 
-#include "field/field.hpp"
-#include "apt/vec.hpp"
-
 namespace field {
   using namespace pic;
   constexpr auto Dq = particle::Specs<real_t>::Dim;
@@ -21,13 +18,13 @@ namespace field {
 
   template void
   deposit ( Field<real_t, 3, DGrid>& field,
-            apt::Vec<real_t, 3> var,
+            apt::array<real_t, 3> var,
             const apt::array<real_t,Dq>& q_std,
             const ShapeF& shapef );
 
   template void
   deposit ( Field<real_t, 1, DGrid>& field,
-            apt::Vec<real_t, 1> var,
+            apt::array<real_t, 1> var,
             const apt::array<real_t,Dq>& q_std,
             const ShapeF& shapef );
 }

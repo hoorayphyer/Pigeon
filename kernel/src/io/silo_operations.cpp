@@ -21,6 +21,16 @@ namespace silo {
   }
 }
 
+namespace silo {
+  namespace pmpio { struct file_t; }
+
+  template < typename F >
+  constexpr bool IsPmpio() noexcept { return false; }
+
+  template <>
+  constexpr bool IsPmpio<pmpio::file_t>() noexcept { return true; }
+}
+
 namespace silo{
   template < typename file_t >
   template < typename StorageType >
@@ -38,51 +48,24 @@ namespace silo{
   template < typename file_t >
   template < typename StorageType >
   void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const StorageType* vardata, const std::vector<int>& dims ) {
-      //TODO do a downsampling outside?
     DBPutQuadvar1(_dbfile(), varname.c_str(), meshname.c_str, vardata, dims.data(), dims.size(), NULL, 0, datatype((StorageType)0), DB_NODECENT, NULL);
   }
 
   template < typename file_t >
-  void SiloPutter<file_t>:: put_multimesh( std::string multimeshname, const std::vector<std::string>& piecenames, const OptList& optlist ) {
-    std::vector<const char*> names(piecenames.size());
-    for ( int i = 0; i < names.size(); ++i )
-      names[i] = piecenames[i].c_str();
-    DBPutMultimesh(_dbfile(), multimeshname.c_str(), names.size(), names.data(), NULL, optlist );
+  void SiloPutter<file_t>:: put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
+    DBoptlist* raw_list = optlist;
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, DB_QUAD_RECT);
+    DBAddOption(raw_list, DBOPT_MB_FILE_NS, file_ns.c_str());
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_NS, block_ns.c_str());
+    DBPutMultimesh(_dbfile(), multimeshname.c_str(), nblock, NULL, NULL, raw_list );
   }
 
   template < typename file_t >
-  void SiloPutter<file_t>:: put_multivar( std::string multivarname, const std::vector<std::string>& piecenames, const OptList& optlist ) {
-    std::vector<const char*> names(piecenames.size());
-    for ( int i = 0; i < names.size(); ++i )
-      names[i] = piecenames[i].c_str();
-    DBPutMultivar(_dbfile(), multivarname.c_str(), names.size(), names.data(), NULL, optlist );
+  void SiloPutter<file_t>:: put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
+    DBoptlist* raw_list = optlist;
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, (void*)DB_QUADVAR);
+    DBAddOption(raw_list, DBOPT_MB_FILE_NS, file_ns.c_str());
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_NS, block_ns.c_str());
+    DBPutMultivar(_dbfile(), multivarname.c_str(), nblock, NULL, NULL, raw_list );
   }
-
-  // auto put_multi_sth =
-  //   [&pmpio=pmpio, nblocks=comm_size, isPmpio=pane.isPmpio, prefix=pane.prefix] (DBfile* dbfile, int timestep, std::string name_sth, const int type_sth, auto db_put_multisth) {
-  //     // TODO move to outside
-  //     // std::vector<char*> names(nblocks);
-
-  //     // for (int i = 0; i < nblocks; i++) {
-  //     //   char* name = new char[100];
-  //     //   if ( isPmpio ) {
-  //     //     sprintf(name, "group%d/%s%06d.d:proc%d/%s", pmpio->GroupRank(i), prefix.c_str(), timestep, i, name_sth.c_str());
-  //     //   } else {
-  //     //     sprintf(name, "rank%d/%s%06d.d:%s", i, prefix.c_str(), timestep, name_sth.c_str());
-  //     //   }
-  //     //   names.push_back(name);
-  //     // }
-
-  //     // DBoptlist* optlist = DBMakeOptlist(1);
-  //     // DBAddOption(optlist, DBOPT_MB_BLOCK_TYPE, &type_sth);
-  //     db_put_multisth(dbfile, name_sth.c_str(), nblocks, names.data(), NULL, optlist);
-  //     // DBFreeOptlist(optlist);
-
-  //     // for ( auto& elm : names )
-  //     //   delete[] elm;
-  //   };
-
-  // put_multimesh = [=] (DBfile* dbfile, int timestep ) { return put_multi_sth(dbfile, timestep, MESHNAME, (linearMesh ? DB_QUAD_RECT : DB_QUAD_CURV), DBPutMultimesh); };
-
-
 }

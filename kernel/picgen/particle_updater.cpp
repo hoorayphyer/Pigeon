@@ -2,7 +2,6 @@
 #include "particle_updater.hpp"
 
 #include "field/mesh_shape_interplay.hpp"
-#include "field/current_deposition.hpp"
 
 #include "kernel/grid.hpp"
 #include "kernel/shapef.hpp"
@@ -61,21 +60,11 @@ namespace particle {
         Metric::geodesic_move( ptc.q(), ptc.p(), dt, is_massive );
       };
 
-    auto abs2std =
-      [&grid=_localgrid]( const auto& qabs ) {
-        apt::array<Real,PtcSpecs<Real>::Dim> q_std;
-        apt::foreach<0,DGrid> // NOTE DGrid instead of DPtc
-          ( [](auto& q, auto q_abs, const auto& g ) noexcept {
-              q = ( q_abs - g.lower() ) / g.delta();
-            }, q_std, qabs, grid );
-        return q_std;
-      };
-
     for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
       if( ptc.is(flag::empty) ) continue;
 
       {
-        auto q0_std = abs2std( ptc.q() );
+        auto q0_std = field::to_standard( _localgrid, ptc.q() );
         auto E_itpl = field::interpolate( E, q0_std, shapef );
         auto B_itpl = field::interpolate( B, q0_std, shapef );
 
@@ -90,7 +79,7 @@ namespace particle {
         update_q( ptc, dt );
         // TODO pusher handle boundary condition. Is it needed?
         if ( prop.charge_x != 0 )
-          deposit( J, charge_over_dt, shapef, q0_std, abs2std(ptc.q()) );
+          field::current_deposition::deposit( J, charge_over_dt, shapef, q0_std, field::to_standard(_localgrid, ptc.q()) );
       }
 
     }
@@ -124,7 +113,7 @@ namespace particle {
       }
     }
 
-    integrate(J);
+    field::current_deposition::integrate(J);
 
     // NOTE rescale Jmesh back to real grid delta
     for ( int i = 0; i < DGrid; ++i ) {

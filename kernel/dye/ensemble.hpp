@@ -23,6 +23,12 @@ namespace dye {
     int label() const noexcept;
     apt::pair<bool> is_at_boundary( int ith_dim ) const noexcept;
     apt::array< apt::pair<bool>, DGrid > is_at_boundary() const noexcept;
+
+    // a convinience function NOTE the reduction is in-place, which is what most of use cases is
+    template < typename T >
+    inline void reduce_to_chief( mpi::by op, T* buffer, int count ) const {
+      intra.reduce<true>(op, chief, buffer, count);
+    }
   };
 
 }

@@ -1,8 +1,8 @@
-#include "field/current_deposition.hpp"
+#include "field/mesh_shape_interplay.hpp"
 #include "field/communication.hpp"
 #include "apt/block.hpp"
 
-namespace field :: impl {
+namespace field :: current_deposition:: impl {
   // RATIONALE Due to the MIDWAY offset of dJ field, we define the NATIVE grid te be one shifted to the right by half spacing from the standard grid, therefore q_nat = q_std - 0.5. By design, dJ[i] is INSITU on the native grid.
   // The contributed cells in the native grid are [ INT_FLOOR( q_nat_min - sf.r) + 1,  INT_FLOOR( q_nat_max + sf.r) + 1 ). These are also the correct cell numbers in the standard grid
   // Now we have q0_std and q1_std, the final range of contributed cells is the union of individual ones
@@ -43,7 +43,7 @@ namespace field :: impl {
 
 }
 
-namespace field {
+namespace field::current_deposition {
   template < typename T >
   constexpr T Wesir( T sx0, T sx1, T sy0 = 1.0, T sy1 = 1.0 ) noexcept {
     return ( ( 2 * sx1 + sx0 ) * sy1 + ( sx1 + 2 * sx0 ) * sy0 ) / 6.0;
@@ -95,7 +95,7 @@ namespace field {
 
 }
 
-namespace field {
+namespace field::current_deposition {
   template < typename RealJ, int DField, int DGrid >
   void integrate( Field<RealJ,DField,DGrid>& J ) {
     const auto& mesh = J.mesh();

@@ -28,6 +28,7 @@ namespace pic {
 
   using real_j_t = long double;
 
+  using real_export_t = float;
 };
 
 

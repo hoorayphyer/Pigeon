@@ -54,28 +54,38 @@ namespace field::impl {
 
 namespace field {
 
+
+  template < int DGrid, int Supp >
+  constexpr apt::Index<DGrid> ShapeExtent
+  ( [](){
+      apt::Index<DGrid> res;
+      for ( int i = 0; i < DGrid; ++i ) res[i] = Supp;
+      return res;}() );
+
+  template < typename T, int DGrid, int Dq, typename ShapeF >
+  T interpolate ( const typename field::Component<T,DGrid>& fcomp,
+                  const apt::array<T,Dq>& q_std,
+                  const ShapeF& shapef ) noexcept {
+    T res{};
+
+    auto wf = impl::WeightFinder( q_std, fcomp.offset(), shapef );
+    for ( const auto& I : apt::Block(ShapeExtent<DGrid, ShapeF::support()>) )
+      res += fcomp( wf.I_b() + I ) * wf.weight(I);
+
+    return res;
+  }
+
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const Field<T,DField,DGrid>& field,
                                     const apt::array<T,Dq>& q_std,
-                                    const ShapeF& shapef ) {
+                                    const ShapeF& shapef ) noexcept {
     apt::Vec<T, DField> result;
     constexpr auto supp = ShapeF::support();
 
     apt::foreach<0,DField>
       ( [&] ( auto& res, const auto& comp ) {
-          res = 0.0;
-          auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
-
-          constexpr apt::Index<DGrid> ext
-            ( [supp](){
-                apt::Index<DGrid> res;
-                for ( int i = 0; i < DGrid; ++i ) res[i] = supp;
-                return res;}() );
-          for ( const auto& I : apt::Block(ext) )
-            res += comp( wf.I_b() + I ) * wf.weight(I);
-
+          res = interpolate(comp, q_std, shapef );
         }, result, field );
-
 
     return result;
   }
@@ -85,9 +95,9 @@ namespace field {
 namespace field {
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   void deposit ( Field<T,DField,DGrid>& field,
-                 apt::Vec<T, DField> variable,
+                 apt::array<T, DField> variable,
                  const apt::array<T, Dq>& q_std,
-                 const ShapeF& shapef ) {
+                 const ShapeF& shapef ) noexcept {
     constexpr auto supp = ShapeF::support();
 
     constexpr apt::Index<DGrid> ext

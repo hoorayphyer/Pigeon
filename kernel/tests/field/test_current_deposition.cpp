@@ -4,6 +4,7 @@
 #include "apt/pair.hpp"
 
 using namespace field;
+using namespace field::current_deposition;
 using apt::array;
 
 constexpr int DPtc = 3;

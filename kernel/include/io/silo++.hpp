@@ -26,7 +26,6 @@ namespace silo {
 
   template < Mode mode > // use template to prohibit use of Mode::Append in silo::pmpio::open
   file_t open( std::string filename );
-
 }
 
 typedef struct _PMPIO_baton_t PMPIO_baton_t;
@@ -50,7 +49,7 @@ namespace silo::pmpio {
   };
 
   template < Mode mode >
-  file_t open( std::string dirname, const mpi::Comm& comm );
+  file_t open( std::string filename, std::string dirname, const mpi::Comm& comm, int num_files );
 }
 
 namespace silo {

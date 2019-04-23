@@ -19,6 +19,7 @@ if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
 endif()
 
 add_subdirectory(src)
+add_subdirectory(data_exporter)
 add_subdirectory(dye)
 add_subdirectory(picgen)
 add_subdirectory(tests)

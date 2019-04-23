@@ -21,9 +21,9 @@ namespace silo {
     template < typename StorageType >
     void put_var( std::string varname, std::string meshname, const StorageType* vardata, const std::vector<int>& dims );
 
-    void put_multimesh( std::string multimeshname, const std::vector<std::string>& piecenames, const OptList& optlist );
+    void put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, OptList optlist );
 
-    void put_multivar( std::string multivarname, const std::vector<std::string>& piecenames, const OptList& optlist );
+    void put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist );
   };
 }
 

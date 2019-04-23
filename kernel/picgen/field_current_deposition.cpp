@@ -1,7 +1,7 @@
 #include "field/current_deposition.cpp"
 #include "pic.hpp"
 
-namespace field {
+namespace field::current_deposition {
   using namespace pic;
 
   template
