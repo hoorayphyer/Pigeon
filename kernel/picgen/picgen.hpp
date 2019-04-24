@@ -23,7 +23,7 @@ namespace pic {
              typename ShapeF,
              typename RealJ,
              typename Metric >
-  struct PIC {
+  struct Simulator {
   private:
     const knl::Grid< Real, DGrid >& _supergrid;
     const int _guard;
@@ -94,7 +94,7 @@ namespace pic {
     }
 
   public:
-    PIC( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng, double unit_e )
+    Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng, double unit_e )
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt), _rng(std::move(rng)),
         _injector{ _grid, _E, _B, _J, _particles },
         _fbj_lower{ _grid, _E, _B, _J, _particles },
@@ -107,7 +107,7 @@ namespace pic {
       const auto& ens = *_ens_opt;
       refresh(ens, unit_e);
 
-      InitialConditionDipole ic( _grid, _E, _B, _J, _particles );
+      InitialCondition ic( _grid, _E, _B, _J, _particles );
       ic();
     }
 

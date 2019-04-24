@@ -118,7 +118,7 @@ namespace ofs {
     // field BC, specialized for pulsar
     { auto& fbc = fieldBC[LOWER_1];
       fbc.type = FieldBCType::ROTATING_CONDUCTOR;
-      fbc.indent = 5;
+      fbc.indent = pic::ofs::indent[LOWER_1];
       fbc.ft = FT_SpinUp;
       if ( pic::ofs::magnetic_pole == 1 )
         Rotating_Monopole_LogSph( fbc, pic::mu0, pic::omega_max );
@@ -127,16 +127,16 @@ namespace ofs {
     }
     { auto& fbc = fieldBC[UPPER_1];
       fbc.type = FieldBCType::DAMPING;
-      fbc.damping_rate = 0.1;
-      fbc.indent = 86;
+      fbc.damping_rate = pic::ofs::damping_rate;
+      fbc.indent = pic::ofs::indent[UPPER_1];
     }
     { auto& fbc = fieldBC[LOWER_2];
       fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = guard;
+      fbc.indent = pic::ofs::indent[LOWER_2];
     }
     { auto& fbc = fieldBC[UPPER_2];
       fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = guard;
+      fbc.indent = pic::ofs::indent[UPPER_2];
     }
   }
 

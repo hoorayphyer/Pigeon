@@ -20,7 +20,6 @@ namespace particle {
   struct Properties {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
-    bool is_radiative = false; // TODO move this to scattering
     const char* name  = "";
   };
 }
@@ -35,8 +34,23 @@ namespace particle {
   ForceGen<Real, Specs,Ptc_t> force_gen;
 }
 
+// common parameters
 namespace pic {
-  // TODOL these will become free parameters
+  constexpr long double PI = std::acos(-1.0l);
+
+  inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
+  inline constexpr apt::array<bool,DGrid> periodic = {false,false};
+  inline constexpr int total_timesteps = 10;
+  inline constexpr real_t dt = 0.001;
+  inline constexpr real_t unit_e = 100;
+
+  constexpr knl::Grid<real_t,DGrid> supergrid
+  = {{ { 0.0, std::log(30.0), 16 }, { 0.0, PI, 16 } }};
+  inline constexpr int guard = 1;
+}
+
+// TODOL free parameters for specific lab
+namespace pic {
   inline constexpr real_t mu0 = 60000.0;
   inline constexpr real_t omega_max = 1.0 / 6.0;
 
@@ -46,7 +60,9 @@ namespace pic {
     return std::min( time / pic::spinup_duration, 1.0 ) * pic::omega_max;
   }
   namespace ofs {
-    inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
+    inline constexpr int magnetic_pole = 1; // 1 for mono-, 2 for di-
+    inline constexpr int indent[4] = { 5, 86, guard, guard };
+    inline constexpr real_t damping_rate = 0.1;
   }
 
 }
@@ -56,107 +72,11 @@ namespace particle {
   template < typename T, template < typename > class Specs >
   using Pat = typename array< T, Specs >::particle_type; // type of particle from array
 
-  template < typename T, template < typename > class Specs >
-  struct CurvatureRadiate : public scat::Channel<T, Specs> {
-    using Vec = apt::Vec<T,Specs<T>::Dim>;
-
-    constexpr T calc_Rc ( const Pat<T,Specs>& ptc, const Vec& dp, T dt, const Vec& B ) noexcept {
-      // qB / (\gamma m c) * dt < 2 \pi / 10
-      bool is_gyration_resolved =
-        std::sqrt( apt::sqabs(B) / ( (mass_x != 0) + apt::sqabs(ptc.p()) ) ) * abs_charge_x * dt / mass_x < (2 * std::acos(-1) / 10.0);
-
-      if ( is_gyration_resolved ) {
-        // find momentum at half time step
-        auto phalf = ptc.p() - dp * 0.5; // NOTE ptc.p() is already the updated p
-        auto v = phalf / std::sqrt( (mass_x != 0) + apt::sqabs(phalf) );
-        auto vv = apt::sqabs(v);
-        Vec a = dp / dt; // a is for now force, will be converted to dv/dt
-        // convert a to dv/dt
-        a = ( a - v * apt::dot(v,a) ) * std::sqrt( 1.0 - vv );
-        auto va = apt::dot(v,a); // get the real v dot a
-        return vv / std::max( std::sqrt( apt::sqabs(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
-      } else {
-        // Dipolar radius of curvature in LogSpherical
-        const auto& theta = ptc.q()[1];
-        auto tmp = 2.5 + 1.5 * std::cos( 2 * theta );
-        return std::exp(ptc.q()[0]) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
-      }
-    }
-
-    constexpr T sample_E_ph() noexcept { return 3.5; }
-
-    unsigned int abs_charge_x{};
-    unsigned int mass_x{};
-
-    T K_thr{};
-    T gamma_off{};
-    T emission_rate{};
-
-    // return sampled energy if any
-    std::optional<T> operator() ( const Pat<T,Specs>& ptc, const Vec& dp, T dt,
-                                  const Vec& B, util::Rng<T>& rng ) override {
-      T Rc = calc_Rc( ptc, dp, dt, B );
-      T gamma = std::sqrt( (mass_x != 0) + apt::sqabs(ptc.p()) );
-
-      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < emission_rate * dt * gamma  / Rc ) {
-        return { std::min( sample_E_ph(), gamma - 1.0 ) };
-      } else return {};
-
-    }
-  };
-
-  template < typename T, template < typename > class Specs >
-  struct MagneticConvert : public scat::Channel<T,Specs> {
-    T B_thr{};
-    T mfp{};
-
-    std::optional<T> operator() ( const Pat<T,Specs>& photon, const apt::Vec<T,Specs<T>::Dim>& dp, T dt,
-                                  const apt::Vec<T,Specs<T>::Dim>& B, util::Rng<T>& rng ) override {
-      // prob_mag_conv = dt / mfp_mag_conv
-      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
-    }
-  };
-
-  template < typename T, template < typename > class Specs >
-  struct TwoPhotonCollide : public scat::Channel<T,Specs> {
-    // TODO double check this implementation, it is not equivalent because the original one has some sort of gaussian in it. Use Monte Carlo
-    // inline T f_x ( T x ) {
-    //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
-    //   return std::sqrt( -2.0 * std::log(x) );
-    // }
-    T mfp{};
-
-    std::optional<T> operator() ( const Pat<T,Specs>& photon, const apt::Vec<T,Specs<T>::Dim>& dp, T dt,
-                                  const apt::Vec<T,Specs<T>::Dim>& B, util::Rng<T>& rng ) override {
-      // prob_mag_conv = dt / mfp_ph_ph
-      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
-    }
-  };
-
-
   // LogSpherical
   namespace force {
     template < typename T, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
     void gravity( Ptc_t<T,Specs>& ptc, T dt, const apt::Vec<T,Specs<T>::Dim>& , const apt::Vec<T,Specs<T>::Dim>&, T g  ) noexcept {
       ptc.p()[0] -= g * std::exp( - 2 * ptc.q()[0] ) * dt;
-    };
-
-    // when B is strong enough, damp the perpendicular component of momentum
-    template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-    void landau0( Ptc_t<T,PtcSpecs>& ptc, T dt, const Vec<T,PtcSpecs>& E, const Vec<T,PtcSpecs>& B, T B2_thr  ) {
-      if ( apt::sqabs(B) < B2_thr ) return;
-
-      auto EB2 = apt::dot(E,B);
-      EB2 = EB2 * EB2;
-      auto B2_E2 = apt::sqabs(B) - apt::sqabs(E);
-      // calculate E'^2
-      auto Ep2 = 2 * EB2 / ( std::sqrt(B2_E2 * B2_E2 + 4 * EB2) + B2_E2 );
-      auto beta_ExB = apt::cross(E,B) / ( apt::sqabs(B) + Ep2);
-      // find B' modulo gamma_ExB
-      auto Bp = B - apt::cross( beta_ExB, E);
-      // obtain the momentum with perpendicular components damped
-      ptc.p() = Bp * ( apt::dot( ptc.p(), Bp ) / apt::sqabs(Bp) );
-      ptc.p() += beta_ExB * std::sqrt( ( 1.0 + apt::sqabs(ptc.p()) ) / ( 1.0 - apt::sqabs(beta_ExB) ) );
     };
   }
 }
@@ -169,18 +89,16 @@ namespace particle {
     {
       // TODO initialize properties at a different place
       // TODO move out
-      properties[species::electron] = {1,-1,true,"electron"};
-      properties[species::positron] = {1,1,true,"positron"};
-      properties[species::ion] = { 5, 1, false,"ion"};
-      properties[species::photon] = { 0, 0, true,"photon" };
+      properties[species::electron] = {1,-1,"electron"};
+      properties[species::positron] = {1,1,"positron"};
+      properties[species::ion] = { 5, 1, "ion"};
     }
 
     {
-      Real landau0_B_thr = 0.1 * pic::mu0;
+      constexpr Real gravity_strength = 1.8;
       using Force = force::Force<real_t,Specs,vParticle>;
       constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
       {
         auto sp = species::electron;
@@ -188,8 +106,7 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
-        force.add( landau0, landau0_B_thr );
+        force.add( gravity, gravity_strength );
 
         fgen.Register( sp, force );
       }
@@ -199,8 +116,7 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
-        force.add( landau0, landau0_B_thr );
+        force.add( gravity, gravity_strength );
 
         fgen.Register( sp, force );
       }
@@ -210,69 +126,16 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
-        // force.add( landau0, landau0_B_thr ); // TODO check
+        force.add( gravity, gravity_strength );
 
         fgen.Register( sp, force );
       }
     }
 
-
-    {
-      scat::RadiationFromCharges<false,real_t,Specs> ep_scat;
-
-      {
-        struct InZone : public scat::Eligible<real_t,Specs> {
-          bool operator() ( const Pat<real_t,Specs>& ptc ) override {
-            return ptc.q()[0] < std::log(9.0);
-          }
-        };
-        ep_scat.add(InZone{});
-      }
-
-      {
-        CurvatureRadiate<real_t,Specs> cr;
-        cr.abs_charge_x = 1u;
-        cr.mass_x = 1u;
-        cr.K_thr = 20.0;
-        cr.gamma_off = 15.0;
-        cr.emission_rate = 0.25;
-
-        ep_scat.add(cr);
-      }
-
-      scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
-      scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
-    }
-
-    {
-      scat::PhotonPairProduction<real_t,Specs> photon_scat;
-      {
-        // TODOL are there any restrictions on where photons can or cannot produce pairs?
-        // photon_scat.add(InZone<Ptc>{});
-      }
-
-      {
-        MagneticConvert<real_t,Specs> mc;
-        mc.B_thr = 1000.0;
-        mc.mfp = 0.2;
-        photon_scat.add(mc);
-      }
-      {
-        TwoPhotonCollide<real_t,Specs> tc;
-        tc.mfp = 5.0;
-        photon_scat.add(tc);
-      }
-
-      scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
-    }
   }
-
 }
 
 namespace pic {
-  constexpr long double PI = std::acos(-1.0l);
-
   template < typename Real, int DGrid >
   apt::pair< apt::Index<DGrid> > gtl ( const apt::array<apt::pair<Real>,DGrid>& range,
                                        const knl::Grid<Real,DGrid>& localgrid ) noexcept {
@@ -289,7 +152,7 @@ namespace pic {
              typename Real,
              template < typename > class Specs,
              typename RealJ >
-  struct InitialConditionDipole {
+  struct InitialCondition {
   private:
     const knl::Grid<Real,DGrid>& _grid;
     field::Field<Real, 3, DGrid>& _Bfield;
@@ -308,11 +171,11 @@ namespace pic {
     };
 
   public:
-    InitialConditionDipole ( const knl::Grid<Real,DGrid>& localgrid,
-                             const field::Field<Real, 3, DGrid>& Efield,
-                             field::Field<Real, 3, DGrid>& Bfield,
-                             const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-                             const particle::map<particle::array<Real,Specs>>& particles )
+    InitialCondition ( const knl::Grid<Real,DGrid>& localgrid,
+                       const field::Field<Real, 3, DGrid>& Efield,
+                       field::Field<Real, 3, DGrid>& Bfield,
+                       const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
+                       const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Bfield(Bfield) {
       constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {1.0, std::log(30.0)}, {0, PI} }};
       apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
