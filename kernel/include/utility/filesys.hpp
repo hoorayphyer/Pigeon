@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace util::filesys {
+namespace util::fs {
   std::string append_slash( std::string dir );
 
   void create_directories(std::string dir);

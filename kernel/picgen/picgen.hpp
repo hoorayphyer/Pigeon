@@ -12,6 +12,8 @@
 
 #include "particle/migration.hpp"
 
+#include "data_exporter/data_export.hpp"
+
 #include <memory>
 
 #include "gen.hpp"
@@ -92,8 +94,8 @@ namespace pic {
     }
 
   public:
-    Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng )
-      : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt), _rng(std::move(rng)),
+    Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
+      : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt),
         _injector{ _grid, _E, _B, _J, _particles },
         _fbj_lower{ _grid, _E, _B, _J, _particles },
         _fbj_upper{ _grid, _E, _B, _J, _particles } {
@@ -103,10 +105,16 @@ namespace pic {
 
       const auto& ens = *_ens_opt;
       refresh(ens);
-
-      InitialCondition ic( _grid, _E, _B, _J, _particles );
-      ic();
     }
+
+    template < template < int, typename, template < typename > class, typename > class IC >
+    int load_initial_condition() {
+      IC ic( _grid, _E, _B, _J, _particles );
+      ic();
+      return ic.initial_timestep();
+    }
+
+    inline void set_rng_seed( int seed ) { _rng.set_seed(seed); }
 
     void evolve( int timestep, Real dt ) {
       if ( _ens_opt ) {
@@ -173,9 +181,9 @@ namespace pic {
       // TODOL annihilation will affect deposition // NOTE one can deposit in the end
       // annihilate_mark_pairs( );
 
-      if (false) {
+      if ( (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
         // TODO check idle?
-        // TODO export_data();
+        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( "./this_run_dir", timestep, dt, 1, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
         if ( false ) {
           // TODO has a few hyper parameters
           // TODO touch create is not multinode safe even buffer is used

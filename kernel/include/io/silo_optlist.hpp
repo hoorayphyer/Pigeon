@@ -42,14 +42,14 @@ namespace silo {
     std::unique_ptr<RawList, void(*)(RawList*)> _p{nullptr, optlist_free};
 
   public:
-    operator RawList*();
+    operator RawList*() const;
 
     OptVal& operator[] ( int opt_id ) {
       emplace(opt_id, OptVal(opt_id));
       return at(opt_id);
     }
 
-    OptList() = default;
+    OptList();
     OptList( const OptList& other ) // simply call the copy constructor of unordered_map
       : std::unordered_map<int,OptVal>( static_cast<const std::unordered_map<int,OptVal>&>(other) ) {}
     OptList( OptList&& ) = default;

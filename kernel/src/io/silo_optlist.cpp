@@ -52,12 +52,15 @@ namespace silo {
     DBFreeOptlist(optlist);
   }
 
-  OptList::operator DBoptlist* () {
-    _p.reset(DBMakeOptlist( size() ));
+  OptList::OptList() {
+    _p.reset(DBMakeOptlist(3));
+  }
+
+  OptList::operator DBoptlist* () const {
 
     for ( auto& [id, val] : *this ) {
       if ( int_array_opt(id) ) {
-        DBAddOption(_p.get(), id, val._array.data());
+        DBAddOption(_p.get(), id, (void*)val._array.data());
       } else {
         std::visit( [id, ptr = _p.get()](auto& v)
                     { DBAddOption(ptr, id, (void*)&v); }, val._numeric );

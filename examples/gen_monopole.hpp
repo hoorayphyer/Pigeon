@@ -59,7 +59,7 @@ namespace pic {
 
 // TODOL free parameters for specific lab
 namespace pic {
-  inline constexpr real_t mu0 = 60000.0;
+  inline constexpr real_t mu0 = 15000.0;
   inline constexpr real_t omega_max = 1.0 / 6.0;
 
   inline constexpr int spinup_duration = 10.0;
@@ -67,12 +67,16 @@ namespace pic {
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min( time / pic::spinup_duration, 1.0 ) * pic::omega_max;
   }
+
   namespace ofs {
     inline constexpr int magnetic_pole = 1; // 1 for mono-, 2 for di-
-    inline constexpr int indent[4] = { 5, 86, guard, guard };
-    inline constexpr real_t damping_rate = 0.1;
+    inline constexpr int indent[4] = { 5, 20, guard, guard };
+    inline constexpr real_t damping_rate = 0.01;
   }
+}
 
+namespace pic :: interval {
+  inline constexpr int data_export = 20;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -186,6 +190,8 @@ namespace pic {
         _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
       }
     }
+
+    constexpr int initial_timestep() noexcept { return 0; }
   };
 
   // template < int DGrid,
@@ -381,7 +387,7 @@ namespace pic {
       using namespace particle;
 
       constexpr Real v_th = 0.3;
-      constexpr Real j_reg_x = 2.0;
+      constexpr Real j_reg_x = 0.0;
       constexpr int Ninj = 10;
 
       constexpr auto posion = species::positron;

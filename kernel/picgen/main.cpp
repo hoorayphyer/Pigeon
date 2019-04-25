@@ -32,16 +32,13 @@ int main() {
   { // use block to force destruction of potential mpi communicators before mpi::finalize
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
-    // TODO initial condition. Hard Code for now. Will set the following
-    int timestep_begin = 0;
-
-    util::Rng<pic::real_t> rng{};
-    rng.set_seed( timestep_begin + mpi::world.rank() );
-
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
-      sim( pic::supergrid, cart_opt, pic::guard, rng );
+      sim( pic::supergrid, cart_opt, pic::guard );
 
-    for ( int ts = timestep_begin; ts < timestep_begin + pic::total_timesteps; ++ts ) {
+    int init_timestep = sim.load_initial_condition<pic::InitialCondition>();
+    sim.set_rng_seed( init_timestep + mpi::world.rank() );
+
+    for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
       sim.evolve( ts, pic::dt );
     }
   }

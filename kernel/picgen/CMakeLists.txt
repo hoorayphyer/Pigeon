@@ -27,7 +27,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 
 add_executable(pic "main.cpp")
 target_include_directories(pic PRIVATE ${KERNEL_DIR} ${KERNEL_DIR}/include )
-target_link_libraries(pic PRIVATE old_field_solver particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen)
+target_link_libraries(pic PRIVATE old_field_solver particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen data_exporter)
 
 # if(LAB_ROOT_DIR)
 #   set_target_properties(aperture PROPERTIES

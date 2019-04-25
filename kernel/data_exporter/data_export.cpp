@@ -1,6 +1,5 @@
 #include "data_export.hpp"
 #include "io/silo++.hpp"
-#include "io/silo_optlist.hpp"
 #include "parallel/mpi++.hpp"
 #include "utility/filesys.hpp"
 #include "field/communication.hpp"
@@ -272,8 +271,8 @@ namespace io {
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
 
-    const std::string prefix = util::filesys::append_slash(this_run_dir) + "data/timestep" + str_ts + "/";
-    util::filesys::create_directories(prefix);
+    const std::string prefix = util::fs::append_slash(this_run_dir) + "data/timestep" + str_ts + "/";
+    util::fs::create_directories(prefix);
 
     silo::pmpio::file_t dbfile;
     silo::file_t master;
@@ -317,20 +316,21 @@ namespace io {
       }
 
       dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
+      return;
       if ( cart_opt->rank() == 0 ) {
         master = silo::open<silo::Mode::Write>( prefix + "../timestep" + str_ts + ".silo" );
 
         // set up file_ns and block_ns
         constexpr char delimiter = ' ';
         file_ns = delimiter + prefix + "set%d.silo" + delimiter + "n%" + std::to_string(num_files);
-        block_ns = delimiter + "cart";
+        block_ns = delimiter + std::string("cart");
         auto [c, dims, p] = cart_opt -> coords_dims_periodic();
         for ( int i = 0; i < dims.size(); ++i ) block_ns += "_%03d";
         std::vector<int> strides ( dims.size() + 1 );
         strides[0] = 1;
         for ( int i = 0; i < dims.size(); ++i ) strides[i+1] = strides[i] * dims[i];
         for ( int i = 0; i < dims.size(); ++i ) {
-          block_ns += delimiter + "(n%" + std::to_string(strides[i+1]) + ")/" + std::to_string(strides[i]);
+          block_ns += delimiter + std::string("(n%" + std::to_string(strides[i+1]) + ")/") + std::to_string(strides[i]);
         }
       }
       {

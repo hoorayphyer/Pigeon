@@ -60,7 +60,7 @@ test_gen(field mesh) # DONE
 test_gen(field communication mpipp) # DONE
 test_gen(field current_deposition) # DONE
 
-# test_gen(io silo++ mpipp silo_lib) # TODO
+test_gen(io silo++ mpipp silopp filesys) # TODO
 
 test_gen(particle state) # DONE
 # test_gen(particle particle) # TODO some tests on this are in particle_array
