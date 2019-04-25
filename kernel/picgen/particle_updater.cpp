@@ -115,10 +115,18 @@ namespace particle {
 
     field::current_deposition::integrate(J);
 
-    // NOTE rescale Jmesh back to real grid delta
-    for ( int i = 0; i < DGrid; ++i ) {
-      auto comp = J[i]; // TODOL semantics;
-      for ( auto& elm : comp.data() ) elm *= _localgrid[i].delta();
+    { // NOTE rescale Jmesh back to real grid delta
+      Real dV = 1.0;
+      for ( int i = 0; i < DGrid; ++i ) dV *= _localgrid[i].delta();
+
+      for ( int i = 0; i < DGrid; ++i ) {
+        Real tmp = _localgrid[i].delta() / dV;
+        for ( auto& elm : J[i].data() ) elm *= tmp;
+      }
+
+      for ( int i = DGrid; i < 3; ++i ) {
+        for ( auto& elm : J[i].data() ) elm /= dV;
+      }
     }
 
   }
