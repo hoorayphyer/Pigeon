@@ -14,7 +14,7 @@ static void CleanField (MultiArray<Scalar>& input, Scalar upper_lim) {
 }
 
 template < typename FBCParams_t >
-void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond, const FUParams& params, const FBCParams_t& fieldBC ) {
+void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond, const FUParams& params, const FBCParams_t& fieldBC, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg ) {
   const auto& isBoundary = params.is_at_boundary;
   for ( const auto& elm : fieldBC ) {
     auto b = elm.first;
@@ -26,8 +26,7 @@ void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond,
       field_bdry_cond[b] = new FieldBC_coordinate(b);
       break;
     case FieldBCType::DAMPING :
-      // TODO last two fields are not set up
-      field_bdry_cond[b] = new FieldBC_damping( b, params.dt, params.grid, fieldBC.at(b), VectorField<Scalar>(), VectorField<Scalar>() );
+      field_bdry_cond[b] = new FieldBC_damping( b, params.dt, params.grid, fieldBC.at(b), E_bg, B_bg );
       break;
     case FieldBCType::ROTATING_CONDUCTOR :
       field_bdry_cond[b] = new FieldBC_rotating_conductor( b, params.grid, fbc );
@@ -36,13 +35,13 @@ void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond,
   } // end of for
 }
 
-FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc)
+FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg)
   : _grid(params.grid), _is_at_boundary(params.is_at_boundary),
     _fd(fd), _fc(fc) {
 
   const auto& grid = params.grid;
 
-  SetFieldBC( _fieldBC, params, params.fieldBC );
+  SetFieldBC( _fieldBC, params, params.fieldBC, E_bg, B_bg );
 
   _BfieldOld = vector_field_type(grid);
   _BfieldDelta = vector_field_type(grid);

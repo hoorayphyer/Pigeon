@@ -22,7 +22,7 @@ namespace particle {
   ParticleUpdater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
   ::ParticleUpdater( const knl::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng )
     : _localgrid(localgrid), _rng(rng) {
-    set_up<Real>(); // TODO
+    set_up<Real>();
   }
 }
 

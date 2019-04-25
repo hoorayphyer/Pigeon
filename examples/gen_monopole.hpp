@@ -40,13 +40,21 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 10;
+  inline constexpr int total_timesteps = 1000;
   inline constexpr real_t dt = 0.001;
-  inline constexpr real_t unit_e = 100;
 
   constexpr knl::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, std::log(30.0), 16 }, { 0.0, PI, 16 } }};
+  = {{ { 0.0, std::log(30.0), 128 }, { 0.0, PI, 128 } }};
   inline constexpr int guard = 1;
+
+  inline constexpr int Np = 5;
+  inline constexpr real_t epsilon = 1.0 / 5.0;
+
+  constexpr real_t classic_electron_radius () noexcept {
+    real_t res = epsilon * epsilon / ( 4 * PI* Np * dt * dt);
+    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
+    return res;
+  }
 }
 
 // TODOL free parameters for specific lab
@@ -82,7 +90,6 @@ namespace particle {
 }
 
 namespace particle {
-  // TODO call this function in particle updater
   template < typename Real >
   void set_up() {
     using namespace pic;
@@ -136,15 +143,11 @@ namespace particle {
 }
 
 namespace pic {
-  template < typename Real, int DGrid >
-  apt::pair< apt::Index<DGrid> > gtl ( const apt::array<apt::pair<Real>,DGrid>& range,
-                                       const knl::Grid<Real,DGrid>& localgrid ) noexcept {
-    apt::Index<DGrid> Ib;
-    apt::Index<DGrid> extent;
-    for ( int i = 0; i < DGrid; ++i ) {
-      Ib[i] = std::max<int>( 0, ( range[i][LFT] - localgrid[i].lower() ) / localgrid[i].delta() );
-      extent[i] = std::min<int>( range[i][RGT], localgrid[i].dim() ) - Ib[i];
-    }
+  template < typename Real >
+  apt::pair< Real > gtl ( const apt::pair<Real>& range,
+                          const knl::Grid1D<Real>& localgrid ) noexcept {
+    Real Ib = std::max<int>( 0, ( range[LFT] - localgrid.lower() ) / localgrid.delta() );
+    Real extent = std::min<int>( range[RGT], localgrid.dim() ) - Ib;
     return { Ib, extent };
   }
 
@@ -163,11 +166,7 @@ namespace pic {
     const Real _mu0 = pic::mu0;
 
     Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
-      return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
-    };
-
-    Real B_th_over_mu0 ( Real logr, Real theta ) noexcept {
-      return std::sin(theta) * std::exp(-3.0 * logr);
+      return std::exp(-2.0 * logr);
     };
 
   public:
@@ -177,117 +176,117 @@ namespace pic {
                        const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                        const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Bfield(Bfield) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {1.0, std::log(30.0)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
+      apt::tie(_Ib[0], _extent[0]) = gtl( {0.0, std::log(30.0)}, localgrid[0] );
+      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
     void operator() () {
       for ( auto I : apt::Block(_extent) ) {
         I += _Ib;
         _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
-        _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
       }
     }
   };
 
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct FieldBC_Rotating_Conductor {
-  private:
-    const knl::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _Efield;
-    field::Field<Real, 3, DGrid>& _Bfield;
+  // template < int DGrid,
+  //            typename Real,
+  //            template < typename > class Specs,
+  //            typename RealJ >
+  // struct FieldBC_Rotating_Conductor {
+  // private:
+  //   const knl::Grid<Real,DGrid>& _grid;
+  //   field::Field<Real, 3, DGrid>& _Efield;
+  //   field::Field<Real, 3, DGrid>& _Bfield;
 
-    apt::Index<DGrid> _Ib;
-    apt::Index<DGrid> _extent;
+  //   apt::Index<DGrid> _Ib;
+  //   apt::Index<DGrid> _extent;
 
-    const Real _mu0 = pic::mu0;
+  //   const Real _mu0 = pic::mu0;
 
-    Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
-      return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
-    };
+  //   Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
+  //     return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
+  //   };
 
-    Real B_th_over_mu0 ( Real logr, Real theta ) noexcept {
-      return std::sin(theta) * std::exp(-3.0 * logr);
-    };
+  //   Real B_th_over_mu0 ( Real logr, Real theta ) noexcept {
+  //     return std::sin(theta) * std::exp(-3.0 * logr);
+  //   };
 
-    // find out E by E = -( Omega x r ) x B
-    Real E_r_over_mu0omega ( Real logr, Real theta ) noexcept {
-      auto sin_t = std::sin(theta);
-      return std::exp( -2.0 * logr ) * sin_t * sin_t;
-    };
+  //   // find out E by E = -( Omega x r ) x B
+  //   Real E_r_over_mu0omega ( Real logr, Real theta ) noexcept {
+  //     auto sin_t = std::sin(theta);
+  //     return std::exp( -2.0 * logr ) * sin_t * sin_t;
+  //   };
 
-    Real E_th_over_mu0omega ( Real logr, Real theta ) noexcept {
-      return - std::exp( -2.0 * logr ) * std::sin( 2.0 * theta );
-    };
+  //   Real E_th_over_mu0omega ( Real logr, Real theta ) noexcept {
+  //     return - std::exp( -2.0 * logr ) * std::sin( 2.0 * theta );
+  //   };
 
-  public:
-    FieldBC_Rotating_Conductor ( const knl::Grid<Real,DGrid>& localgrid,
-                                 field::Field<Real, 3, DGrid>& Efield,
-                                 field::Field<Real, 3, DGrid>& Bfield,
-                                 const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-                                 const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {0.0, std::log(1.01)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
-    }
+  // public:
+  //   FieldBC_Rotating_Conductor ( const knl::Grid<Real,DGrid>& localgrid,
+  //                                field::Field<Real, 3, DGrid>& Efield,
+  //                                field::Field<Real, 3, DGrid>& Bfield,
+  //                                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
+  //                                const particle::map<particle::array<Real,Specs>>& particles )
+  //     : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
+  //     _Ib[0] = 0;
+  //     _extent[0] = pic::ofs::indent[0];
+  //     apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
+  //   }
 
-    void operator() ( int timestep, Real dt ) {
-      const auto omega = pic::omega_spinup( timestep * dt );
-      for ( auto I : apt::Block(_extent) ) {
-        I += _Ib;
-        // TODO deal with discontinuous and continuous variables
-        // TODO piecing together different patches
-        _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
-        _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
-        _Bfield[2](I) = 0.0;
+  //   void operator() ( int timestep, Real dt ) {
+  //     const auto omega = pic::omega_spinup( timestep * dt );
+  //     for ( auto I : apt::Block(_extent) ) {
+  //       I += _Ib;
+  //       // TODO deal with discontinuous and continuous variables
+  //       // TODO piecing together different patches
+  //       _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
+  //       _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
+  //       _Bfield[2](I) = 0.0;
 
-        _Efield[0](I) = _mu0 * omega * E_r_over_mu0omega( _grid[0].absc(I[0], _Efield[0].offset()[0]), _grid[1].absc(I[1], _Efield[0].offset()[1]) );
-        _Efield[1](I) = _mu0 * omega * E_th_over_mu0omega( _grid[0].absc(I[0], _Efield[1].offset()[0]), _grid[1].absc(I[1], _Efield[1].offset()[1]) );
-        _Efield[2](I) = 0.0;
-      }
-    }
-  };
+  //       _Efield[0](I) = _mu0 * omega * E_r_over_mu0omega( _grid[0].absc(I[0], _Efield[0].offset()[0]), _grid[1].absc(I[1], _Efield[0].offset()[1]) );
+  //       _Efield[1](I) = _mu0 * omega * E_th_over_mu0omega( _grid[0].absc(I[0], _Efield[1].offset()[0]), _grid[1].absc(I[1], _Efield[1].offset()[1]) );
+  //       _Efield[2](I) = 0.0;
+  //     }
+  //   }
+  // };
 
-  template < bool IsLower, int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct FieldBC_Axis {
-  private:
-    const knl::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _Efield;
-    field::Field<Real, 3, DGrid>& _Bfield;
+  // template < bool IsLower, int DGrid,
+  //            typename Real,
+  //            template < typename > class Specs,
+  //            typename RealJ >
+  // struct FieldBC_Axis {
+  // private:
+  //   const knl::Grid<Real,DGrid>& _grid;
+  //   field::Field<Real, 3, DGrid>& _Efield;
+  //   field::Field<Real, 3, DGrid>& _Bfield;
 
-    bool _is_at_axis = false;
+  //   bool _is_at_axis = false;
 
-  public:
-    FieldBC_Axis ( const knl::Grid<Real,DGrid>& localgrid,
-                        field::Field<Real, 3, DGrid>& Efield,
-                        field::Field<Real, 3, DGrid>& Bfield,
-                        const field::Field<RealJ, 3, DGrid>& Jfield,
-                        const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-      if constexpr ( IsLower )
-                     _is_at_axis = std::abs( localgrid[1].lower() - 0.0 ) < localgrid[1].delta();
-      else
-        _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
-    }
+  // public:
+  //   FieldBC_Axis ( const knl::Grid<Real,DGrid>& localgrid,
+  //                       field::Field<Real, 3, DGrid>& Efield,
+  //                       field::Field<Real, 3, DGrid>& Bfield,
+  //                       const field::Field<RealJ, 3, DGrid>& Jfield,
+  //                       const particle::map<particle::array<Real,Specs>>& particles )
+  //     : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
+  //     if constexpr ( IsLower )
+  //                    _is_at_axis = std::abs( localgrid[1].lower() - 0.0 ) < localgrid[1].delta();
+  //     else
+  //       _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
+  //   }
 
-    void operator() () {
-      // TODO We don't need to do anything to the guard cells right?
-      if ( !_is_at_axis ) return;
-      // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
-      const auto& mesh = _Efield.mesh();
-      int n = IsLower ? 0 : _grid[1].dim();
-      for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-        _Efield[1][trI | n] = 0.0;
-        _Bfield[2][trI | n] = 0.0;
-      }
-    }
-  };
+  //   void operator() () {
+  //     // TODO We don't need to do anything to the guard cells right?
+  //     if ( !_is_at_axis ) return;
+  //     // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
+  //     const auto& mesh = _Efield.mesh();
+  //     int n = IsLower ? 0 : _grid[1].dim();
+  //     for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+  //       _Efield[1][trI | n] = 0.0;
+  //       _Bfield[2][trI | n] = 0.0;
+  //     }
+  //   }
+  // };
 
   template < bool IsLower, int DGrid,
              typename Real,
@@ -373,8 +372,9 @@ namespace pic {
                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Efield(Efield), _Bfield(Bfield), _Jfield(Jfield), _particles(particles) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {std::log(1.01), std::log(1.02)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
+      _Ib[0] = pic::ofs::indent[0] - 1;
+      _extent[0] = 1;
+      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
     void operator() ( int timestep, Real dt, util::Rng<Real>& rng ) {

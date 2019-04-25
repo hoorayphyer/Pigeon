@@ -39,7 +39,7 @@ int main() {
     rng.set_seed( timestep_begin + mpi::world.rank() );
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
-      sim( pic::supergrid, cart_opt, pic::guard, rng, pic::unit_e );
+      sim( pic::supergrid, cart_opt, pic::guard, rng );
 
     for ( int ts = timestep_begin; ts < timestep_begin + pic::total_timesteps; ++ts ) {
       sim.evolve( ts, pic::dt );

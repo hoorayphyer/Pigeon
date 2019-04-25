@@ -141,11 +141,10 @@ namespace ofs {
   }
 
   template < int DGrid >
-  OldFieldUpdater<DGrid>::OldFieldUpdater( double unit_e,
-                                           const mpi::CartComm& cart,
+  OldFieldUpdater<DGrid>::OldFieldUpdater( const mpi::CartComm& cart,
                                            const knl::Grid<double,DGrid>& local_grid,
                                            apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                           int guard ) : _cart(cart), _unit_e(unit_e) {
+                                           int guard ) : _cart(cart) {
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
       fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
@@ -179,16 +178,42 @@ namespace ofs {
 
     // NOTE Currently FieldUpdater only lives on primaries, which permits grid to be copied into Fields
     // set up E, B, J
-    { auto& grid = fuparams.grid;
+    {
+      const auto& grid = fuparams.grid;
       Efield.resize(grid);
       Bfield.resize(grid);
       current.resize(grid);
     }
 
+    { // set up E_bg and B_bg for damping and store in Efield, Bfield
+      Efield.assign(0.0);
+      Bfield.assign(0.0);
+      const auto& grid = fuparams.grid;
+
+      for (int j = 0; j < grid.dims[1]; j++) {
+        Scalar theta = grid.pos(1, j, 0);
+        Scalar theta_s = grid.pos(1, j, 1);
+        for (int i = 0; i < grid.dims[0]; i++) {
+          Scalar r = exp(grid.pos(0, i, 0));
+          Scalar r_s = exp(grid.pos(0, i, 1));
+
+          if ( pic::ofs::magnetic_pole == 1 ) {
+            Bfield(0, i, j ) = pic::mu0 / (r * r);
+          } else if ( pic::ofs::magnetic_pole == 2 ) {
+            Bfield(0, i, j) = pic::mu0 * 2.0 * cos(theta_s) / (r * r * r);
+            Bfield(1, i, j) = pic::mu0 * sin(theta) / (r_s * r_s * r_s);
+          }
+        }
+      }
+
+    }
     // create FieldUpdater
     fc.reset( new FieldCommunicator( cart, fuparams ) );
     fd.reset( new FiniteDiff(CoordType::LOG_SPHERICAL, fuparams.grid) );
-    fu.reset( new FieldUpdater( fuparams, *fd, *fc ) );
+    fu.reset( new FieldUpdater( fuparams, *fd, *fc, Efield, Bfield ) );
+
+    Efield.assign(0.0);
+    Bfield.assign(0.0);
   }
 
   template < int DGrid >
@@ -224,12 +249,11 @@ namespace ofs {
       convert_from_new( current, Jmesh );
 
       // NOTE differences of new code
-      // 1. The new code will evolve Maxwell's equations with 4\pi. So `current` should first be multiplied by 4\pi
+      // 1. The new code will evolve Maxwell's equations with 4\pi r_e.
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
-      // 3. Jmesh needs to be multiplied by unit_e
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= (4 * CONST_PI * _unit_e);
+          current.ptr(c)[i] *= (4 * pic::PI * pic::classic_electron_radius());
 
       RestoreJToRealSpace(current, grid);
       fc->SendGuardCells(current);

@@ -42,7 +42,7 @@ class FieldUpdater {
   typedef VectorField<Scalar> vector_field_type;
   typedef ScalarField<Scalar> scalar_field_type;
 
-  FieldUpdater( const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc );
+  FieldUpdater( const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg );
   ~FieldUpdater();
 
   void Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,

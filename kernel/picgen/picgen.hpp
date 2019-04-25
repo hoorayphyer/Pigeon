@@ -48,8 +48,6 @@ namespace pic {
     FieldBC_FoldBackJ<false, DGrid, Real, PtcSpecs, RealJ> _fbj_upper;
     Injector< DGrid, Real, PtcSpecs, RealJ> _injector;
 
-    Real _unit_e;
-
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
 
@@ -60,7 +58,7 @@ namespace pic {
       return res;
     }
 
-    void refresh( const dye::Ensemble<DGrid>& ens, double unit_e ) {
+    void refresh( const dye::Ensemble<DGrid>& ens ) {
       apt::Index<DGrid> bulk_dims;
       for ( int i = 0; i < DGrid; ++i ) {
         int dim = _supergrid[i].dim() / ens.cart_dims[i];
@@ -89,23 +87,22 @@ namespace pic {
 
       ens.is_at_boundary();
       if ( _cart_opt )
-        _field_update.reset(new ::ofs::OldFieldUpdater<>( unit_e, *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
+        _field_update.reset(new ::ofs::OldFieldUpdater<>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
       _ptc_update.reset(new particle::ParticleUpdater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng ) );
     }
 
   public:
-    Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng, double unit_e )
+    Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard, util::Rng<Real> rng )
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt), _rng(std::move(rng)),
         _injector{ _grid, _E, _B, _J, _particles },
         _fbj_lower{ _grid, _E, _B, _J, _particles },
-        _fbj_upper{ _grid, _E, _B, _J, _particles },
-        _unit_e(unit_e) {
+        _fbj_upper{ _grid, _E, _B, _J, _particles } {
       _grid = supergrid;
       _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
       if ( !_ens_opt ) return;
 
       const auto& ens = *_ens_opt;
-      refresh(ens, unit_e);
+      refresh(ens);
 
       InitialCondition ic( _grid, _E, _B, _J, _particles );
       ic();
@@ -189,7 +186,7 @@ namespace pic {
 
           std::optional<int> new_label;
           if ( _ens_opt ) new_label.emplace(_ens_opt->label());
-          if ( old_label != new_label ) refresh(*_ens_opt, _unit_e);
+          if ( old_label != new_label ) refresh(*_ens_opt);
         }
       }
 

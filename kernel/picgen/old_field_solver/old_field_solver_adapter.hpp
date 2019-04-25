@@ -18,15 +18,13 @@ namespace ofs {
     static_assert( DGrid == 2 );
   private:
     const mpi::CartComm& _cart;
-    const double _unit_e;
 
   public:
     using field_type = field::Field<double,3,DGrid>;
     using J_type = field::Field<RealJ,3,DGrid>;
 
     // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
-    OldFieldUpdater( const double unit_e,
-                     const mpi::CartComm& cart,
+    OldFieldUpdater( const mpi::CartComm& cart,
                      const knl::Grid<double,DGrid>& local_grid,
                      apt::array< apt::pair<bool>, DGrid > is_at_boundary,
                      int guard );
