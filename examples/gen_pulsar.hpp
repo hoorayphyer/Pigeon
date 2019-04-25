@@ -20,7 +20,6 @@ namespace particle {
   struct Properties {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
-    bool is_radiative = false; // TODO move this to scattering
     const char name[] = "";
   };
 }
@@ -35,6 +34,29 @@ namespace particle {
   ForceGen<Real, Specs,Ptc_t> force_gen;
 }
 
+// common parameters
+namespace pic {
+  constexpr long double PI = std::acos(-1.0l);
+
+  inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
+  inline constexpr apt::array<bool,DGrid> periodic = {false,false};
+  inline constexpr int total_timesteps = 1000;
+  inline constexpr real_t dt = 0.001;
+
+  constexpr knl::Grid<real_t,DGrid> supergrid
+  = {{ { 0.0, std::log(30.0), 128 }, { 0.0, PI, 128 } }};
+  inline constexpr int guard = 1;
+
+  inline constexpr int Np = 5;
+  inline constexpr real_t epsilon = 1.0 / 5.0;
+
+  constexpr real_t classic_electron_radius () noexcept {
+    real_t res = epsilon * epsilon / ( 4 * PI* Np * dt * dt);
+    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
+    return res;
+  }
+}
+
 namespace pic {
   // TODOL these will become free parameters
   inline constexpr real_t mu0 = 60000.0;
@@ -47,8 +69,14 @@ namespace pic {
   }
   namespace ofs {
     inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
+    inline constexpr int indent[4] = { 5, 20, guard, guard };
+    inline constexpr real_t damping_rate = 0.01;
   }
 
+}
+
+namespace pic :: interval {
+  inline constexpr int data_export = 20;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -133,7 +161,6 @@ namespace particle {
     }
   };
 
-
   // LogSpherical
   namespace force {
     template < typename T, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
@@ -169,18 +196,20 @@ namespace particle {
     {
       // TODO initialize properties at a different place
       // TODO move out
-      properties[species::electron] = {1,-1,true,"electron"};
-      properties[species::positron] = {1,1,true,"positron"};
-      properties[species::ion] = { 5, 1, false,"ion"};
-      properties[species::photon] = { 0, 0, true,"photon" };
+      properties[species::electron] = {1,-1,"electron"};
+      properties[species::positron] = {1,1,"positron"};
+      properties[species::ion] = { 5, 1, "ion"};
+      properties[species::photon] = { 0, 0, "photon" };
     }
 
     {
-      Real landau0_B_thr = 0.1 * pic::mu0;
       using Force = force::Force<real_t,Specs,vParticle>;
       constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
+      Real landau0_B_thr = 0.1 * pic::mu0;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
+
+      constexpr Real gravity_strength = 1.8;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
       {
         auto sp = species::electron;
@@ -188,7 +217,7 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
+        force.add( gravity, gravity_strength );
         force.add( landau0, landau0_B_thr );
 
         fgen.Register( sp, force );
@@ -199,7 +228,7 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
+        force.add( gravity, gravity_strength );
         force.add( landau0, landau0_B_thr );
 
         fgen.Register( sp, force );
@@ -210,7 +239,7 @@ namespace particle {
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, 1.8 );
+        force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr ); // TODO check
 
         fgen.Register( sp, force );
@@ -271,17 +300,11 @@ namespace particle {
 }
 
 namespace pic {
-  constexpr long double PI = std::acos(-1.0l);
-
-  template < typename Real, int DGrid >
-  apt::pair< apt::Index<DGrid> > gtl ( const apt::array<apt::pair<Real>,DGrid>& range,
-                                       const knl::Grid<Real,DGrid>& localgrid ) noexcept {
-    apt::Index<DGrid> Ib;
-    apt::Index<DGrid> extent;
-    for ( int i = 0; i < DGrid; ++i ) {
-      Ib[i] = std::max<int>( 0, ( range[i][LFT] - localgrid[i].lower() ) / localgrid[i].delta() );
-      extent[i] = std::min<int>( range[i][RGT], localgrid[i].dim() ) - Ib[i];
-    }
+  template < typename Real >
+  apt::pair< Real > gtl ( const apt::pair<Real>& range,
+                          const knl::Grid1D<Real>& localgrid ) noexcept {
+    Real Ib = std::max<int>( 0, ( range[LFT] - localgrid.lower() ) / localgrid.delta() );
+    Real extent = std::min<int>( range[RGT], localgrid.dim() ) - Ib;
     return { Ib, extent };
   }
 
@@ -314,8 +337,8 @@ namespace pic {
                              const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                              const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Bfield(Bfield) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {1.0, std::log(30.0)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
+      apt::tie(_Ib[0], _extent[0]) = gtl( {0.0, std::log(30.0)}, localgrid[0] );
+      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
     void operator() () {
@@ -325,6 +348,8 @@ namespace pic {
         _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
       }
     }
+
+    constexpr int initial_timestep() noexcept { return 0; }
   };
 
   template < int DGrid,
@@ -367,8 +392,9 @@ namespace pic {
                                  const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                                  const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {0.0, std::log(1.01)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
+          _Ib[0] = 0;
+          _extent[0] = pic::ofs::indent[0];
+          apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
     void operator() ( int timestep, Real dt ) {
@@ -413,6 +439,7 @@ namespace pic {
         _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
     }
 
+    // TODO also set Ib and extent for this class
     void operator() () {
       // TODO We don't need to do anything to the guard cells right?
       if ( !_is_at_axis ) return;
@@ -451,6 +478,7 @@ namespace pic {
         _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
     }
 
+    // TODO also set Ib and extent for this class
     void operator() () {
       if ( !_is_at_axis ) return;
 
@@ -510,8 +538,9 @@ namespace pic {
                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Efield(Efield), _Bfield(Bfield), _Jfield(Jfield), _particles(particles) {
-      constexpr apt::array<apt::pair<Real>,DGrid> global_range = {{ {std::log(1.01), std::log(1.02)}, {0, PI} }};
-      apt::tie(_Ib, _extent) = gtl( global_range, localgrid );
+      _Ib[0] = pic::ofs::indent[0] - 1;
+      _extent[0] = 1;
+      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
     void operator() ( int timestep, Real dt, util::Rng<Real>& rng ) {
