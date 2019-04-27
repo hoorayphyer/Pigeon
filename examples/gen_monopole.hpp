@@ -38,9 +38,12 @@ namespace particle {
 namespace pic {
   constexpr long double PI = std::acos(-1.0l);
 
+  inline constexpr char* project_name = "Monopole";
+  inline constexpr char* datadir_prefix = "../Data/";
+
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 1000;
+  inline constexpr int total_timesteps = 100;
   inline constexpr real_t dt = 0.001;
 
   constexpr knl::Grid<real_t,DGrid> supergrid

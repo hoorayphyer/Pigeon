@@ -9,6 +9,57 @@
 
 #include "gen.hpp"
 
+#include <time.h>
+#include <cstring>
+namespace io {
+  std::string this_run_dir;
+
+  void init_this_run_dir( std::string prefix ) {
+    util::fs::append_slash(prefix);
+
+    char subDir[100] = {};
+    for ( int i = 0; i < 100; ++i )
+      subDir[i] = '\0';
+    // use world root time to ensure uniqueness
+    if ( mpi::world.rank() == 0 ) {
+      char myTime[100] = {};
+      time_t rawtime;
+      struct tm* timeinfo;
+      time (&rawtime);
+      timeinfo = localtime(&rawtime);
+      strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
+      snprintf(subDir, sizeof(subDir), "%s/", myTime);
+    }
+    mpi::world.broadcast( 0, subDir, 100 );
+
+    this_run_dir = prefix + pic::project_name + "-" + subDir;
+
+    if ( mpi::world.rank() == 0 ) {
+      std::string local_data_dir = "Data/"; // local directory for storing data symlinks
+      util::fs::create_directories(this_run_dir);
+      util::fs::create_directories(local_data_dir);
+      util::fs::create_directory_symlink(this_run_dir, local_data_dir + pic::project_name + "-" + subDir);
+    }
+
+    util::fs::append_slash(this_run_dir);
+  }
+
+  // TODO
+  // void set_logger_dir( std::string logDir ) {
+  //   // int rank = comm.world().rank();
+  //   // Logger::thisRank = rank;
+  //   // Logger::setActiveRank( rank );
+  //   // if( Logger::isActiveRank && Logger::isLogToFile ) {
+  //   //   FileSystem::create_directories(logDir);
+  //   //   Logger::setLogFile( logDir + "rank_" + std::to_string( rank ) );
+  //   // } else {
+  //   //   // is not LogToFile, only let rank0 output to screen
+  //   //   if ( rank != 0)
+  //   //     Logger::setVerbosityLevel(-1);
+  //   // }
+  // }
+}
+
 namespace io {
   // template < typename T, int DGrid >
   // std::unordered_map<std::string, FieldBasedExportee<T,DGrid>*> fld_exportees;
@@ -257,7 +308,7 @@ namespace io {
              typename ShapeF,
              typename RealJ,
              typename Metric >
-  void export_data( std::string this_run_dir, int timestep, Real dt, int num_files,
+  void export_data( int timestep, Real dt, int num_files,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
                     const knl::Grid<Real,DGrid>& grid, // local grid
@@ -271,7 +322,7 @@ namespace io {
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
 
-    const std::string prefix = util::fs::append_slash(this_run_dir) + "data/timestep" + str_ts + "/";
+    const std::string prefix = this_run_dir + "data/timestep" + str_ts + "/";
     util::fs::create_directories(prefix);
 
     silo::pmpio::file_t dbfile;
@@ -396,7 +447,7 @@ namespace io {
 
   template
   void export_data<real_export_t, DGrid, real_t, particle::Specs, ShapeF, real_j_t, Metric>
-  ( std::string this_run_dir, int timestep, real_t dt, int num_files,
+  ( int timestep, real_t dt, int num_files,
     const std::optional<mpi::CartComm>& cart_opt,
     const dye::Ensemble<DGrid>& ens,
     const knl::Grid<real_t,DGrid>& grid, // local grid

@@ -30,6 +30,7 @@ int main() {
   mpi::initialize();
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
+    io::init_this_run_dir( pic::datadir_prefix );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >

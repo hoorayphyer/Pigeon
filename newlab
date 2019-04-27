@@ -19,8 +19,8 @@ printf "%s\n" \
     "#!/bin/bash"\
     "# This script works only under the current directory."\
     "# It deletes symlinks and their associated data directories."\
-    "# To avoid any catastrophical event, deletable symlinks must begin with Data20, followed by 6 digits, followed by -, followed by 4 digits."\
-    "regex='^Data20[0-9]{6}[-][0-9]{4}$'"\
+    "# To avoid any catastrophical event, deletable symlinks must begin with Data/, followed by some project name, followed by 6 digits, followed by -, followed by 4 digits."\
+    "regex='^Data/.+\-20[0-9]{6}[-][0-9]{4}$'"\
     "for i in \"\$@\""\
     "do"\
     "    if [[ \$i =~ \$regex && -L \$i ]]; then # -L checks symlink"\
