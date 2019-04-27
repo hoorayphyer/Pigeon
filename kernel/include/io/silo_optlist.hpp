@@ -50,8 +50,7 @@ namespace silo {
     }
 
     OptList();
-    OptList( const OptList& other ) // simply call the copy constructor of unordered_map
-      : std::unordered_map<int,OptVal>( static_cast<const std::unordered_map<int,OptVal>&>(other) ) {}
+    OptList( const OptList& other );
     OptList( OptList&& ) = default;
     ~OptList() = default;
   };

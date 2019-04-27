@@ -299,7 +299,8 @@ namespace io {
 
     auto put_to_master =
       [&master, &file_ns, &block_ns, &optlist]( std::string varname, int nblock ) {
-        master.put_multivar( varname, nblock, file_ns, block_ns, optlist );
+        // FIXME
+        // master.put_multivar( varname, nblock, file_ns, block_ns, optlist );
       };
 
     if ( cart_opt ) {
@@ -311,17 +312,17 @@ namespace io {
       std::string silo_dname = "cart";
       for ( const auto& x : coords ) {
         char tmp[10];
-        sprintf(tmp, "_%03d\0", x );
+        sprintf(tmp, "_%03d", x );
         silo_dname += tmp;
       }
 
       dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
-      return;
+
       if ( cart_opt->rank() == 0 ) {
         master = silo::open<silo::Mode::Write>( prefix + "../timestep" + str_ts + ".silo" );
 
         // set up file_ns and block_ns
-        constexpr char delimiter = ' ';
+        constexpr char delimiter = '|';
         file_ns = delimiter + prefix + "set%d.silo" + delimiter + "n%" + std::to_string(num_files);
         block_ns = delimiter + std::string("cart");
         auto [c, dims, p] = cart_opt -> coords_dims_periodic();
@@ -346,8 +347,9 @@ namespace io {
         }
 
         dbfile.put_mesh(MeshExport, coords, optlist);
-        if ( cart_opt->rank() == 0 )
+        if ( cart_opt->rank() == 0 ) {
           master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns, optlist );
+        }
       }
 
       // TODOL

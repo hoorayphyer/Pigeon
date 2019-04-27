@@ -35,17 +35,23 @@ namespace silo::pmpio {
 
   extern int num_files;
 
-  struct PmpioDBfileHandle {
+  struct DBfileHandle {
     PMPIO_baton_t* baton_h = nullptr;
     DBfile* file_h = nullptr;
   };
 
-  void pmpio_file_free( PmpioDBfileHandle* p );
-  inline PmpioDBfileHandle pmpio_file_null() { return {}; }
+  void file_free( DBfileHandle* p );
+  inline DBfileHandle file_null() { return {}; }
 
-  struct file_t : public apt::Handle<PmpioDBfileHandle, pmpio_file_free, pmpio_file_null>,
-                  public SiloPutter<file_t>{
-    operator DBfile*() noexcept { return *this ? static_cast<PmpioDBfileHandle*>(*this)->file_h : nullptr; }
+  struct file_t : public apt::Handle<pmpio::DBfileHandle, pmpio::file_free, pmpio::file_null>,
+                  public SiloPutter<pmpio::file_t> {
+    // NOTE: This is subtle. This explicit delegated call is needed because otherwise, converting to bool would go as first converting to DBfile*, which is a pointer, and then converting that to bool, which is not what we want. Add explicit in conversion to DBfile* is not preferred because we do want implicit conversion of file_t to DBfile*
+    inline operator bool() noexcept {
+      return apt::Handle<pmpio::DBfileHandle, pmpio::file_free, pmpio::file_null>::operator bool();
+    }
+
+    operator DBfile*() noexcept { return *this ? static_cast<pmpio::DBfileHandle*>(*this)->file_h : nullptr; }
+
   };
 
   template < Mode mode >

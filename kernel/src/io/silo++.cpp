@@ -41,7 +41,7 @@ namespace silo {
 }
 
 namespace silo :: pmpio {
-  void pmpio_file_free( PmpioDBfileHandle* p ) {
+  void file_free( DBfileHandle* p ) {
     if ( p && (*p).baton_h ) {
       if ( (*p).file_h ) PMPIO_HandOffBaton( (*p).baton_h, (*p).file_h );
       PMPIO_Finish( (*p).baton_h );
@@ -83,7 +83,7 @@ namespace silo :: pmpio {
     PMPIO_baton_t* baton_h = PMPIO_Init( num_files, pmpio_mode, comm, mpi_tag, createCb, openCb, PMPIO_DefaultClose, NULL );
 
     DBfile* file_h = (DBfile*) PMPIO_WaitForBaton( baton_h, filename.c_str(), dirname.c_str() );
-    dbfile.reset( new PmpioDBfileHandle{ baton_h, file_h } );
+    dbfile.reset( new DBfileHandle{ baton_h, file_h } );
 
     return dbfile;
   }

@@ -33,27 +33,42 @@ namespace silo {
 namespace silo{
   template < typename file_t >
   template < typename T >
-  void SiloPutter<file_t>::put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, const OptList& optlist ) {
-    int ndims = coords.size();
+  void SiloPutter<file_t>::put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, OptList optlist ) {
+    const int ndims = coords.size();
+
+    std::vector<const void*> raw_ptr(ndims);
+    for ( int i = 0; i < ndims; ++i ) raw_ptr[i] = coords[i].data();
+
     std::vector<int> dims(ndims);
-    for (int i = 0; i < ndims; ++i )
+    for ( int i = 0; i < ndims; ++i )
       dims[i] = coords[i].size();
 
-    DBPutQuadmesh( _dbfile(), meshname.c_str(), NULL,
-                   coords.data(), dims.data(), ndims,
-                   datatype((T)0), DB_COLLINEAR, optlist );
+
+    DBPutQuadmesh( _dbfile(), meshname.c_str(), NULL, raw_ptr.data(), dims.data(), ndims, datatype((T)0), DB_COLLINEAR, optlist );
   }
 
   template < typename file_t >
   template < typename T >
-  void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims ) {
-    DBPutQuadvar1(_dbfile(), varname.c_str(), meshname.c_str(), vardata, dims.data(), dims.size(), NULL, 0, datatype((T)0), DB_NODECENT, NULL);
+  void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims, OptList optlist ) {
+    DBPutQuadvar1(_dbfile(), varname.c_str(), meshname.c_str(), vardata, dims.data(), dims.size(), NULL, 0, datatype((T)0), DB_NODECENT, optlist);
+  }
+
+  template < typename file_t >
+  template < typename T >
+  void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const std::vector<const T*>& vardata, const std::vector<int>& dims, OptList optlist ) {
+    int nvars = vardata.size();
+    std::vector<std::string> varstrs(nvars);
+    for ( int i = 0; i < nvars; ++i ) varstrs[i] = varname + std::to_string(i+1);
+    std::vector<const char*> varnames(nvars);
+    for ( int i = 0; i < nvars; ++i ) varnames[i] = varstrs[i].c_str();
+    DBPutQuadvar(_dbfile(), varname.c_str(), meshname.c_str(), nvars, varnames.data(), vardata.data(), dims.data(), dims.size(), NULL, 0, datatype((T)0), DB_NODECENT, optlist);
   }
 
   template < typename file_t >
   void SiloPutter<file_t>:: put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
     DBoptlist* raw_list = optlist;
-    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, (void*)DB_QUAD_RECT);
+    int a = DB_QUAD_RECT;
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, &a);
     DBAddOption(raw_list, DBOPT_MB_FILE_NS, (void*)file_ns.c_str());
     DBAddOption(raw_list, DBOPT_MB_BLOCK_NS, (void*)block_ns.c_str());
     DBPutMultimesh(_dbfile(), multimeshname.c_str(), nblock, NULL, NULL, raw_list );
@@ -62,7 +77,8 @@ namespace silo{
   template < typename file_t >
   void SiloPutter<file_t>:: put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
     DBoptlist* raw_list = optlist;
-    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, (void*)DB_QUADVAR);
+    int a = DB_QUADVAR;
+    DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, &a);
     DBAddOption(raw_list, DBOPT_MB_FILE_NS, (void*)file_ns.c_str());
     DBAddOption(raw_list, DBOPT_MB_BLOCK_NS, (void*)block_ns.c_str());
     DBPutMultivar(_dbfile(), multivarname.c_str(), nblock, NULL, NULL, raw_list );
@@ -71,14 +87,19 @@ namespace silo{
 
 #include "io/silo++.hpp"
 namespace silo {
-  template struct SiloPutter<silo::file_t>;
-  template struct SiloPutter<silo::pmpio::file_t>;
-#define INSTANTIATE_SILO_PUT(_TYPE_) \
-  template void SiloPutter<silo::file_t>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, const OptList& ); \
-  template void SiloPutter<silo::file_t>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims ); \
-  template void SiloPutter<silo::pmpio::file_t>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, const OptList& ); \
-  template void SiloPutter<silo::pmpio::file_t>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims )
+  template struct SiloPutter<file_t>;
+  template struct SiloPutter<pmpio::file_t>;
 
-  INSTANTIATE_SILO_PUT(float);
-  INSTANTIATE_SILO_PUT(double);
+#define INSTANTIATE_SILO_PUTTER_FOR_FILE(_SILO_FILE_, _TYPE_)           \
+  template void SiloPutter<_SILO_FILE_>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, OptList ); \
+  template void SiloPutter<_SILO_FILE_>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims, OptList ); \
+  template void SiloPutter<_SILO_FILE_>::put_var( std::string, std::string, const std::vector<const _TYPE_*>&, const std::vector<int>& dims, OptList )
+
+#define INSTANTIATE_SILO_PUTTER(_TYPE_)                   \
+  INSTANTIATE_SILO_PUTTER_FOR_FILE(file_t, _TYPE_);       \
+  INSTANTIATE_SILO_PUTTER_FOR_FILE(pmpio::file_t, _TYPE_)
+
+
+  INSTANTIATE_SILO_PUTTER(float);
+  INSTANTIATE_SILO_PUTTER(double);
 }

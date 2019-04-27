@@ -56,6 +56,11 @@ namespace silo {
     _p.reset(DBMakeOptlist(3));
   }
 
+  OptList::OptList( const OptList& other )
+    : std::unordered_map<int,OptVal>( static_cast<const std::unordered_map<int,OptVal>&>(other) ) {
+    _p.reset(DBMakeOptlist(3));
+  }
+
   OptList::operator DBoptlist* () const {
 
     for ( auto& [id, val] : *this ) {
