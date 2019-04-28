@@ -18,8 +18,11 @@ namespace field::impl {
       : _shapef( shapef ) {
 
       apt::foreach<0,DGrid>
-        ( []( auto& i_b, auto& s_b, auto l, const auto& ofs ){
+        ( []( auto& i_b, auto& s_b, auto l, const auto& ofs ) {
             l -= ofs; // now l is the native grid index
+
+            static_assert( ShapeF::support() > 1); // TODOL
+
             i_b = int(l - ShapeF::support() / 2.0) + 1; // i_b is native
             s_b = i_b - l;
             i_b += (( ofs == MIDWAY ) && ( l - static_cast<int>(l) >= ofs )); // i_b now is with respect to original grid
@@ -29,7 +32,7 @@ namespace field::impl {
     constexpr const auto& I_b() const noexcept { return _I_b; }
 
     constexpr T weight ( const apt::Index<DGrid>& I ) noexcept{
-      T result = 0;
+      T result = 1.0; // NOTE 1.0, not 0.0
 
       auto update_wgt = // alternative to nested loops
         [&]( const auto& I ) {
@@ -53,7 +56,6 @@ namespace field::impl {
 }
 
 namespace field {
-
 
   template < int DGrid, int Supp >
   constexpr apt::Index<DGrid> ShapeExtent

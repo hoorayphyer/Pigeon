@@ -43,7 +43,7 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 100;
+  inline constexpr int total_timesteps = 1000;
   inline constexpr real_t dt = 0.001;
 
   constexpr knl::Grid<real_t,DGrid> supergrid
@@ -150,11 +150,12 @@ namespace particle {
 }
 
 namespace pic {
+  // TODOL check gtl boundary on extent.
   template < typename Real >
   apt::pair< Real > gtl ( const apt::pair<Real>& range,
                           const knl::Grid1D<Real>& localgrid ) noexcept {
     Real Ib = std::max<int>( 0, ( range[LFT] - localgrid.lower() ) / localgrid.delta() );
-    Real extent = std::min<int>( range[RGT], localgrid.dim() ) - Ib;
+    Real extent = std::min<int>( ( range[RGT] - localgrid.lower() ) / localgrid.delta(), localgrid.dim() ) - Ib;
     return { Ib, extent };
   }
 
@@ -172,7 +173,7 @@ namespace pic {
 
     const Real _mu0 = pic::mu0;
 
-    Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
+    Real B_r_over_mu0 ( Real logr ) noexcept {
       return std::exp(-2.0 * logr);
     };
 
@@ -190,7 +191,7 @@ namespace pic {
     void operator() () {
       for ( auto I : apt::Block(_extent) ) {
         I += _Ib;
-        _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
+        _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]) );
       }
     }
 
@@ -390,7 +391,6 @@ namespace pic {
       using namespace particle;
 
       constexpr Real v_th = 0.3;
-      constexpr Real j_reg_x = 0.0;
       constexpr int Ninj = 10;
 
       constexpr auto posion = species::positron;
@@ -404,14 +404,8 @@ namespace pic {
       // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
       auto profile_inj =
         [&Ninj,&timestep] ( Real theta ) noexcept {
-          Real inj_num_base = Ninj * 0.5 * std::abs( std::sin( 2 * theta ) );
+          Real inj_num_base = Ninj * std::abs( std::sin(theta) );
           return static_cast<int>( (timestep + 1) * inj_num_base ) - static_cast<int>( timestep * inj_num_base );
-        };
-
-      auto j_reg_inj =
-        [&grid=_grid, charge_x, &j_reg_x]( Real J ) noexcept {
-          static auto factor = j_reg_x * grid[0].delta() * grid[1].delta() / charge_x;
-          return J * factor;
         };
 
       auto itr_po = std::back_inserter(_particles[posion]);
@@ -429,7 +423,7 @@ namespace pic {
           J[i] = _Jfield[i](I);
         }
 
-        int num = std::max<Real>( profile_inj(q[1]), j_reg_inj(apt::abs(J)) );
+        int num = profile_inj(q[1]);
 
         // find n_B
         nB /= apt::abs(nB);

@@ -8,6 +8,7 @@
 #include "dye/ensemble.hpp"
 
 #include "gen.hpp"
+#include <silo.h> // for some DBOPTs
 
 #include <time.h>
 #include <cstring>
@@ -298,7 +299,6 @@ namespace io {
 }
 
 
-#include <silo.h> // for some DBOPTs
 namespace io {
 
   template < typename RealExport,
@@ -350,8 +350,7 @@ namespace io {
 
     auto put_to_master =
       [&master, &file_ns, &block_ns, &optlist]( std::string varname, int nblock ) {
-        // FIXME
-        // master.put_multivar( varname, nblock, file_ns, block_ns, optlist );
+        master.put_multivar( varname, nblock, file_ns, block_ns, optlist );
       };
 
     if ( cart_opt ) {
