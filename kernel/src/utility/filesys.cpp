@@ -6,6 +6,11 @@ namespace filesystem = std::filesystem;
 using std::error_code;
 
 namespace util::fs {
+  std::string absolute( std::string dir ) {
+    filesystem::path p = dir;
+    return filesystem::absolute(p);
+  }
+
   std::string append_slash( std::string dir ) {
     if ( dir != "" && dir.back() != '/' )
       dir.append("/");

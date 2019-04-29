@@ -19,7 +19,7 @@ namespace silo {
   void dbfile_free ( DBfileHandle* p );
   inline DBfileHandle dbfile_null() { return nullptr; };
 
-  enum class Mode : char { Read = 0, Write, Append };
+  enum class Mode : bool { Read = false, Write = true };
 
   struct file_t : public apt::Handle<DBfileHandle, dbfile_free, dbfile_null>,
                   public SiloPutter<file_t> {};

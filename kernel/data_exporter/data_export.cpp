@@ -33,7 +33,7 @@ namespace io {
     }
     mpi::world.broadcast( 0, subDir, 100 );
 
-    this_run_dir = prefix + pic::project_name + "-" + subDir;
+    this_run_dir = util::fs::absolute( prefix + pic::project_name + "-" + subDir );
 
     if ( mpi::world.rank() == 0 ) {
       std::string local_data_dir = "Data/"; // local directory for storing data symlinks
@@ -268,7 +268,7 @@ namespace io {
     template < typename File_t, typename RealExport, typename F_put_to_master >
     void operator() ( File_t& dbfile, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       // TODO dbfile.put charge mass of the species in
-      // FIXME TODO save gamma P density, which is total gamma / physical cell volume. Later this divided by number density gives us gamma P per unit particle. TODO: think this over.
+      // TODO save gamma P density, which is total gamma / physical cell volume. Later this divided by number density gives us gamma P per unit particle. Think this over.
       field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
 
       std::vector<int> dims(DGrid);
@@ -326,9 +326,31 @@ namespace io {
     util::fs::create_directories(prefix);
 
     silo::pmpio::file_t dbfile;
+
     silo::file_t master;
-    std::string file_ns;
-    std::string block_ns;
+    // set up file_ns and block_ns. Only significant on world.rank() == 0
+    constexpr char delimiter = '|';
+    const std::string file_ns = delimiter + prefix + "set%d.silo" + delimiter + "n%" + std::to_string(num_files);
+
+    auto block_ns_gen =
+      [delimiter, &cart_opt]( std::string name ) -> std::string {
+        static auto parts =
+          [&]() -> apt::pair<std::string> {
+            std::string part1 = delimiter + std::string("cart");
+            auto [c, dims, p] = cart_opt->coords_dims_periodic();
+            for ( int i = 0; i < dims.size(); ++i ) part1 += "_%03d";
+
+            std::string part2 = "";
+            std::vector<int> strides ( dims.size() + 1 );
+            strides[0] = 1;
+            for ( int i = 0; i < dims.size(); ++i ) strides[i+1] = strides[i] * dims[i];
+            for ( int i = 0; i < dims.size(); ++i ) {
+              part2 += delimiter + std::string("(n%" + std::to_string(strides[i+1]) + ")/") + std::to_string(strides[i]);
+            }
+            return {part1, part2};
+          } ();
+        return parts[LFT] + "/" + name + parts[RGT];
+      };
 
     auto bulk_dims_export = Efield.mesh().bulk_dims();
     for ( int i = 0; i < DGrid; ++i ) bulk_dims_export[i] /= ds_ratio;
@@ -349,8 +371,8 @@ namespace io {
     optlist[DBOPT_HI_OFFSET] = export_offset;
 
     auto put_to_master =
-      [&master, &file_ns, &block_ns, &optlist]( std::string varname, int nblock ) {
-        master.put_multivar( varname, nblock, file_ns, block_ns, optlist );
+      [&master, &file_ns, &block_ns_gen, &optlist]( std::string varname, int nblock ) {
+        master.put_multivar( varname, nblock, file_ns, block_ns_gen(varname), optlist );
       };
 
     if ( cart_opt ) {
@@ -368,22 +390,9 @@ namespace io {
 
       dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
 
-      if ( cart_opt->rank() == 0 ) {
+      if ( cart_opt->rank() == 0 )
         master = silo::open<silo::Mode::Write>( prefix + "../timestep" + str_ts + ".silo" );
 
-        // set up file_ns and block_ns
-        constexpr char delimiter = '|';
-        file_ns = delimiter + prefix + "set%d.silo" + delimiter + "n%" + std::to_string(num_files);
-        block_ns = delimiter + std::string("cart");
-        auto [c, dims, p] = cart_opt -> coords_dims_periodic();
-        for ( int i = 0; i < dims.size(); ++i ) block_ns += "_%03d";
-        std::vector<int> strides ( dims.size() + 1 );
-        strides[0] = 1;
-        for ( int i = 0; i < dims.size(); ++i ) strides[i+1] = strides[i] * dims[i];
-        for ( int i = 0; i < dims.size(); ++i ) {
-          block_ns += delimiter + std::string("(n%" + std::to_string(strides[i+1]) + ")/") + std::to_string(strides[i]);
-        }
-      }
       {
         std::vector< std::vector<RealExport> > coords(DGrid);
         for ( int i = 0; i < DGrid; ++i ) {
@@ -398,7 +407,7 @@ namespace io {
 
         dbfile.put_mesh(MeshExport, coords, optlist);
         if ( cart_opt->rank() == 0 ) {
-          master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns, optlist );
+          master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
         }
       }
 

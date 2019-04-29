@@ -19,25 +19,32 @@ namespace silo {
     if (p && *p) DBClose(*p);
   }
 
-  // TODO check file existence
   template < Mode mode >
   file_t open(  std::string filename ) {
     file_t dbfile;
 
     if constexpr ( Mode::Read == mode )
                    dbfile.reset( new DBfileHandle(DBOpen( filename.c_str(), traits::filetype, DB_READ )));
-    else if ( Mode::Write == mode )
-      // TODO what if an existing file?
-      dbfile.reset( new DBfileHandle(DBCreate( filename.c_str(), traits::create_mode, traits::create_target, NULL, traits::filetype )));
-    else
-      dbfile.reset(new DBfileHandle( DBOpen( filename.c_str(), traits::filetype, DB_APPEND )));
+    else {
+      // try open with DB_APPEND, if failed, do DBCreate
+      // TODOL edge case: the file exists by accident so is garbage, but we need a new file
+      // Temporarily disable error string to be printed
+      auto* errfunc = DBErrfunc();
+      int errlvl = DBErrlvl();
+      DBShowErrors(DB_NONE, errfunc);
+      DBfile* db = DBOpen( filename.c_str(), traits::filetype, DB_APPEND );
+      DBShowErrors(errlvl, errfunc);
+      if ( NULL == db ) {
+        db = DBCreate( filename.c_str(), traits::create_mode, traits::create_target, NULL, traits::filetype );
+      }
+      dbfile.reset( new DBfileHandle(db));
+    }
     return dbfile;
   }
 
 
   template file_t open<Mode::Read>( std::string filename );
   template file_t open<Mode::Write>( std::string filename );
-  template file_t open<Mode::Append>( std::string filename );
 }
 
 namespace silo :: pmpio {
@@ -71,7 +78,6 @@ namespace silo :: pmpio {
     return (void *) siloFile;
   }
 
-  // TODO check file existence
   template< Mode mode >
   file_t open( std::string filename, std::string dirname, const mpi::Comm& comm, int num_files ) {
     file_t dbfile;
