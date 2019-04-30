@@ -233,16 +233,17 @@ namespace ofs {
           const auto& g = grid.guard;
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
-            for ( int j = 0; j < grid.reducedDim(1); ++j ) {
-              for ( int i = 0; i < grid.reducedDim(0); ++i ) {
+            // TODO double check the correction to j < .... and i < ...
+            for ( int j = 0; j < grid.reducedDim(1) + (o[1] == INSITU); ++j ) {
+              for ( int i = 0; i < grid.reducedDim(0) + (o[0] == INSITU); ++i ) {
                 old_f( c,
                        i + g[0] - (o[0] == INSITU),
                        j + g[1] - (o[1] == INSITU)
                        ) = new_f[c]({i,j});
               }}}
+          // TODOL there is no need to copy guard cell values to current right? Because field solver doesn't use those values, instead they have boundary conditions
           fc->SendGuardCells(old_f);
         };
-      // TODO also should copy guard cell values into old_f
       convert_from_new( current, Jmesh );
 
 
@@ -268,8 +269,8 @@ namespace ofs {
           const auto& g = grid.guard;
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
-            for ( int j = 0; j < grid.reducedDim(1); ++j ) {
-              for ( int i = 0; i < grid.reducedDim(0); ++i ) {
+            for ( int j = 0; j < grid.reducedDim(1) + (o[1] == INSITU); ++j ) {
+              for ( int i = 0; i < grid.reducedDim(0) + (o[0] == INSITU); ++i ) {
                 new_f[c]({i,j}) = old_f( c,
                                          i + g[0] - (o[0] == INSITU),
                                          j + g[1] - (o[1] == INSITU)
@@ -277,7 +278,6 @@ namespace ofs {
                 field::sync_guard_cells_from_bulk( new_f, _cart );
               }}}
         };
-      // TODO also should copy guard cell values into new_f
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
     }

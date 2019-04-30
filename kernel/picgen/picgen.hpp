@@ -46,8 +46,8 @@ namespace pic {
 
     std::vector<particle::cParticle<Real, PtcSpecs>> _migrators;
 
-    std::unique_ptr<FieldBC_FoldBackJ<true, DGrid, Real, PtcSpecs, RealJ>> _fbj_lower;
-    std::unique_ptr<FieldBC_FoldBackJ<false, DGrid, Real, PtcSpecs, RealJ>> _fbj_upper;
+    std::unique_ptr<FieldBC_Axis<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
+    std::unique_ptr<FieldBC_FoldBackJ<DGrid, Real, PtcSpecs, RealJ>> _fbj;
     std::unique_ptr<Injector< DGrid, Real, PtcSpecs, RealJ>> _injector;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
@@ -87,8 +87,8 @@ namespace pic {
         _J.reset();
       }
 
-      _fbj_lower.reset( new typename decltype(_fbj_lower)::element_type {_grid, _E, _B, _J, _particles} );
-      _fbj_upper.reset( new typename decltype(_fbj_upper)::element_type {_grid, _E, _B, _J, _particles} );
+      _fbc_axis.reset( new typename decltype(_fbc_axis)::element_type {_grid, _E, _B, _J, _particles} );
+      _fbj.reset( new typename decltype(_fbj)::element_type {_grid, _E, _B, _J, _particles} );
       _injector.reset( new typename decltype(_injector)::element_type {_grid, _E, _B, _J, _particles} );
 
       ens.is_at_boundary();
@@ -130,6 +130,7 @@ namespace pic {
         if ( _cart_opt ) {
           field::merge_guard_cells_into_bulk( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
+          (*_fbc_axis)();
         }
 
         // TODOL reduce number of communications?
@@ -144,8 +145,7 @@ namespace pic {
 
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
 
-        if(_fbj_lower) (*_fbj_lower)();
-        if(_fbj_upper) (*_fbj_upper)();
+        (*_fbj)();
 
         { // migration
           auto migrate_dir =
@@ -174,7 +174,7 @@ namespace pic {
           _migrators.resize(0);
         }
 
-        if(_injector) (*_injector)( timestep, dt, _rng );
+        (*_injector)( timestep, dt, _rng );
       }
 
 

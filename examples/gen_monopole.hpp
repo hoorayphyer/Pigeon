@@ -20,7 +20,7 @@ namespace particle {
   struct Properties {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
-    const std::string name  = "";
+    std::string name  = "";
   };
 }
 
@@ -264,46 +264,54 @@ namespace pic {
   //   }
   // };
 
-  // template < bool IsLower, int DGrid,
-  //            typename Real,
-  //            template < typename > class Specs,
-  //            typename RealJ >
-  // struct FieldBC_Axis {
-  // private:
-  //   const knl::Grid<Real,DGrid>& _grid;
-  //   field::Field<Real, 3, DGrid>& _Efield;
-  //   field::Field<Real, 3, DGrid>& _Bfield;
+  template < int DGrid,
+             typename Real,
+             template < typename > class Specs,
+             typename RealJ >
+  struct FieldBC_Axis {
+  private:
+    const knl::Grid<Real,DGrid>& _grid;
+    field::Field<Real, 3, DGrid>& _Efield;
+    field::Field<Real, 3, DGrid>& _Bfield;
 
-  //   bool _is_at_axis = false;
+    const int axis_dir = 1;
+    bool _is_at_axis_lower = false;
+    bool _is_at_axis_upper = false;
 
-  // public:
-  //   FieldBC_Axis ( const knl::Grid<Real,DGrid>& localgrid,
-  //                       field::Field<Real, 3, DGrid>& Efield,
-  //                       field::Field<Real, 3, DGrid>& Bfield,
-  //                       const field::Field<RealJ, 3, DGrid>& Jfield,
-  //                       const particle::map<particle::array<Real,Specs>>& particles )
-  //     : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-  //     if constexpr ( IsLower )
-  //                    _is_at_axis = std::abs( localgrid[1].lower() - 0.0 ) < localgrid[1].delta();
-  //     else
-  //       _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
-  //   }
+  public:
+    FieldBC_Axis ( const knl::Grid<Real,DGrid>& localgrid,
+                        field::Field<Real, 3, DGrid>& Efield,
+                        field::Field<Real, 3, DGrid>& Bfield,
+                        const field::Field<RealJ, 3, DGrid>& Jfield,
+                        const particle::map<particle::array<Real,Specs>>& particles )
+      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
+      _is_at_axis_lower = std::abs( localgrid[axis_dir].lower() - 0.0 ) < localgrid[axis_dir].delta();
+      _is_at_axis_upper = std::abs( localgrid[axis_dir].upper() - PI ) < localgrid[axis_dir].delta();
+    }
 
-  //   void operator() () {
-  //     // TODO We don't need to do anything to the guard cells right?
-  //     // TODO NO! Guard cells values are needed when doing interpolating E and B
-  //     if ( !_is_at_axis ) return;
-  //     // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
-  //     const auto& mesh = _Efield.mesh();
-  //     int n = IsLower ? 0 : _grid[1].dim();
-  //     for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-  //       _Efield[1][trI | n] = 0.0;
-  //       _Bfield[2][trI | n] = 0.0;
-  //     }
-  //   }
-  // };
+    void operator() () {
+      // TODO Guard cells values are needed when doing interpolating E and B
+      // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
+      const auto& mesh = _Efield.mesh();
+      if ( _is_at_axis_lower ) {
+        int n = 0;
+        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+          _Efield[1][trI | n] = 0.0;
+          _Bfield[2][trI | n] = 0.0;
+        }
+      }
 
-  template < bool IsLower, int DGrid,
+      if ( _is_at_axis_upper ) {
+        int n = _grid[1].dim();
+        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+          _Efield[1][trI | n] = 0.0;
+          _Bfield[2][trI | n] = 0.0;
+        }
+      }
+    }
+  };
+
+  template < int DGrid,
              typename Real,
              template < typename > class Specs,
              typename RealJ >
@@ -313,7 +321,9 @@ namespace pic {
     const knl::Grid<Real,DGrid>& _grid;
     field::Field<RealJ, 3, DGrid>& _Jmesh;
 
-    bool _is_at_axis = false;
+    const int axis_dir = 1;
+    bool _is_at_axis_lower = false;
+    bool _is_at_axis_upper = false;
 
   public:
     FieldBC_FoldBackJ ( const knl::Grid<Real,DGrid>& localgrid,
@@ -322,32 +332,29 @@ namespace pic {
                         field::Field<RealJ, 3, DGrid>& Jfield,
                         const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Jmesh(Jfield) {
-      if constexpr ( IsLower )
-                     _is_at_axis = std::abs( localgrid[1].lower() - 0.0 ) < localgrid[1].delta();
-      else
-        _is_at_axis = std::abs( localgrid[1].upper() - PI ) < localgrid[1].delta();
+      _is_at_axis_lower = std::abs( localgrid[axis_dir].lower() - 0.0 ) < localgrid[axis_dir].delta();
+      _is_at_axis_upper = std::abs( localgrid[axis_dir].upper() - PI ) < localgrid[axis_dir].delta();
     }
 
     void operator() () {
-      if ( !_is_at_axis ) return;
-
       const auto& mesh = _Jmesh.mesh();
       const int guard = mesh.guard();
 
-      if constexpr ( IsLower ) {
-          for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-            for ( int n = 0; n < guard; ++n ) {
-              _Jmesh[0][ trI | n ] += _Jmesh[0][ trI | -1 - n ];
-              _Jmesh[2][ trI | n ] -= _Jmesh[0][ trI | -1 - n ];
-            }
-
-            _Jmesh[1][trI | 0] = 0.0;
-            // TODO check the negative sign here
-            for ( int n = 0; n < guard; ++n )
-              _Jmesh[1][ trI | 1 + n ] -= _Jmesh[1][ trI | -1 - n ];
+      if ( _is_at_axis_lower ) {
+        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+          for ( int n = 0; n < guard; ++n ) {
+            _Jmesh[0][ trI | n ] += _Jmesh[0][ trI | -1 - n ];
+            _Jmesh[2][ trI | n ] -= _Jmesh[0][ trI | -1 - n ];
           }
-        } else {
 
+          _Jmesh[1][trI | 0] = 0.0;
+          // TODO check the negative sign here
+          for ( int n = 0; n < guard; ++n )
+            _Jmesh[1][ trI | 1 + n ] -= _Jmesh[1][ trI | -1 - n ];
+        }
+      }
+
+      if ( _is_at_axis_upper ) {
         const int dim = mesh.bulk_dim(1);
         for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
           for ( int n = 0; n < guard; ++n ) {
