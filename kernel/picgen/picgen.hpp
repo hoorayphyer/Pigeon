@@ -46,9 +46,9 @@ namespace pic {
 
     std::vector<particle::cParticle<Real, PtcSpecs>> _migrators;
 
-    FieldBC_FoldBackJ<true, DGrid, Real, PtcSpecs, RealJ> _fbj_lower;
-    FieldBC_FoldBackJ<false, DGrid, Real, PtcSpecs, RealJ> _fbj_upper;
-    Injector< DGrid, Real, PtcSpecs, RealJ> _injector;
+    std::unique_ptr<FieldBC_FoldBackJ<true, DGrid, Real, PtcSpecs, RealJ>> _fbj_lower;
+    std::unique_ptr<FieldBC_FoldBackJ<false, DGrid, Real, PtcSpecs, RealJ>> _fbj_upper;
+    std::unique_ptr<Injector< DGrid, Real, PtcSpecs, RealJ>> _injector;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
@@ -87,6 +87,10 @@ namespace pic {
         _J.reset();
       }
 
+      _fbj_lower.reset( new typename decltype(_fbj_lower)::element_type {_grid, _E, _B, _J, _particles} );
+      _fbj_upper.reset( new typename decltype(_fbj_upper)::element_type {_grid, _E, _B, _J, _particles} );
+      _injector.reset( new typename decltype(_injector)::element_type {_grid, _E, _B, _J, _particles} );
+
       ens.is_at_boundary();
       if ( _cart_opt )
         _field_update.reset(new ::ofs::OldFieldUpdater<>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
@@ -95,10 +99,7 @@ namespace pic {
 
   public:
     Simulator( const knl::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
-      : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt),
-        _injector{ _grid, _E, _B, _J, _particles },
-        _fbj_lower{ _grid, _E, _B, _J, _particles },
-        _fbj_upper{ _grid, _E, _B, _J, _particles } {
+      : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
       _grid = supergrid;
       _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
       if ( !_ens_opt ) return;
@@ -140,10 +141,11 @@ namespace pic {
         _J.reset();
         // if ( false )
         //   sort_particles();
+
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
 
-        _fbj_lower();
-        _fbj_upper();
+        if(_fbj_lower) (*_fbj_lower)();
+        if(_fbj_upper) (*_fbj_upper)();
 
         { // migration
           auto migrate_dir =
@@ -172,7 +174,7 @@ namespace pic {
           _migrators.resize(0);
         }
 
-        _injector( timestep, dt, _rng );
+        if(_injector) (*_injector)( timestep, dt, _rng );
       }
 
 

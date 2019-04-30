@@ -16,7 +16,10 @@ namespace io {
   std::string this_run_dir;
 
   void init_this_run_dir( std::string prefix ) {
-    util::fs::append_slash(prefix);
+    using namespace util;
+    fs::create_directories(prefix);
+    prefix = fs::canonical(prefix);
+    fs::append_slash(prefix);
 
     char subDir[100] = {};
     for ( int i = 0; i < 100; ++i )
@@ -29,20 +32,31 @@ namespace io {
       time (&rawtime);
       timeinfo = localtime(&rawtime);
       strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
-      snprintf(subDir, sizeof(subDir), "%s/", myTime);
+      snprintf(subDir, sizeof(subDir), "%s", myTime);
     }
     mpi::world.broadcast( 0, subDir, 100 );
 
-    this_run_dir = util::fs::absolute( prefix + pic::project_name + "-" + subDir );
+    std::string postfix (subDir);
+
+    this_run_dir = prefix + pic::project_name + "-";
+    // in case of running too frequently within a minute, directories with postfixed numbers are created
+    if ( fs::exists(this_run_dir + postfix + "/") ) {
+      for ( int n = 1; ; ++n ) {
+        if ( !fs::exists(this_run_dir + postfix + "-" + std::to_string(n) + "/") ) {
+          postfix += "-" + std::to_string(n);
+          break;
+        }
+      }
+    }
+    this_run_dir += postfix + "/";
 
     if ( mpi::world.rank() == 0 ) {
       std::string local_data_dir = "Data/"; // local directory for storing data symlinks
-      util::fs::create_directories(this_run_dir);
-      util::fs::create_directories(local_data_dir);
-      util::fs::create_directory_symlink(this_run_dir, local_data_dir + pic::project_name + "-" + subDir);
+      fs::create_directories(this_run_dir);
+      fs::create_directories(local_data_dir);
+      fs::create_directory_symlink(this_run_dir, local_data_dir + pic::project_name + "-" + postfix + "/");
     }
 
-    util::fs::append_slash(this_run_dir);
   }
 
   // TODO
@@ -88,7 +102,7 @@ namespace io {
 
   constexpr char MeshExport[] = "PICMesh";
 
-  constexpr int ds_ratio = 2;
+  constexpr int ds_ratio = 1;
   using Tio = float;
 
   template < int DGrid >
@@ -391,21 +405,47 @@ namespace io {
       dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
 
       if ( cart_opt->rank() == 0 )
-        master = silo::open<silo::Mode::Write>( prefix + "../timestep" + str_ts + ".silo" );
+        master = silo::open<silo::Mode::Write>( this_run_dir + "timestep" + str_ts + ".silo" );
 
-      {
-        std::vector< std::vector<RealExport> > coords(DGrid);
-        for ( int i = 0; i < DGrid; ++i ) {
-          auto& c = coords[i];
-          auto dim = mesh_export.extent()[i];
-          c.reserve(dim);
-          c.resize(dim, {});
+      // { // TODO uncomment
+      //   std::vector< std::vector<RealExport> > coords(DGrid);
+      //   for ( int i = 0; i < DGrid; ++i ) {
+      //     auto& c = coords[i];
+      //     auto dim = mesh_export.extent()[i];
+      //     c.reserve(dim);
+      //     c.resize(dim, {});
 
-          for ( int j = 0; j < dim; ++j )
-            c[j] = grid[i].absc( ds_ratio * j, ofs_export<DGrid>[i] );
+      //     for ( int j = 0; j < dim; ++j )
+      //       c[j] = grid[i].absc( ds_ratio * j, ofs_export<DGrid>[i] );
+      //   }
+
+      //   dbfile.put_mesh(MeshExport, coords, optlist);
+      //   if ( cart_opt->rank() == 0 ) {
+      //     master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
+      //   }
+      // }
+
+      { // TODO these are solely for LogSpherical2D. It is a hotfix on visit operators problems
+        static_assert(DGrid == 2 );
+
+        int dims[DGrid] = { mesh_export.extent()[0], mesh_export.extent()[1] };
+        RealExport* coords[DGrid];
+        coords[0] = new RealExport [ dims[0] * dims[1] ];
+        coords[1] = new RealExport [ dims[0] * dims[1] ];
+
+        for ( int j = 0; j < dims[1]; ++j ) {
+          for ( int i = 0; i < dims[0]; ++i ) {
+            auto r = std::exp( grid[0].absc( ds_ratio * (i - mesh_export.guard()), ofs_export<DGrid>[0] ) );
+            auto theta = grid[1].absc( ds_ratio * (j - mesh_export.guard()), ofs_export<DGrid>[1] );
+            coords[0][i + j * dims[0]] = r * std::sin(theta);
+            coords[1][i + j * dims[0]] = r * std::cos(theta);
+          }
         }
 
-        dbfile.put_mesh(MeshExport, coords, optlist);
+        DBPutQuadmesh(dbfile, MeshExport, NULL, coords, dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist);
+        delete [] coords[0];
+        delete [] coords[1];
+
         if ( cart_opt->rank() == 0 ) {
           master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
         }

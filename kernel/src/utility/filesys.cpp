@@ -11,7 +11,12 @@ namespace util::fs {
     return filesystem::absolute(p);
   }
 
-  std::string append_slash( std::string dir ) {
+  std::string canonical( std::string dir ) {
+    filesystem::path p = dir;
+    return filesystem::canonical(p);
+  }
+
+  std::string& append_slash( std::string& dir ) {
     if ( dir != "" && dir.back() != '/' )
       dir.append("/");
     return dir;

@@ -62,7 +62,7 @@ public:
   FieldBC_rotating_conductor( BoundaryPosition bpos, const Grid& grid, const FBC& fieldBC )
     : _bpos(bpos), _grid_cond(grid), _f_t(fieldBC.ft)  {
     int dir = bpos / 2;
-    bool islower = bpos % 2;
+    bool islower = ( bpos % 2 == 0 );
 
     //1. taylor the full grid to fit the conductor region.
     //2. guard cells are irrelevant for _grid_cond. However, we still make
@@ -98,7 +98,7 @@ public:
     // At upper boundary, discontious and continuous components will both be applied boundary conditions starting from 0-th cell; stagger doesn't affect in this case.
     int dir = _bpos / 2;
     int trans[2] = { ( dir + 1 ) % VECTOR_DIM, ( dir + 2 ) % VECTOR_DIM };
-    bool islower = _bpos % 2;
+    bool islower = (_bpos % 2 == 0);
 
     Scalar ft = _f_t( time );
 

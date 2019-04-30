@@ -185,7 +185,7 @@ namespace ofs {
       current.resize(grid);
     }
 
-    { // set up E_bg and B_bg for damping and store in Efield, Bfield
+    { // NOTE this is setting up IC, as well as setting up E_bg and B_bg for damping and store in Efield, Bfield
       Efield.assign(0.0);
       Bfield.assign(0.0);
       const auto& grid = fuparams.grid;
@@ -212,8 +212,6 @@ namespace ofs {
     fd.reset( new FiniteDiff(CoordType::LOG_SPHERICAL, fuparams.grid) );
     fu.reset( new FieldUpdater( fuparams, *fd, *fc, Efield, Bfield ) );
 
-    Efield.assign(0.0);
-    Bfield.assign(0.0);
   }
 
   template < int DGrid >
@@ -244,9 +242,9 @@ namespace ofs {
               }}}
           fc->SendGuardCells(old_f);
         };
-      convert_from_new( Efield, E );
-      convert_from_new( Bfield, B );
+      // TODO also should copy guard cell values into old_f
       convert_from_new( current, Jmesh );
+
 
       // NOTE differences of new code
       // 1. The new code will evolve Maxwell's equations with 4\pi r_e.
@@ -279,6 +277,7 @@ namespace ofs {
                 field::sync_guard_cells_from_bulk( new_f, _cart );
               }}}
         };
+      // TODO also should copy guard cell values into new_f
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
     }

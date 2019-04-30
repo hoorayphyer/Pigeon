@@ -20,7 +20,7 @@ namespace particle {
   struct Properties {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
-    const char name[] = "";
+    const std::string name = "";
   };
 }
 
@@ -38,8 +38,8 @@ namespace particle {
 namespace pic {
   constexpr long double PI = std::acos(-1.0l);
 
-  inline constexpr char* project_name = "Pulsar";
-  inline constexpr char* datadir_prefix = "../Data/";
+  inline constexpr const char* project_name = "Pulsar";
+  inline constexpr const char* datadir_prefix = "../Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
@@ -306,8 +306,12 @@ namespace pic {
   template < typename Real >
   apt::pair< Real > gtl ( const apt::pair<Real>& range,
                           const knl::Grid1D<Real>& localgrid ) noexcept {
-    Real Ib = std::max<int>( 0, ( range[LFT] - localgrid.lower() ) / localgrid.delta() );
-    Real extent = std::min<int>( range[RGT], localgrid.dim() ) - Ib;
+    auto to_grid_index =
+      [&localgrid] ( auto absc ) noexcept {
+        return ( absc - localgrid.lower() ) / localgrid.delta();
+      };
+    Real Ib = std::max<int>( 0, to_grid_index( range[LFT] ) );
+    Real extent = std::min<int>( to_grid_index( range[RGT] ), localgrid.dim() ) - Ib;
     return { Ib, extent };
   }
 
@@ -445,6 +449,7 @@ namespace pic {
     // TODO also set Ib and extent for this class
     void operator() () {
       // TODO We don't need to do anything to the guard cells right?
+      // TODO NO! Guard cells values are needed when doing interpolating E and B
       if ( !_is_at_axis ) return;
       // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
       const auto& mesh = _Efield.mesh();
@@ -551,7 +556,7 @@ namespace pic {
 
       constexpr Real v_th = 0.3;
       constexpr Real j_reg_x = 2.0;
-      constexpr int Ninj = 10;
+      constexpr Real Ninj = 10;
 
       constexpr auto posion = species::positron;
       constexpr auto negaon = species::electron;
@@ -600,7 +605,7 @@ namespace pic {
         for ( int n = 0; n < num; ++n ) {
           auto q_ptc = q;
           for ( int i = 0; i < DGrid; ++i )
-            q_ptc[i] += rng.uniform();
+            q_ptc[i] += _grid[i].delta() * rng.uniform();
           auto p_ptc = p;
           p_ptc += nB * rng.gaussian( 0.0, v_th );
           *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon );

@@ -23,9 +23,14 @@ namespace field::impl {
 
             static_assert( ShapeF::support() > 1); // TODOL
 
-            i_b = int(l - ShapeF::support() / 2.0) + 1; // i_b is native
+            auto int_flr =
+              []( auto q ) noexcept {
+                // Since min(q0_std) = 0.0 by design, min(q_nat) = - r - offset, so q_nat + ( support ) / 2.0 + offset >= 0. We will simply use (support + 1) as the shift
+                constexpr auto shift = 1 + ShapeF::support();
+                return int(q+shift) - shift; };
+
+            i_b = int_flr(l - ShapeF::support() / 2.0) + 1; // i_b is native as well as standard
             s_b = i_b - l;
-            i_b += (( ofs == MIDWAY ) && ( l - static_cast<int>(l) >= ofs )); // i_b now is with respect to original grid
           }, _I_b, _sep_b, loc, offset );
     }
 
