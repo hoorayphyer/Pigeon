@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
+
+# cmake uses cc and c++ when searching for compilers. The following enables use of compilers found from PATH. Current example uses gnu compilers
+# find_program(CMAKE_C_COMPILER NAMES $ENV{CC} gcc PATHS ENV PATH NO_DEFAULT_PATH)
+find_program(CMAKE_CXX_COMPILER NAMES $ENV{CXX} g++ PATHS ENV PATH NO_DEFAULT_PATH)
+
 project () # specify your project name
 enable_testing()
 message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
@@ -29,5 +34,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu+
 add_library(picgen INTERFACE)
 target_include_directories(picgen INTERFACE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_SOURCE_DIR}/include)
 set(CMAKE_BINARY_DIR ${CMAKE_CURRENT_LIST_DIR}/.build)
+
+# uncomment to set custom silo install directory
+# set(Silo_DIR "")
 
 add_subdirectory(../kernel ${CMAKE_BINARY_DIR}/kernel)
