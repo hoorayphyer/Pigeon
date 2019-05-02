@@ -89,11 +89,11 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
         if ( world.rank() == 0 ) {
           int send_msg = 351;
           Request req = world.Isend( 1, 147, &send_msg, 1 );
-          wait(req);
+          mpi::wait(req);
         } else if ( world.rank() == 1 ) {
           int recv_msg;
           Request req = world.Irecv( 0, 147, &recv_msg, 1 );
-          wait(req);
+          mpi::wait(req);
           REQUIRE( recv_msg == 351 );
         }
         world.barrier();
@@ -117,10 +117,10 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
       SECTION("test wait on null requests") {
         if ( world.rank() == 0  ) {
           Request req;
-          wait(req);
+          mpi::wait(req);
 
           std::vector<Request> reqs(2);
-          waitall(reqs);
+          mpi::waitall(reqs);
         }
       }
     }
