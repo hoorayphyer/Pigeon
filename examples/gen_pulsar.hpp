@@ -319,7 +319,7 @@ namespace pic {
              typename Real,
              template < typename > class Specs,
              typename RealJ >
-  struct InitialConditionDipole {
+  struct InitialCondition {
   private:
     const knl::Grid<Real,DGrid>& _grid;
     field::Field<Real, 3, DGrid>& _Bfield;
@@ -338,11 +338,11 @@ namespace pic {
     };
 
   public:
-    InitialConditionDipole ( const knl::Grid<Real,DGrid>& localgrid,
-                             const field::Field<Real, 3, DGrid>& Efield,
-                             field::Field<Real, 3, DGrid>& Bfield,
-                             const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-                             const particle::map<particle::array<Real,Specs>>& particles )
+    InitialCondition ( const knl::Grid<Real,DGrid>& localgrid,
+                       const field::Field<Real, 3, DGrid>& Efield,
+                       field::Field<Real, 3, DGrid>& Bfield,
+                       const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
+                       const particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Bfield(Bfield) {
       apt::tie(_Ib[0], _extent[0]) = gtl( {0.0, std::log(30.0)}, localgrid[0] );
       apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );

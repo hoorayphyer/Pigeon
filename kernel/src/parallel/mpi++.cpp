@@ -290,7 +290,7 @@ namespace mpi {
 namespace mpi {
   InterComm::InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag ) {
     auto* comm = new MPI_Comm;
-    auto pc = ( local_comm.rank() == local_leader ) ? (*peer_comm) : MPI_COMM_NULL;
+    auto pc = ( local_comm.rank() == local_leader ) ? static_cast<MPI_Comm>(*peer_comm) : MPI_COMM_NULL;
     MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, comm );
     reset( comm );
   }

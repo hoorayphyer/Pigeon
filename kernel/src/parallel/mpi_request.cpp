@@ -29,7 +29,7 @@ namespace mpi {
     std::vector<MPI_Request> raw_reqs;
     raw_reqs.reserve(reqs.size());
     for ( int i = 0; i < reqs.size(); ++i ) {
-      raw_reqs.push_back( reqs[i] ? reqs[i] : MPI_REQUEST_NULL );
+      raw_reqs.push_back( reqs[i] ? static_cast<MPI_Request>(reqs[i]) : MPI_REQUEST_NULL );
     }
 
     MPI_Waitall( raw_reqs.size(), raw_reqs.data(), MPI_STATUSES_IGNORE );
