@@ -35,58 +35,6 @@ namespace dye::impl {
 
 // calc_nprocs_new
 namespace dye::impl {
-  void calc_new_nprocs_impl ( std::vector<int>& nproc, const std::vector<particle::load_t>& load, particle::load_t ave_load, const particle::load_t target_load ) {
-    // nproc is valid to start with
-    const unsigned int nens = nproc.size();
-
-    ave_load = ( ave_load > target_load ) ? ave_load : target_load;
-
-    int total_surplus = 0;
-    for ( int i = 0; i < nens; ++i ) {
-      total_surplus += nproc[i]; // old nproc[i]
-      nproc[i] = load[i] / ave_load;
-      nproc[i] = (nproc[i] > 1) ? nproc[i] : 1;
-      total_surplus -= nproc[i]; // new nproc[i]
-    }
-
-    if ( total_surplus > 0 ) {
-      // have more than needed. Leverage idles to mitigate the most stressed
-      apt::priority_queue<particle::load_t> pq; // store average load in pq
-      for ( int i = 0; i < nens; ++i )
-          pq.push( i, load[i] / nproc[i] );
-
-      int count = total_surplus;
-      while( count > 0 && !pq.empty() ) {
-        auto [i,avld] = pq.top(); // avld means ave_load
-        if ( avld > target_load ) {
-          pq.pop();
-          ++nproc[i];
-          particle::load_t avld_new = load[i] / nproc[i];
-          if ( avld_new > target_load )
-            pq.push( i, avld_new );
-          --count;
-        } else
-          pq.pop();
-      }
-    } else if ( total_surplus < 0 ) { //
-      // have less than needed. The richest needs to spit out
-      apt::priority_queue< particle::load_t, std::greater<particle::load_t> > pq; // store average load in pq
-      for ( int i = 0; i < nens; ++i )
-          pq.push( i, load[i] / nproc[i] );
-
-      int count = -total_surplus;
-      while( count > 0 ) {
-        int i = std::get<0>(pq.top());
-        pq.pop();
-        if ( nproc[i] > 1 ) {
-          --nproc[i];
-          pq.push( i, load[i] / nproc[i] );
-          --count;
-        }
-      }
-    }
-  }
-
   // loads = [ ens_tot_load_0, ens_size_0, ens_tot_load_1, ens_size_1... ]
   // actual total_nprocs = max( total_num_procs, accummulated_value_from_loads)
   std::vector<int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs = 0 ) {
@@ -94,8 +42,10 @@ namespace dye::impl {
     // 1. Priority Queue is used to accommodate excess or leftover of processes if any
     // 2. Edge cases:
     //    - make sure every ensemble retains at least one process
-    //    - when the load is below target_load, priority queue should do nothing to that ensemble even when there's idles
-    //    - note if load = 0 on some ensembles
+    //    - when the load is below target_load, priority queue should do nothing to that ensemble even when there's idles. This is to save computational resources when the load is not that intense
+    //    - if load = 0 on some ensembles
+    //    - if total_load = 0
+    //    - if total_load < total_nprocs, this may result in ave_load_least_possible being zero
     //    - only one ensemble
 
     // first split loads into loads and nprocs
@@ -118,13 +68,38 @@ namespace dye::impl {
       total_load += loads_and_nprocs[2*i];
       total_nprocs += loads_and_nprocs[2*i + 1];
     }
+
+    if ( 0 == total_load ) {
+      for ( auto& x : nproc ) x = 1;
+      return nproc;
+    }
+
     total_nprocs = ( total_nprocs > max_nprocs ? total_nprocs : max_nprocs );
+    // we take out the primaries and proceed as if they were not there but the loads are the same
+    total_nprocs -= nens;
 
-    const particle::load_t ave_load_least_possible = (total_load / total_nprocs) + 1; // ceiling
+    const particle::load_t ave_load_least_possible = (total_load / total_nprocs) + 1; // a-bit-larger-than-ceiling. +1 to ensure it's not 0
+    // generate a tentative deployment that utilizes all total_nprocs
+    int surplus = total_nprocs;
+    apt::priority_queue<long double> pq; // store average load in pq
+    for ( int i = 0; i < nens; ++i ) {
+      nproc[i] = load[i] / ave_load_least_possible;
+      auto ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
+      if ( ave_load > target_load ) pq.push( i, ave_load );
+      surplus -= nproc[i];
+    }
+    // NOTE one can show that by now surplus >= 0
+    while( surplus > 0 && !pq.empty() ) {
+      auto [i,avld] = pq.top(); // avld means ave_load
+      pq.pop();
+      ++nproc[i];
+      auto avld_new = static_cast<long double>(load[i]) / (nproc[i] + 1);
+      if ( avld_new > target_load ) pq.push( i, avld_new );
+      --surplus;
+    }
 
-    int N = 1; // TODOL does iteration give better results?
-    while( N-- )
-      calc_new_nprocs_impl( nproc, load, ave_load_least_possible, target_load );
+    // add back primaries
+    for ( auto& x : nproc ) ++x;
 
     return nproc;
   }

@@ -37,7 +37,7 @@ endfunction()
 
 # TODO all uses of std::abs in the code, see if anywhere std::labs should be used
 # TODO all mpi test modules should have larger tests
-# TODO apt particle has newer modules
+# TODO apt particle has new modules
 
 test_gen(apt array) # DONE
 test_gen(apt pair) # DONE
@@ -47,6 +47,7 @@ test_gen(apt vec) # DONE
 # test_gen(apt virtual_vec) # TODO
 test_gen(apt numeric) # DONE
 test_gen(apt handle) # DONE
+test_gen(apt priority_queue) # DONE
 
 
 # test_gen(kernel curvilinear) # TODO slight mismatched in phi
@@ -56,7 +57,7 @@ test_gen(parallel mpi++ mpipp) # DONE
 
 test_gen(field field) # DONE
 test_gen(field mesh) # DONE
-# test_gen(field mesh_shape_interplay) # TODO
+test_gen(field mesh_shape_interplay) # TODO
 test_gen(field communication mpipp) # DONE
 test_gen(field current_deposition) # DONE
 
@@ -71,5 +72,6 @@ test_gen(particle array) # DONE
 test_gen(particle forces) # TODO
 test_gen(particle migration mpipp dye)
 
-test_gen(dye ensemble mpipp dye) # TODO
+test_gen(dye ensemble mpipp dye) # DONE
+test_gen(dye dynamic_balance mpipp dye) # TODO
 # test_gen(aperture dynamic_balance mpipp)

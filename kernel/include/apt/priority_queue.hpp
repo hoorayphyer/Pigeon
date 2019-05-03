@@ -6,29 +6,27 @@ namespace apt {
   // provides indexing. Indexing need not be distinct
   template < typename T, class Compare = std::less<T>, typename Ind = int >
   class priority_queue {
-  private:
-
+  public:
     struct node_t {
       Ind i{};
       T val{};
     };
 
+  private:
     struct node_compare {
     private:
       Compare _comp;
     public:
       constexpr bool operator()( const node_t& a, const node_t& b ) noexcept {
-        return _comp(a.val, b.val) ? true : a.i < b.i; //NOTE index breaks ties
+        //NOTE index breaks ties. NOTE use >= so that the smaller index gets chosen first
+        return a.val == b.val ? a.i >= b.i : _comp(a.val, b.val);
       }
     };
 
     std::priority_queue< node_t, std::vector<node_t>, node_compare > _pq{};
 
   public:
-    auto top() const {
-      node_t tp = _pq.top();
-      return std::tuple<Ind, const T&>(tp.i, tp.val);
-    }
+    decltype(auto) top() const { return _pq.top(); }
 
     inline void pop() { _pq.pop(); }
 
@@ -36,6 +34,7 @@ namespace apt {
 
     inline bool empty() const { return _pq.empty(); }
 
+    inline auto size() const { return _pq.size(); }
   };
 }
 

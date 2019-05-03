@@ -31,6 +31,9 @@ namespace aio {
 
   template < typename T = double >
   using unif_real = Dist<T,std::uniform_real_distribution>;
+
+  template < typename T = double >
+  using gauss_real = Dist<T,std::normal_distribution>;
 }
 
 namespace mpi { struct CartComm; }
