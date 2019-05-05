@@ -4,6 +4,7 @@
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
 #include "particle/load_type.hpp"
 
+// bifurcate
 namespace dye::impl {
   auto bifurcate( const mpi::Comm& parent, bool color ) {
     mpi::Comm child ( *(parent.split(color)) );
@@ -24,8 +25,8 @@ namespace dye::impl {
           if ( !is_found(ranks_in_child, i) ) return i;
       };
 
-    // RATIONALE the one with smallest rank in parent in each branch becomes the leader
-    int local_leader = child.group().translate( 0, parent.group() ); // using parent.rank() in calling parent.split guarantees the correctness
+    // RATIONALE the one with smallest rank in parent in each branch becomes the leader.
+    int local_leader = 0; // NOTE local_leader is the rank in the child comm], using parent.rank() in calling parent.split guarantees the correctness
     int remote_leader = find_first_in_other(child.group().translate_all(parent.group()), parent.size());
     itc.emplace(mpi::InterComm(child, local_leader, parent, remote_leader, 80));
 
@@ -36,8 +37,7 @@ namespace dye::impl {
 // calc_nprocs_new
 namespace dye::impl {
   // loads = [ ens_tot_load_0, ens_size_0, ens_tot_load_1, ens_size_1... ]
-  // actual total_nprocs = max( total_num_procs, accummulated_value_from_loads)
-  std::vector<int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs = 0 ) {
+  std::vector<int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs ) {
     // RATIONALE The following gives a close to the, if not THE, most optimal deployment
     // 1. Priority Queue is used to accommodate excess or leftover of processes if any
     // 2. Edge cases:
@@ -50,52 +50,58 @@ namespace dye::impl {
 
     // first split loads into loads and nprocs
     const auto nens = loads_and_nprocs.size() / 2;
-    if ( nens == 1 ) return { loads_and_nprocs[1]};
-
-    particle::load_t total_load = 0;
-    unsigned int total_nprocs = 0;
-
-    std::vector<particle::load_t> load;
-    load.reserve(nens);
-    load.resize(nens, 0);
     std::vector<int> nproc;
     nproc.reserve(nens);
-    nproc.resize(nens, 0);
+    nproc.resize(nens, 1);
 
-    for ( int i = 0; i < nens; ++i ) {
-      load[i] = loads_and_nprocs[2*i];
-      nproc[i] = loads_and_nprocs[2*i+1];
-      total_load += loads_and_nprocs[2*i];
-      total_nprocs += loads_and_nprocs[2*i + 1];
+    particle::load_t total_load = 0;
+    unsigned int total_nfp = 0; // nfp means number of free procs, which excludes those that have to stay in the ensemble because there needs to be one at least
+
+    std::vector<particle::load_t> load;
+    {
+      load.reserve(nens);
+      load.resize(nens, 0);
+
+      for ( int i = 0; i < nens; ++i ) {
+        load[i] = loads_and_nprocs[2*i];
+        total_load += load[i];
+      }
+
+      if ( 0 == total_load ) return nproc;
+
+      for ( int i = 0; i < nens; ++i ) {
+        nproc[i] = loads_and_nprocs[2*i+1];
+        total_nfp += nproc[i];
+      }
+
+      if ( nens == 1 ) return nproc;
+
+      // actual available number of procs = max( total_num_procs, accummulated_value_from_loads)
+      total_nfp = ( total_nfp > max_nprocs ? total_nfp : max_nprocs );
+      // we take out the primaries and proceed as if they were not there but the loads are the same
+      total_nfp -= nens;
     }
 
-    if ( 0 == total_load ) {
-      for ( auto& x : nproc ) x = 1;
-      return nproc;
-    }
-
-    total_nprocs = ( total_nprocs > max_nprocs ? total_nprocs : max_nprocs );
-    // we take out the primaries and proceed as if they were not there but the loads are the same
-    total_nprocs -= nens;
-
-    const particle::load_t ave_load_least_possible = (total_load / total_nprocs) + 1; // a-bit-larger-than-ceiling. +1 to ensure it's not 0
-    // generate a tentative deployment that utilizes all total_nprocs
-    int surplus = total_nprocs;
-    apt::priority_queue<long double> pq; // store average load in pq
-    for ( int i = 0; i < nens; ++i ) {
-      nproc[i] = load[i] / ave_load_least_possible;
-      auto ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
-      if ( ave_load > target_load ) pq.push( i, ave_load );
-      surplus -= nproc[i];
-    }
-    // NOTE one can show that by now surplus >= 0
-    while( surplus > 0 && !pq.empty() ) {
-      auto [i,avld] = pq.top(); // avld means ave_load
-      pq.pop();
-      ++nproc[i];
-      auto avld_new = static_cast<long double>(load[i]) / (nproc[i] + 1);
-      if ( avld_new > target_load ) pq.push( i, avld_new );
-      --surplus;
+    {
+      const particle::load_t ave_load_least_possible = (total_load / total_nfp) + 1; // a-bit-larger-than-ceiling. +1 to ensure it's not 0
+      // generate a tentative deployment that utilizes all total_nprocs
+      int surplus = total_nfp;
+      apt::priority_queue<long double> pq; // store average load in pq
+      for ( int i = 0; i < nens; ++i ) {
+        nproc[i] = load[i] / ave_load_least_possible;
+        auto ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
+        if ( ave_load > target_load ) pq.push( i, ave_load );
+        surplus -= nproc[i];
+      }
+      // NOTE one can show that by now surplus >= 0
+      while( surplus > 0 && !pq.empty() ) {
+        auto [i,avld] = pq.top(); // avld means ave_load
+        pq.pop();
+        ++nproc[i];
+        auto avld_new = static_cast<long double>(load[i]) / (nproc[i] + 1);
+        if ( avld_new > target_load ) pq.push( i, avld_new );
+        --surplus;
+      }
     }
 
     // add back primaries
@@ -143,7 +149,7 @@ namespace dye::impl {
 
 // assign_labels
 namespace dye::impl{
-  std::optional<int> assign_labels( const mpi::InterComm& job_market,
+  std::optional<int> assign_labels( const std::optional<mpi::InterComm>& job_market_opt,
                                     const std::vector<int>& deficits,
                                     std::optional<int> cur_label ) {
     // RATIONALE job_market contains all primaries and all idles including those just fired from shrinking ensembles. The goal here is for all primaries to coordinate whom to send their labels to.
@@ -152,18 +158,26 @@ namespace dye::impl{
     //   - the sum of deficits <= num_idles. In the case of inequality, idles will be picked by their rank in the job_market.
     // Edge cases:
     //   - no idles
-
-    if ( job_market.remote_size() == 0 ) return {};
-
     std::optional<int> new_label;
-
-    if ( cur_label ) { // primary
+    if ( cur_label ) // primary
       new_label = cur_label;
-      int num_offers = 0;
+
+    if ( !job_market_opt ) return new_label;
+    const auto& job_market = *job_market_opt;
+    const bool is_prmy {cur_label};
+
+    int num_offers = 0;
+    if ( is_prmy ) {
       for ( int i = 0; i < deficits.size(); ++i ) num_offers += deficits[i];
 
       int root = ( 0 == job_market.rank() ) ? MPI_ROOT : MPI_PROC_NULL;
       job_market.broadcast( root, &num_offers, 1 );
+    } else {
+      job_market.broadcast(0, &num_offers, 1 );
+    }
+
+
+    if ( cur_label ) { // primary
 
       int myrank = job_market.rank();
       int num_offers_ahead = 0;
@@ -178,8 +192,6 @@ namespace dye::impl{
       mpi::waitall(reqs);
 
     } else {
-      int num_offers = 0;
-      job_market.broadcast(0, &num_offers, 1 );
       if ( job_market.rank() < num_offers ) {
         int label = 0;
         job_market.recv(MPI_ANY_SOURCE, 835, &label, 1);
@@ -379,11 +391,13 @@ namespace dye {
       auto prmy_idle_comm = std::get<0>( impl::bifurcate( mpi::world, is_replica ) );
       if ( is_replica ) new_label.emplace(ens_opt->label());
       else {
+        // treat primaries and idles here
+        std::optional<unsigned int> cur_label;
+        if ( cart_opt ) cur_label.emplace( ens_opt->label() );
+
         bool is_idle = !ens_opt;
         auto[comm, job_market] = impl::bifurcate( prmy_idle_comm, is_idle );
-        std::optional<unsigned int> cur_label;
-        if ( ens_opt ) cur_label.emplace( ens_opt->label() );
-        new_label = impl::assign_labels( *job_market, nproc_deficit, cur_label );
+        new_label = impl::assign_labels( job_market, nproc_deficit, cur_label );
       }
       auto new_ens_intra_opt = mpi::world.split( new_label );
 
@@ -391,7 +405,7 @@ namespace dye {
       ens_opt.swap(new_ens_opt);
     }
 
-    { // Step 4. Perform a complete rebalance on all ensembles together
+    { // Step 4. Perform a complete rebalance on all ensembles together. NOTE touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we simply loop over all possible
       if ( ens_opt ) {
         for ( auto&[sp, ptcs] : particles )
           detailed_balance(ptcs, ens_opt->intra);

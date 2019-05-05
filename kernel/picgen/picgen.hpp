@@ -191,6 +191,7 @@ namespace pic {
           std::optional<int> old_label;
           if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
+          // TODO manually initialize all species in the simulation
           dynamic_load_balance( _particles, _ens_opt, _cart_opt, 100000 );
 
           std::optional<int> new_label;

@@ -6,11 +6,10 @@
 #include <unordered_set>
 
 using namespace particle;
-SCENARIO("Test calc_new_nprocs", "[dye]") {
+SCENARIO("Test calc_new_nprocs", "[dye][.]") {
   if ( mpi::world.rank() == 0 ) {
     aio::unif_int<int> nens_gen( 1, 100 );
     aio::unif_int<int> ens_size_gen( 1, 100 );
-    // aio::gauss_real<double> load_gen( 1000.0, 500.0 );
 
     int N = 1000;
     while(N--) {
@@ -70,9 +69,108 @@ SCENARIO("Test calc_new_nprocs", "[dye]") {
   }
 }
 
-TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi][.]"
+TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
+                    , (std::integral_constant<int,4>)
+                    , (std::integral_constant<int,7>)
+                    ) {
+  constexpr auto nprocs = TestType::value;
+  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
+    auto parent = *(mpi::world.split( mpi::world.rank() < nprocs ));
+    // what bifurcate does is it splits an intra comm into two separate intra comms and creates an intercomm between them
+    WHEN("all members don't share the same color") {
+      if ( mpi::world.rank() < nprocs ) {
+        bool color = parent.rank() < nprocs / 2;
+        auto[ intra, inter ] = dye::impl::bifurcate( parent, color );
+        REQUIRE(inter);
+        if ( color ) {
+          REQUIRE( intra.size() == nprocs / 2 );
+          REQUIRE( inter->remote_size() == parent.size() - nprocs / 2 );
+        } else {
+          REQUIRE( intra.size() == parent.size() - nprocs / 2 );
+          REQUIRE( inter->remote_size() == nprocs / 2 );
+        }
+      }
+      mpi::world.barrier();
+    }
+
+    WHEN("all members share same color") {
+      if ( mpi::world.rank() < nprocs ) {
+        bool color = true;
+        auto[ intra, inter ] = dye::impl::bifurcate( parent, color );
+        REQUIRE_FALSE(inter);
+        REQUIRE(intra.size() == parent.size());
+      }
+      mpi::world.barrier();
+    }
+  }
+}
+
+TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi][.]"
+                    , (std::integral_constant<int,4>)
+                    , (std::integral_constant<int,7>)
+                    ) {
+  constexpr auto nprocs = TestType::value;
+  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
+    auto prmy_idle_comm = *(mpi::world.split( mpi::world.rank() < nprocs ));
+    if ( mpi::world.rank() < nprocs ) {
+      // what bifurcate does is it splits an intra comm into two separate intra comms and creates an intercomm between them
+      int nprmy = nprocs / 2;
+      bool is_primary = prmy_idle_comm.rank() < nprmy;
+      std::vector<int> deficits; // significant only at primaries
+      if ( is_primary ) {
+        deficits = std::vector<int>(nprmy,0);
+        int n = 0;
+        int nidle = nprocs - nprmy;
+        for ( int i = 0; i < nidle; ++i ) ++deficits[(n++) % nidle];
+      }
+
+      std::optional<int> cur_label; // current label
+      if ( is_primary ) cur_label.emplace( prmy_idle_comm.rank() );
+
+      auto[ intra, job_market ] = dye::impl::bifurcate( prmy_idle_comm, is_primary );
+      REQUIRE(job_market);
+
+      auto new_label = dye::impl::assign_labels( job_market, deficits, cur_label );
+      REQUIRE(new_label);
+      if ( is_primary ) REQUIRE( *new_label == *cur_label );
+    }
+  }
+  mpi::world.barrier();
+}
+
+TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
+                    , (std::integral_constant<int,2>)
+                    , (std::integral_constant<int,4>)
+                    ) {
+  constexpr auto ens_size = TestType::value;
+  if ( mpi::world.size() >= ens_size ) {
+    auto intra = *( mpi::world.split( mpi::world.rank() < ens_size ) );
+    if ( mpi::world.rank() < ens_size ) {
+      int N = 100;
+      while ( N-- ) {
+        aio::gauss_real<double> load_gen( 1000.0, 1000.0 );
+        std::vector<load_t> loads(ens_size);
+        for ( auto& l : loads )
+          l = std::max<load_t>( 0, load_gen() );
+        array<double, Specs> ptcs;
+        ptcs.resize(loads[intra.rank()]);
+
+        dye::detailed_balance( ptcs, intra );
+
+        load_t total_load = 0;
+        for ( auto l : loads ) total_load += l;
+        CAPTURE( loads, ptcs.size(), total_load / ens_size );
+        REQUIRE( (ptcs.size() == total_load / ens_size || ptcs.size() == 1 + total_load / ens_size ) );
+      }
+    }
+    intra.barrier();
+  }
+}
+
+TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi]"
                     , (aio::IndexType<2,1>)
                     ) {
+  // TODO test a shrinking ensemble
   constexpr int DGrid = 2;
   int nens = 1;
   std::vector<int> cart_dims;
@@ -80,17 +178,30 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     cart_dims.push_back( i > 0 ? i : -i );
     nens *= cart_dims.back();
   }
+  // NOTE current implementation requires explicit touch-create before detailed balance
+  map<array<double, Specs>> ptcs;
+  map<std::vector<load_t>> loads;
+  {
+    auto& x = ptcs[species::electron];
+    auto& y = ptcs[species::ion];
+    auto& xx = loads[species::electron];
+    auto& yy = loads[species::ion];
+  }
+
+
   if ( mpi::world.size() > nens ) {
+    aio::gauss_real<double> load_gen( 1000.0, 500.0 );
     unsigned int target_load = 0;
-    std::vector<load_t> loads(nens);
-    // loads = { 1000, 1000, 1000, 1000 };
-    loads = { 1000, 1000 };
     auto cart_opt = aio::make_cart( cart_dims, {false,false}, mpi::world );
     auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
-    map<array<double, Specs>> ptcs;
-    if ( ens_opt ) {
-      auto myload = loads[ens_opt->label()];
-      ptcs[species::electron].resize( myload );
+
+    for ( auto&[sp, load] : loads ) {
+      load.resize(nens);
+      for ( int label = 0; label < nens; ++label ) {
+        load[label] = load_gen();
+        if ( ens_opt && ens_opt->label() == label )
+          ptcs[sp].resize( load[label] );
+      }
     }
 
     dye::dynamic_load_balance(ptcs, ens_opt, cart_opt, target_load );

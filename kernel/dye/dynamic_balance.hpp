@@ -17,6 +17,7 @@ namespace dye {
                           const mpi::Comm& intra );
 
   // NOTE fields are not taken care of during dynamic_adjust, so data such as pair creation rate on each ensemble is simply lost. The solution is to do dynamic_ajust always afeter a data export, which is reset that kind of data anyway.
+  // NOTE TODOL current implementation assumes that particles have initialized arrays for species that may be relevant during detailed balance. This is due to confilict between touch create and mpi communication
   template < typename T, template < typename > class PtcSpecs, int DGrid >
   void dynamic_load_balance( particle::map<particle::array<T,PtcSpecs>>& particles,
                              std::optional<Ensemble<DGrid>>& ens_opt,
