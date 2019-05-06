@@ -105,6 +105,47 @@ TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
   }
 }
 
+TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi]"
+                    , (std::integral_constant<int,1>)
+                    , (std::integral_constant<int,2>)
+                    , (std::integral_constant<int,4>)
+                    , (std::integral_constant<int,8>)
+                    ) {
+  // the sending side of an intercommunicator consists of MPI_ROOT and one MPI_PROC_NULL
+  // the receiving side consists of number of processes specified by the template parameter
+  constexpr auto nremotes = TestType::value;
+  static_assert(nremotes > 0);
+  if ( mpi::world.size() >= nremotes + 2 ) {
+    auto parent = *( mpi::world.split( mpi::world.rank() < nremotes + 2 ) );
+    if ( mpi::world.rank() < nremotes + 2 ) {
+      auto[intra, itc] = dye::impl::bifurcate( parent, mpi::world.rank() < 2 );
+      array<double,Specs> ptcs;
+      if ( mpi::world.rank() == 0 ) {
+        ptcs.resize(1000);
+        for ( int i = 0; i < ptcs.size(); ++i ) {
+          ptcs[i].q()[0] = 132.0;
+          ptcs[i].p()[0] = -546.0;
+          ptcs[i].set(flag::secondary);
+        }
+        dye::impl::relinguish_data( ptcs, *itc, MPI_ROOT );
+        REQUIRE( ptcs.size() == 0 );
+      } else if ( mpi::world.rank() == 1 ) {
+        ptcs.resize(10);
+        dye::impl::relinguish_data( ptcs, *itc, MPI_PROC_NULL );
+        REQUIRE( ptcs.size() == 10 );
+      } else {
+        dye::impl::relinguish_data( ptcs, *itc, 0 );
+        REQUIRE( ptcs.size() == 1000 / intra.size() );
+        for ( int i = 0; i < ptcs.size(); ++i ) {
+          REQUIRE( ptcs[i].q()[0] == 132.0 );
+          REQUIRE( ptcs[i].p()[0] == -546.0 );
+          REQUIRE( ptcs[i].is(flag::secondary) );
+        }
+      }
+    }
+  }
+}
+
 TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi][.]"
                     , (std::integral_constant<int,4>)
                     , (std::integral_constant<int,7>)
@@ -167,7 +208,7 @@ TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
   }
 }
 
-TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi]"
+TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi][.]"
                     , (aio::IndexType<2,1>)
                     ) {
   // TODO test a shrinking ensemble

@@ -120,7 +120,7 @@ namespace dye::impl {
     int count = 0;
     if ( root == MPI_ROOT ) {
       const auto size = ptc_array.size();
-      count = ( size / itc.remote_size() ) + 1; // will do padding
+      count = ( size / itc.remote_size() ) + ( size % itc.remote_size() != 0 );
       itc.broadcast( root, &count, 1 );
       buf.reserve( count * itc.remote_size() );
     } else {
@@ -132,7 +132,8 @@ namespace dye::impl {
 
     if ( root == MPI_ROOT ) {
       for ( int i = 0; i < ptc_array.size(); ++i )
-        buf[i] = ptc_array[i];
+        buf[i] = std::move(ptc_array[i]);
+      ptc_array.resize(0);
     }
 
     itc.scatter(root, buf.data(), count );
@@ -374,10 +375,7 @@ namespace dye {
             }
           }
 
-          if ( is_leaving ) {
-            for ( auto&[sp, ptcs] : particles ) ptcs = {}; // clear out particles
-            ens_opt.reset(); // CRUCIAL!!
-          }
+          if ( is_leaving ) ens_opt.reset(); // CRUCIAL!!
         }
       }
       if ( cart_opt ) { // clear negative deficits
@@ -407,8 +405,9 @@ namespace dye {
 
     { // Step 4. Perform a complete rebalance on all ensembles together. NOTE touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we simply loop over all possible
       if ( ens_opt ) {
-        for ( auto&[sp, ptcs] : particles )
+        for ( auto&[sp, ptcs] : particles ) {
           detailed_balance(ptcs, ens_opt->intra);
+        }
       }
     }
 
