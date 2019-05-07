@@ -17,44 +17,55 @@ namespace io {
 
   void init_this_run_dir( std::string prefix ) {
     using namespace util;
-    fs::create_directories(prefix);
-    prefix = fs::canonical(prefix);
-    fs::append_slash(prefix);
-
-    char subDir[100] = {};
-    for ( int i = 0; i < 100; ++i )
-      subDir[i] = '\0';
     // use world root time to ensure uniqueness
     if ( mpi::world.rank() == 0 ) {
-      char myTime[100] = {};
-      time_t rawtime;
-      struct tm* timeinfo;
-      time (&rawtime);
-      timeinfo = localtime(&rawtime);
-      strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
-      snprintf(subDir, sizeof(subDir), "%s", myTime);
-    }
-    mpi::world.broadcast( 0, subDir, 100 );
+      fs::create_directories(prefix);
+      prefix = fs::canonical(prefix);
+      fs::append_slash(prefix);
 
-    std::string postfix (subDir);
+      char subDir[100] = {};
+      for ( int i = 0; i < 100; ++i )
+        subDir[i] = '\0';
+      if ( mpi::world.rank() == 0 ) {
+        char myTime[100] = {};
+        time_t rawtime;
+        struct tm* timeinfo;
+        time (&rawtime);
+        timeinfo = localtime(&rawtime);
+        strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
+        snprintf(subDir, sizeof(subDir), "%s", myTime);
+      }
 
-    this_run_dir = prefix + pic::project_name + "-";
-    // in case of running too frequently within a minute, directories with postfixed numbers are created
-    if ( fs::exists(this_run_dir + postfix + "/") ) {
-      for ( int n = 1; ; ++n ) {
-        if ( !fs::exists(this_run_dir + postfix + "-" + std::to_string(n) + "/") ) {
-          postfix += "-" + std::to_string(n);
-          break;
+      std::string postfix (subDir);
+
+      this_run_dir = prefix + pic::project_name + "-";
+      // in case of running too frequently within a minute, directories with postfixed numbers are created
+      if ( fs::exists(this_run_dir + postfix + "/") ) {
+        for ( int n = 1; ; ++n ) {
+          if ( !fs::exists(this_run_dir + postfix + "-" + std::to_string(n) + "/") ) {
+            postfix += "-" + std::to_string(n);
+            break;
+          }
         }
       }
-    }
-    this_run_dir += postfix + "/";
+      this_run_dir += postfix + "/";
 
-    if ( mpi::world.rank() == 0 ) {
       std::string local_data_dir = "Data/"; // local directory for storing data symlinks
       fs::create_directories(this_run_dir);
       fs::create_directories(local_data_dir);
       fs::create_directory_symlink(this_run_dir, local_data_dir + pic::project_name + "-" + postfix + "/");
+    }
+
+    char buf[200];
+    if ( mpi::world.rank() == 0 ) {
+      for ( int i = 0; i < this_run_dir.size(); ++i )
+        buf[i] = this_run_dir[i];
+      buf[this_run_dir.size()] = '\0';
+      mpi::world.broadcast(0, buf, 200);
+    }
+    else {
+      mpi::world.broadcast(0, buf, 200);
+      this_run_dir = {buf};
     }
 
   }
@@ -337,7 +348,8 @@ namespace io {
     sprintf(str_ts, "%06d\0", timestep);
 
     const std::string prefix = this_run_dir + "data/timestep" + str_ts + "/";
-    util::fs::create_directories(prefix);
+    if ( mpi::world.rank() == 0 )
+      util::fs::create_directories(prefix);
 
     silo::pmpio::file_t dbfile;
 
