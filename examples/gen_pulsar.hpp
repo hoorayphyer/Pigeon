@@ -72,14 +72,14 @@ namespace pic {
   }
   namespace ofs {
     inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
-    inline constexpr int indent[4] = { 5, 20, guard, guard };
-    inline constexpr real_t damping_rate = 0.01;
+    inline constexpr int indent[4] = { 5, 43, guard, guard };
+    inline constexpr real_t damping_rate = 0.012;
   }
 
 }
 
 namespace pic :: interval {
-  inline constexpr int data_export = 20;
+  inline constexpr int data_export = 200;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -92,6 +92,11 @@ namespace particle {
     using Vec = apt::Vec<T,Specs<T>::Dim>;
 
     constexpr T calc_Rc ( const Pat<T,Specs>& ptc, const Vec& dp, T dt, const Vec& B ) noexcept {
+      // TODOL uniform Rc is used here
+      return 1.0;
+
+
+
       // qB / (\gamma m c) * dt < 2 \pi / 10
       bool is_gyration_resolved =
         std::sqrt( apt::sqabs(B) / ( (mass_x != 0) + apt::sqabs(ptc.p()) ) ) * abs_charge_x * dt / mass_x < (2 * std::acos(-1) / 10.0);
@@ -114,7 +119,7 @@ namespace particle {
       }
     }
 
-    constexpr T sample_E_ph() noexcept { return 3.5; }
+    T (*sample_E_ph)() = nullptr;
 
     unsigned int abs_charge_x{};
     unsigned int mass_x{};
@@ -144,7 +149,7 @@ namespace particle {
     std::optional<T> operator() ( const Pat<T,Specs>& photon, const apt::Vec<T,Specs<T>::Dim>& dp, T dt,
                                   const apt::Vec<T,Specs<T>::Dim>& B, util::Rng<T>& rng ) override {
       // prob_mag_conv = dt / mfp_mag_conv
-      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
+      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt; // NOTE return std::optional(0.0) so as to be treated true in boolean conversion
     }
   };
 
@@ -243,7 +248,7 @@ namespace particle {
 
         force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
-        // force.add( landau0, landau0_B_thr ); // TODO check
+        // force.add( landau0, landau0_B_thr );
 
         fgen.Register( sp, force );
       }
@@ -266,9 +271,10 @@ namespace particle {
         CurvatureRadiate<real_t,Specs> cr;
         cr.abs_charge_x = 1u;
         cr.mass_x = 1u;
-        cr.K_thr = 20.0;
+        cr.K_thr = 80.0;
         cr.gamma_off = 15.0;
         cr.emission_rate = 0.25;
+        cr.sample_E_ph = []() noexcept { return 14.0; };
 
         ep_scat.add(cr);
       }
@@ -279,14 +285,10 @@ namespace particle {
 
     {
       scat::PhotonPairProduction<real_t,Specs> photon_scat;
-      {
-        // TODOL are there any restrictions on where photons can or cannot produce pairs?
-        // photon_scat.add(InZone<Ptc>{});
-      }
-
+      // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       {
         MagneticConvert<real_t,Specs> mc;
-        mc.B_thr = 1000.0;
+        mc.B_thr = pic::mu0 / 10.0 ;
         mc.mfp = 0.2;
         photon_scat.add(mc);
       }
@@ -561,9 +563,9 @@ namespace pic {
 
       constexpr Real v_th = 0.3;
       constexpr Real j_reg_x = 2.0;
-      constexpr Real Ninj = 10;
+      constexpr Real Ninj = 5.0;
 
-      constexpr auto posion = species::positron;
+      constexpr auto posion = species::ion;
       constexpr auto negaon = species::electron;
 
       Real omega = pic::omega_spinup( timestep * dt );
