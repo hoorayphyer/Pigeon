@@ -3,7 +3,6 @@
 
 #include "particle/particle_expression.hpp"
 #include "apt/virtual_vec.hpp"
-#include "pic.hpp"
 
 namespace particle {
   template < typename T, template < typename > class Specs >

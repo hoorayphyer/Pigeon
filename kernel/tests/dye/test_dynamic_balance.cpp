@@ -1,4 +1,5 @@
 #include "all_in_one.hpp"
+#include "pic.hpp"
 #include "particle/load_type.hpp"
 #include "particle/array.cpp"
 #include "parallel/mpi++.hpp"

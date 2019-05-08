@@ -3,7 +3,6 @@
 
 #include "particle/particle_expression.hpp"
 #include "apt/vec.hpp"
-#include "pic.hpp"
 
 namespace particle {
 

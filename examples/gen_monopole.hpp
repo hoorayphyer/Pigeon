@@ -8,6 +8,7 @@
 
 #include "field/field.hpp"
 
+#include "particle/properties.hpp"
 #include "particle/map.hpp"
 #include "particle/array.hpp"
 #include "particle/forces.hpp"
@@ -17,16 +18,6 @@
 #include "pic.hpp"
 
 namespace particle {
-  struct Properties {
-    unsigned int mass_x = 0; // in terms of unit mass
-    int charge_x = 0; // in terms of unit charge
-    std::string name  = "";
-  };
-}
-
-namespace particle {
-  extern map<Properties> properties;
-
   template < typename Real, template < typename > class Specs >
   ScatGen<Real, Specs> scat_gen;
 
@@ -43,7 +34,7 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 1000;
+  inline constexpr int total_timesteps = 10000;
   inline constexpr real_t dt = 0.005;
 
   constexpr knl::Grid<real_t,DGrid> supergrid

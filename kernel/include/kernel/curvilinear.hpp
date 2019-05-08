@@ -19,7 +19,6 @@ namespace knl {
     };
 }
 
-
 namespace knl {
 
   template < coordsys Coord = coordsys::Cartesian >

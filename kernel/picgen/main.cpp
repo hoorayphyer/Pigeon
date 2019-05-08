@@ -30,6 +30,7 @@ int main() {
   mpi::initialize();
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
+    io::project_name = pic::project_name;
     io::init_this_run_dir( pic::datadir_prefix );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 

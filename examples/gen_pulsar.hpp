@@ -8,6 +8,7 @@
 
 #include "field/field.hpp"
 
+#include "particle/properties.hpp"
 #include "particle/map.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
@@ -17,16 +18,6 @@
 #include "pic.hpp"
 
 namespace particle {
-  struct Properties {
-    unsigned int mass_x = 0; // in terms of unit mass
-    int charge_x = 0; // in terms of unit charge
-    std::string name = "";
-  };
-}
-
-namespace particle {
-  extern map<Properties> properties;
-
   template < typename Real, template < typename > class Specs >
   ScatGen<Real, Specs> scat_gen;
 

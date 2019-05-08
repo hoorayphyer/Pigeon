@@ -50,7 +50,7 @@ test_gen(apt handle) # DONE
 test_gen(apt priority_queue) # DONE
 
 
-# test_gen(kernel curvilinear) # TODO slight mismatched in phi
+test_gen(kernel curvilinear) # TODO slight mismatched in phi
 # test_gen(kernel grid) # TODO
 
 test_gen(parallel mpi++ mpipp) # DONE
@@ -69,7 +69,7 @@ test_gen(particle state) # DONE
 # test_gen(particle c_particle) # TODO
 test_gen(particle array) # DONE
 
-test_gen(particle forces) # TODO
+test_gen(particle forces) # DONE
 test_gen(particle migration mpipp dye)
 
 test_gen(dye ensemble mpipp dye) # DONE

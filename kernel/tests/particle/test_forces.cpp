@@ -1,4 +1,5 @@
 #include "all_in_one.hpp"
+#include "pic.hpp"
 #include "particle/forces.cpp"
 #include "particle/particle.hpp"
 
@@ -141,7 +142,7 @@ namespace old_vay {
 
 SCENARIO("Test against old Vay Pusher") {
   aio::unif_real<double> unif(-1.0 , 1.0);
-  const int N = 1000;
+  const int N = 1000000;
   for ( int i = 0; i < N; ++i ) {
     apt::Vec<double, 3> E( unif(), unif(), unif() );
     apt::Vec<double, 3> B( unif(), unif(), unif() );

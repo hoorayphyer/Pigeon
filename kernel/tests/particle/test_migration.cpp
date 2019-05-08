@@ -1,4 +1,5 @@
 #include "all_in_one.hpp"
+#include "pic.hpp"
 #include "particle/migration.cpp"
 #include "particle/particle.hpp"
 #include "dye/ensemble.hpp"

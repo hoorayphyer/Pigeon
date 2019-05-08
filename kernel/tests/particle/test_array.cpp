@@ -1,4 +1,5 @@
 #include "all_in_one.hpp"
+#include "pic.hpp"
 #include "particle/array.cpp"
 #include "particle/particle.hpp"
 #include "particle/virtual_particle.hpp"
