@@ -1,5 +1,23 @@
 #include "picgen.hpp"
 #include <stdexcept>
+#include <time.h>
+#include <cstring>
+
+std::string data_dirname() {
+  char subDir[100] = {};
+  for ( int i = 0; i < 100; ++i )
+    subDir[i] = '\0';
+  if ( mpi::world.rank() == 0 ) {
+    char myTime[100] = {};
+    time_t rawtime;
+    struct tm* timeinfo;
+    time (&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
+    snprintf(subDir, sizeof(subDir), "%s", myTime);
+  }
+  return std::string(pic::project_name) + "-" + subDir;
+}
 
 std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, const apt::array<bool,pic::DGrid> periodic ) {
   std::optional<mpi::CartComm> cart_opt;
@@ -30,8 +48,7 @@ int main() {
   mpi::initialize();
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
-    io::project_name = pic::project_name;
-    io::init_this_run_dir( pic::datadir_prefix );
+    io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >

@@ -11,14 +11,20 @@ namespace util::fs {
     return filesystem::absolute(p);
   }
 
-  std::string canonical( std::string dir ) {
-    filesystem::path p = dir;
-    return filesystem::canonical(p);
-  }
+  // std::string canonical( std::string dir ) {
+  //   filesystem::path p = dir;
+  //   return filesystem::canonical(p);
+  // }
 
   std::string& append_slash( std::string& dir ) {
     if ( dir != "" && dir.back() != '/' )
       dir.append("/");
+    return dir;
+  }
+
+  std::string& remove_slash( std::string& dir ) {
+    if ( dir.back() == '/' )
+      dir.pop_back();
     return dir;
   }
 
@@ -43,11 +49,8 @@ namespace util::fs {
 
   void create_directory_symlink( std::string to, std::string new_link ) {
     // NOTE to and new_link must not end with '/'
-    if (to.back() == '/')
-      to.pop_back();
-
-    if (new_link.back() == '/')
-      new_link.pop_back();
+    remove_slash(to);
+    remove_slash(new_link);
 
     filesystem::path p_to(to);
     filesystem::path p_new_link(new_link);

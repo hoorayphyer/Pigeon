@@ -6,9 +6,12 @@
 namespace util::fs {
   std::string absolute( std::string dir );
 
-  std::string canonical( std::string dir );
+  // NOTE canonical requires dir to be already existed
+  // std::string canonical( std::string dir );
 
   std::string& append_slash( std::string& dir );
+
+  std::string& remove_slash( std::string& dir );
 
   void create_directories(std::string dir);
 

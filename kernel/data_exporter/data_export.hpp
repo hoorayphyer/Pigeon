@@ -19,8 +19,7 @@ namespace dye {
 }
 
 namespace io {
-  void init_this_run_dir( std::string prefix );
-  extern std::string project_name;
+  void init_this_run_dir( std::string prefix, std::string dirname );
   // void set_logger_dir( std::string logDir );
 }
 

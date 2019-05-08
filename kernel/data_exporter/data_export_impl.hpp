@@ -12,13 +12,23 @@
 #include <cmath>
 #include <silo.h> // for some DBOPTs
 
-#include <time.h>
-#include <cstring>
 namespace io {
   std::string this_run_dir;
-  std::string project_name;
 
-  void init_this_run_dir( std::string prefix ) {
+  // local directory for storing data symlinks
+#ifdef APPARENT_DATA_DIR
+  std::string local_data_dir =
+    []() {
+      std::string str = APPARENT_DATA_DIR;
+      util::fs::remove_slash(str);
+      return str;
+    }();
+#else
+  std::string local_data_dir = "Data";
+#endif
+
+  // TODOL what if prefix == local_data_dir??
+  void init_this_run_dir( std::string prefix, std::string dirname ) {
     using namespace util;
     // use world root time to ensure uniqueness
     if ( mpi::world.rank() == 0 ) {
@@ -26,43 +36,22 @@ namespace io {
       fs::create_directories(prefix);
       fs::append_slash(prefix);
 
-      char subDir[100] = {};
-      for ( int i = 0; i < 100; ++i )
-        subDir[i] = '\0';
-      if ( mpi::world.rank() == 0 ) {
-        char myTime[100] = {};
-        time_t rawtime;
-        struct tm* timeinfo;
-        time (&rawtime);
-        timeinfo = localtime(&rawtime);
-        strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
-        snprintf(subDir, sizeof(subDir), "%s", myTime);
-      }
-
-      std::string postfix (subDir);
-
-      this_run_dir = prefix + project_name + "-";
+      fs::remove_slash(dirname);
       // in case of running too frequently within a minute, directories with postfixed numbers are created
-      if ( fs::exists(this_run_dir + postfix + "/") ) {
+      if ( fs::exists(prefix + dirname) ) {
         for ( int n = 1; ; ++n ) {
-          if ( !fs::exists(this_run_dir + postfix + "-" + std::to_string(n) + "/") ) {
-            postfix += "-" + std::to_string(n);
+          if ( !fs::exists(prefix + dirname + "-" + std::to_string(n)) ) {
+            dirname += "-" + std::to_string(n);
             break;
           }
         }
       }
-      this_run_dir += postfix + "/";
+      fs::append_slash(dirname);
+      this_run_dir = prefix + dirname;
 
-      // local directory for storing data symlinks
-#ifdef APPARENT_DATA_DIR
-      std::string local_data_dir = APPARENT_DATA_DIR;
-      fs::append_slash(local_data_dir);
-#else
-      std::string local_data_dir = "Data/";
-#endif
       fs::create_directories(this_run_dir);
       fs::create_directories(local_data_dir);
-      fs::create_directory_symlink(this_run_dir, local_data_dir + project_name + "-" + postfix + "/");
+      fs::create_directory_symlink(this_run_dir, local_data_dir + "/" + dirname);
     }
 
     char buf[200];
