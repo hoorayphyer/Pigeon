@@ -5,7 +5,7 @@ target_link_libraries( data_exporter PRIVATE silopp dye picgen filesys field_com
 
 add_executable( test_data_export test_data_export.cpp )
 target_include_directories( test_data_export PRIVATE ${KERNEL_DIR} ${KERNEL_DIR}/tests )
-target_link_libraries( test_data_export PRIVATE catch_main_mpipp mpipp filesys )
+target_link_libraries( test_data_export PRIVATE silopp catch_main_mpipp mpipp filesys )
 target_link_libraries( test_data_export PRIVATE stdc++fs) #TODO this is only for gnu
 set_target_properties( test_data_export
   PROPERTIES

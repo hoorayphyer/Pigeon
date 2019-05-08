@@ -29,9 +29,12 @@ namespace util::fs {
   }
 
   void create_directories(std::string dir) {
+    // NOTE on some platforms path ending with a slash is not created as a directory
+    remove_slash(dir);
     filesystem::path p(dir);
     error_code returnedError;
-    filesystem::create_directories(p, returnedError);
+    if ( ! filesystem::create_directories(p, returnedError) )
+      std::cout << "Directory not created : " << dir << std::endl;
     if (returnedError) {
       std::cerr << "ERROR creating directories " << dir << "\nError code = " << returnedError.value() << std::endl;
     }

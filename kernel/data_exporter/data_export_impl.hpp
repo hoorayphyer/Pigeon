@@ -33,37 +33,38 @@ namespace io {
     // use world root time to ensure uniqueness
     if ( mpi::world.rank() == 0 ) {
       prefix = fs::absolute(prefix);
+      fs::remove_slash(prefix);
       fs::create_directories(prefix);
-      fs::append_slash(prefix);
 
       fs::remove_slash(dirname);
       // in case of running too frequently within a minute, directories with postfixed numbers are created
-      if ( fs::exists(prefix + dirname) ) {
+      if ( fs::exists(prefix + "/" + dirname) ) {
         for ( int n = 1; ; ++n ) {
-          if ( !fs::exists(prefix + dirname + "-" + std::to_string(n)) ) {
+          if ( !fs::exists(prefix + "/" + dirname + "-" + std::to_string(n)) ) {
             dirname += "-" + std::to_string(n);
             break;
           }
         }
       }
-      fs::append_slash(dirname);
-      this_run_dir = prefix + dirname;
+      this_run_dir = prefix + "/" + dirname;
 
       fs::create_directories(this_run_dir);
       fs::create_directories(local_data_dir);
       fs::create_directory_symlink(this_run_dir, local_data_dir + "/" + dirname);
     }
 
-    char buf[200];
-    if ( mpi::world.rank() == 0 ) {
-      for ( int i = 0; i < this_run_dir.size(); ++i )
-        buf[i] = this_run_dir[i];
-      buf[this_run_dir.size()] = '\0';
-      mpi::world.broadcast(0, buf, 200);
-    }
-    else {
-      mpi::world.broadcast(0, buf, 200);
-      this_run_dir = {buf};
+    if ( mpi::world.size() > 1 ) {
+      char buf[200];
+      if ( mpi::world.rank() == 0 ) {
+        for ( int i = 0; i < this_run_dir.size(); ++i )
+          buf[i] = this_run_dir[i];
+        buf[this_run_dir.size()] = '\0';
+        mpi::world.broadcast(0, buf, 200);
+      }
+      else {
+        mpi::world.broadcast(0, buf, 200);
+        this_run_dir = {buf};
+      }
     }
 
   }
