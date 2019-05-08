@@ -1,5 +1,5 @@
-#ifndef  _PICGEN_HPP_
-#define  _PICGEN_HPP_
+#ifndef  _PIC_SIMULATOR_HPP_
+#define  _PIC_SIMULATOR_HPP_
 
 #include "abstract_field_updater.hpp"
 #include "kernel/grid.hpp"

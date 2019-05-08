@@ -5,5 +5,5 @@ target_sources(old_field_solver PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/Fields.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/FieldUpdater.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/FiniteDiff.cpp"
-  "${KERNEL_DIR}/picgen/field_communication.cpp")
+  "${KERNEL_DIR}/simulator/field_communication.cpp")
 target_link_libraries(old_field_solver PRIVATE mpipp picgen)

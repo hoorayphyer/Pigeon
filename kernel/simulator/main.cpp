@@ -1,4 +1,4 @@
-#include "picgen.hpp"
+#include "simulator.hpp"
 #include <stdexcept>
 #include <time.h>
 #include <cstring>

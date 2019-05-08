@@ -3,16 +3,16 @@
 !.gitignore
 !CMakeLists.txt
 
-!picgen/
-!picgen/CMakeLists.txt
-!picgen/*.hpp
-!picgen/*.cpp
-!picgen/old_field_solver/
-!picgen/old_field_solver/*
-!picgen/old_field_solver/boundaryconditions/
-!picgen/old_field_solver/boundaryconditions/*
-!picgen/old_field_solver/multiarray/
-!picgen/old_field_solver/multiarray/*
+!simulator/
+!simulator/CMakeLists.txt
+!simulator/*.hpp
+!simulator/*.cpp
+!simulator/old_field_solver/
+!simulator/old_field_solver/*
+!simulator/old_field_solver/boundaryconditions/
+!simulator/old_field_solver/boundaryconditions/*
+!simulator/old_field_solver/multiarray/
+!simulator/old_field_solver/multiarray/*
 
 !dye/
 !dye/*
