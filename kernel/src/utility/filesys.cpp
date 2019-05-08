@@ -33,8 +33,9 @@ namespace util::fs {
     remove_slash(dir);
     filesystem::path p(dir);
     error_code returnedError;
-    if ( ! filesystem::create_directories(p, returnedError) )
-      std::cout << "Directory not created : " << dir << std::endl;
+    if ( !filesystem::create_directories(p, returnedError) && !filesystem::exists(p) ) {
+      std::cout << "Directory neither existed nor created: " << dir << std::endl;
+    }
     if (returnedError) {
       std::cerr << "ERROR creating directories " << dir << "\nError code = " << returnedError.value() << std::endl;
     }

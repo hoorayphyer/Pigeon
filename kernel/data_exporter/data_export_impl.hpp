@@ -34,9 +34,8 @@ namespace io {
     if ( mpi::world.rank() == 0 ) {
       prefix = fs::absolute(prefix);
       fs::remove_slash(prefix);
-      fs::create_directories(prefix);
-
       fs::remove_slash(dirname);
+
       // in case of running too frequently within a minute, directories with postfixed numbers are created
       if ( fs::exists(prefix + "/" + dirname) ) {
         for ( int n = 1; ; ++n ) {
