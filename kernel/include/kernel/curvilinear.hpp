@@ -5,8 +5,8 @@
 #include "apt/vec.hpp"
 #include "apt/virtual_vec.hpp"
 
-inline constexpr
-long double PI_CONST =3.141592653589793238462643383279502884197169399375105820974944592307816406286L;
+template < typename T >
+inline constexpr T PI = std::acos(-1.0L);
 
 namespace knl {
   enum class coordsys : unsigned char
@@ -68,19 +68,6 @@ namespace knl {
     template < class X, class P, typename T >
     static inline void geodesic_move( X& x, P& p, T dt, bool is_massive ) noexcept {
       // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
-
-      constexpr T PI = PI_CONST;
-      auto gamma = std::sqrt( is_massive + apt::sqabs(p) );
-      // dx is the return value and meanwhile it serves as a temporary
-      apt::Vec<T, apt::ndim_v<P>> dx = p * (dt / gamma);
-
-      auto& dlogr = dx[0];
-      auto& dtheta = dx[1];
-      auto& dphi = dx[2];
-
-      const auto& logr  = x[0];
-      const auto& theta = x[1];
-
       class Rotator {
       private:
         T _cos = 0.0;
@@ -101,35 +88,43 @@ namespace knl {
         inline T sin() const noexcept { return _sin; }
       } rot;
 
-      { // compute dx in this block
+      auto gamma = std::sqrt( is_massive + apt::sqabs(p) );
+      apt::Vec<T, apt::ndim_v<P>> tmp = p * (dt / gamma);
+      // now tmp holds displacements under the local cartesian frame
+
+      const auto& logr  = x[0];
+      const auto& theta = x[1];
+
+      { // compute final coordiantes
         rot.set_angle(theta);
-
-        dlogr += std::exp( logr ); // now dx is ( r0 + v_r * dt, v_theta * dt, v_phi * dt )
-
-        auto r_final = apt::abs( dx );
-
-        dtheta = std::acos( ( dlogr * rot.cos() - dtheta * rot.sin() ) / r_final ) - theta;
-        dphi = std::atan( dphi / std::abs( dlogr * rot.sin() + dtheta * rot.cos() ) );
-
-        dlogr = std::log( r_final ) - logr;
+        tmp[0] += std::exp( logr ); // tmp[0] = r_i + v_r * dt
+        x[0] = tmp[0] * rot.sin() + tmp[1] * rot.cos();
+        x[0] = std::atan( tmp[2] / x[0] ) + PI<T> * ( x[0] < 0 );
+        tmp[2] = apt::abs( tmp );
+        tmp[1] = std::acos( ( tmp[0]*rot.cos() - tmp[1]*rot.sin() ) / tmp[2] );
+        std::swap( x[0], tmp[2] );
+        // by now, x[0] = r_final, tmp[0] is free, tmp[1] = \theta_final, tmp[2] = \phi_final - \phi_init
       }
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
-        rot.set_angle( theta - PI / 2.0 );
+        rot.set_angle( theta - PI<T> / 2.0 );
         rot.rotate( p[0], p[1] );
 
         // then rotate in r-phi plane. Location is rotated by dphi, so velocity components are rotated -dphi
-        rot.set_angle( -dphi );
+        rot.set_angle( -tmp[2] );
         rot.rotate( p[0], p[2] );
 
         // last rotate in r-theta plane to new location. Location is rotated by theta_new - PI/2, so velocity components are rotated by PI/2 - theta_new
-        rot.set_angle( PI / 2.0 - theta - dtheta );
+        rot.set_angle( PI<T> / 2.0 - tmp[1] );
         rot.rotate( p[0], p[1] );
       }
 
       { // in this block we update x
         // NOTE we don't normalize cyclic coordinates such as \phi in spherical. This operation is designated to mesh_shape_interplay
-        x += dx;
+        tmp[0] = std::log( x[0] );
+        std::swap( x[0], tmp[0] );
+        x[1] = tmp[1];
+        x[2] += tmp[2];
       }
 
     }

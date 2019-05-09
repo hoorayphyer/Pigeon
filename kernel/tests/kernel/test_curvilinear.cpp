@@ -1,27 +1,22 @@
-#include <iostream>
+#include "all_in_one.hpp"
 #include "kernel/curvilinear.hpp"
-#include "apt/vec.hpp"
-#include "apt/print.hpp"
-#include "catch2/catch.hpp"
-#include "utility/rng.hpp"
-#include <ctime>
 
 using namespace apt;
 
-SCENARIO("Cartesian", "[knl]") {
-  using Coord = knl::coord<knl::coordsys::Cartesian>;
-  util::Rng<double> rng;
-  rng.set_seed(std::time(0));
+// SCENARIO("Cartesian", "[metric]") {
+//   using Coord = knl::coord<knl::coordsys::Cartesian>;
+//   util::Rng<double> rng;
+//   rng.set_seed(std::time(0));
 
-  Vec<double,3> x_old( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
-  auto x = x_old;
-  Vec<double,3> v( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
-  double dt = rng.uniform();
+//   Vec<double,3> x_old( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
+//   auto x = x_old;
+//   Vec<double,3> v( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
+//   double dt = rng.uniform();
 
-  Coord::geodesic_move( x, v, dt );
-  for ( int i = 0; i < 3; ++i )
-    REQUIRE( x[i] == Approx( v[i] * dt + x_old[i] ));
-}
+//   Coord::geodesic_move( x, v, dt );
+//   for ( int i = 0; i < 3; ++i )
+//     REQUIRE( x[i] == Approx( v[i] * dt + x_old[i] ));
+// }
 
 #include "old_caldisp.h"
 
@@ -30,46 +25,52 @@ using std::cos;
 using std::exp;
 using std::log;
 
-constexpr double PI = PI_CONST;
+auto PV = []( auto phi ) {
+            return phi - 2 * PI<double> * std::floor( phi / ( 2 * PI<double>) );
+          };
 
-SCENARIO("LogSpherical", "[knl]") {
+SCENARIO("LogSpherical special cases", "[metric]") {
   using Coord = knl::coord<knl::coordsys::LogSpherical>;
-  util::Rng<double> rng;
-  rng.set_seed(std::time(0));
+  aio::unif_real<double> unif;
 
-  GIVEN("NOT on axes") {
-    WHEN("velocity is radial") {
-      Vec<double,3> x_old( rng.uniform(0,3), rng.uniform(0.1,PI-0.1), rng.uniform(0,2*PI) );
-      Vec<double,3> v_old( rng.uniform(0,5), 0.0, 0.0 );
-      v_old /= std::sqrt( 1.0 + apt::sqabs(v_old) );
+  WHEN("velocity is radial") {
+    int N = 10000;
+    while(N--) {
+      double dt = 0.001;
+      Vec<double,3> x_old( unif() * 3.0, unif() * (PI<double>-0.2) + 0.1, unif() * 2 * PI<double> );
+      Vec<double,3> p_old( unif() * 5.0, 0.0, 0.0 );
       auto x = x_old;
-      auto v = v_old;
-      double dt = rng.uniform( 0.0, 0.1 );
+      auto p = p_old;
+      bool is_massive = unif() > 0.5;
 
-      Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, p, dt, is_massive );
 
-      CAPTURE( dt, x_old, v_old, x, v );
+      CAPTURE( dt, x_old, p_old, x, p, is_massive );
 
-      REQUIRE( exp(x[0]) == Approx( v[0] * dt + exp(x_old[0]) ));
+      auto v_old = p_old / std::sqrt( is_massive + apt::sqabs(p_old) );
+      REQUIRE( exp(x[0]) == Approx( v_old[0] * dt + exp(x_old[0]) ));
       REQUIRE( x[1] == Approx( x_old[1] ) );
       REQUIRE( x[2] == Approx( x_old[2] ) );
 
       for ( int i = 0; i < 3; ++i )
-        REQUIRE( v[i] == Approx(v_old[i]).margin(1e-12) );
+        REQUIRE( p[i] == Approx(p_old[i]).margin(1e-12) );
     }
+  }
 
-    WHEN("velocity is in meridional plane") {
-      Vec<double,3> x_old( rng.uniform(0,3), rng.uniform(0.1,PI-0.1), 0.0 );
-      Vec<double,3> v_old( rng.uniform(-2,2) * 0, rng.uniform(-2,2), 0.0 );
-      v_old /= std::sqrt( 1.0 + apt::sqabs(v_old) );
+  WHEN("velocity is in meridional plane") {
+    double dt = 0.001;
+    int N = 10000;
+    while(N--) {
+      Vec<double,3> x_old( unif() * 3.0, unif() * (PI<double>-0.2) + 0.1, unif() * 2 * PI<double> );
+      Vec<double,3> p_old( 2.0 * ( 2 * unif() - 1 ), 2.0 * ( 2 * unif() - 1 ), 0.0 );
 
       auto x = x_old;
-      auto v = v_old;
-      double dt = rng.uniform( 0.0, 0.1 );
+      auto p = p_old;
+      bool is_massive = unif() > 0.5;
 
-      Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, p, dt, is_massive );
 
-      CAPTURE( dt, x_old, v_old, x, v );
+      CAPTURE( dt, x_old, p_old, x, p, is_massive );
 
       auto get_vzvx =
         []( double angle, double v_r, double v_t ) {
@@ -80,6 +81,9 @@ SCENARIO("LogSpherical", "[knl]") {
 
       constexpr int R = 0;
       constexpr int THETA = 1;
+      auto gamma = std::sqrt( is_massive + apt::sqabs(p_old) );
+      auto v_old = p_old / gamma;
+
       auto[v_z, v_x] = get_vzvx( x_old[THETA], v_old[R], v_old[THETA] );
       double z_new = exp(x_old[R]) * cos(x_old[THETA]) + v_z * dt;
       double x_new = exp(x_old[R]) * sin(x_old[THETA]) + v_x * dt;
@@ -87,24 +91,28 @@ SCENARIO("LogSpherical", "[knl]") {
       REQUIRE( exp(x[R]) * cos(x[THETA]) == Approx(z_new) );
       REQUIRE( exp(x[R]) * sin(x[THETA]) == Approx(x_new) );
 
-      auto[v_z1, v_x1] = get_vzvx( x[THETA], v[R], v[THETA] );
-      REQUIRE( v_z1 == Approx(v_z) );
-      REQUIRE( v_x1 == Approx(v_x) );
-
+      auto[p_z1, p_x1] = get_vzvx( x[THETA], p[R], p[THETA] );
+      REQUIRE( p_z1 / gamma == Approx(v_z) );
+      REQUIRE( p_x1 / gamma == Approx(v_x) );
     }
 
-    WHEN("location is at equator, velocity is in the plane") {
-      Vec<double,3> x_old( rng.uniform(0,3), PI / 2.0, rng.uniform(0.1, 2*PI) );
-      Vec<double,3> v_old( rng.uniform(-2,2), 0.0, rng.uniform(-2,2) );
-      v_old /= std::sqrt( 1.0 + apt::sqabs(v_old) );
+  }
+
+  WHEN("location is at equator, velocity is in the plane") {
+    double dt = 0.001;
+    int N = 10000;
+    while(N--) {
+      Vec<double,3> x_old( unif() * 3.0, PI<double> / 2.0, unif() * 2 * PI<double> );
+      Vec<double,3> p_old( 2.0 * ( 2 * unif() - 1 ), 0.0, 2.0 * ( 2 * unif() - 1 ) );
 
       auto x = x_old;
-      auto v = v_old;
-      double dt = rng.uniform( 0.0, 0.1 );
+      auto p = p_old;
+      bool is_massive = unif() > 0.5;
 
-      Coord::geodesic_move( x, v, dt );
+      Coord::geodesic_move( x, p, dt, is_massive );
 
-      CAPTURE( dt, x_old, v_old, x, v );
+      CAPTURE( dt, x_old, p_old, x, p, is_massive );
+
 
       auto get_vxvy =
         []( double angle, double v_r, double v_p ) {
@@ -115,6 +123,9 @@ SCENARIO("LogSpherical", "[knl]") {
       constexpr int R = 0;
       constexpr int PHI = 2;
 
+      auto gamma = std::sqrt( is_massive + apt::sqabs(p_old) );
+      auto v_old = p_old / gamma;
+
       auto[v_x, v_y] = get_vxvy( x_old[PHI], v_old[R], v_old[PHI] );
       double x_new = exp(x_old[R]) * cos(x_old[PHI]) + v_x * dt;
       double y_new = exp(x_old[R]) * sin(x_old[PHI]) + v_y * dt;
@@ -122,46 +133,46 @@ SCENARIO("LogSpherical", "[knl]") {
       REQUIRE( exp(x[R]) * cos(x[PHI]) == Approx(x_new) );
       REQUIRE( exp(x[R]) * sin(x[PHI]) == Approx(y_new) );
 
-      auto[v_x1, v_y1] = get_vxvy( x[PHI], v[R], v[PHI] );
-      REQUIRE( v_x1 == Approx(v_x) );
-      REQUIRE( v_y1 == Approx(v_y) );
-
+      auto[p_x1, p_y1] = get_vxvy( x[PHI], p[R], p[PHI] );
+      REQUIRE( p_x1 / gamma == Approx(v_x) );
+      REQUIRE( p_y1 / gamma == Approx(v_y) );
     }
   }
+}
 
-  // TODO test on axes
+SCENARIO("LogSpherical, test against with old geodesic mover, which presumably is correct", "[metric]") {
+  using Coord = knl::coord<knl::coordsys::LogSpherical>;
+  aio::unif_real<double> unif;
 
-  SECTION("compare with old geodesic mover, which presumably is correct") {
-    util::Rng<double> rng;
-    rng.set_seed(std::time(0));
+  int N = 100000;
+  const double dt = 0.001;
+  while (N--) {
+    Vec<double,3> x1( unif() * 3.0, unif() * PI<double>, unif() * 2 * PI<double> );
+    Vec<double,3> p1( 10.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ) );
+    bool is_massive = unif() > 0.5;
 
-    int N = 100;
-    for ( int i = 0; i < N; ++i ) {
-      const double dt = rng.uniform(0.0, 0.01);
-      Vec<double,3> x1( rng.uniform(0,3), rng.uniform(0, PI), rng.uniform(0,2*PI) );
-      Vec<double,3> v1( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
-      v1 /= std::sqrt( 1.0 + apt::sqabs(v1) );
+    auto x2 = x1;
+    Vec<double,3> v2 = p1 / std::sqrt( is_massive + apt::sqabs(p1) );
 
-      auto x2 = x1;
-      auto v2 = v1;
+    Coord::geodesic_move( x1, p1, dt, is_massive );
+    OLD_geodesic_move( x2, v2, dt );
 
-      CAPTURE(dt, x1, v1);
+    CAPTURE( dt, x1, p1, is_massive );
 
-      Coord::geodesic_move( x1, v1, dt );
-      OLD_geodesic_move( x2, v2, dt );
 
-      REQUIRE( x1[0] == Approx(x2[0]));
-      REQUIRE( x1[1] == Approx(x2[1]));
+    REQUIRE( x1[0] == Approx(x2[0]) );
+    REQUIRE( x1[1] == Approx(x2[1]) );
 
-      // REQUIRE( x1[2] == Approx(x2[2]));
+    REQUIRE( PV(x1[2]) == Approx(PV(x2[2])));
 
-      // REQUIRE( v1[0] == Approx(v2[0]));
-      // REQUIRE( v1[1] == Approx(v2[1]));
-      // REQUIRE( v1[2] == Approx(v2[2]));
 
-    }
+    Vec<double,3> v1 = p1 / std::sqrt( is_massive + apt::sqabs(p1) );
+    REQUIRE( v1[0] == Approx(v2[0]));
+    REQUIRE( v1[1] == Approx(v2[1]));
+    REQUIRE( v1[2] == Approx(v2[2]));
 
   }
+
 }
 
 #include <chrono>
@@ -177,8 +188,8 @@ using namespace std::chrono;
 //   std::vector<double> rdn ( MIL * 6 );
 //   for ( int i = 0; i < MIL; ++i ) {
 //     rdn[6*i + 0] = rng.uniform(0,3);
-//     rdn[6*i + 1] = rng.uniform(0,PI);
-//     rdn[6*i + 2] = rng.uniform(0,2*PI);
+//     rdn[6*i + 1] = rng.uniform(0,PI<double>);
+//     rdn[6*i + 2] = rng.uniform(0,2*PI<double>);
 
 //     rdn[6*i + 3] = rng.uniform(-10,10);
 //     rdn[6*i + 4] = rng.uniform(-10,10);
