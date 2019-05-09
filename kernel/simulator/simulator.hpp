@@ -110,9 +110,16 @@ namespace pic {
 
     template < template < int, typename, template < typename > class, typename > class IC >
     int load_initial_condition() {
-      IC ic( _grid, _E, _B, _J, _particles );
-      ic();
-      return ic.initial_timestep();
+      // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
+      int init_ts = 0;
+      if (_cart_opt) {
+        IC ic( _grid, _E, _B, _J, _particles );
+        ic();
+        init_ts = ic.initial_timestep();
+      }
+      // broadcast to ensure uniformity
+      mpi::world.broadcast( 0, &init_ts, 1 );
+      return init_ts;
     }
 
     inline void set_rng_seed( int seed ) { _rng.set_seed(seed); }
