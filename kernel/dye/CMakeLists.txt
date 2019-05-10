@@ -1,6 +1,6 @@
-add_library(dye STATIC "ensemble.cpp" "dynamic_balance.cpp")
+add_library(dye SHARED "ensemble.cpp" "dynamic_balance.cpp")
 target_include_directories(dye PRIVATE ${KERNEL_DIR})
-target_link_libraries(dye PRIVATE mpipp picgen)
+target_link_libraries(dye PRIVATE particle_array mpipp picgen)
 
 test_gen(dye ensemble mpipp dye) # DONE
 test_gen(dye dynamic_balance mpipp dye) # TODO
