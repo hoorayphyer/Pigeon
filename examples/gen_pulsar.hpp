@@ -4,7 +4,7 @@
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
 
-#include "kernel/grid.hpp"
+#include "manifold/grid.hpp"
 
 #include "field/field.hpp"
 
@@ -37,7 +37,7 @@ namespace pic {
   inline constexpr int total_timesteps = 1000;
   inline constexpr real_t dt = 0.001;
 
-  constexpr knl::Grid<real_t,DGrid> supergrid
+  constexpr mani::Grid<real_t,DGrid> supergrid
   = {{ { 0.0, std::log(30.0), 128 }, { 0.0, PI, 128 } }};
   inline constexpr int guard = 1;
 
@@ -298,7 +298,7 @@ namespace particle {
 namespace pic {
   template < typename Real >
   apt::pair< Real > gtl ( const apt::pair<Real>& range,
-                          const knl::Grid1D<Real>& localgrid ) noexcept {
+                          const mani::Grid1D<Real>& localgrid ) noexcept {
     auto to_grid_index =
       [&localgrid] ( auto absc ) noexcept {
         return ( absc - localgrid.lower() ) / localgrid.delta();
@@ -314,7 +314,7 @@ namespace pic {
              typename RealJ >
   struct InitialCondition {
   private:
-    const knl::Grid<Real,DGrid>& _grid;
+    const mani::Grid<Real,DGrid>& _grid;
     field::Field<Real, 3, DGrid>& _Bfield;
 
     apt::Index<DGrid> _Ib;
@@ -331,7 +331,7 @@ namespace pic {
     };
 
   public:
-    InitialCondition ( const knl::Grid<Real,DGrid>& localgrid,
+    InitialCondition ( const mani::Grid<Real,DGrid>& localgrid,
                        const field::Field<Real, 3, DGrid>& Efield,
                        field::Field<Real, 3, DGrid>& Bfield,
                        const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
@@ -358,7 +358,7 @@ namespace pic {
              typename RealJ >
   struct FieldBC_Rotating_Conductor {
   private:
-    const knl::Grid<Real,DGrid>& _grid;
+    const mani::Grid<Real,DGrid>& _grid;
     field::Field<Real, 3, DGrid>& _Efield;
     field::Field<Real, 3, DGrid>& _Bfield;
 
@@ -386,7 +386,7 @@ namespace pic {
     };
 
   public:
-    FieldBC_Rotating_Conductor ( const knl::Grid<Real,DGrid>& localgrid,
+    FieldBC_Rotating_Conductor ( const mani::Grid<Real,DGrid>& localgrid,
                                  field::Field<Real, 3, DGrid>& Efield,
                                  field::Field<Real, 3, DGrid>& Bfield,
                                  const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
@@ -420,7 +420,7 @@ namespace pic {
              typename RealJ >
   struct FieldBC_Axis {
   private:
-    const knl::Grid<Real,DGrid>& _grid;
+    const mani::Grid<Real,DGrid>& _grid;
     field::Field<Real, 3, DGrid>& _Efield;
     field::Field<Real, 3, DGrid>& _Bfield;
 
@@ -429,7 +429,7 @@ namespace pic {
     bool _is_at_axis_upper = false;
 
   public:
-    FieldBC_Axis ( const knl::Grid<Real,DGrid>& localgrid,
+    FieldBC_Axis ( const mani::Grid<Real,DGrid>& localgrid,
                         field::Field<Real, 3, DGrid>& Efield,
                         field::Field<Real, 3, DGrid>& Bfield,
                         const field::Field<RealJ, 3, DGrid>& Jfield,
@@ -468,7 +468,7 @@ namespace pic {
   struct FieldBC_FoldBackJ {
   private:
     static_assert(DGrid==2);
-    const knl::Grid<Real,DGrid>& _grid;
+    const mani::Grid<Real,DGrid>& _grid;
     field::Field<RealJ, 3, DGrid>& _Jmesh;
 
     const int axis_dir = 1;
@@ -476,7 +476,7 @@ namespace pic {
     bool _is_at_axis_upper = false;
 
   public:
-    FieldBC_FoldBackJ ( const knl::Grid<Real,DGrid>& localgrid,
+    FieldBC_FoldBackJ ( const mani::Grid<Real,DGrid>& localgrid,
                         const field::Field<Real, 3, DGrid>& Efield,
                         const field::Field<Real, 3, DGrid>& Bfield,
                         field::Field<RealJ, 3, DGrid>& Jfield,
@@ -528,7 +528,7 @@ namespace pic {
              typename RealJ >
   struct Injector {
   private:
-    const knl::Grid<Real,DGrid>& _grid;
+    const mani::Grid<Real,DGrid>& _grid;
     const field::Field<Real, 3, DGrid>& _Efield;
     const field::Field<Real, 3, DGrid>& _Bfield;
     const field::Field<RealJ, 3, DGrid>& _Jfield; // J is Jmesh on a replica
@@ -538,7 +538,7 @@ namespace pic {
     apt::Index<DGrid> _extent;
 
   public:
-    Injector ( const knl::Grid<Real,DGrid>& localgrid,
+    Injector ( const mani::Grid<Real,DGrid>& localgrid,
                const field::Field<Real, 3, DGrid>& Efield,
                const field::Field<Real, 3, DGrid>& Bfield,
                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica

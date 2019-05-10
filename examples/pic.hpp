@@ -1,8 +1,8 @@
 #ifndef _PIC_HPP_
 #define _PIC_HPP_
 
-#include "kernel/shapef.hpp"
-#include "kernel/curvilinear.hpp"
+#include "particle/shapef.hpp"
+#include "manifold/curvilinear.hpp"
 #include "apt/type_traits.hpp"
 
 namespace particle {
@@ -22,9 +22,9 @@ namespace pic {
 
   constexpr int DGrid = 2;
 
-  using ShapeF = knl::shapef_t<knl::shape::Cloud_In_Cell>;
+  using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
-  using Metric = knl::coord<knl::coordsys::Cartesian>;
+  using Metric = mani::coord<mani::coordsys::Cartesian>;
 
   using real_j_t = long double;
 

@@ -18,8 +18,43 @@ if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 endif()
 
-add_subdirectory(src)
-add_subdirectory(data_exporter)
+function(test_gen category name)
+  set(test_target "test_${category}_${name}")
+  add_executable( ${test_target} "tests/test_${name}.cpp")
+  target_include_directories(${test_target} PRIVATE ${KERNEL_DIR})
+
+  set(link_testfw testfw)
+  foreach( lib IN LISTS ARGN)
+    target_link_libraries(${test_target} PRIVATE ${lib})
+    if( ${lib} STREQUAL "mpipp" )
+      set(link_testfw testfw_mpi)
+    endif()
+  endforeach()
+  target_link_libraries( ${test_target} PRIVATE ${link_testfw} )
+  add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
+endfunction()
+
+add_subdirectory(apt)
+
+add_subdirectory(filesys)
+add_subdirectory(mpipp)
+add_subdirectory(silopp)
+add_subdirectory(logger)
+add_subdirectory(random)
+
+add_subdirectory(manifold)
+
+add_subdirectory(field)
+add_subdirectory(msh)
+add_subdirectory(particle)
+
 add_subdirectory(dye)
-add_subdirectory(simulator)
-add_subdirectory(tests)
+add_subdirectory(io)
+add_subdirectory(ckpt)
+
+add_executable(pic "simulator.cpp")
+target_include_directories(pic PRIVATE ${KERNEL_DIR} )
+target_link_libraries(pic PRIVATE field_updater field_communication particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen io)
+
+
+add_subdirectory(testfw)

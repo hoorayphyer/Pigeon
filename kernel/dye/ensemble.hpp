@@ -1,7 +1,7 @@
 #ifndef  _DYE_ENSEMBLE_HPP_
 #define  _DYE_ENSEMBLE_HPP_
 
-#include "parallel/mpi++.hpp"
+#include "mpipp/mpi++.hpp"
 #include "apt/array.hpp"
 
 namespace dye {

@@ -4,7 +4,7 @@
 #include "particle/array.hpp"
 #include "particle/map.hpp"
 
-#include "ensemble.hpp"
+#include "dye/ensemble.hpp"
 
 namespace mpi {
   struct Comm;
