@@ -12,6 +12,6 @@ SCENARIO("Test setting offset") {
     REQUIRE(f[i].offset() == offset );
   }
 
-  REQUIRE( !MIDWAY == INSITU );
-  REQUIRE( !INSITU == MIDWAY );
+  REQUIRE( (!MIDWAY) == INSITU );
+  REQUIRE( (!INSITU) == MIDWAY );
 }

@@ -346,7 +346,7 @@ namespace io {
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
 
-    const std::string prefix = this_run_dir + "data/timestep" + str_ts + "/";
+    const std::string prefix = this_run_dir + "/data/timestep" + str_ts;
     if ( mpi::world.rank() == 0 )
       util::fs::create_directories(prefix);
 
@@ -355,7 +355,7 @@ namespace io {
     silo::file_t master;
     // set up file_ns and block_ns. Only significant on world.rank() == 0
     constexpr char delimiter = '|';
-    const std::string file_ns = delimiter + prefix + "set%d.silo" + delimiter + "n%" + std::to_string(num_files);
+    const std::string file_ns = delimiter + prefix + "/set%d.silo" + delimiter + "n%" + std::to_string(num_files);
 
     auto block_ns_gen =
       [delimiter, &cart_opt]( std::string name ) -> std::string {
@@ -405,7 +405,7 @@ namespace io {
 
       const int rank = cart_opt->rank();
       const auto coords = cart_opt->coords();
-      std::string filename = prefix + "set" + std::to_string(rank % num_files)+".silo";
+      std::string filename = prefix + "/set" + std::to_string(rank % num_files)+".silo";
       std::string silo_dname = "cart";
       for ( const auto& x : coords ) {
         char tmp[10];
@@ -416,7 +416,7 @@ namespace io {
       dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
 
       if ( cart_opt->rank() == 0 )
-        master = silo::open<silo::Mode::Write>( this_run_dir + "timestep" + str_ts + ".silo" );
+        master = silo::open<silo::Mode::Write>( this_run_dir + "/timestep" + str_ts + ".silo" );
 
       // { // TODO uncomment
       //   std::vector< std::vector<RealExport> > coords(DGrid);
