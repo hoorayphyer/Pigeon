@@ -2,6 +2,7 @@
 #include "silopp/silo++.hpp"
 #include <silo.h>
 #include "mpipp/mpi++.hpp"
+#include <pmpio>
 #include "filesys/filesys.hpp"
 #include <unistd.h>
 
@@ -108,13 +109,23 @@ SCENARIO("putters", "[silo][.]") {
 }
 
 SCENARIO("pmpio create files", "[silo]") {
-  const int num_files = 2;
+  const int num_files = 4;
 
   std::string prefix = "test_pmpio";
   if ( world.rank() == 0 ) fs::remove_all(prefix);
   fs::create_directories(prefix);
 
-  std::string filename = prefix + "/set" + std::to_string(silo::to_group_rank(world, num_files ))+".silo";
+  auto gr = []( int rank, int size, int num_files ) -> int {
+              int split = (size % num_files) * ( size / num_files + 1 );
+              return (rank >= split) ? (size % num_files) + ( rank - split ) / ( size / num_files ) : rank / ( size / num_files + 1 );
+            };
+  if ( world.rank() == 0 ) {
+    for ( int i = 0; i < 10; ++i )
+      std::cout << "wr, gr " << i << ", " << gr(i, 10, 4 ) << std::endl;
+  }
+
+  int g = gr(world.rank(), world.size(), num_files );
+  std::string filename = prefix + "/set" + std::to_string(g)+".silo";
   std::string silo_dname = "rank" + std::to_string(world.rank());
 
   {
@@ -124,16 +135,12 @@ SCENARIO("pmpio create files", "[silo]") {
   world.barrier();
   if ( world.rank() == 0 ) {
     const int size = world.size();
-    int num_per_file = size / num_files + ( size % num_files != 0 );
-    for ( int i_file = 0; i_file < std::min<int>( num_files, size ); ++i_file  ) {
-      std::string fname = prefix + "/set" + std::to_string(i_file) + ".silo";
+    for ( int i = 0; i < size; ++i ) {
+      std::string fname = prefix + "/set" + std::to_string(gr(i, size, num_files )) + ".silo";
+      CAPTURE(fname);
       REQUIRE(fs::exists(fname));
       auto dbfile = open<Mode::Read>( fname );
-      for ( int i_d = 0; i_d < num_per_file; ++i_d ) {
-        int rank = i_file * num_per_file + i_d;
-        if ( rank < size )
-          REQUIRE( DBInqVarExists( dbfile, ("rank" + std::to_string(rank) ).c_str() ) );
-      }
+      REQUIRE( DBInqVarExists( dbfile, ("rank" + std::to_string(i) ).c_str() ) );
     }
     fs::remove_all(prefix);
   }
