@@ -98,3 +98,10 @@ namespace silo :: pmpio {
   template file_t open<Mode::Write>( std::string, std::string, const mpi::Comm&, int );
 
 }
+
+namespace silo {
+  int to_group_rank( const mpi::Comm& comm, int num_files ) {
+    // RATIONALE: rank / num_in_each_file, where num_in_each_file = ceiling( comm.size / num_files )
+    return comm.rank() / ( comm.size() / num_files + ( comm.size() % num_files != 0 ) );
+  }
+}

@@ -184,7 +184,6 @@ namespace io {
       std::vector<int> dims(DGrid);
       for ( int i = 0; i < DGrid; ++i ) dims[i] = io_field.mesh().extent()[i];
 
-
       std::string varname;
       for ( int comp = 0; comp < 3; ++comp ) {
         {
@@ -322,7 +321,6 @@ namespace io {
 
 }
 
-
 namespace io {
 
   template < typename RealExport,
@@ -403,9 +401,8 @@ namespace io {
     if ( cart_opt ) {
       // TODOL average to expf should factor in the scale functions, i.e. one should find the downsampled value by conserving the flux.
 
-      const int rank = cart_opt->rank();
       const auto coords = cart_opt->coords();
-      std::string filename = prefix + "/set" + std::to_string(rank % num_files)+".silo";
+      std::string filename = prefix + "/set" + std::to_string(silo::to_group_rank(*cart_opt, num_files ))+".silo";
       std::string silo_dname = "cart";
       for ( const auto& x : coords ) {
         char tmp[10];
@@ -418,7 +415,7 @@ namespace io {
       if ( cart_opt->rank() == 0 )
         master = silo::open<silo::Mode::Write>( this_run_dir + "/timestep" + str_ts + ".silo" );
 
-      // { // TODO uncomment
+      // { // TODO uncomment after fixing the visit operator issue
       //   std::vector< std::vector<RealExport> > coords(DGrid);
       //   for ( int i = 0; i < DGrid; ++i ) {
       //     auto& c = coords[i];

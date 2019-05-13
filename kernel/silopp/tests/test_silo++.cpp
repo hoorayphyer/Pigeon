@@ -2,6 +2,7 @@
 #include "silopp/silo++.hpp"
 #include <silo.h>
 #include "mpipp/mpi++.hpp"
+#include <pmpio.h>
 #include "filesys/filesys.hpp"
 #include <unistd.h>
 
@@ -9,7 +10,7 @@ using namespace mpi;
 using namespace silo;
 using namespace util;
 
-SCENARIO("create files", "[io][silo][.]") {
+SCENARIO("create files", "[silo][.]") {
   if ( world.rank() == 0 ) {
     file_t dbfile;
     REQUIRE_FALSE(fs::exists("pubg__cc.silo"));
@@ -20,7 +21,7 @@ SCENARIO("create files", "[io][silo][.]") {
   world.barrier();
 }
 
-SCENARIO("OptList", "[io][silo]") {
+SCENARIO("OptList", "[silo][.]") {
   if ( world.rank() == 0 ) {
     OptList optlist;
     optlist[DBOPT_TIME] = 147.0f; // float option
@@ -47,7 +48,7 @@ SCENARIO("OptList", "[io][silo]") {
   world.barrier();
 }
 
-SCENARIO("putters", "[io][silo][.]") {
+SCENARIO("putters", "[silo][.]") {
   if ( world.rank() == 0 ) {
     WHEN("put a quadmesh into a silo file") {
       auto dbfile = open<Mode::Write>( "pubg.silo" );
@@ -107,7 +108,48 @@ SCENARIO("putters", "[io][silo][.]") {
   world.barrier();
 }
 
-SCENARIO("pmpio putters", "[io][silo]") {
+SCENARIO("pmpio create files", "[silo]") {
+  const int num_files = 2;
+
+  std::string prefix = "test_pmpio";
+  if ( world.rank() == 0 ) fs::remove_all(prefix);
+  fs::create_directories(prefix);
+
+  std::cout << world.size() << std::endl;
+  std::string filename = prefix + "/set" + std::to_string(world.rank() % num_files)+".silo";
+  std::string silo_dname = "rank" + std::to_string(world.rank());
+
+  {
+    auto dbfile = pmpio::open<Mode::Write>( filename, silo_dname, world, num_files );
+
+    if ( world.rank() == 0 ) {
+      for ( int i = 0; i < world.size(); ++i ) {
+        auto* baton = static_cast<pmpio::DBfileHandle>(dbfile).baton_h;
+        int gr = PMPIO_GroupRank(baton, i);
+        int rig = PMPIO_RankInGroup(baton, i);
+        std::cout << "i, gr, rig = " << i << ", " << gr << ", " << rig << std::endl;
+      }
+    }
+  }
+
+  // if ( world.rank() == 0 ) {
+  //   const int size = world.size();
+  //   for ( int i_file = 0; i_file < std::min<int>( num_files, size ); ++i_file  ) {
+  //     std::string fname = prefix + "/set" + std::to_string(i_file) + ".silo";
+  //     REQUIRE(fs::exists(fname));
+  //     auto dbfile = open<Mode::Read>( fname );
+  //     for ( int i_d = i_file; i_d < size; i_d += num_files ) {
+  //       REQUIRE( DBInqVarExists( dbfile, ("rank" + std::to_string(i_d) ).c_str() ) );
+  //     }
+  //   }
+  //   // fs::remove_all(prefix);
+  // }
+
+
+}
+
+// TODO this test is not correct
+SCENARIO("pmpio putters", "[silo][.]") {
   if ( world.rank() == 0 ) {
     WHEN("put a quadmesh into a silo file") {
       auto dbfile = pmpio::open<Mode::Write>( "pmpio_pubg.silo", "test_pmpio", world, 1 );
@@ -167,7 +209,7 @@ SCENARIO("pmpio putters", "[io][silo]") {
   world.barrier();
 }
 
-SCENARIO("multiputters with namescheme", "[io][silo]") {
+SCENARIO("multiputters with namescheme", "[silo][.]") {
   if ( world.rank() == 0 ) {
     WHEN("put a 3 blocks by 4 blocks into 2 silo files each of which contains 6 directories") {
       const std::vector<int> dims = { 3, 4 };
