@@ -190,7 +190,7 @@ namespace pic {
       // annihilate_mark_pairs( );
 
       if ( (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
-        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( timestep, dt, 1, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
         if ( false ) {
           // TODO has a few hyper parameters
           // TODO touch create is not multinode safe even buffer is used

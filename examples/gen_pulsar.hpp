@@ -69,6 +69,10 @@ namespace pic {
 
 }
 
+namespace pic {
+  inline constexpr int pmpio_num_files = 2;
+}
+
 namespace pic :: interval {
   inline constexpr int data_export = 200;
 }
