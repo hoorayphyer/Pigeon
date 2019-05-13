@@ -1,7 +1,7 @@
 #include "silopp/silo++.hpp"
 #include <silo.h>
 #include "mpipp/mpi++.hpp"
-#include <pmpio.h> // needs mpi
+#include "silopp/pmpio.hpp" // needs mpi
 
 namespace silo :: traits {
   bool display_guard = true;
@@ -97,11 +97,4 @@ namespace silo :: pmpio {
   template file_t open<Mode::Read>( std::string, std::string, const mpi::Comm&, int );
   template file_t open<Mode::Write>( std::string, std::string, const mpi::Comm&, int );
 
-}
-
-namespace silo {
-  int to_group_rank( const mpi::Comm& comm, int num_files ) {
-    // RATIONALE: rank / num_in_each_file, where num_in_each_file = ceiling( comm.size / num_files )
-    return comm.rank() / ( comm.size() / num_files + ( comm.size() % num_files != 0 ) );
-  }
 }

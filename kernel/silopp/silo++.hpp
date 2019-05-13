@@ -63,9 +63,4 @@ namespace silo {
   inline void close( pmpio::file_t& f ) { f.reset(); }
 }
 
-namespace silo {
-  // returns the group rank of the calling process. This is significant when pmpio is used, but it extends to normal case trivially. NOTE TODOL this function is a reverse-engineering product of the PMPIO_GroupRank.
-  int to_group_rank( const mpi::Comm& comm, int num_files );
-}
-
 #endif

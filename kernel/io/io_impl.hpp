@@ -351,7 +351,10 @@ namespace io {
     silo::pmpio::file_t dbfile;
 
     silo::file_t master;
-    // set up file_ns and block_ns. Only significant on world.rank() == 0
+
+    if ( cart_opt && cart_opt->size() < num_files ) num_files = cart_opt->size();
+
+    // set up file_ns and block_ns. n below is thought of as the cartesian rank. Only significant on world.rank() == 0
     constexpr char delimiter = '|';
     const std::string file_ns = delimiter + prefix + "/set%d.silo" + delimiter + "n%" + std::to_string(num_files);
 
@@ -364,11 +367,13 @@ namespace io {
             for ( int i = 0; i < dims.size(); ++i ) part1 += "_%03d";
 
             std::string part2 = "";
-            std::vector<int> strides ( dims.size() + 1 );
-            strides[0] = 1;
-            for ( int i = 0; i < dims.size(); ++i ) strides[i+1] = strides[i] * dims[i];
+            // mpi uses row major numbering to map cartesian rank to coordinates, e.g. (0,0) -> 0, (0,1) -> 1, (1,0) -> 2, (1,1) -> 3
+            std::vector<int> strides ( dims.size() + 1 ); // strides = ( DzDyDx, DzDy, Dz, 1 )
+            strides.back() = 1;
+            for ( int i = dims.size() - 1; i > -1; --i ) strides[i] = strides[i+1] * dims[i];
+
             for ( int i = 0; i < dims.size(); ++i ) {
-              part2 += delimiter + std::string("(n%" + std::to_string(strides[i+1]) + ")/") + std::to_string(strides[i]);
+              part2 += delimiter + std::string("(n%" + std::to_string(strides[i]) + ")/") + std::to_string(strides[i+1]);
             }
             return {part1, part2};
           } ();
@@ -402,7 +407,7 @@ namespace io {
       // TODOL average to expf should factor in the scale functions, i.e. one should find the downsampled value by conserving the flux.
 
       const auto coords = cart_opt->coords();
-      std::string filename = prefix + "/set" + std::to_string(silo::to_group_rank(*cart_opt, num_files ))+".silo";
+      std::string filename = prefix + "/set" + std::to_string(cart_opt->rank() % num_files ) + ".silo";
       std::string silo_dname = "cart";
       for ( const auto& x : coords ) {
         char tmp[10];

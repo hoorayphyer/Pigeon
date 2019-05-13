@@ -2,7 +2,7 @@
 #include "silopp/silo++.hpp"
 #include <silo.h>
 #include "mpipp/mpi++.hpp"
-#include <pmpio>
+#include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
 #include <unistd.h>
 
@@ -115,20 +115,9 @@ SCENARIO("pmpio create files", "[silo]") {
   if ( world.rank() == 0 ) fs::remove_all(prefix);
   fs::create_directories(prefix);
 
-  auto gr = []( int rank, int size, int num_files ) -> int {
-              int split = (size % num_files) * ( size / num_files + 1 );
-              return (rank >= split) ? (size % num_files) + ( rank - split ) / ( size / num_files ) : rank / ( size / num_files + 1 );
-            };
-  if ( world.rank() == 0 ) {
-    for ( int i = 0; i < 10; ++i )
-      std::cout << "wr, gr " << i << ", " << gr(i, 10, 4 ) << std::endl;
-  }
-
-  int g = gr(world.rank(), world.size(), num_files );
-  std::string filename = prefix + "/set" + std::to_string(g)+".silo";
-  std::string silo_dname = "rank" + std::to_string(world.rank());
-
   {
+    std::string filename = prefix + "/set" + std::to_string(PMPIO_GroupRank(world.rank(), num_files, world.size() ))+".silo";
+    std::string silo_dname = "rank" + std::to_string(world.rank());
     auto dbfile = pmpio::open<Mode::Write>( filename, silo_dname, world, num_files );
   }
 
@@ -136,7 +125,7 @@ SCENARIO("pmpio create files", "[silo]") {
   if ( world.rank() == 0 ) {
     const int size = world.size();
     for ( int i = 0; i < size; ++i ) {
-      std::string fname = prefix + "/set" + std::to_string(gr(i, size, num_files )) + ".silo";
+      std::string fname = prefix + "/set" + std::to_string(PMPIO_GroupRank(i, num_files, size )) + ".silo";
       CAPTURE(fname);
       REQUIRE(fs::exists(fname));
       auto dbfile = open<Mode::Read>( fname );
