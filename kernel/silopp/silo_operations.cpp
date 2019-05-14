@@ -88,7 +88,6 @@ namespace silo{
 #include "silopp/silo++.hpp"
 namespace silo {
   template struct SiloPutter<file_t>;
-  template struct SiloPutter<pmpio::file_t>;
 
 #define INSTANTIATE_SILO_PUTTER_FOR_FILE(_SILO_FILE_, _TYPE_)           \
   template void SiloPutter<_SILO_FILE_>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, OptList ); \
@@ -96,8 +95,7 @@ namespace silo {
   template void SiloPutter<_SILO_FILE_>::put_var( std::string, std::string, const std::vector<const _TYPE_*>&, const std::vector<int>& dims, OptList )
 
 #define INSTANTIATE_SILO_PUTTER(_TYPE_)                   \
-  INSTANTIATE_SILO_PUTTER_FOR_FILE(file_t, _TYPE_);       \
-  INSTANTIATE_SILO_PUTTER_FOR_FILE(pmpio::file_t, _TYPE_)
+  INSTANTIATE_SILO_PUTTER_FOR_FILE(file_t, _TYPE_)
 
 
   INSTANTIATE_SILO_PUTTER(float);

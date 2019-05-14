@@ -13,7 +13,7 @@ SCENARIO("create files", "[silo][.]") {
   if ( world.rank() == 0 ) {
     file_t dbfile;
     REQUIRE_FALSE(fs::exists("pubg__cc.silo"));
-    dbfile = open<Mode::Write>( "pubg__cc.silo" );
+    dbfile = open( "pubg__cc.silo", Mode::Write );
     REQUIRE(fs::exists("pubg__cc.silo"));
     fs::remove_all("pubg__cc.silo");
   }
@@ -50,7 +50,7 @@ SCENARIO("OptList", "[silo][.]") {
 SCENARIO("putters", "[silo][.]") {
   if ( world.rank() == 0 ) {
     WHEN("put a quadmesh into a silo file") {
-      auto dbfile = open<Mode::Write>( "pubg.silo" );
+      auto dbfile = open( "pubg.silo", Mode::Write );
 
       apt::array<int,3> dims = { 16, 32, 64 };
       std::vector<std::vector<double>> coords(dims.size());
@@ -70,7 +70,7 @@ SCENARIO("putters", "[silo][.]") {
       silo::close(dbfile);
 
       AND_WHEN("later reopened for read") {
-        auto dbfile = open<Mode::Read>( "pubg.silo" );
+        auto dbfile = open( "pubg.silo", Mode::Read );
         auto* quadmesh = DBGetQuadmesh(dbfile, "mesh");
         REQUIRE( quadmesh->ndims == 3 );
         REQUIRE( quadmesh->datatype == DB_DOUBLE );
@@ -117,19 +117,20 @@ SCENARIO("pmpio create files", "[silo]") {
                    });
 
   {
-    std::string filename = prefix + "/set" + std::to_string(PMPIO_GroupRank(world.rank(), num_files, world.size() ))+".silo";
+    std::string filename = prefix + "/set" + std::to_string( world.rank() % num_files )+".silo";
     std::string silo_dname = "rank" + std::to_string(world.rank());
-    auto dbfile = pmpio::open<Mode::Write>( filename, silo_dname, world, num_files );
+    Pmpio pmpio { world, filename, silo_dname, Mode::Write };
+    pmpio( [](auto& ){} );
   }
-
   world.barrier();
+
   if ( world.rank() == 0 ) {
     const int size = world.size();
     for ( int i = 0; i < size; ++i ) {
-      std::string fname = prefix + "/set" + std::to_string(PMPIO_GroupRank(i, num_files, size )) + ".silo";
+      std::string fname = prefix + "/set" + std::to_string( i % num_files ) + ".silo";
       CAPTURE(fname);
       REQUIRE(fs::exists(fname));
-      auto dbfile = open<Mode::Read>( fname );
+      auto dbfile = open( fname, Mode::Read );
       REQUIRE( DBInqVarExists( dbfile, ("rank" + std::to_string(i) ).c_str() ) );
     }
   }
@@ -139,65 +140,65 @@ SCENARIO("pmpio create files", "[silo]") {
 }
 
 // TODO this test is not correct
-SCENARIO("pmpio putters", "[silo][.]") {
-  if ( world.rank() == 0 ) {
-    WHEN("put a quadmesh into a silo file") {
-      auto dbfile = pmpio::open<Mode::Write>( "pmpio_pubg.silo", "test_pmpio", world, 1 );
+// SCENARIO("pmpio putters", "[silo][.]") {
+//   if ( world.rank() == 0 ) {
+//     WHEN("put a quadmesh into a silo file") {
+//       auto dbfile = pmpio::open<Mode::Write>( "pmpio_pubg.silo", "test_pmpio", world, 1 );
 
-      apt::array<int,3> dims = { 16, 32, 64 };
-      std::vector<std::vector<double>> coords(dims.size());
-      for ( int i = 0; i < dims.size(); ++i ) {
-        coords[i].resize(dims[i]);
-        for ( auto& x : coords[i] ) x = dims[i] / 3.0;
-      }
+//       apt::array<int,3> dims = { 16, 32, 64 };
+//       std::vector<std::vector<double>> coords(dims.size());
+//       for ( int i = 0; i < dims.size(); ++i ) {
+//         coords[i].resize(dims[i]);
+//         for ( auto& x : coords[i] ) x = dims[i] / 3.0;
+//       }
 
-      OptList optlist;
-      optlist[DBOPT_TIME] = 147.0f; // float option
-      optlist[DBOPT_DTIME] = 369.0; // double option
-      optlist[DBOPT_CYCLE] = 555; // int option
-      optlist[DBOPT_LO_OFFSET] = std::vector<int>{4,10,2}; // int array
-      optlist[DBOPT_HI_OFFSET] = std::vector<int>{1,0,2}; // int array
+//       OptList optlist;
+//       optlist[DBOPT_TIME] = 147.0f; // float option
+//       optlist[DBOPT_DTIME] = 369.0; // double option
+//       optlist[DBOPT_CYCLE] = 555; // int option
+//       optlist[DBOPT_LO_OFFSET] = std::vector<int>{4,10,2}; // int array
+//       optlist[DBOPT_HI_OFFSET] = std::vector<int>{1,0,2}; // int array
 
-      dbfile.put_mesh( "mesh", coords, optlist );
-      silo::close(dbfile);
+//       dbfile.put_mesh( "mesh", coords, optlist );
+//       silo::close(dbfile);
 
-      AND_WHEN("later reopened for read") {
-        auto dbfile = open<Mode::Read>( "pmpio_pubg.silo" );
-        auto* quadmesh = DBGetQuadmesh(dbfile, "test_pmpio/mesh");
-        REQUIRE( quadmesh->ndims == 3 );
-        REQUIRE( quadmesh->datatype == DB_DOUBLE );
-        REQUIRE( quadmesh->dims[0] == 16 );
-        REQUIRE( quadmesh->dims[1] == 32 );
-        REQUIRE( quadmesh->dims[2] == 64 );
-        REQUIRE( quadmesh->coordtype == DB_COLLINEAR );
-        double* coord;
-        coord = (double*)quadmesh->coords[0];
-        for ( int i = 0; i < 16; ++i ) REQUIRE( coord[0] == 16 / 3.0 );
-        coord = (double*)quadmesh->coords[1];
-        for ( int i = 0; i < 32; ++i ) REQUIRE( coord[1] == 32 / 3.0 );
-        coord = (double*)quadmesh->coords[2];
-        for ( int i = 0; i < 64; ++i ) REQUIRE( coord[2] == 64 / 3.0 );
+//       AND_WHEN("later reopened for read") {
+//         auto dbfile = open<Mode::Read>( "pmpio_pubg.silo" );
+//         auto* quadmesh = DBGetQuadmesh(dbfile, "test_pmpio/mesh");
+//         REQUIRE( quadmesh->ndims == 3 );
+//         REQUIRE( quadmesh->datatype == DB_DOUBLE );
+//         REQUIRE( quadmesh->dims[0] == 16 );
+//         REQUIRE( quadmesh->dims[1] == 32 );
+//         REQUIRE( quadmesh->dims[2] == 64 );
+//         REQUIRE( quadmesh->coordtype == DB_COLLINEAR );
+//         double* coord;
+//         coord = (double*)quadmesh->coords[0];
+//         for ( int i = 0; i < 16; ++i ) REQUIRE( coord[0] == 16 / 3.0 );
+//         coord = (double*)quadmesh->coords[1];
+//         for ( int i = 0; i < 32; ++i ) REQUIRE( coord[1] == 32 / 3.0 );
+//         coord = (double*)quadmesh->coords[2];
+//         for ( int i = 0; i < 64; ++i ) REQUIRE( coord[2] == 64 / 3.0 );
 
-        // check optlist
-        REQUIRE( quadmesh->cycle == 555 );
-        REQUIRE( quadmesh->time == 147.0f );
-        REQUIRE( quadmesh->dtime == 369.0 );
-        // these come from LO and HI offsets
-        REQUIRE( quadmesh->min_index[0] == 4 );
-        REQUIRE( quadmesh->max_index[0] == 16 - 1 - 1 );
-        REQUIRE( quadmesh->min_index[1] == 10 );
-        REQUIRE( quadmesh->max_index[1] == 32 - 1 - 0 );
-        REQUIRE( quadmesh->min_index[2] == 2 );
-        REQUIRE( quadmesh->max_index[2] == 64 - 1 - 2 );
+//         // check optlist
+//         REQUIRE( quadmesh->cycle == 555 );
+//         REQUIRE( quadmesh->time == 147.0f );
+//         REQUIRE( quadmesh->dtime == 369.0 );
+//         // these come from LO and HI offsets
+//         REQUIRE( quadmesh->min_index[0] == 4 );
+//         REQUIRE( quadmesh->max_index[0] == 16 - 1 - 1 );
+//         REQUIRE( quadmesh->min_index[1] == 10 );
+//         REQUIRE( quadmesh->max_index[1] == 32 - 1 - 0 );
+//         REQUIRE( quadmesh->min_index[2] == 2 );
+//         REQUIRE( quadmesh->max_index[2] == 64 - 1 - 2 );
 
-        silo::close(dbfile);
-      }
+//         silo::close(dbfile);
+//       }
 
-      fs::remove_all("pmpio_pubg.silo");
-    }
-  }
-  world.barrier();
-}
+//       fs::remove_all("pmpio_pubg.silo");
+//     }
+//   }
+//   world.barrier();
+// }
 
 SCENARIO("multiputters with namescheme", "[silo][.]") {
   if ( world.rank() == 0 ) {
@@ -210,7 +211,7 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
       // create inidividual quadmesh
       for ( int y = 0; y < 4; ++y ) {
         for ( int x = 0; x < 3; ++x ) {
-          auto db = open<Mode::Write>( prefix + "set" + std::to_string( (x+3*y)%2 ) + ".silo" );
+          auto db = open( prefix + "set" + std::to_string( (x+3*y)%2 ) + ".silo", Mode::Write );
           std::string dname = "cart_00" + std::to_string(x) + "_00" + std::to_string(y);
           DBMkDir( db, dname.c_str() );
           DBSetDir( db, dname.c_str() );
@@ -238,7 +239,7 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
       }
 
       {
-        auto dbfile = open<Mode::Write>( prefix + "pubg_master.silo" );
+        auto dbfile = open( prefix + "pubg_master.silo", Mode::Write );
         dbfile.put_multimesh( "multimesh_ns", strides.back(), file_ns, block_ns );
         // hard code meshnames and block types
         const char* meshnames[12] =
@@ -266,7 +267,7 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
       }
 
       {
-        auto dbfile = open<Mode::Read>( prefix + "pubg_master.silo" );
+        auto dbfile = open( prefix + "pubg_master.silo", Mode::Read );
         auto multimesh = DBGetMultimesh(dbfile, "multimesh_ns");
         REQUIRE(std::string(multimesh->file_ns) == "|set%d.silo|n%2");
         REQUIRE(std::string(multimesh->block_ns) == "|cart_%03d_%03d/submesh|(n%3)/1|(n%12)/3" );

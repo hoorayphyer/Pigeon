@@ -1,16 +1,14 @@
 #include "io/io.hpp"
 #include "silopp/silo++.hpp"
 #include "mpipp/mpi++.hpp"
+#include <silo.h> // for some DBOPTs and for pmpio.hpp
+#include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
 #include "field/communication.hpp"
 #include "msh/mesh_shape_interplay.hpp"
-
 #include "dye/ensemble.hpp"
-
 #include "particle/properties.hpp"
-
 #include <cmath>
-#include <silo.h> // for some DBOPTs
 
 namespace io {
   std::string this_run_dir;
@@ -174,8 +172,8 @@ namespace io {
     const field::Field<RealJ, 3, DGrid>& Jfield;// J is Jmesh on a replica
     const particle::map<particle::array<Real,PtcSpecs>>& particles;
 
-    template < typename File_t, typename RealExport, typename F_put_to_master >
-    void operator() ( File_t& dbfile, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
+    template < typename RealExport, typename F_put_to_master >
+    void operator() ( const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       if ( !cart_opt ) return;
 
       field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
@@ -189,14 +187,18 @@ namespace io {
           downsample( io_field, Efield, comp, ShapeF() );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "E" + std::to_string(comp+1);
-          dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
-          if ( cart_opt->rank() == 0 ) put_to_master( varname, cart_opt->size());
+          pmpio([&](auto& dbfile){
+                  dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
+                });
+          put_to_master( varname, cart_opt->size());
 
           downsample( io_field, Bfield, comp, ShapeF() );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "B" + std::to_string(comp+1);
-          dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
-          if ( cart_opt->rank() == 0 ) put_to_master( varname, cart_opt->size());
+          pmpio([&](auto& dbfile){
+                  dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
+                });
+          put_to_master( varname, cart_opt->size());
         }
 
         {
@@ -236,8 +238,10 @@ namespace io {
           downsample( io_field, tmp, 0, ShapeF() );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
-          dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
-          if ( cart_opt->rank() == 0 ) put_to_master( varname, cart_opt->size());
+          pmpio([&](auto& dbfile){
+                  dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
+                });
+          put_to_master( varname, cart_opt->size());
         }
       }
 
@@ -287,8 +291,8 @@ namespace io {
     const field::Field<RealJ, 3, DGrid>& Jfield;// J is Jmesh on a replica
     const particle::map<particle::array<Real,PtcSpecs>>& particles;
 
-    template < typename File_t, typename RealExport, typename F_put_to_master >
-    void operator() ( File_t& dbfile, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
+    template < typename RealExport, typename F_put_to_master >
+    void operator() ( const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       // TODO dbfile.put charge mass of the species in
       // TODO save gamma P density, which is total gamma / physical cell volume. Later this divided by number density gives us gamma P per unit particle. Think this over.
       field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
@@ -310,8 +314,10 @@ namespace io {
         if ( cart_opt ) {
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = std::string("n") + particle::properties[sp].name;
-          dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
-          if ( cart_opt->rank() == 0 ) put_to_master( varname, cart_opt->size());
+          pmpio([&](auto& dbfile){
+                  dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
+                });
+          put_to_master( varname, cart_opt->size());
         }
       }
     }
@@ -348,11 +354,20 @@ namespace io {
     if ( cart_opt ) fs::mpido(*cart_opt, [&](){fs::create_directories(prefix);} );
     ens.intra.barrier();
 
-    silo::pmpio::file_t dbfile;
-
-    silo::file_t master;
-
-    if ( cart_opt && cart_opt->size() < num_files ) num_files = cart_opt->size();
+    silo::file_t master; // only significant on world.rank() == 0
+    silo::Pmpio pmpio; // only significant on carts
+    if ( cart_opt ) {
+      pmpio.filename = prefix + "/set" + std::to_string(cart_opt->rank() % num_files ) + ".silo";
+      pmpio.dirname = "cart";
+      for ( const auto& x : cart_opt->coords() ) {
+        char tmp[10];
+        sprintf(tmp, "_%03d", x );
+        pmpio.dirname += tmp;
+      }
+      pmpio.comm = cart_opt->split( (cart_opt->rank()) % num_files );
+      if ( cart_opt->rank() == 0 )
+        master = silo::open( this_run_dir + "/timestep" + str_ts + ".silo", silo::Mode::Write );
+    }
 
     // set up file_ns and block_ns. n below is thought of as the cartesian rank. Only significant on world.rank() == 0
     constexpr char delimiter = '|';
@@ -399,26 +414,13 @@ namespace io {
     optlist[DBOPT_HI_OFFSET] = export_offset;
 
     auto put_to_master =
-      [&master, &file_ns, &block_ns_gen, &optlist]( std::string varname, int nblock ) {
-        master.put_multivar( varname, nblock, file_ns, block_ns_gen(varname), optlist );
+      [&cart_opt, &master, &file_ns, &block_ns_gen, &optlist]( std::string varname, int nblock ) {
+        if ( cart_opt && cart_opt->rank() == 0 )
+          master.put_multivar( varname, nblock, file_ns, block_ns_gen(varname), optlist );
       };
 
     if ( cart_opt ) {
       // TODOL average to expf should factor in the scale functions, i.e. one should find the downsampled value by conserving the flux.
-
-      const auto coords = cart_opt->coords();
-      std::string filename = prefix + "/set" + std::to_string(cart_opt->rank() % num_files ) + ".silo";
-      std::string silo_dname = "cart";
-      for ( const auto& x : coords ) {
-        char tmp[10];
-        sprintf(tmp, "_%03d", x );
-        silo_dname += tmp;
-      }
-
-      dbfile = silo::pmpio::open<silo::Mode::Write>( filename, silo_dname, *cart_opt, num_files );
-
-      if ( cart_opt->rank() == 0 )
-        master = silo::open<silo::Mode::Write>( this_run_dir + "/timestep" + str_ts + ".silo" );
 
       // { // TODO uncomment after fixing the visit operator issue
       //   std::vector< std::vector<RealExport> > coords(DGrid);
@@ -455,13 +457,15 @@ namespace io {
           }
         }
 
-        DBPutQuadmesh(dbfile, MeshExport, NULL, coords, dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist);
+        pmpio( [&](auto& dbfile) {
+                 DBPutQuadmesh(dbfile, MeshExport, NULL, coords, dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist);
+               } );
+
         delete [] coords[0];
         delete [] coords[1];
 
-        if ( cart_opt->rank() == 0 ) {
+        if ( cart_opt->rank() == 0 )
           master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
-        }
       }
 
       // TODOL
@@ -474,7 +478,7 @@ namespace io {
       // }
 
       ExportEBJ<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportEBJ{grid,Efield,Bfield,Jfield,particles};
-      exportEBJ(dbfile, field_export, cart_opt, ens, put_to_master );
+      exportEBJ(pmpio, field_export, cart_opt, ens, put_to_master );
     }
 
     {
@@ -493,12 +497,10 @@ namespace io {
       //     dbfile.put_var( name, meshname, exfd );
       //   }
       // }
-      ExportParticles<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
-      exportPtcs(dbfile, field_export, cart_opt, ens, put_to_master );
-    }
 
-    silo::close( dbfile );
-    silo::close( master );
+      ExportParticles<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
+      exportPtcs(pmpio, field_export, cart_opt, ens, put_to_master );
+    }
 
   }
 }
