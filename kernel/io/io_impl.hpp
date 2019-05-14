@@ -11,8 +11,24 @@
 #include <cmath>
 
 namespace io {
-  std::string this_run_dir;
+  // template < typename T, int DGrid >
+  // std::unordered_map<std::string, FieldBasedExportee<T,DGrid>*> fld_exportees;
 
+  // template < typename T, int DGrid >
+  // std::unordered_map<std::string, ParticleBasedExportee<T,DGrid>*> ptc_exportees;
+
+  // template < typename T, int DGrid >
+  // void register_exportee( std::string name, FieldBasedExportee<T,DGrid>* ptr ) {
+  //   fld_exportees<T,DGrid>[name] = ptr;
+  // }
+
+  // template < typename T, int DGrid >
+  // void register_exportee( std::string name, ParticleBasedExportee<T,DGrid>* ptr ) {
+  //   ptc_exportees<T,DGrid>[name] = ptr;
+  // }
+}
+
+namespace io {
   // local directory for storing data symlinks
 #ifdef APPARENT_DATA_DIR
   std::string local_data_dir =
@@ -26,8 +42,9 @@ namespace io {
 #endif
 
   // TODOL what if prefix == local_data_dir??
-  void init_this_run_dir( std::string prefix, std::string dirname ) {
+  std::string init_this_run_dir( std::string prefix, std::string dirname ) {
     // use world root time to ensure uniqueness
+    std::string this_run_dir;
     if ( mpi::world.rank() == 0 ) {
       prefix = fs::absolute(prefix);
       fs::remove_slash(prefix);
@@ -63,40 +80,9 @@ namespace io {
       }
     }
 
+    return this_run_dir;
+
   }
-
-  // TODO
-  // void set_logger_dir( std::string logDir ) {
-  //   // int rank = comm.world().rank();
-  //   // Logger::thisRank = rank;
-  //   // Logger::setActiveRank( rank );
-  //   // if( Logger::isActiveRank && Logger::isLogToFile ) {
-  //   //   FileSystem::create_directories(logDir);
-  //   //   Logger::setLogFile( logDir + "rank_" + std::to_string( rank ) );
-  //   // } else {
-  //   //   // is not LogToFile, only let rank0 output to screen
-  //   //   if ( rank != 0)
-  //   //     Logger::setVerbosityLevel(-1);
-  //   // }
-  // }
-}
-
-namespace io {
-  // template < typename T, int DGrid >
-  // std::unordered_map<std::string, FieldBasedExportee<T,DGrid>*> fld_exportees;
-
-  // template < typename T, int DGrid >
-  // std::unordered_map<std::string, ParticleBasedExportee<T,DGrid>*> ptc_exportees;
-
-  // template < typename T, int DGrid >
-  // void register_exportee( std::string name, FieldBasedExportee<T,DGrid>* ptr ) {
-  //   fld_exportees<T,DGrid>[name] = ptr;
-  // }
-
-  // template < typename T, int DGrid >
-  // void register_exportee( std::string name, ParticleBasedExportee<T,DGrid>* ptr ) {
-  //   ptc_exportees<T,DGrid>[name] = ptr;
-  // }
 }
 
 namespace io {
@@ -335,7 +321,7 @@ namespace io {
              typename ShapeF,
              typename RealJ,
              typename Metric >
-  void export_data( int timestep, Real dt, int num_files,
+  void export_data( std::string prefix, int timestep, Real dt, int num_files,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid
@@ -349,12 +335,13 @@ namespace io {
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
 
-    const std::string prefix = this_run_dir + "/data/timestep" + str_ts;
-
-    if ( cart_opt ) fs::mpido(*cart_opt, [&](){fs::create_directories(prefix);} );
-    ens.intra.barrier();
-
     silo::file_t master; // only significant on world.rank() == 0
+    if ( cart_opt && cart_opt->rank() == 0 ) {
+      master = silo::open( prefix + "/timestep" + str_ts + ".silo", silo::Mode::Write );
+    }
+
+    prefix = prefix + "/data/timestep" + str_ts;
+
     silo::Pmpio pmpio; // only significant on carts
     if ( cart_opt ) {
       pmpio.filename = prefix + "/set" + std::to_string(cart_opt->rank() % num_files ) + ".silo";
@@ -365,9 +352,10 @@ namespace io {
         pmpio.dirname += tmp;
       }
       pmpio.comm = cart_opt->split( (cart_opt->rank()) % num_files );
-      if ( cart_opt->rank() == 0 )
-        master = silo::open( this_run_dir + "/timestep" + str_ts + ".silo", silo::Mode::Write );
+      fs::mpido(*cart_opt, [&](){fs::create_directories(prefix);} );
     }
+
+    ens.intra.barrier();
 
     // set up file_ns and block_ns. n below is thought of as the cartesian rank. Only significant on world.rank() == 0
     constexpr char delimiter = '|';

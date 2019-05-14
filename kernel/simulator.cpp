@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <time.h>
 #include <cstring>
+#include "filesys/filesys.hpp"
+#include "logger/logger.hpp"
 
 std::string data_dirname() {
   char subDir[100] = {};
@@ -48,8 +50,14 @@ int main() {
   mpi::initialize();
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
-    io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
+    pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
+
+    fs::mpido( mpi::world, [&](){
+                             fs::create_directories(pic::this_run_dir + "/data");
+                             fs::create_directories(pic::this_run_dir + "/logs");
+                           } );
+    lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log", std::fstream::out );
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
       sim( pic::supergrid, cart_opt, pic::guard );
@@ -58,8 +66,12 @@ int main() {
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
+      lgr::file << lgr::indent << "==== Timestep " << ts << " ====" << std::endl;
+      lgr::indent = "\t";
       sim.evolve( ts, pic::dt );
+      lgr::indent = "";
     }
+    lgr::file.close();
   }
 
   mpi::finalize();

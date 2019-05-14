@@ -17,7 +17,12 @@
 
 #include "gen.hpp"
 
+#include "logger/logger.hpp"
+
 namespace pic {
+  std::string this_run_dir;
+
+
   template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
@@ -127,6 +132,7 @@ namespace pic {
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
 
+        lgr::file << lgr::indent << "reduce J" << std::endl;
         // TODOL Opimize communication. Use persistent and buffer?
         for ( int i = 0; i < 3; ++i ) {
           auto& buffer = _J[i].data();
@@ -134,11 +140,15 @@ namespace pic {
         }
 
         if ( _cart_opt ) {
+          lgr::file << lgr::indent << "merge guard cells of J" << std::endl;
           field::merge_guard_cells_into_bulk( _J, *_cart_opt );
+          lgr::file << lgr::indent << "field update" << std::endl;
           (*_field_update)(_E, _B, _J, dt, timestep);
+          lgr::file << lgr::indent << "field BC" << std::endl;
           (*_fbc_axis)();
         }
 
+        lgr::file << lgr::indent << "broadcast E and B" << std::endl;
         // TODOL reduce number of communications?
         for ( int i = 0; i < 3; ++i )
           ens.intra.broadcast( ens.chief, _E[i].data().data(), _E[i].data().size() );
@@ -149,10 +159,13 @@ namespace pic {
         // if ( false )
         //   sort_particles();
 
+        lgr::file << lgr::indent << "particle update" << std::endl;
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
 
+        lgr::file << lgr::indent << "particle BC" << std::endl;
         (*_fbj)();
 
+        lgr::file << lgr::indent << "migration" << std::endl;
         { // migration
           auto migrate_dir =
             []( auto q, auto lb, auto ub ) noexcept {
@@ -180,6 +193,7 @@ namespace pic {
           _migrators.resize(0);
         }
 
+        lgr::file << lgr::indent << "injection" << std::endl;
         (*_injector)( timestep, dt, _rng );
       }
 
@@ -190,7 +204,8 @@ namespace pic {
       // annihilate_mark_pairs( );
 
       if ( (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
-        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        lgr::file << lgr::indent << "export_data" << std::endl;
+        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
         if ( false ) {
           // TODO has a few hyper parameters
           // TODO touch create is not multinode safe even buffer is used

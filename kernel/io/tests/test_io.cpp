@@ -14,9 +14,9 @@ SCENARIO( "Test init data export directory", "[io][mpi]" ) {
   }
   // NOTE dirname is significant only on rank 0
   std::string dirname = "FOO-M416-" + std::to_string(mpi::world.rank());
-  init_this_run_dir( prefix , dirname );
+  auto this_run_dir = init_this_run_dir( prefix , dirname );
 
-  REQUIRE( equivalent(io::this_run_dir, prefix + "/FOO-M416-0") );
+  REQUIRE( equivalent(this_run_dir, prefix + "/FOO-M416-0") );
 
   std::vector<path> paths;
   paths.emplace_back(prefix);
@@ -41,5 +41,11 @@ SCENARIO( "Test init data export directory", "[io][mpi]" ) {
     REQUIRE( is_symlink(paths.back()) );
   } else {
     REQUIRE_FALSE( exists(paths.back()) );
+  }
+}
+
+SCENARIO( "Test downsample", "[io]") {
+  if ( mpi::world.rank() == 0 ) {
+
   }
 }

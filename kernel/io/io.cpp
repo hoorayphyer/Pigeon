@@ -6,7 +6,7 @@ namespace io {
 
   template
   void export_data<real_export_t, DGrid, real_t, particle::Specs, ShapeF, real_j_t, Metric>
-  ( int timestep, real_t dt, int num_files,
+  ( std::string prefix, int timestep, real_t dt, int num_files,
     const std::optional<mpi::CartComm>& cart_opt,
     const dye::Ensemble<DGrid>& ens,
     const mani::Grid<real_t,DGrid>& grid, // local grid

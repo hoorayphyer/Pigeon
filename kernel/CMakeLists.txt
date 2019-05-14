@@ -54,7 +54,7 @@ add_subdirectory(ckpt)
 
 add_executable(pic "simulator.cpp")
 target_include_directories(pic PRIVATE ${KERNEL_DIR} )
-target_link_libraries(pic PRIVATE field_updater field_communication particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen io)
+target_link_libraries(pic PRIVATE field_updater field_communication particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen io filesys logger)
 
 
 add_subdirectory(testfw)

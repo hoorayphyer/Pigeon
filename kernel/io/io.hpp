@@ -19,11 +19,7 @@ namespace dye {
 }
 
 namespace io {
-  void init_this_run_dir( std::string prefix, std::string dirname );
-  // void set_logger_dir( std::string logDir );
-}
-
-namespace io {
+  std::string init_this_run_dir( std::string prefix, std::string dirname );
   // template < typename T, int DGrid >
   // void register_exportee( std::string name, FieldBasedExportee<T,DGrid>* );
 
@@ -37,7 +33,7 @@ namespace io {
              typename ShapeF,
              typename RealJ,
              typename Metric >
-  void export_data( int timestep, Real dt, int num_files,
+  void export_data( std::string prefix, int timestep, Real dt, int num_files,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid
