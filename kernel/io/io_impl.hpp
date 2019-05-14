@@ -20,7 +20,7 @@ namespace io {
   std::string local_data_dir =
     []() {
       std::string str = APPARENT_DATA_DIR;
-      util::fs::remove_slash(str);
+      fs::remove_slash(str);
       return str;
     }();
 #else
@@ -29,7 +29,6 @@ namespace io {
 
   // TODOL what if prefix == local_data_dir??
   void init_this_run_dir( std::string prefix, std::string dirname ) {
-    using namespace util;
     // use world root time to ensure uniqueness
     if ( mpi::world.rank() == 0 ) {
       prefix = fs::absolute(prefix);
@@ -345,8 +344,9 @@ namespace io {
     sprintf(str_ts, "%06d\0", timestep);
 
     const std::string prefix = this_run_dir + "/data/timestep" + str_ts;
-    if ( mpi::world.rank() == 0 )
-      util::fs::create_directories(prefix);
+
+    if ( cart_opt ) fs::mpido(*cart_opt, [&](){fs::create_directories(prefix);} );
+    ens.intra.barrier();
 
     silo::pmpio::file_t dbfile;
 

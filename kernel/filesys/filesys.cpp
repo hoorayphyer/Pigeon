@@ -5,7 +5,7 @@
 namespace filesystem = std::filesystem;
 using std::error_code;
 
-namespace util::fs {
+namespace fs {
   std::string absolute( std::string dir ) {
     filesystem::path p = dir;
     return filesystem::absolute(p);

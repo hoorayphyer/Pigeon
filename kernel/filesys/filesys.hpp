@@ -1,13 +1,10 @@
-#ifndef  _UTIL_FILESYS_HPP_
-#define  _UTIL_FILESYS_HPP_
+#ifndef  _FILESYS_HPP_
+#define  _FILESYS_HPP_
 
 #include <string>
 
-namespace util::fs {
+namespace fs {
   std::string absolute( std::string dir );
-
-  // NOTE canonical requires dir to be already existed
-  // std::string canonical( std::string dir );
 
   std::string& append_slash( std::string& dir );
 
@@ -22,6 +19,15 @@ namespace util::fs {
   void create_directory_symlink( std::string to, std::string new_link );
 
   void copy_file( std::string target, std::string dest );
+}
+
+// template wrapper for doing filesystem with mpi. For this to work, include filesys.hpp after mpi. This makes sure no race condition happens during e.g. file creation/deletion
+namespace fs {
+  template < class Comm, class F >
+  void mpido ( const Comm& comm, const F& f ) {
+    if ( comm.rank() == 0 ) f();
+    comm.barrier();
+  }
 }
 
 #endif

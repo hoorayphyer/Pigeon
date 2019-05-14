@@ -8,7 +8,6 @@
 
 using namespace mpi;
 using namespace silo;
-using namespace util;
 
 SCENARIO("create files", "[silo][.]") {
   if ( world.rank() == 0 ) {
@@ -112,8 +111,10 @@ SCENARIO("pmpio create files", "[silo]") {
   const int num_files = 4;
 
   std::string prefix = "test_pmpio";
-  if ( world.rank() == 0 ) fs::remove_all(prefix);
-  fs::create_directories(prefix);
+  fs::mpido(world, [&](){
+                     fs::remove_all(prefix);
+                     fs::create_directories(prefix);
+                   });
 
   {
     std::string filename = prefix + "/set" + std::to_string(PMPIO_GroupRank(world.rank(), num_files, world.size() ))+".silo";
@@ -131,9 +132,9 @@ SCENARIO("pmpio create files", "[silo]") {
       auto dbfile = open<Mode::Read>( fname );
       REQUIRE( DBInqVarExists( dbfile, ("rank" + std::to_string(i) ).c_str() ) );
     }
-    fs::remove_all(prefix);
   }
 
+  fs::mpido(world, [&](){fs::remove_all(prefix);});
 
 }
 
