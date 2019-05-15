@@ -57,7 +57,7 @@ int main() {
                              fs::create_directories(pic::this_run_dir + "/data");
                              fs::create_directories(pic::this_run_dir + "/logs");
                            } );
-    lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log", std::fstream::out );
+    lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
       sim( pic::supergrid, cart_opt, pic::guard );
@@ -66,12 +66,16 @@ int main() {
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
-      lgr::file << lgr::indent << "==== Timestep " << ts << " ====" << std::endl;
-      lgr::indent = "\t";
+      lgr::file % "==== Timestep " << ts << " ====" << std::endl;
+      lgr::file.indent_append("\t");
       sim.evolve( ts, pic::dt );
-      lgr::indent = "";
+      lgr::file.indent_reset();
+
+      // occasionally barrier everyone to avoid idles running too fast
+      if ( ts % 100 == 0 ) mpi::world.barrier();
     }
     lgr::file.close();
+    mpi::world.barrier();
   }
 
   mpi::finalize();

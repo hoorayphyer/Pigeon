@@ -3,8 +3,8 @@
 namespace lgr {
   std::string indent{};
 
-  std::fstream file;
-  std::fstream debug;
+  ofstream file;
+  ofstream debug;
 
-  std::stringstream str;
+  std::ostringstream str;
 }
