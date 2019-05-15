@@ -36,8 +36,8 @@ namespace lgr {
   extern ofstream file;
   extern ofstream debug;
 
-  auto& out = std::cout;
-  auto& err = std::cerr;
+  extern std::ostream& out;
+  extern std::ostream& err;
   extern std::ostringstream str;
 }
 

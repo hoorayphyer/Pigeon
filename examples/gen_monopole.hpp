@@ -32,9 +32,9 @@ namespace pic {
   inline constexpr const char* project_name = "Monopole";
   inline constexpr const char* datadir_prefix = "../Data/";
 
-  inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
+  inline constexpr apt::array<int,DGrid> dims = { 2, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 10000;
+  inline constexpr int total_timesteps = 1000;
   inline constexpr real_t dt = 0.005;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
@@ -146,16 +146,43 @@ namespace particle {
 
 namespace pic {
   // TODOL check gtl boundary on extent.
+  // NOTE range is assumed to be [,), and range[1] >= range[0]
   template < typename Real >
-  apt::pair< Real > gtl ( const apt::pair<Real>& range,
+  apt::pair< int > gtl ( const apt::pair<Real>& range,
                           const mani::Grid1D<Real>& localgrid ) noexcept {
     auto to_grid_index =
       [&localgrid] ( auto absc ) noexcept {
         return ( absc - localgrid.lower() ) / localgrid.delta();
       };
-    Real Ib = std::max<int>( 0, to_grid_index( range[LFT] ) );
-    Real extent = std::min<int>( to_grid_index( range[RGT] ), localgrid.dim() ) - Ib;
-    return { Ib, extent };
+    int lb = to_grid_index( range[LFT] );
+    int ub = to_grid_index( range[RGT] );
+
+    if ( ub <= 0 || lb >= localgrid.dim() ) {
+      // range not applicable on current local patch
+      return {0,0};
+    } else {
+      lb = std::max<int>( 0, lb );
+      ub = std::min<int>( ub, localgrid.dim() );
+      return { lb, ub - lb };
+    }
+  }
+
+  template < typename Real >
+  apt::pair< int > gtl ( int Ib_global, int extent_global,
+                         const mani::Grid1D<Real>& supergrid,
+                         const mani::Grid1D<Real>& localgrid ) noexcept {
+    // lb is the Ib_global with respect to the localgrid
+    int lb = Ib_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
+    int ub = lb + extent_global;
+
+    if ( ub <= 0 || lb >= localgrid.dim() ) {
+      // range not applicable on current local patch
+      return {0,0};
+    } else {
+      lb = std::max<int>( 0, lb );
+      ub = std::min<int>( ub, localgrid.dim() );
+      return { lb, ub - lb };
+    }
   }
 
   template < int DGrid,
@@ -389,8 +416,7 @@ namespace pic {
                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Efield(Efield), _Bfield(Bfield), _Jfield(Jfield), _particles(particles) {
-      _Ib[0] = pic::ofs::indent[0] - 1;
-      _extent[0] = 1;
+      apt::tie(_Ib[0], _extent[0]) = gtl( pic::ofs::indent[0] - 1, 1, supergrid[0], localgrid[0] );
       apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
