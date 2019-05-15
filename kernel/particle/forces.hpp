@@ -7,15 +7,12 @@
 #include <vector>
 
 namespace particle::force {
-  template < typename T, template < typename > class PtcSpecs >
-  using Vec = apt::Vec<T, PtcSpecs<T>::Dim>;
-
   // NOTE currently we assume all forces have at most one free param
   template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
   using force_t = void (*) ( Ptc_t<T,PtcSpecs>& ptc,
                              T dt,
-                             const Vec<T,PtcSpecs>& E,
-                             const Vec<T,PtcSpecs>& B,
+                             const apt::Vec<T, PtcSpecs<T>::Dim>& E,
+                             const apt::Vec<T, PtcSpecs<T>::Dim>& B,
                              T param0 );
 }
 
@@ -72,7 +69,7 @@ namespace particle {
 
 namespace particle::force {
   template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const Vec<T,PtcSpecs>& E, const Vec<T,PtcSpecs>& B, T q_over_m  );
+  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const apt::Vec<T, PtcSpecs<T>::Dim>& E, const apt::Vec<T, PtcSpecs<T>::Dim>& B, T q_over_m  );
 }
 
 

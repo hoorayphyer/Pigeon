@@ -4,8 +4,8 @@
 // TODO optimize use of intermediate variables
 namespace particle::force {
   template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const Vec<T,PtcSpecs>& E, const Vec<T,PtcSpecs>& B, T q_over_m  ) {
-    using Vec = Vec<T,PtcSpecs>;
+  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& E, const apt::Vec<T,PtcSpecs<T>::Dim>& B, T q_over_m  ) {
+    using Vec = apt::Vec<T,PtcSpecs<T>::Dim>;
     // lambda = 0.5 * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
     dt *= 0.5 * q_over_m; // repurpose dt for lambda
 
