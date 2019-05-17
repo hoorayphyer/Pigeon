@@ -71,11 +71,11 @@ namespace pic {
 
 namespace pic {
   inline constexpr int pmpio_num_files = 2;
+  inline constexpr int data_export_init_ts = 0;
 }
 
 namespace pic :: interval {
   inline constexpr int data_export = 200;
-  inline constexpr int data_export_init_ts = 0;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
