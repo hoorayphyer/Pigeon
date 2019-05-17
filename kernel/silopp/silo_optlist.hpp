@@ -17,11 +17,22 @@ namespace silo {
   struct OptVal {
   private:
     std::variant<int, float, double > _numeric;
-    std::vector<int> _array; // NOTE variant is not allowed to hold reference, array, or void
+    std::unique_ptr<int[]> _int3; // NOTE variant is not allowed to hold reference, array, or void
 
   public:
     friend struct OptList;
     OptVal( int opt_id );
+
+    OptVal() = default;
+    OptVal( const OptVal& other ) {
+      _numeric = other._numeric;
+      if ( other._int3 ) {
+        if ( !_int3 ) _int3.reset(new int [3]);
+        for ( int i = 0; i < 3; ++i ) _int3[i] = other._int3[i];
+      }
+    }
+    OptVal( OptVal&& ) = default;
+    ~OptVal() = default;
 
     // TODO does this change the type of val? Seems no from reference, which IS what we want
     template < typename T >
@@ -31,7 +42,7 @@ namespace silo {
     }
 
     OptVal& operator= ( const std::vector<int>& t ) {
-      _array = t;
+      for ( int i = 0; i < t.size(); ++ i ) _int3[i] = t[i];
       return *this;
     }
   };

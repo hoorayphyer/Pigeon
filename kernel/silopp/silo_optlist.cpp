@@ -33,6 +33,7 @@ namespace silo {
     switch( option ) {
     case DBOPT_LO_OFFSET:
     case DBOPT_HI_OFFSET:
+    case DBOPT_BASEINDEX:
       return true;
     default:
       return false;
@@ -43,7 +44,10 @@ namespace silo {
     if ( int_opt(id) )  _numeric = (int)0;
     else if ( float_opt(id) ) _numeric = (float)0;
     else if ( double_opt(id) ) _numeric = (double)0;
-    else if ( int_array_opt(id) ) _array = std::vector<int>{};
+    else if ( int_array_opt(id) ) {
+      _int3.reset(new int [3]);
+      for ( int i = 0; i < 3; ++i ) _int3[i] = 0;
+    }
   }
 };
 
@@ -65,7 +69,7 @@ namespace silo {
 
     for ( auto& [id, val] : *this ) {
       if ( int_array_opt(id) ) {
-        DBAddOption(_p.get(), id, (void*)val._array.data());
+        DBAddOption(_p.get(), id, val._int3.get());
       } else {
         std::visit( [id, ptr = _p.get()](auto& v)
                     { DBAddOption(ptr, id, (void*)&v); }, val._numeric );

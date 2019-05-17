@@ -7,6 +7,10 @@
 typedef struct DBfile DBfile;
 
 namespace silo {
+  enum class MeshType : char { Rect=0, Curv };
+}
+
+namespace silo {
 
   template < typename file_t >
   struct SiloPutter {
@@ -15,7 +19,7 @@ namespace silo {
 
   public:
     template < typename T >
-    void put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, OptList optlist = {} );
+    void put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, MeshType mt, OptList optlist = {} );
 
     // put scalar field
     template < typename T >
@@ -25,7 +29,7 @@ namespace silo {
     template < typename T >
     void put_var( std::string varname, std::string meshname, const std::vector<const T*>& vardata, const std::vector<int>& dims, OptList optlist = {} );
 
-    void put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, OptList optlist = {} );
+    void put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, MeshType mt, OptList optlist = {} );
 
     void put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist = {} );
   };

@@ -20,7 +20,7 @@ SCENARIO("create files", "[silo][.]") {
   world.barrier();
 }
 
-SCENARIO("OptList", "[silo][.]") {
+SCENARIO("OptList", "[silo]") {
   if ( world.rank() == 0 ) {
     OptList optlist;
     optlist[DBOPT_TIME] = 147.0f; // float option
@@ -66,7 +66,7 @@ SCENARIO("putters", "[silo][.]") {
       optlist[DBOPT_LO_OFFSET] = std::vector<int>{4,10,2}; // int array
       optlist[DBOPT_HI_OFFSET] = std::vector<int>{1,0,2}; // int array
 
-      dbfile.put_mesh( "mesh", coords, optlist );
+      dbfile.put_mesh( "mesh", coords, MeshType::Rect, optlist );
       silo::close(dbfile);
 
       AND_WHEN("later reopened for read") {
@@ -107,7 +107,61 @@ SCENARIO("putters", "[silo][.]") {
   world.barrier();
 }
 
-SCENARIO("pmpio create files", "[silo]") {
+SCENARIO("Put meshes with ghost zones", "[silo][.]") {
+  // To make it work, key is to realize that in silo lingo, coords are defined at nodes, which is grid point in our terms. Coords in one dimension has length grid.dim() + 1, i.e. both the lower bound and upper bound are included. Ghost cells are needed only on mesh, not on quad_vars
+  if ( world.size() >= 4 ) {
+    std::string prefix = "test_putmesh_ghost_zones";
+    fs::mpido(world, [&](){
+                       fs::remove_all(prefix);
+                       fs::create_directories(prefix);
+                     });
+
+    if ( world.rank() < 4 ) {
+      int c[2] = { world.rank() % 2, world.rank() / 2 };
+      auto dbfile = open( prefix + "/pubg" + std::to_string(world.rank()) + ".silo", Mode::Write );
+
+      const int guard = 1;
+      const int patch_size = 16; // in silo lingo, this is equivalent to number of zones
+      apt::array<int,2> dims = { patch_size + 1, patch_size + 1 };
+      std::vector<int> lo_ofs {0,0};
+      std::vector<int> hi_ofs {0,0};
+      // no need for guard cells at actual boundaries
+      for ( int i = 0; i < 2; ++i ) {
+        if ( c[i] > 0 ) {
+          dims[i] += guard;
+          lo_ofs[i] = guard;
+        }
+        if ( c[i] < 2 - 1 ) {
+          dims[i] += guard;
+          hi_ofs[i] = guard;
+        }
+      }
+      std::vector<std::vector<double>> coords(dims.size());
+      for ( int i = 0; i < 2; ++i ) {
+        coords[i].resize(dims[i]);
+        for ( int j = 0; j < dims[i]; ++j ) {
+          coords[i][j] = c[i] * patch_size + ( j - lo_ofs[i] );
+        }
+      }
+
+      OptList optlist;
+      optlist[DBOPT_LO_OFFSET] = lo_ofs;
+      optlist[DBOPT_HI_OFFSET] = hi_ofs;
+      optlist[DBOPT_BASEINDEX] = {c[0], c[1]};
+
+      dbfile.put_mesh( "mesh", coords, MeshType::Rect, optlist );
+
+      if ( world.rank() == 0 ) {
+        auto master = open( prefix + "/master.silo", Mode::Write );
+        master.put_multimesh( "mesh", 4, "|pubg%d.silo|n", "|mesh|", MeshType::Rect );
+      }
+    }
+    world.barrier();
+    // fs::mpido(world, [&](){fs::remove_all(prefix);});
+  }
+}
+
+SCENARIO("pmpio create files", "[silo][.]") {
   const int num_files = 4;
 
   std::string prefix = "test_pmpio";
@@ -221,7 +275,7 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
           for ( int i = 0; i < 8; ++i ) coords[0][i] = x * 8 + i;
           coords[1].resize(8);
           for ( int i = 0; i < 8; ++i ) coords[1][i] = y * 8 + i;
-          db.put_mesh("submesh", coords );
+          db.put_mesh("submesh", coords, MeshType::Rect );
         }
       }
 
@@ -240,7 +294,7 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
 
       {
         auto dbfile = open( prefix + "pubg_master.silo", Mode::Write );
-        dbfile.put_multimesh( "multimesh_ns", strides.back(), file_ns, block_ns );
+        dbfile.put_multimesh( "multimesh_ns", strides.back(), file_ns, block_ns, MeshType::Rect );
         // hard code meshnames and block types
         const char* meshnames[12] =
           {

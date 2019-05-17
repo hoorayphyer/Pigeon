@@ -330,7 +330,8 @@ namespace io {
                     const field::Field<RealJ, 3, DGrid>& Jfield,// J is Jmesh on a replica
                     const particle::map<particle::array<Real,PtcSpecs>>& particles
                     ) {
-    constexpr int export_guard = 1;  // add one ghost zone in put_var
+    constexpr int silo_mesh_ghost = 1;
+    constexpr auto silo_mesh_type = silo::MeshType::Curv;
 
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
@@ -385,21 +386,16 @@ namespace io {
 
     auto bulk_dims_export = Efield.mesh().bulk_dims();
     for ( int i = 0; i < DGrid; ++i ) bulk_dims_export[i] /= ds_ratio;
-    field::Mesh<DGrid> mesh_export( bulk_dims_export, export_guard );
 
-    field::Field<RealExport,1,DGrid> field_export( mesh_export );
+    field::Field<RealExport,1,DGrid> field_export( { bulk_dims_export, silo_mesh_ghost } );
 
     // TODOL can we save just one mesh in a dedicated file and store a pointer to it in other files
 
-    // These are for push_mesh and put_multimesh
     silo::OptList optlist;
-    std::vector<int> export_offset(DGrid);
-    for ( auto& x : export_offset ) x = export_guard;
-
-    optlist[DBOPT_TIME] = timestep * dt;
-    optlist[DBOPT_CYCLE] = timestep;
-    optlist[DBOPT_LO_OFFSET] = export_offset;
-    optlist[DBOPT_HI_OFFSET] = export_offset;
+    if ( cart_opt ) {
+      optlist[DBOPT_TIME] = timestep * dt;
+      optlist[DBOPT_CYCLE] = timestep;
+    }
 
     auto put_to_master =
       [&cart_opt, &master, &file_ns, &block_ns_gen, &optlist]( std::string varname, int nblock ) {
@@ -408,9 +404,29 @@ namespace io {
       };
 
     if ( cart_opt ) {
+      // set quadmesh ghost cells
+      /* this is the most correct way to do ghost, but it needs mesh to support variable guards
+      // std::vector<int> lo_ofs( DGrid, 0);
+      // std::vector<int> hi_ofs( DGrid, 0);
+      // {
+      //   const auto& c = ens.cart_coords;
+      //   for ( int i = 0; i < DGrid; ++i ) {
+      //     if ( c[i] > 0 ) lo_ofs[i] = silo_mesh_ghost;
+      //     if ( c[i] < ens.cart_dims[i] - 1 ) hi_ofs[i] = silo_mesh_ghost;
+      //   }
+      // }
+      */
+      std::vector<int> lo_ofs( DGrid, silo_mesh_ghost);
+      std::vector<int> hi_ofs( DGrid, silo_mesh_ghost);
+      auto optlist_mesh = optlist;
+      optlist_mesh[DBOPT_LO_OFFSET] = lo_ofs;
+      optlist_mesh[DBOPT_HI_OFFSET] = hi_ofs;
+      optlist_mesh[DBOPT_BASEINDEX] = cart_opt -> coords(); // need this in rectilinear mesh
+
       // TODOL average to expf should factor in the scale functions, i.e. one should find the downsampled value by conserving the flux.
 
       // { // TODO uncomment after fixing the visit operator issue
+      // TODO coord ghost cell issue
       //   std::vector< std::vector<RealExport> > coords(DGrid);
       //   for ( int i = 0; i < DGrid; ++i ) {
       //     auto& c = coords[i];
@@ -422,38 +438,41 @@ namespace io {
       //       c[j] = grid[i].absc( ds_ratio * j, ofs_export<DGrid>[i] );
       //   }
 
-      //   dbfile.put_mesh(MeshExport, coords, optlist);
+      //   dbfile.put_mesh(MeshExport, coords, silo_mesh_type, optlist);
       //   if ( cart_opt->rank() == 0 ) {
-      //     master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
+      //     master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist_mesh );
       //   }
       // }
 
       { // TODO these are solely for LogSpherical2D. It is a hotfix on visit operators problems
         static_assert(DGrid == 2 );
 
-        int dims[DGrid] = { mesh_export.extent()[0], mesh_export.extent()[1] };
-        RealExport* coords[DGrid];
-        coords[0] = new RealExport [ dims[0] * dims[1] ];
-        coords[1] = new RealExport [ dims[0] * dims[1] ];
+        int quadmesh_dims[DGrid] = {};
+        for ( int i = 0; i < DGrid; ++i )
+          quadmesh_dims[i] = bulk_dims_export[i] + 1 + lo_ofs[i] + hi_ofs[i];
 
-        for ( int j = 0; j < dims[1]; ++j ) {
-          for ( int i = 0; i < dims[0]; ++i ) {
-            auto r = std::exp( grid[0].absc( ds_ratio * (i - mesh_export.guard()), ofs_export<DGrid>[0] ) );
-            auto theta = grid[1].absc( ds_ratio * (j - mesh_export.guard()), ofs_export<DGrid>[1] );
-            coords[0][i + j * dims[0]] = r * std::sin(theta);
-            coords[1][i + j * dims[0]] = r * std::cos(theta);
+        RealExport* coords[DGrid];
+        coords[0] = new RealExport [ quadmesh_dims[0] * quadmesh_dims[1] ];
+        coords[1] = new RealExport [ quadmesh_dims[0] * quadmesh_dims[1] ];
+
+        for ( int j = 0; j < quadmesh_dims[1]; ++j ) {
+          for ( int i = 0; i < quadmesh_dims[0]; ++i ) {
+            auto r = std::exp( grid[0].absc( ds_ratio * ( i - lo_ofs[0]) ) );
+            auto theta = grid[1].absc( ds_ratio * (j - lo_ofs[1]) );
+            coords[0][i + j * quadmesh_dims[0]] = r * std::sin(theta);
+            coords[1][i + j * quadmesh_dims[0]] = r * std::cos(theta);
           }
         }
 
         pmpio( [&](auto& dbfile) {
-                 DBPutQuadmesh(dbfile, MeshExport, NULL, coords, dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist);
+                 DBPutQuadmesh(dbfile, MeshExport, NULL, coords, quadmesh_dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist_mesh);
                } );
 
         delete [] coords[0];
         delete [] coords[1];
 
         if ( cart_opt->rank() == 0 )
-          master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), optlist );
+          master.put_multimesh ( MeshExport, cart_opt->size(), file_ns, block_ns_gen(MeshExport), silo_mesh_type, optlist ); // NOTE use optlist here, not optlist_mesh
       }
 
       // TODOL
