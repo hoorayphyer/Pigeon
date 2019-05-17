@@ -75,6 +75,7 @@ namespace pic {
 
 namespace pic :: interval {
   inline constexpr int data_export = 200;
+  inline constexpr int data_export_init_ts = 0;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -524,7 +525,7 @@ namespace pic {
       const int guard = mesh.guard();
 
       if ( _is_at_axis_lower ) {
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
           for ( int n = 0; n < guard; ++n ) {
             _Jmesh[0][ trI | n ] += _Jmesh[0][ trI | -1 - n ];
             _Jmesh[2][ trI | n ] -= _Jmesh[0][ trI | -1 - n ];
@@ -539,7 +540,7 @@ namespace pic {
 
       if ( _is_at_axis_upper ) {
         const int dim = mesh.bulk_dim(1);
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
+        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
           for ( int n = 0; n < guard; ++n ) {
             _Jmesh[0][ trI | dim - 1 - n ] += _Jmesh[0][ trI | dim + n ];
             _Jmesh[2][ trI | dim - 1 - n ] -= _Jmesh[0][ trI | dim + n ];

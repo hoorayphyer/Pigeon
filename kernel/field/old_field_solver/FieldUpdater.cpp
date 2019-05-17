@@ -57,7 +57,7 @@ FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunic
   for ( BoundaryPosition b = 0; b < NUM_BOUNDARIES; ++b ) {
     if ( !params.is_at_boundary[b] ) continue;
     int dir = b / 2;
-    bool islower = b % 2;
+    bool islower = (b % 2 == 0);
     // check for damping
     if ( params.fieldBC.at(b).type == FieldBCType::DAMPING ) {
       continue;
@@ -110,7 +110,6 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
   // and unstaggered fields
 
   _BfieldOld.copyFrom(Bfield);
-
   _fc.SendGuardCells(_BfieldOld);
 
   if (std::abs(_beta) > EPS) {
@@ -142,7 +141,6 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
   _BfieldDelta.multiplyBy(-1.0 * dt);
   Bfield.addBy(_BfieldDelta);
 
-
   if ( _is_at_boundary[0] ) {
     _d_start[0] += 1;
     _d_ext[0] -= 1;
@@ -164,7 +162,6 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
     // std::cout << "At iteration " << j << ": " << _BfieldDelta(0, 3, 257) << std::endl;
     // for (int i = 0; i < VECTOR_DIM; i++)
       // CleanField(_BfieldDelta.data(i), UPPER_LIMIT);
-
     Bfield.addBy(_BfieldDelta);
     _fc.SendGuardCells(_BfieldDelta);
   }
