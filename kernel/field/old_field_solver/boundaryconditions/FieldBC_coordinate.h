@@ -59,7 +59,6 @@ public:
     ReflectArrayAtAxis( Bfield.data(2), grid, FieldType::ETYPE, false );
   }
 
-  virtual FieldBCType bcType() const { return FieldBCType::COORDINATE; };
 };
 
 #endif // FIELDBC_COORDINATE_H

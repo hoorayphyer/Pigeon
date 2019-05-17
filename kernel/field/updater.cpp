@@ -169,7 +169,7 @@ namespace field {
       for ( int i = 0; i < DGrid; ++i ) {
         grid.dims[i] = local_grid[i].dim() + 2 * guard;
         grid.delta[i] = local_grid[i].delta();
-        grid.lower[i] = local_grid[i].lower(); // NOTE mesh containing this local_grid should have zero margin.
+        grid.lower[i] = local_grid[i].lower();
 
         grid.guard[i] = guard;
         for ( int j = 0; j < 2; ++j )

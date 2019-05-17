@@ -169,8 +169,6 @@ public:
 
   }
 
-  virtual FieldBCType bcType() const { return FieldBCType::DAMPING; };
-
   // TODO FIXME TODO
   // For saving snapshots. This function is not a virtual
   // void CopyToSnapshot( SaveSnapshotProxy& proxy ) const {

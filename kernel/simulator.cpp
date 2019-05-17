@@ -66,7 +66,8 @@ int main() {
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
-      lgr::file % "==== Timestep " << ts << " ====" << std::endl;
+      if ( ts % 100 == 0 && mpi::world.rank() == 0 )
+        lgr::file % "==== Timestep " << ts << " ====" << std::endl;
       lgr::file.indent_append("\t");
       sim.evolve( ts, pic::dt );
       lgr::file.indent_reset();

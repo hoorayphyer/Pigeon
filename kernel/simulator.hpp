@@ -132,7 +132,7 @@ namespace pic {
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
 
-        lgr::file % "reduce J" << std::endl;
+        // lgr::file % "reduce J" << std::endl;
         // TODOL Opimize communication. Use persistent and buffer?
         for ( int i = 0; i < 3; ++i ) {
           auto& buffer = _J[i].data();
@@ -140,15 +140,15 @@ namespace pic {
         }
 
         if ( _cart_opt ) {
-          lgr::file % "merge guard cells of J" << std::endl;
+          // lgr::file % "merge guard cells of J" << std::endl;
           field::merge_guard_cells_into_bulk( _J, *_cart_opt );
-          lgr::file % "field update" << std::endl;
+          // lgr::file % "field update" << std::endl;
           (*_field_update)(_E, _B, _J, dt, timestep);
-          lgr::file % "field BC" << std::endl;
+          // lgr::file % "field BC" << std::endl;
           (*_fbc_axis)();
         }
 
-        lgr::file % "broadcast E and B" << std::endl;
+        // lgr::file % "broadcast E and B" << std::endl;
         // TODOL reduce number of communications?
         for ( int i = 0; i < 3; ++i )
           ens.intra.broadcast( ens.chief, _E[i].data().data(), _E[i].data().size() );
@@ -159,13 +159,13 @@ namespace pic {
         // if ( false )
         //   sort_particles();
 
-        lgr::file % "particle update" << std::endl;
+        // lgr::file % "particle update" << std::endl;
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
 
-        lgr::file % "particle BC" << std::endl;
+        // lgr::file % "particle BC" << std::endl;
         (*_fbj)();
 
-        lgr::file % "migration" << std::endl;
+        // lgr::file % "migration" << std::endl;
         { // migration
           auto migrate_dir =
             []( auto q, auto lb, auto ub ) noexcept {
@@ -193,8 +193,8 @@ namespace pic {
           _migrators.resize(0);
         }
 
-        lgr::file % "injection" << std::endl;
-        (*_injector)( timestep, dt, _rng );
+        // lgr::file % "injection" << std::endl;
+        // (*_injector)( timestep, dt, _rng );
       }
 
 
@@ -203,8 +203,8 @@ namespace pic {
       // TODOL annihilation will affect deposition // NOTE one can deposit in the end
       // annihilate_mark_pairs( );
 
-      if ( (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
-        lgr::file % "export_data" << std::endl;
+      if ( timestep >= pic::data_export_init_ts && (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
+        // lgr::file % "export_data" << std::endl;
         io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
         if ( false ) {
           // TODO has a few hyper parameters

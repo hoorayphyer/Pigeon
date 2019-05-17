@@ -116,7 +116,5 @@ public:
 
   }
 
-  virtual FieldBCType bcType() const { return FieldBCType::ROTATING_CONDUCTOR; };
-
 };
 #endif // FIELDBC_ROTATING_CONDUCTOR_H
