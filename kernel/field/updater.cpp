@@ -243,9 +243,9 @@ namespace field {
                        ) = new_f[c]({i,j});
               }}}
           // TODOL there is no need to copy guard cell values to current right? Because field solver doesn't use those values, instead they have boundary conditions
-          fc->SendGuardCells(old_f);
         };
       convert_from_new( current, Jmesh );
+      fc->SendGuardCells(current);
 
 
       // NOTE differences of new code
@@ -276,11 +276,12 @@ namespace field {
                                          i + g[0] - (o[0] == INSITU),
                                          j + g[1] - (o[1] == INSITU)
                                          );
-                field::sync_guard_cells_from_bulk( new_f, _cart );
               }}}
         };
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
+      field::sync_guard_cells_from_bulk( E, _cart );
+      field::sync_guard_cells_from_bulk( B, _cart );
     }
   }
 }
