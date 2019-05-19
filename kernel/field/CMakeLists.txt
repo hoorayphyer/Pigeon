@@ -10,3 +10,5 @@ target_link_libraries(field_updater PRIVATE field_communication picgen old_field
 test_gen(field field) # DONE
 test_gen(field mesh) # DONE
 test_gen(field communication mpipp) # DONE
+
+timer_gen(field updater mpipp old_field_solver field_communication)

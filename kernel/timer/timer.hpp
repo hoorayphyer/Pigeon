@@ -3,14 +3,15 @@
 #include <any>
 
 namespace tmr {
-  struct TimeStamp {
+  struct Timestamp {
   private:
     std::any _t;
   public:
-    TimeStamp();
+    Timestamp();
     double lapse();
-    double operator- ( const TimeStamp& other );
+    double operator- ( const Timestamp& other );
   };
+
 }
 
 #endif

@@ -67,9 +67,7 @@ namespace pic {
     void refresh( const dye::Ensemble<DGrid>& ens ) {
       apt::Index<DGrid> bulk_dims;
       for ( int i = 0; i < DGrid; ++i ) {
-        int dim = _supergrid[i].dim() / ens.cart_dims[i];
-        _grid[i] = _supergrid[i];
-        _grid[i].clip( ens.cart_coords[i] * dim, dim );
+        _grid[i] = _supergrid[i].divide( ens.cart_dims[i], ens.cart_coords[i] );
         // TODOL cart_dim = 1 and periodic
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
         bulk_dims[i] = _grid[i].dim();

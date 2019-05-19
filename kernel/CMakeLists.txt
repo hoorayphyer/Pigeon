@@ -34,6 +34,23 @@ function(test_gen category name)
   add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
 endfunction()
 
+function(timer_gen category name)
+  set(test_target "time_${category}_${name}")
+  add_executable( ${test_target} "tests/time_${name}.cpp")
+  target_include_directories(${test_target} PRIVATE ${KERNEL_DIR} ${CMAKE_SOURCE_DIR})
+
+  set(link_testfw testfw)
+  foreach( lib IN LISTS ARGN)
+    target_link_libraries(${test_target} PRIVATE ${lib})
+    if( ${lib} STREQUAL "mpipp" )
+      set(link_testfw testfw_mpi)
+    endif()
+  endforeach()
+  target_link_libraries( ${test_target} PRIVATE ${link_testfw} )
+  target_link_libraries( ${test_target} PRIVATE timer logger )
+  add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
+endfunction()
+
 add_subdirectory(apt)
 add_subdirectory(timer)
 

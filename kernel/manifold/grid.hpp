@@ -89,6 +89,13 @@ namespace mani {
       _lower = absc( i_start );
       _dim = extent;
     }
+
+    constexpr Grid1D divide( int num_pieces, int ith_piece ) const noexcept {
+      Grid1D res = *this;
+      int dim = _dim / num_pieces;
+      res.clip( ith_piece * dim, dim );
+      return res;
+    }
   };
 
 }

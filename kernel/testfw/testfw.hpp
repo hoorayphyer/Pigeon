@@ -52,6 +52,13 @@ namespace aio {
 }
 
 namespace aio {
+  template < int... I>
+  struct IndexType {
+    constexpr static apt::array<int, sizeof...(I)> get() noexcept {return {I...};}
+  };
+}
+
+namespace aio {
 
   template < typename CartComm = mpi::CartComm, typename WorldComm  >
   auto make_cart( std::vector<int> dims, std::vector<bool> periodic, const WorldComm& world ) {
@@ -66,14 +73,24 @@ namespace aio {
 
     return cart;
   }
+
+  // NOTE Notation: XxYxZ is the cartesian partition. Each one of X,Y,Z can be positive ( meaning nonperiodic ) or negative ( meaning periodic ).
+  template < int Size, typename CartComm = mpi::CartComm, typename WorldComm  >
+  auto make_cart( apt::array<int,Size> topo, const WorldComm& world ) {
+    std::vector<int> cart_dims;
+    std::vector<bool> periodic;
+    for ( auto i : topo ) {
+      bool is_neg = (i < 0);
+      cart_dims.push_back( is_neg ? -i : i );
+      periodic.push_back( is_neg );
+    }
+    return make_cart( std::move(cart_dims), std::move(periodic), world );
+  }
 }
 
-#include <array>
-namespace aio {
-  template < int... I>
-  struct IndexType {
-    constexpr static apt::array<int, sizeof...(I)> get() noexcept {return {I...};}
-  };
-}
+// #include "logger/logger.hpp"
+// namespace aio {
+  
+// }
 
 #endif
