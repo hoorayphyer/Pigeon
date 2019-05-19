@@ -35,6 +35,7 @@ function(test_gen category name)
 endfunction()
 
 add_subdirectory(apt)
+add_subdirectory(timer)
 
 add_subdirectory(filesys)
 add_subdirectory(mpipp)
