@@ -15,6 +15,9 @@
 #include "particle/scattering.hpp"
 #include "particle/particle.hpp"
 
+#include "bc/fold_back_J.hpp"
+#include "bc/axissymmetric.hpp"
+
 #include "pic.hpp"
 
 namespace particle {
@@ -32,13 +35,13 @@ namespace pic {
   inline constexpr const char* project_name = "Monopole";
   inline constexpr const char* datadir_prefix = "../Data/";
 
-  inline constexpr apt::array<int,DGrid> dims = { 2, 1 };
+  inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 1000;
-  inline constexpr real_t dt = 0.005;
+  inline constexpr int total_timesteps = 2000;
+  inline constexpr real_t dt = 0.01;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, std::log(30.0), 128 }, { 0.0, PI, 128 } }};
+  = {{ { 0.0, std::log(10.0), 64 }, { 0.0, PI, 64 } }};
   inline constexpr int guard = 1;
 
   inline constexpr int Np = 5;
@@ -56,7 +59,7 @@ namespace pic {
   inline constexpr real_t mu0 = 15000.0;
   inline constexpr real_t omega_max = 1.0 / 6.0;
 
-  inline constexpr int spinup_duration = 10.0;
+  inline constexpr int spinup_duration = 2.0;
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min( time / pic::spinup_duration, 1.0 ) * pic::omega_max;
@@ -70,7 +73,7 @@ namespace pic {
 }
 
 namespace pic {
-  inline constexpr int pmpio_num_files = 2;
+  inline constexpr int pmpio_num_files = 1;
   inline constexpr int data_export_init_ts = 0;
 }
 
@@ -223,175 +226,6 @@ namespace pic {
     }
 
     constexpr int initial_timestep() noexcept { return 0; }
-  };
-
-  // template < int DGrid,
-  //            typename Real,
-  //            template < typename > class Specs,
-  //            typename RealJ >
-  // struct FieldBC_Rotating_Conductor {
-  // private:
-  //   const mani::Grid<Real,DGrid>& _grid;
-  //   field::Field<Real, 3, DGrid>& _Efield;
-  //   field::Field<Real, 3, DGrid>& _Bfield;
-
-  //   apt::Index<DGrid> _Ib;
-  //   apt::Index<DGrid> _extent;
-
-  //   const Real _mu0 = pic::mu0;
-
-  //   Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
-  //     return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
-  //   };
-
-  //   Real B_th_over_mu0 ( Real logr, Real theta ) noexcept {
-  //     return std::sin(theta) * std::exp(-3.0 * logr);
-  //   };
-
-  //   // find out E by E = -( Omega x r ) x B
-  //   Real E_r_over_mu0omega ( Real logr, Real theta ) noexcept {
-  //     auto sin_t = std::sin(theta);
-  //     return std::exp( -2.0 * logr ) * sin_t * sin_t;
-  //   };
-
-  //   Real E_th_over_mu0omega ( Real logr, Real theta ) noexcept {
-  //     return - std::exp( -2.0 * logr ) * std::sin( 2.0 * theta );
-  //   };
-
-  // public:
-  //   FieldBC_Rotating_Conductor ( const mani::Grid<Real,DGrid>& localgrid,
-  //                                field::Field<Real, 3, DGrid>& Efield,
-  //                                field::Field<Real, 3, DGrid>& Bfield,
-  //                                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-  //                                const particle::map<particle::array<Real,Specs>>& particles )
-  //     : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-  //     _Ib[0] = 0;
-  //     _extent[0] = pic::ofs::indent[0];
-  //     apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
-  //   }
-
-  //   void operator() ( int timestep, Real dt ) {
-  //     const auto omega = pic::omega_spinup( timestep * dt );
-  //     for ( auto I : apt::Block(_extent) ) {
-  //       I += _Ib;
-  //       // TODO deal with discontinuous and continuous variables
-  //       // TODO piecing together different patches
-  //       _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
-  //       _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
-  //       _Bfield[2](I) = 0.0;
-
-  //       _Efield[0](I) = _mu0 * omega * E_r_over_mu0omega( _grid[0].absc(I[0], _Efield[0].offset()[0]), _grid[1].absc(I[1], _Efield[0].offset()[1]) );
-  //       _Efield[1](I) = _mu0 * omega * E_th_over_mu0omega( _grid[0].absc(I[0], _Efield[1].offset()[0]), _grid[1].absc(I[1], _Efield[1].offset()[1]) );
-  //       _Efield[2](I) = 0.0;
-  //     }
-  //   }
-  // };
-
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct FieldBC_Axis {
-  private:
-    const mani::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _Efield;
-    field::Field<Real, 3, DGrid>& _Bfield;
-
-    const int axis_dir = 1;
-    bool _is_at_axis_lower = false;
-    bool _is_at_axis_upper = false;
-
-  public:
-    FieldBC_Axis ( const mani::Grid<Real,DGrid>& localgrid,
-                        field::Field<Real, 3, DGrid>& Efield,
-                        field::Field<Real, 3, DGrid>& Bfield,
-                        const field::Field<RealJ, 3, DGrid>& Jfield,
-                        const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-      _is_at_axis_lower = std::abs( localgrid[axis_dir].lower() - 0.0 ) < localgrid[axis_dir].delta();
-      _is_at_axis_upper = std::abs( localgrid[axis_dir].upper() - PI ) < localgrid[axis_dir].delta();
-    }
-
-    void operator() () {
-      // TODO Guard cells values are needed when doing interpolating E and B
-      // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
-      const auto& mesh = _Efield.mesh();
-      if ( _is_at_axis_lower ) {
-        int n = 0;
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-          _Efield[1][trI | n] = 0.0;
-          _Bfield[2][trI | n] = 0.0;
-        }
-      }
-
-      if ( _is_at_axis_upper ) {
-        int n = _grid[1].dim();
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-          _Efield[1][trI | n] = 0.0;
-          _Bfield[2][trI | n] = 0.0;
-        }
-      }
-    }
-  };
-
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct FieldBC_FoldBackJ {
-  private:
-    static_assert(DGrid==2);
-    const mani::Grid<Real,DGrid>& _grid;
-    field::Field<RealJ, 3, DGrid>& _Jmesh;
-
-    const int axis_dir = 1;
-    bool _is_at_axis_lower = false;
-    bool _is_at_axis_upper = false;
-
-  public:
-    FieldBC_FoldBackJ ( const mani::Grid<Real,DGrid>& localgrid,
-                        const field::Field<Real, 3, DGrid>& Efield,
-                        const field::Field<Real, 3, DGrid>& Bfield,
-                        field::Field<RealJ, 3, DGrid>& Jfield,
-                        const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Jmesh(Jfield) {
-      _is_at_axis_lower = std::abs( localgrid[axis_dir].lower() - 0.0 ) < localgrid[axis_dir].delta();
-      _is_at_axis_upper = std::abs( localgrid[axis_dir].upper() - PI ) < localgrid[axis_dir].delta();
-    }
-
-    void operator() () {
-      const auto& mesh = _Jmesh.mesh();
-      const int guard = mesh.guard();
-
-      if ( _is_at_axis_lower ) {
-        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n ) {
-            _Jmesh[0][ trI | n ] += _Jmesh[0][ trI | -1 - n ];
-            _Jmesh[2][ trI | n ] -= _Jmesh[0][ trI | -1 - n ];
-          }
-
-          _Jmesh[1][trI | 0] = 0.0;
-          // TODO check the negative sign here
-          for ( int n = 0; n < guard; ++n )
-            _Jmesh[1][ trI | 1 + n ] -= _Jmesh[1][ trI | -1 - n ];
-        }
-      }
-
-      if ( _is_at_axis_upper ) {
-        const int dim = mesh.bulk_dim(1);
-        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n ) {
-            _Jmesh[0][ trI | dim - 1 - n ] += _Jmesh[0][ trI | dim + n ];
-            _Jmesh[2][ trI | dim - 1 - n ] -= _Jmesh[0][ trI | dim + n ];
-          }
-
-          _Jmesh[1][trI | dim] = 0.0;
-          for ( int n = 0; n < guard - 1; ++n ) // NOTE -1 is because of the favoring-lower convention
-            _Jmesh[1][ trI | dim-1-n ] -= _Jmesh[1][ trI | dim+1+n ];
-
-        }
-      }
-    }
   };
 
   // as a boundary condition for particles

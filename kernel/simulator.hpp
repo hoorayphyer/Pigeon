@@ -50,8 +50,8 @@ namespace pic {
 
     std::vector<particle::cParticle<Real, PtcSpecs>> _migrators;
 
-    std::unique_ptr<FieldBC_Axis<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
-    std::unique_ptr<FieldBC_FoldBackJ<DGrid, Real, PtcSpecs, RealJ>> _fbj;
+    std::unique_ptr<bc::Axissymmetric<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
+    std::unique_ptr<bc::FoldBackJ<DGrid, Real, PtcSpecs, RealJ>> _fbj;
     std::unique_ptr<Injector< DGrid, Real, PtcSpecs, RealJ>> _injector;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
