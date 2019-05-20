@@ -21,20 +21,23 @@ namespace silo {
           comm->recv( myrank - 1, 147, &baton, 1 );
         }
 
-        auto dbfile = open( filename, mode );
-        if ( Mode::Write == mode && !DBInqVarExists(dbfile, dirname.c_str()) ) {
-          DBMkDir( dbfile, dirname.c_str() );
+        { // force cleanup dbfile before possible mpi::send
+          auto dbfile = open( filename, mode );
+          if ( Mode::Write == mode && !DBInqVarExists(dbfile, dirname.c_str()) ) {
+            DBMkDir( dbfile, dirname.c_str() );
+          }
+          // set current directory within the silo file
+          DBSetDir( dbfile, dirname.c_str() );
+
+          f(dbfile);
         }
-        // set current directory within the silo file
-        DBSetDir( dbfile, dirname.c_str() );
 
-        f(dbfile);
-
-        close(dbfile);
         if ( myrank != comm->size() - 1 ) {
           int baton = 0;
           comm->send( myrank + 1, 147, &baton, 1 );
         }
+
+        comm->barrier(); // NOTE this barrier is necessary to prevent early finished process from reentering from a later while other processes haven't finished the present one.
       }
     }
   };
