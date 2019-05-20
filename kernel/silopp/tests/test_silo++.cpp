@@ -23,10 +23,10 @@ SCENARIO("create files", "[silo][.]") {
 SCENARIO("OptList", "[silo]") {
   if ( world.rank() == 0 ) {
     OptList optlist;
-    optlist[DBOPT_TIME] = 147.0f; // float option
-    optlist[DBOPT_DTIME] = 369.0; // double option
-    optlist[DBOPT_CYCLE] = 555; // int option
-    optlist[DBOPT_LO_OFFSET] = std::vector<int>{124,18,384}; // int array
+    optlist[Opt::TIME] = 147.0f; // float option
+    optlist[Opt::DTIME] = 369.0; // double option
+    optlist[Opt::CYCLE] = 555; // int option
+    optlist[Opt::LO_OFFSET] = std::vector<int>{124,18,384}; // int array
     DBoptlist* list = optlist;
 
     float* float_opt = (float*)DBGetOption(list, DBOPT_TIME);
@@ -38,10 +38,10 @@ SCENARIO("OptList", "[silo]") {
     int* int_opt = (int*)DBGetOption(list, DBOPT_CYCLE);
     REQUIRE( int_opt[0] == 555);
 
-    int* int_arr_opt = (int*)DBGetOption(list, DBOPT_LO_OFFSET);
-    REQUIRE( int_arr_opt[0] == 124 );
-    REQUIRE( int_arr_opt[1] == 18 );
-    REQUIRE( int_arr_opt[2] == 384 );
+    int* int3_opt = (int*)DBGetOption(list, DBOPT_LO_OFFSET);
+    REQUIRE( int3_opt[0] == 124 );
+    REQUIRE( int3_opt[1] == 18 );
+    REQUIRE( int3_opt[2] == 384 );
 
   }
   world.barrier();
@@ -60,11 +60,11 @@ SCENARIO("putters", "[silo][.]") {
       }
 
       OptList optlist;
-      optlist[DBOPT_TIME] = 147.0f; // float option
-      optlist[DBOPT_DTIME] = 369.0; // double option
-      optlist[DBOPT_CYCLE] = 555; // int option
-      optlist[DBOPT_LO_OFFSET] = std::vector<int>{4,10,2}; // int array
-      optlist[DBOPT_HI_OFFSET] = std::vector<int>{1,0,2}; // int array
+      optlist[Opt::TIME] = 147.0f; // float option
+      optlist[Opt::DTIME] = 369.0; // double option
+      optlist[Opt::CYCLE] = 555; // int option
+      optlist[Opt::LO_OFFSET] = std::vector<int>{4,10,2}; // int array
+      optlist[Opt::HI_OFFSET] = std::vector<int>{1,0,2}; // int array
 
       dbfile.put_mesh( "mesh", coords, MeshType::Rect, optlist );
       silo::close(dbfile);
@@ -145,9 +145,9 @@ SCENARIO("Put meshes with ghost zones", "[silo][.]") {
       }
 
       OptList optlist;
-      optlist[DBOPT_LO_OFFSET] = lo_ofs;
-      optlist[DBOPT_HI_OFFSET] = hi_ofs;
-      optlist[DBOPT_BASEINDEX] = {c[0], c[1]};
+      optlist[Opt::LO_OFFSET] = lo_ofs;
+      optlist[Opt::HI_OFFSET] = hi_ofs;
+      optlist[Opt::BASEINDEX] = {c[0], c[1]};
 
       dbfile.put_mesh( "mesh", coords, MeshType::Rect, optlist );
 

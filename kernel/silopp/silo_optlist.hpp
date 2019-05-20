@@ -10,6 +10,17 @@ typedef struct DBoptlist_ DBoptlist;
 using RawList = DBoptlist;
 
 namespace silo {
+  enum class Opt : int
+    { TIME = 0,
+      DTIME,
+      CYCLE,
+      LO_OFFSET,
+      HI_OFFSET,
+      BASEINDEX
+    };
+}
+
+namespace silo {
   void optlist_free (RawList *);
 
   struct OptList;
@@ -21,7 +32,7 @@ namespace silo {
 
   public:
     friend struct OptList;
-    OptVal( int opt_id );
+    OptVal( Opt opt_id );
 
     OptVal() = default;
     OptVal( const OptVal& other ) {
@@ -47,7 +58,7 @@ namespace silo {
     }
   };
 
-  struct OptList : public std::unordered_map<int,OptVal> {
+  struct OptList : public std::unordered_map<Opt,OptVal> {
   private:
     // used only to auto manage resources when converting to RawList*. No need to be copied in copy constructor
     std::unique_ptr<RawList, void(*)(RawList*)> _p{nullptr, optlist_free};
@@ -55,7 +66,7 @@ namespace silo {
   public:
     operator RawList*() const;
 
-    OptVal& operator[] ( int opt_id ) {
+    OptVal& operator[] ( Opt opt_id ) {
       emplace(opt_id, OptVal(opt_id));
       return at(opt_id);
     }

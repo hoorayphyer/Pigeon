@@ -23,11 +23,11 @@ namespace silo {
 
         { // force cleanup dbfile before possible mpi::send
           auto dbfile = open( filename, mode );
-          if ( Mode::Write == mode && !DBInqVarExists(dbfile, dirname.c_str()) ) {
-            DBMkDir( dbfile, dirname.c_str() );
+          if ( Mode::Write == mode && !dbfile.exists(dirname) ) {
+            dbfile.mkdir(dirname);
           }
           // set current directory within the silo file
-          DBSetDir( dbfile, dirname.c_str() );
+          dbfile.cd(dirname);
 
           f(dbfile);
         }

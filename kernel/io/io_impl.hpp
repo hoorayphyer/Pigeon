@@ -1,7 +1,6 @@
 #include "io/io.hpp"
 #include "silopp/silo++.hpp"
 #include "mpipp/mpi++.hpp"
-#include <silo.h> // for some DBOPTs and for pmpio.hpp
 #include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
 #include "field/communication.hpp"
@@ -9,6 +8,8 @@
 #include "dye/ensemble.hpp"
 #include "particle/properties.hpp"
 #include <cmath>
+
+#include <silo.h> // for an ad hoc DBPutQuadmesh
 
 namespace io {
   // template < typename T, int DGrid >
@@ -393,8 +394,8 @@ namespace io {
 
     silo::OptList optlist;
     if ( cart_opt ) {
-      optlist[DBOPT_TIME] = timestep * dt;
-      optlist[DBOPT_CYCLE] = timestep;
+      optlist[silo::Opt::TIME] = timestep * dt;
+      optlist[silo::Opt::CYCLE] = timestep;
     }
 
     auto put_to_master =
@@ -419,9 +420,9 @@ namespace io {
       std::vector<int> lo_ofs( DGrid, silo_mesh_ghost);
       std::vector<int> hi_ofs( DGrid, silo_mesh_ghost);
       auto optlist_mesh = optlist;
-      optlist_mesh[DBOPT_LO_OFFSET] = lo_ofs;
-      optlist_mesh[DBOPT_HI_OFFSET] = hi_ofs;
-      optlist_mesh[DBOPT_BASEINDEX] = cart_opt -> coords(); // need this in rectilinear mesh
+      optlist_mesh[silo::Opt::LO_OFFSET] = lo_ofs;
+      optlist_mesh[silo::Opt::HI_OFFSET] = hi_ofs;
+      optlist_mesh[silo::Opt::BASEINDEX] = cart_opt -> coords(); // need this in rectilinear mesh
 
       // TODOL average to expf should factor in the scale functions, i.e. one should find the downsampled value by conserving the flux.
 
