@@ -9,6 +9,7 @@ namespace silo {
     else if ( std::is_same_v<T, short> ) return DB_SHORT;
     else if ( std::is_same_v<T, int> ) return DB_INT;
     else if ( std::is_same_v<T, long> ) return DB_LONG;
+    else if ( std::is_same_v<T, unsigned long long> ) return DB_LONG_LONG; // TODO check this
     else if ( std::is_same_v<T, float> ) return DB_FLOAT;
     else if ( std::is_same_v<T, double> ) return DB_DOUBLE;
     else return DB_NOTYPE;
@@ -33,7 +34,7 @@ namespace silo {
 namespace silo{
   template < typename file_t >
   template < typename T >
-  void SiloPutter<file_t>::put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, MeshType mt, OptList optlist ) {
+  void Operations<file_t>::put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, MeshType mt, OptList optlist ) {
     const int ndims = coords.size();
 
     std::vector<const void*> raw_ptr(ndims);
@@ -56,13 +57,13 @@ namespace silo{
 
   template < typename file_t >
   template < typename T >
-  void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims, OptList optlist ) {
+  void Operations<file_t>::put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims, OptList optlist ) {
     DBPutQuadvar1(_dbfile(), varname.c_str(), meshname.c_str(), vardata, dims.data(), dims.size(), NULL, 0, datatype((T)0), DB_ZONECENT, optlist);
   }
 
   template < typename file_t >
   template < typename T >
-  void SiloPutter<file_t>::put_var( std::string varname, std::string meshname, const std::vector<const T*>& vardata, const std::vector<int>& dims, OptList optlist ) {
+  void Operations<file_t>::put_var( std::string varname, std::string meshname, const std::vector<const T*>& vardata, const std::vector<int>& dims, OptList optlist ) {
     int nvars = vardata.size();
     std::vector<std::string> varstrs(nvars);
     for ( int i = 0; i < nvars; ++i ) varstrs[i] = varname + std::to_string(i+1);
@@ -72,7 +73,7 @@ namespace silo{
   }
 
   template < typename file_t >
-  void SiloPutter<file_t>:: put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, MeshType mt, OptList optlist ) {
+  void Operations<file_t>:: put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, MeshType mt, OptList optlist ) {
     DBoptlist* raw_list = optlist;
     auto mesh_type =
       [&mt]() {
@@ -88,7 +89,7 @@ namespace silo{
   }
 
   template < typename file_t >
-  void SiloPutter<file_t>:: put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
+  void Operations<file_t>:: put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist ) {
     DBoptlist* raw_list = optlist;
     int a = DB_QUADVAR;
     DBAddOption(raw_list, DBOPT_MB_BLOCK_TYPE, &a);
@@ -96,21 +97,49 @@ namespace silo{
     DBAddOption(raw_list, DBOPT_MB_BLOCK_NS, (void*)block_ns.c_str());
     DBPutMultivar(_dbfile(), multivarname.c_str(), nblock, NULL, NULL, raw_list );
   }
+
+  template < typename file_t >
+  template < typename T >
+  void Operations<file_t>::write( std::string varname, const T* vardata, const std::vector<int>& dims ) {
+    DBWrite( _dbfile(), varname.c_str(), vardata, dims.data(), dims.size(), datatype((T)0) );
+  }
+
+  template < typename file_t >
+  template < typename T >
+  void Operations<file_t>::write( std::string varname, const std::vector<T>& vardata ) {
+    // TODOL silo specifies dims as int, which may be exceeded by number of particles. Now we are relying on the fact that on one process the number of particles is smaller than int limit.
+    int dims = vardata.size();
+    DBWrite( _dbfile(), varname.c_str(), vardata.data(), &dims, 1, datatype((T)0) );
+  }
+
+  template < typename file_t >
+  template < typename T >
+  void Operations<file_t>::write( std::string varname, T vardata ) {
+    int dims = 1;
+    DBWrite( _dbfile(), varname.c_str(), &vardata, &dims, 1, datatype((T)0) );
+  }
 }
 
 #include "silopp/silo++.hpp"
 namespace silo {
-  template struct SiloPutter<file_t>;
+  template struct Operations<file_t>;
 
-#define INSTANTIATE_SILO_PUTTER_FOR_FILE(_SILO_FILE_, _TYPE_)           \
-  template void SiloPutter<_SILO_FILE_>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, MeshType, OptList ); \
-  template void SiloPutter<_SILO_FILE_>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims, OptList ); \
-  template void SiloPutter<_SILO_FILE_>::put_var( std::string, std::string, const std::vector<const _TYPE_*>&, const std::vector<int>& dims, OptList )
-
-#define INSTANTIATE_SILO_PUTTER(_TYPE_)                   \
-  INSTANTIATE_SILO_PUTTER_FOR_FILE(file_t, _TYPE_)
+#define INSTANTIATE_PUTTER(_TYPE_)                                      \
+  template void Operations<file_t>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, MeshType, OptList ); \
+  template void Operations<file_t>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims, OptList ); \
+  template void Operations<file_t>::put_var( std::string, std::string, const std::vector<const _TYPE_*>&, const std::vector<int>& dims, OptList )
 
 
-  INSTANTIATE_SILO_PUTTER(float);
-  INSTANTIATE_SILO_PUTTER(double);
+#define INSTANTIATE_WRITE(_TYPE_)                                       \
+  template void Operations<file_t>::write( std::string, const _TYPE_*, const std::vector<int>& dims ); \
+  template void Operations<file_t>::write( std::string, const std::vector<_TYPE_>& ); \
+  template void Operations<file_t>::write( std::string, _TYPE_ )
+
+
+  INSTANTIATE_PUTTER(float);
+  INSTANTIATE_PUTTER(double);
+
+  INSTANTIATE_WRITE(int);
+  INSTANTIATE_WRITE(double);
+  INSTANTIATE_WRITE(unsigned long long);
 }

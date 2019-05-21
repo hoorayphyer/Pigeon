@@ -16,7 +16,7 @@ namespace silo {
   enum class Mode : bool { Read = false, Write = true };
 
   struct file_t : public apt::Handle<DBfileHandle, dbfile_free, dbfile_null>,
-                  public SiloPutter<file_t>,
+                  public Operations<file_t>,
                   public Navigator<file_t> {};
 
   file_t open( std::string filename, Mode mode );

@@ -3,18 +3,24 @@
 
 namespace silo {
   template < typename file_t >
-  void Navigator<file_t>::mkdir( std::string path ) {
+  void Navigator<file_t>::mkdir( const std::string& path ) {
     DBMkDir(_dbfile(), path.c_str());
   }
 
   template < typename file_t >
-  void Navigator<file_t>::cd( std::string path ) {
+  void Navigator<file_t>::cd( const std::string& path ) {
     DBSetDir(_dbfile(), path.c_str());
   }
 
   template < typename file_t >
-  bool Navigator<file_t>::exists( std::string path ) {
+  bool Navigator<file_t>::exists( const std::string& path ) {
     return DBInqVarExists(_dbfile(), path.c_str());
+  }
+
+  template < typename file_t >
+  void Navigator<file_t>::mkcd( const std::string& path ) {
+    if ( !exists(path) ) mkdir(path);
+    cd(path);
   }
 }
 

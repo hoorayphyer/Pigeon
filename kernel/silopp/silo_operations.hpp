@@ -11,9 +11,8 @@ namespace silo {
 }
 
 namespace silo {
-
   template < typename file_t >
-  struct SiloPutter {
+  struct Operations {
   private:
     inline DBfile* _dbfile() noexcept { return static_cast<file_t&>(*this).operator DBfile* (); }
 
@@ -32,6 +31,16 @@ namespace silo {
     void put_multimesh( std::string multimeshname, int nblock, std::string file_ns, std::string block_ns, MeshType mt, OptList optlist = {} );
 
     void put_multivar( std::string multivarname, int nblock, std::string file_ns, std::string block_ns, OptList optlist = {} );
+
+    template < typename T >
+    void write( std::string varname, const T* vardata, const std::vector<int>& dims );
+
+    template < typename T >
+    void write( std::string varname, const std::vector<T>& vardata );
+
+    template < typename T >
+    void write( std::string varname, T vardata );
+
   };
 }
 

@@ -5,6 +5,11 @@
 #include <iterator>
 #include <vector>
 
+namespace ckpt {
+  template < typename T, template < typename > class PtcSpecs >
+  struct ParticleArrayCkpt;
+}
+
 namespace particle {
   template < typename T, template < typename > class Specs >
   struct array {
@@ -20,6 +25,8 @@ namespace particle {
     using particle_type = vParticle< T, Specs >;
 
     using const_particle_type = vParticle< const T, Specs >;
+
+    friend class ckpt::ParticleArrayCkpt<T,Specs>;
 
     template < bool isConst >
     class iterator {

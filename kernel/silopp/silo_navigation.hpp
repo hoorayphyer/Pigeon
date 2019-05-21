@@ -11,9 +11,12 @@ namespace silo {
   private:
     inline DBfile* _dbfile() noexcept { return static_cast<file_t&>(*this).operator DBfile* (); }
   public:
-    void mkdir( std::string path );
-    void cd ( std::string path );
-    bool exists( std::string path );
+    void mkdir( const std::string& path );
+    void cd ( const std::string& path );
+    bool exists( const std::string& path );
+
+    // cd to the path and if path is not existent, create it first
+    void mkcd( const std::string& path );
   };
 
 }

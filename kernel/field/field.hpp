@@ -38,6 +38,11 @@ namespace field {
   };
 }
 
+namespace ckpt {
+  template < typename T, int DGrid >
+  struct FieldCkpt;
+}
+
 namespace field {
 
   template < typename T, int DField, int DGrid >
@@ -50,6 +55,7 @@ namespace field {
   public:
     using element_type = T;
     static constexpr int NDim = DField;
+    friend class ckpt::FieldCkpt<T,DGrid>;
 
     Field() = default;
 
