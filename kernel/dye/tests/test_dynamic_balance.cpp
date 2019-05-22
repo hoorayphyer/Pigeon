@@ -220,7 +220,7 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     cart_dims.push_back( i > 0 ? i : -i );
     nens *= cart_dims.back();
   }
-  // NOTE current implementation requires explicit touch-create before detailed balance
+  // NOTE TODOL current implementation requires explicit touch-create before detailed balance
   map<array<double, Specs>> ptcs;
   map<std::vector<load_t>> loads;
   {

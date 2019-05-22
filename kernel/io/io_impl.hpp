@@ -316,12 +316,13 @@ namespace io {
 namespace io {
 
   template < typename RealExport,
+             typename Metric,
+             typename ShapeF,
              int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
-             typename ShapeF,
-             typename RealJ,
-             typename Metric >
+             typename RealJ
+             >
   void export_data( std::string prefix, int timestep, Real dt, int num_files,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,

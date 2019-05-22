@@ -75,10 +75,18 @@ namespace pic {
 namespace pic {
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int data_export_init_ts = 0;
+
+  inline constexpr int checkpoint_init_ts = 0;
+  inline constexpr int num_ckpt_parts = 4;
+
+  inline constexpr int dlb_init_ts = 0;
+  inline constexpr std::size_t dlb_target_load = 100000;
 }
 
 namespace pic :: interval {
   inline constexpr int data_export = 20;
+  inline constexpr int checkpoint = 10000;
+  inline constexpr int dlb = 1000;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used

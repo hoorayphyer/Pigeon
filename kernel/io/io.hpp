@@ -27,12 +27,13 @@ namespace io {
   // void register_exportee( std::string name, ParticleBasedExportee<T,DGrid>* );
 
   template < typename RealExport,
+             typename Metric,
+             typename ShapeF,
              int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
-             typename ShapeF,
-             typename RealJ,
-             typename Metric >
+             typename RealJ
+             >
   void export_data( std::string prefix, int timestep, Real dt, int num_files,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,

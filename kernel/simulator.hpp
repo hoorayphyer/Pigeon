@@ -7,11 +7,10 @@
 #include "particle/updater.hpp"
 #include "field/communication.hpp"
 
-#include "dye/dynamic_balance.hpp"
-
 #include "particle/migration.hpp"
-
 #include "io/io.hpp"
+#include "dye/dynamic_balance.hpp"
+#include "ckpt/checkpoint.hpp"
 
 #include <memory>
 
@@ -126,25 +125,10 @@ namespace pic {
 
     inline void set_rng_seed( int seed ) { _rng.set_seed(seed); }
 
+    // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
     void evolve( int timestep, Real dt ) {
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
-
-        // lgr::file % "reduce J" << std::endl;
-        // TODOL Opimize communication. Use persistent and buffer?
-        for ( int i = 0; i < 3; ++i ) {
-          auto& buffer = _J[i].data();
-          ens.intra.template reduce<mpi::IN_PLACE>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
-        }
-
-        if ( _cart_opt ) {
-          // lgr::file % "merge guard cells of J" << std::endl;
-          field::merge_guard_cells_into_bulk( _J, *_cart_opt );
-          // lgr::file % "field update" << std::endl;
-          (*_field_update)(_E, _B, _J, dt, timestep);
-          // lgr::file % "field BC" << std::endl;
-          (*_fbc_axis)();
-        }
 
         // lgr::file % "broadcast E and B" << std::endl;
         // TODOL reduce number of communications?
@@ -191,6 +175,22 @@ namespace pic {
           _migrators.resize(0);
         }
 
+        // lgr::file % "reduce J" << std::endl;
+        // TODOL Opimize communication. Use persistent and buffer?
+        for ( int i = 0; i < 3; ++i ) {
+          auto& buffer = _J[i].data();
+          ens.intra.template reduce<mpi::IN_PLACE>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
+        }
+
+        if ( _cart_opt ) {
+          // lgr::file % "merge guard cells of J" << std::endl;
+          field::merge_guard_cells_into_bulk( _J, *_cart_opt );
+          // lgr::file % "field update" << std::endl;
+          (*_field_update)(_E, _B, _J, dt, timestep);
+          // lgr::file % "field BC" << std::endl;
+          (*_fbc_axis)();
+        }
+
         // lgr::file % "injection" << std::endl;
         // (*_injector)( timestep, dt, _rng );
       }
@@ -203,25 +203,28 @@ namespace pic {
 
       if ( timestep >= pic::data_export_init_ts && (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
         // lgr::file % "export_data" << std::endl;
-        io::export_data<pic::real_export_t, pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
-        if ( false ) {
-          // TODO has a few hyper parameters
-          // TODO touch create is not multinode safe even buffer is used
-          std::optional<int> old_label;
-          if ( _ens_opt ) old_label.emplace(_ens_opt->label());
-
-          // TODO manually initialize all species in the simulation
-          dynamic_load_balance( _particles, _ens_opt, _cart_opt, 100000 );
-
-          std::optional<int> new_label;
-          if ( _ens_opt ) new_label.emplace(_ens_opt->label());
-          if ( old_label != new_label ) refresh(*_ens_opt);
-        }
+        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
       }
 
-      // TODOL
-      // if (false)
-      //   save_snapshot();
+      if ( timestep >= pic::dlb_init_ts && (timestep % pic::interval::dlb == 0 ) ) {
+        // TODO has a few hyper parameters
+        // TODO touch create is not multinode safe even buffer is used
+        std::optional<int> old_label;
+        if ( _ens_opt ) old_label.emplace(_ens_opt->label());
+
+        // NOTE TODOL current implementation requires explicit touch-create before detailed balance
+        for ( const auto& [sp, ignore] : particle::properties )
+          const auto& x = _particles[sp];
+        dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
+
+        std::optional<int> new_label;
+        if ( _ens_opt ) new_label.emplace(_ens_opt->label());
+        if ( old_label != new_label ) refresh(*_ens_opt);
+      }
+
+      if ( timestep >= pic::checkpoint_init_ts && (timestep % pic::interval::checkpoint == 0 ) ) {
+        ckpt::save_checkpoint( this_run_dir, num_ckpt_parts, _ens_opt, timestep, _E, _B, _particles );
+      }
 
       // TODOL
       // if (false)

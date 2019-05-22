@@ -403,15 +403,12 @@ namespace dye {
       ens_opt.swap(new_ens_opt);
     }
 
-    { // Step 4. Perform a complete rebalance on all ensembles together. NOTE touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we simply loop over all possible
+    { // Step 4. Perform a complete rebalance on all ensembles together. NOTE TODOL touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we assume all species are touch created before dynamic_load_balance.
       if ( ens_opt ) {
         for ( auto&[sp, ptcs] : particles ) {
           detailed_balance(ptcs, ens_opt->intra);
         }
       }
-    }
-
-    { // Step 5. After locale is updated, sort particles and photons in case of actions such as annihilation FIXME is this needed?
     }
 
   }
