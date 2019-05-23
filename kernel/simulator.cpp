@@ -56,6 +56,10 @@ int main() {
     fs::mpido( mpi::world, [&](){
                              fs::create_directories(pic::this_run_dir + "/data");
                              fs::create_directories(pic::this_run_dir + "/logs");
+                             fs::create_directories(pic::this_run_dir + "/pigeon");
+                             fs::copy_file("CMakeLists.txt", pic::this_run_dir + "/pigeon/CMakeLists.txt" );
+                             fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp" );
+                             fs::copy_file("gen.hpp", pic::this_run_dir + "/pigeon/gen.hpp" );
                            } );
     lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 

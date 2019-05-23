@@ -192,7 +192,7 @@ namespace pic {
         }
 
         // lgr::file % "injection" << std::endl;
-        // (*_injector)( timestep, dt, _rng );
+        (*_injector)( timestep, dt, _rng );
       }
 
 
