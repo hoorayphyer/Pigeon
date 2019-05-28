@@ -4,6 +4,7 @@
 #include <cstring>
 #include "filesys/filesys.hpp"
 #include "logger/logger.hpp"
+#include "argparser.hpp"
 
 std::string data_dirname() {
   char subDir[100] = {};
@@ -45,13 +46,23 @@ std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, 
   return cart_opt;
 }
 
-int main() {
+int main(int argc, char** argv) {
+
+  auto cli_args = pic::parse_args(argc, argv);
 
   mpi::initialize();
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
     pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
+
+    // journaling
+    fs::mpido( mpi::world, [&](){
+                             std::ofstream out;
+                             out.open(cli_args.journal_file);
+                             out << "ThisRunDir=" << pic::this_run_dir << std::endl;
+                             out.close();
+                           } );
 
     fs::mpido( mpi::world, [&](){
                              fs::create_directories(pic::this_run_dir + "/data");
@@ -71,7 +82,8 @@ int main() {
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
       if ( ts % 100 == 0 && mpi::world.rank() == 0 )
-        lgr::file % "==== Timestep " << ts << " ====" << std::endl;
+        // lgr::file % "==== Timestep " << ts << " ====" << std::endl;
+        std::cout << "==== Timestep " << ts << " ====" << std::endl;
       lgr::file.indent_append("\t");
       sim.evolve( ts, pic::dt );
       lgr::file.indent_reset();
