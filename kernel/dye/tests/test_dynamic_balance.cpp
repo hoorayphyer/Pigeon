@@ -106,7 +106,7 @@ TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
   }
 }
 
-TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi]"
+TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
                     , (std::integral_constant<int,1>)
                     , (std::integral_constant<int,2>)
                     , (std::integral_constant<int,4>)
@@ -183,21 +183,30 @@ TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi]
 TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
                     , (std::integral_constant<int,2>)
                     , (std::integral_constant<int,4>)
+                    , (std::integral_constant<int,16>)
                     ) {
   constexpr auto ens_size = TestType::value;
   if ( mpi::world.size() >= ens_size ) {
-    auto intra = *( mpi::world.split( mpi::world.rank() < ens_size ) );
+    auto intra = mpi::world.split( mpi::world.rank() < ens_size );
     if ( mpi::world.rank() < ens_size ) {
+      aio::gauss_real<double> load_gen( 1000.0, 1000.0 );
       int N = 100;
       while ( N-- ) {
-        aio::gauss_real<double> load_gen( 1000.0, 1000.0 );
         std::vector<load_t> loads(ens_size);
-        for ( auto& l : loads )
-          l = std::max<load_t>( 0, load_gen() );
-        array<double, Specs> ptcs;
-        ptcs.resize(loads[intra.rank()]);
+        if ( intra->rank() == 0 ) {
+          for ( auto& l : loads ) {
+            auto tmp = load_gen();
+            tmp = std::max<double>(tmp, 0);
+            tmp = std::min<double>(tmp, 10000);
+            l = static_cast<load_t>(tmp);
+          }
+        }
+        intra->broadcast(0,loads.data(), loads.size());
 
-        dye::detailed_balance( ptcs, intra );
+        array<double, Specs> ptcs;
+        ptcs.resize(loads[intra->rank()]);
+
+        dye::detailed_balance( ptcs, *intra );
 
         load_t total_load = 0;
         for ( auto l : loads ) total_load += l;
@@ -205,7 +214,7 @@ TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
         REQUIRE( (ptcs.size() == total_load / ens_size || ptcs.size() == 1 + total_load / ens_size ) );
       }
     }
-    intra.barrier();
+    mpi::world.barrier();
   }
 }
 

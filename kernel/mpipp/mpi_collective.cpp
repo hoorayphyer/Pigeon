@@ -117,8 +117,9 @@ namespace mpi {
   std::vector<T> Collective_Comm<Comm>::allgather( const T* send_buf, int send_count ) const {
     int size{};
     MPI_Comm_size(_comm(), &size);
-    std::vector<T> recv( send_count * size ); // CLAIM: also works with intercomm
-    recv.shrink_to_fit();
+    std::vector<T> recv; // CLAIM: also works with intercomm
+    recv.reserve(send_count * size);
+    recv.resize(send_count * size);
     // NOTE recvcount is from one process so it's equal to send_count
     MPI_Allgather( send_buf, send_count, datatype<T>(), recv.data(), send_count, datatype<T>(), _comm() );
     return recv;
