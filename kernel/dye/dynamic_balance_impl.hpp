@@ -87,9 +87,17 @@ namespace dye::impl {
       // generate a tentative deployment that utilizes all total_nprocs
       int surplus = total_nfp;
       apt::priority_queue<long double> pq; // store average load in pq
+
+      // NOTE from here on nproc will hold number of free processes
       for ( int i = 0; i < nens; ++i ) {
-        nproc[i] = load[i] / ave_load_least_possible;
-        auto ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
+        auto ave_load = static_cast<long double>(load[i]) / nproc[i]; // here nproc[i] includes primary
+        if ( ave_load <= target_load ) {
+          --nproc[i]; // take out the primary
+          continue;
+        }
+
+        nproc[i] = load[i] / ave_load_least_possible; // nproc[i] only has free processes
+        ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
         if ( ave_load > target_load ) pq.push( i, ave_load );
         surplus -= nproc[i];
       }

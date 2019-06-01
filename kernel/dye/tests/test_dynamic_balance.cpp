@@ -70,6 +70,20 @@ SCENARIO("Test calc_new_nprocs", "[dye][.]") {
   }
 }
 
+TEST_CASE("Test calc_new_nprocs with nonzero target load", "[dye][.]") {
+  if ( mpi::world.rank() == 0 ) {
+    std::vector<load_t> loads_and_nprocs = { 584,1,588,1,584,1,588,1,
+                                             0,1,0,1, 0,1,0,1,
+                                             0,1,0,1, 0,1,0,1,
+                                             0,1,0,1,0,1,0,1 };
+    load_t target_load = 100000;
+    int max_nprocs = 28;
+    auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs, target_load, max_nprocs);
+    for ( auto x : nprocs_new )
+      REQUIRE(x == 1);
+  }
+}
+
 TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
                     , (std::integral_constant<int,4>)
                     , (std::integral_constant<int,7>)
@@ -161,9 +175,7 @@ TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi]
       std::vector<int> deficits; // significant only at primaries
       if ( is_primary ) {
         deficits = std::vector<int>(nprmy,0);
-        int n = 0;
-        int nidle = nprocs - nprmy;
-        for ( int i = 0; i < nidle; ++i ) ++deficits[(n++) % nidle];
+        for ( int i = 0; i < nprocs - nprmy; ++i ) ++deficits[i % nprmy];
       }
 
       std::optional<int> cur_label; // current label
