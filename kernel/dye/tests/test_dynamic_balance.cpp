@@ -192,6 +192,36 @@ TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi]
   mpi::world.barrier();
 }
 
+TEST_CASE( "Test assign_labels: a specific example ","[dye][mpi][.]") {
+  constexpr auto nprocs = 24;
+  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
+    auto prmy_idle_comm = *(mpi::world.split( mpi::world.rank() < nprocs ));
+    if ( mpi::world.rank() < nprocs ) {
+      int nprmy = 16;
+      bool is_primary = prmy_idle_comm.rank() < nprmy;
+      std::vector<int> deficits; // significant only at primaries
+      if ( is_primary ) {
+        deficits = std::vector<int>(nprmy,0);
+        deficits[0] = 2;
+        deficits[1] = 3;
+        deficits[2] = 2;
+        deficits[3] = 3;
+      }
+
+      std::optional<int> cur_label; // current label
+      if ( is_primary ) cur_label.emplace( prmy_idle_comm.rank() );
+
+      auto[ intra, job_market ] = dye::impl::bifurcate( prmy_idle_comm, is_primary );
+      REQUIRE(job_market);
+
+      auto new_label = dye::impl::assign_labels( job_market, deficits, cur_label );
+      REQUIRE(new_label);
+      if ( is_primary ) REQUIRE( *new_label == *cur_label );
+    }
+  }
+  mpi::world.barrier();
+}
+
 TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
                     , (std::integral_constant<int,2>)
                     , (std::integral_constant<int,4>)
