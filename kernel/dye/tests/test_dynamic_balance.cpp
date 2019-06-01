@@ -193,7 +193,7 @@ TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi]
 }
 
 TEST_CASE( "Test assign_labels: a specific example ","[dye][mpi][.]") {
-  constexpr auto nprocs = 24;
+  constexpr auto nprocs = 28;
   if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
     auto prmy_idle_comm = *(mpi::world.split( mpi::world.rank() < nprocs ));
     if ( mpi::world.rank() < nprocs ) {
@@ -215,8 +215,10 @@ TEST_CASE( "Test assign_labels: a specific example ","[dye][mpi][.]") {
       REQUIRE(job_market);
 
       auto new_label = dye::impl::assign_labels( job_market, deficits, cur_label );
-      REQUIRE(new_label);
       if ( is_primary ) REQUIRE( *new_label == *cur_label );
+
+      auto new_intra = mpi::world.split(new_label);
+      if (new_intra) new_intra -> barrier();
     }
   }
   mpi::world.barrier();

@@ -362,7 +362,8 @@ namespace io {
 
     // set up file_ns and block_ns. n below is thought of as the cartesian rank. Only significant on world.rank() == 0
     constexpr char delimiter = '|';
-    const std::string file_ns = delimiter + prefix + "/set%d.silo" + delimiter + "n%" + std::to_string(num_files);
+    // NOTE file namescheme uses relative path so that when the directory is moved, the data is still viewable
+    const std::string file_ns = delimiter + std::string("data/timestep") + str_ts + "/set%d.silo" + delimiter + "n%" + std::to_string(num_files);
 
     auto block_ns_gen =
       [delimiter, &cart_opt]( std::string name ) -> std::string {
