@@ -205,19 +205,19 @@ namespace particle {
 }
 
 namespace particle {
-  // TODO call this function in particle updater
+  // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
+  template < typename Real = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
+  void set_up_properties() {
+    properties[species::electron] = {1,-1,"electron"};
+    properties[species::positron] = {1,1,"positron"};
+    properties[species::ion] = { 5, 1, "ion"};
+    properties[species::photon] = { 0, 0, "photon" };
+  }
+
+  // NOTE called in particle updater
   template < typename Real >
   void set_up() {
     using namespace pic;
-    {
-      // TODO initialize properties at a different place
-      // TODO move out
-      properties[species::electron] = {1,-1,"electron"};
-      properties[species::positron] = {1,1,"positron"};
-      properties[species::ion] = { 5, 1, "ion"};
-      properties[species::photon] = { 0, 0, "photon" };
-    }
-
     {
       using Force = force::Force<real_t,Specs,vParticle>;
       constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
