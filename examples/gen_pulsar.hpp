@@ -46,12 +46,6 @@ namespace pic {
 
   inline constexpr int Np = 5;
   inline constexpr real_t epsilon = 1.0 / 5.0;
-
-  constexpr real_t classic_electron_radius () noexcept {
-    real_t res = epsilon * epsilon / ( 4 * PI* Np * dt * dt);
-    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
-    return res;
-  }
 }
 
 namespace pic {
@@ -67,7 +61,7 @@ namespace pic {
   namespace ofs {
     inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
     inline constexpr int indent[4] = { 5, 43, guard, guard };
-    inline constexpr real_t damping_rate = 0.012;
+    inline constexpr real_t damping_rate = 10.0;
   }
 
 }
@@ -75,6 +69,7 @@ namespace pic {
 namespace pic {
   inline constexpr int pmpio_num_files = 2;
   inline constexpr int data_export_init_ts = 0;
+  inline constexpr int downsample_ratio = 1;
 
   inline constexpr int checkpoint_init_ts = 0;
   inline constexpr int num_ckpt_parts = 4;

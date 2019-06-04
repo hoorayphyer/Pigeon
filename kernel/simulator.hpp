@@ -206,7 +206,7 @@ namespace pic {
 
       if ( timestep >= pic::data_export_init_ts && (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
         // lgr::file % "export_data" << std::endl;
-        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF, pic::downsample_ratio>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
       }
 
       if ( timestep >= pic::dlb_init_ts && (timestep % pic::interval::dlb == 0 ) ) {

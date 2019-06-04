@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "gen.hpp"
+#include "classical_electron_radius.hpp"
 
 inline auto FT_SpinUp (Scalar t) noexcept {
   return std::min(t / pic::spinup_duration, 1.0);

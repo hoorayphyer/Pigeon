@@ -37,21 +37,15 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 2000;
-  inline constexpr real_t dt = 0.01;
+  inline constexpr int total_timesteps = 10000;
+  inline constexpr real_t dt = 0.004;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, std::log(10.0), 64 }, { 0.0, PI, 64 } }};
+  = {{ { 0.0, std::log(30.0), 256 }, { 0.0, PI, 256 } }};
   inline constexpr int guard = 1;
 
   inline constexpr int Np = 5;
   inline constexpr real_t epsilon = 0.25;
-
-  constexpr real_t classic_electron_radius () noexcept {
-    real_t res = epsilon * epsilon / ( 4 * PI* Np * dt * dt);
-    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
-    return res;
-  }
 }
 
 // TODOL free parameters for specific lab
@@ -59,7 +53,7 @@ namespace pic {
   inline constexpr real_t mu0 = 15000.0;
   inline constexpr real_t omega_max = 1.0 / 6.0;
 
-  inline constexpr int spinup_duration = 2.0;
+  inline constexpr int spinup_duration = 5.0;
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min( time / pic::spinup_duration, 1.0 ) * pic::omega_max;
@@ -67,14 +61,15 @@ namespace pic {
 
   namespace ofs {
     inline constexpr int magnetic_pole = 1; // 1 for mono-, 2 for di-
-    inline constexpr int indent[4] = { 5, 20, guard, guard };
-    inline constexpr real_t damping_rate = 0.01;
+    inline constexpr int indent[4] = { 5, 40, guard, guard };
+    inline constexpr real_t damping_rate = 10.0;
   }
 }
 
 namespace pic {
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int data_export_init_ts = 0;
+  inline constexpr int downsample_ratio = 1;
 
   inline constexpr int checkpoint_init_ts = 0;
   inline constexpr int num_ckpt_parts = 4;
@@ -84,7 +79,7 @@ namespace pic {
 }
 
 namespace pic :: interval {
-  inline constexpr int data_export = 20;
+  inline constexpr int data_export = 100;
   inline constexpr int checkpoint = 10000;
   inline constexpr int dlb = 1000;
 }

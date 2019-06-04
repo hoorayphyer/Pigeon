@@ -29,6 +29,7 @@ namespace io {
   template < typename RealExport,
              typename Metric,
              typename ShapeF,
+             int DownsampleRatio,
              int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
