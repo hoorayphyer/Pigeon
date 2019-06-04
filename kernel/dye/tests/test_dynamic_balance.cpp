@@ -293,7 +293,11 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     for ( auto&[sp, load] : loads ) {
       load.resize(nens);
       for ( int label = 0; label < nens; ++label ) {
-        load[label] = load_gen();
+        auto x = load_gen();
+        x = std::max<double>(x, 0.0);
+        x = std::min<double>(x, 100000.0);
+        load[label] = x;
+
         if ( ens_opt && ens_opt->label() == label )
           ptcs[sp].resize( load[label] );
       }

@@ -26,7 +26,7 @@ void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond,
       field_bdry_cond[b] = new FieldBC_coordinate(b);
       break;
     case FieldBCType::DAMPING :
-      field_bdry_cond[b] = new FieldBC_damping( b, params.dt, params.grid, fieldBC.at(b), E_bg, B_bg );
+      field_bdry_cond[b] = new FieldBC_damping( b, params.grid, fieldBC.at(b), E_bg, B_bg );
       break;
     case FieldBCType::ROTATING_CONDUCTOR :
       field_bdry_cond[b] = new FieldBC_rotating_conductor( b, params.grid, fbc );
@@ -232,7 +232,7 @@ FieldUpdater::Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,
   //FIXME remove t_applyFieldBC from infocollector
   // FIXME need data rather than just E and B because damping will set particles flags. Improve this.
   for ( auto& elm : _fieldBC )
-    elm.second->Apply( Efield, Bfield, timestep * dt );
+    elm.second->Apply( dt, Efield, Bfield, timestep * dt );
 
   // TODO FIXME TODO
   // auto& ssProxy = InfoCollector::Instance().ssProxy;

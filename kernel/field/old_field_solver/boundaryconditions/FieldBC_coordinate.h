@@ -48,7 +48,7 @@ private:
 public:
   FieldBC_coordinate( BoundaryPosition bpos ) : _bpos(bpos) {}
 
-  virtual void Apply(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
+  virtual void Apply(Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
     const Grid& grid = Efield.grid();
     ReflectArrayAtAxis( Efield.data(0), grid, FieldType::ETYPE );
     ReflectArrayAtAxis( Efield.data(1), grid, FieldType::ETYPE, false );

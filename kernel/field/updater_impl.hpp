@@ -220,7 +220,6 @@ namespace field {
                                                field_type& B,
                                                const J_type& Jmesh,
                                                double dt, int timestep ) {
-    fuparams.dt = dt;
     // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,

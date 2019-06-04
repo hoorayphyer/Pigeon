@@ -117,6 +117,9 @@ namespace pic {
         IC ic( _grid, _E, _B, _J, _particles );
         ic();
         init_ts = ic.initial_timestep();
+        field::sync_guard_cells_from_bulk(_E, *_cart_opt);
+        field::sync_guard_cells_from_bulk(_B, *_cart_opt);
+        field::sync_guard_cells_from_bulk(_J, *_cart_opt);
       }
       // broadcast to ensure uniformity
       mpi::world.broadcast( 0, &init_ts, 1 );

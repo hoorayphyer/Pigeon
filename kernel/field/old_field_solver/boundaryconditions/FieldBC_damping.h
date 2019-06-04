@@ -7,7 +7,7 @@
 class FieldBC_damping : public FieldBC {
 private:
   const BoundaryPosition _bpos;
-  Scalar _absorb_coeff;
+  Scalar _absorb_rate;
   Grid _grid_damp;
   Index _shift; // store the index in the original grid that corresponds to new grid's (0,0,0)
   VectorField<Scalar> _B_bg; // initial background B
@@ -61,9 +61,10 @@ private:
 
 public:
   template<typename DBPane>
-  FieldBC_damping( BoundaryPosition bpos, Scalar dt, const Grid& grid, const DBPane& pane, const VectorField<Scalar>& Efield_bg, const VectorField<Scalar>& Bfield_bg )
+  FieldBC_damping( BoundaryPosition bpos, const Grid& grid, const DBPane& pane, const VectorField<Scalar>& Efield_bg, const VectorField<Scalar>& Bfield_bg )
     : _bpos(bpos), _grid_damp(grid) {
-    _absorb_coeff = pane.damping_rate * dt;
+    _absorb_rate = pane.damping_rate;
+
     int dir = _bpos / 2;
     bool isupper = _bpos % 2;
 
@@ -97,7 +98,7 @@ public:
 
   }
 
-  virtual void Apply(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
+  virtual void Apply(Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
     int dir = _bpos / 2;
     bool isupper = _bpos % 2;
 
@@ -124,8 +125,8 @@ public:
       Scalar q1_s = _grid_damp.pos(0, i, 1); // staggered q1
       Scalar h = std::exp( q1 ) - r_indent;
       Scalar h_s = std::exp( q1_s ) - r_indent;
-      lambda[0] = 1.0 - _absorb_coeff * damping_profile( h / thickness );
-      lambda[1] = 1.0 - _absorb_coeff * damping_profile( h_s / thickness );
+      lambda[0] = 1.0 - _absorb_rate * dt * damping_profile( h / thickness );
+      lambda[1] = 1.0 - _absorb_rate * dt * damping_profile( h_s / thickness );
 
       for ( int k = 0; k < _grid_damp.dims[trans[1]]; ++k ) {
         int k_s = k + _shift[trans[1]];
