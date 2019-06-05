@@ -328,6 +328,7 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
     auto ens_opt = dye::create_ensemble<1>(cart_opt);
 
     aio::gauss_real<double> load_gen( 1000.0, 500.0 );
+    load_gen.seed( aio::now() + rwld_opt->rank() );
     unsigned int target_load = 0;
 
     int N = num_cycles;
