@@ -1,5 +1,5 @@
 #include "testfw/testfw.hpp"
-#include "dye/ensemble.hpp"
+#include "dye/ensemble_impl.hpp"
 
 TEMPLATE_TEST_CASE( "Create Trivial Ensemble From Cartesian Topology","[dye][mpi]"
                    // NOTE Notation: XxYxZ is the cartesian partition. The cartesian topology is periodic in all directions

@@ -2,6 +2,7 @@
 #include "particle/load_type.hpp"
 #include "particle/array_impl.hpp"
 #include "mpipp/mpi++.hpp"
+#include "dye/ensemble_impl.hpp"
 #include "dye/dynamic_balance_impl.hpp"
 #include "pic.hpp"
 #include <unordered_set>
@@ -306,5 +307,43 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     dye::dynamic_load_balance(ptcs, ens_opt, cart_opt, target_load );
 
   }
+
+}
+
+SCENARIO("Stress test", "[dye][mpi][.]") {
+  const int num_ens = 1;
+  const int num_procs = mpi::world.size();
+  const int num_cycles = 10000;
+  // NOTE TODOL current implementation requires explicit touch-create before detailed balance
+  map<array<double, Specs>> particles;
+  {
+    auto& x = particles[species::electron];
+    auto& y = particles[species::ion];
+    auto& z = particles[species::photon];
+  }
+
+  auto rwld_opt = aio::reduced_world(num_procs, mpi::world);
+  if ( rwld_opt ) {
+    auto cart_opt = aio::make_cart( {num_ens}, {false}, *rwld_opt );
+    auto ens_opt = dye::create_ensemble<1>(cart_opt);
+
+    aio::gauss_real<double> load_gen( 1000.0, 500.0 );
+    unsigned int target_load = 0;
+
+    int N = num_cycles;
+    while ( N-- ) {
+      if ( ens_opt ) {
+        for ( auto&[sp, ptcs] : particles ) {
+            auto x = load_gen();
+            x = std::max<double>(x, 0.0);
+            x = std::min<double>(x, 100000.0);
+            ptcs.resize( static_cast<load_t>(x) );
+        }
+      }
+      dye::dynamic_load_balance(particles, ens_opt, cart_opt, target_load );
+    }
+
+  }
+  mpi::world.barrier();
 
 }

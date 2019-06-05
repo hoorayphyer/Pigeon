@@ -36,7 +36,7 @@ namespace aio {
   using gauss_real = Dist<T,std::normal_distribution>;
 }
 
-namespace mpi { struct CartComm; }
+namespace mpi { struct CartComm; struct Comm; }
 
 // define Specs so that particle struct can be complete
 #include "apt/type_traits.hpp"
@@ -85,6 +85,14 @@ namespace aio {
       periodic.push_back( is_neg );
     }
     return make_cart( std::move(cart_dims), std::move(periodic), world );
+  }
+
+  template < typename Comm = mpi::Comm, typename WorldComm  >
+  std::optional<Comm>reduced_world( int reduced_size, const WorldComm& world ) {
+    if ( world.size() < reduced_size ) return {};
+    std::optional<unsigned int> color;
+    if ( world.rank() < reduced_size ) color.emplace(1);
+    return world.split( color );
   }
 }
 
