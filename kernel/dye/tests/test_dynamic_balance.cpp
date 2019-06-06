@@ -6,6 +6,7 @@
 #include "dye/dynamic_balance_impl.hpp"
 #include "pic.hpp"
 #include <unordered_set>
+#include "logger/ofstream.hpp"
 
 using namespace particle;
 SCENARIO("Test calc_new_nprocs", "[dye][.]") {
@@ -313,7 +314,7 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
 SCENARIO("Stress test", "[dye][mpi][.]") {
   const int num_ens = 1;
   const int num_procs = mpi::world.size();
-  const int num_cycles = 10000;
+  const int num_cycles = 1000;
   // NOTE TODOL current implementation requires explicit touch-create before detailed balance
   map<array<double, Specs>> particles;
   {
@@ -324,6 +325,8 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
 
   auto rwld_opt = aio::reduced_world(num_procs, mpi::world);
   if ( rwld_opt ) {
+    lgr::ofstream<> out;
+    out.open("derun" + std::to_string(rwld_opt->rank()));
     auto cart_opt = aio::make_cart( {num_ens}, {false}, *rwld_opt );
     auto ens_opt = dye::create_ensemble<1>(cart_opt);
 
@@ -334,16 +337,30 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
     int N = num_cycles;
     while ( N-- ) {
       if ( ens_opt ) {
+        out << "--- Cycle = " << num_cycles - N << " ----" << std::endl;
+        out << "\told sizes:" << std::endl;;
+        for ( auto&[sp, ptcs] : particles ) {
+          out << "\t\tsp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+        }
+
         for ( auto&[sp, ptcs] : particles ) {
             auto x = load_gen();
             x = std::max<double>(x, 0.0);
             x = std::min<double>(x, 100000.0);
             ptcs.resize( static_cast<load_t>(x) );
         }
+
+        out << "\tnew sizes:" << std::endl;;
+        for ( auto&[sp, ptcs] : particles ) {
+          out << "\t\tsp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+        }
+
+        if ( N % 5 == 0 && N != 0 ) out.clear();
       }
       dye::dynamic_load_balance(particles, ens_opt, cart_opt, target_load );
     }
 
+    out.close();
   }
   mpi::world.barrier();
 
