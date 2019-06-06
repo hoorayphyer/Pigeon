@@ -338,9 +338,9 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
     while ( N-- ) {
       if ( ens_opt ) {
         out << "--- Cycle = " << num_cycles - N << " ----" << std::endl;
-        out << "\told sizes:" << std::endl;;
+        out << "old sizes:" << std::endl;;
         for ( auto&[sp, ptcs] : particles ) {
-          out << "\t\tsp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+          out << "  sp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
         }
 
         for ( auto&[sp, ptcs] : particles ) {
@@ -350,9 +350,9 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
             ptcs.resize( static_cast<load_t>(x) );
         }
 
-        out << "\tnew sizes:" << std::endl;;
+        out << "new sizes:" << std::endl;;
         for ( auto&[sp, ptcs] : particles ) {
-          out << "\t\tsp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+          out << "  sp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
         }
 
         if ( N % 5 == 0 && N != 0 ) out.clear();
