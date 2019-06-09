@@ -382,13 +382,21 @@ namespace dye {
                 impl::relinguish_data( ptcs, itc, i );
             }
           }
-
-          if ( is_leaving ) ens_opt.reset(); // CRUCIAL!!
         }
       }
       if ( cart_opt ) { // clear negative deficits
         for ( auto& x : nproc_deficit ) x = ( x > 0 ) ? x : 0;
       }
+
+      // clear ens_opt properly, which needs 1. we do the following outside the above scope so as to make sure [comm, itc_opt] are deallocated, 2. freeing communicator is collective though implemented as local operation, 3. we'd like to enforce the rule that idles have empty ens_opt.
+      if ( ens_opt ) {
+        for ( auto& itc : ens_opt->inter ) {
+          itc[LFT].reset();
+          itc[RGT].reset();
+        }
+        ens_opt->intra.reset();
+      }
+      if ( is_leaving ) ens_opt.reset();
     }
 
     { // Step 3. Assign ensemble labels to all processes and update Ensemble. Need an intercommunicator between all primaries and all idles
