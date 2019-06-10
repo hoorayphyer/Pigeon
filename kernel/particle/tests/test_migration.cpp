@@ -2,7 +2,7 @@
 #include "pic.hpp"
 #include "particle/migration_impl.hpp"
 #include "particle/particle.hpp"
-#include "dye/ensemble.hpp"
+#include "dye/ensemble_impl.hpp"
 
 using namespace particle;
 using cPtc_t = cParticle<double,Specs>;
@@ -47,7 +47,7 @@ SCENARIO("Test sendrecv cparticle", "[particle][mpi][.]") {
   mpi::world.barrier();
 }
 
-SCENARIO("Test lcr_sort", "[particle]") {
+SCENARIO("Test lcr_sort", "[particle][.]") {
   auto test =
     []( const std::vector<int>& lcr_vals ) {
       if ( mpi::world.rank() == 0 ) {
@@ -108,7 +108,7 @@ SCENARIO("Test lcr_sort", "[particle]") {
   }
 }
 
-TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][mpi]"
+TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][mpi][.]"
                    // NOTE Notation: XxYxZ is the cartesian partition. The cartesian topology is periodic in all directions
                    , (aio::IndexType<1,1>)
                    , (aio::IndexType<2,1>)
@@ -196,4 +196,53 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
   mpi::world.barrier();
 }
 
-// TODO test nontrivial ensemble
+SCENARIO("Stress Test" , "[particle][mpi]") {
+  constexpr int DGrid = 2;
+  const apt::array<int,DGrid> partition { 3, 3 };
+  const int num_procs = mpi::world.size();
+  const int num_proc_map = 1000;
+  const int num_cycles_each_proc_map = 10000;
+
+  auto rwld_opt = aio::reduced_world(num_procs, mpi::world);
+  if ( rwld_opt ) {
+    auto cart_opt = aio::make_cart( partition, *rwld_opt );
+    int M = num_proc_map;
+    int num_ens = 1;
+    for (auto x : partition) num_ens *= x;
+    // TODO seeding
+    aio::unif_int<int> ui( 0, num_ens - 1 );
+    aio::gauss_real<double> load_gen( 1000.0, 1000.0 );
+    // load_gen.seed( aio::now() + rwld_opt->rank() );
+    load_gen.seed( rwld_opt->rank() );
+    aio::unif_int<int> mig_dir_gen( 0, apt::pow3(DGrid) - 1 );
+
+    std::vector<cPtc_t> ptcs;
+    while ( M-- ) {
+      int color = 0;
+      if ( rwld_opt->rank() < num_ens ) color = rwld_opt->rank();
+      else color = ui();
+      std::optional<dye::Ensemble<DGrid>> ens_opt;
+      {
+        auto intra = rwld_opt->split(color);
+        ens_opt = dye::create_ensemble<DGrid>(cart_opt, intra);
+      }
+      int N = num_cycles_each_proc_map;
+      while ( N-- ) {
+        {
+          auto x = load_gen();
+          x = std::max<double>(x, 0.0);
+          x = std::min<double>(x, 100000.0);
+          ptcs.resize(static_cast<std::size_t>(x));
+          for ( auto& ptc : ptcs ) {
+            do {
+              ptc.extra() = mig_dir_gen();
+            } while ( ptc.extra() == (apt::pow3(DGrid) - 1) / 2 );
+          }
+        }
+        migrate( ptcs, ens_opt->inter, 0 ); // TODO shift
+      }
+    }
+
+  }
+  mpi::world.barrier();
+}
