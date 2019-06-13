@@ -33,6 +33,18 @@ namespace misc {
     }
     return num;
   }
+
+  template < typename T, template < typename > class Specs, template < typename, template < typename > class > class Ptc >
+  inline int has_nan( const Ptc<T,Specs>& ptc ) {
+    int res = 0;
+    constexpr auto DPtc = Specs<T>::Dim;
+    for ( int i = 0; i < DPtc; ++i ) {
+      if ( std::isnan(ptc.q()[i]) ) res |= ( 1u << i);
+      if ( std::isnan(ptc.p()[i]) ) res |= ( 1u << (i+DPtc) );
+      if ( std::isnan(ptc.state() )) res |= ( 1u << (2 * DPtc) );
+    }
+    return res;
+  }
 }
 
 #endif
