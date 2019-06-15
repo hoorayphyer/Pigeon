@@ -98,6 +98,34 @@ namespace pic {
       _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng ) );
     }
 
+    void migrate_particles( int timestep ) {
+      constexpr auto migrate_dir =
+        []( auto q, auto lb, auto ub ) noexcept {
+          return ( q >= lb ) + ( q > ub );
+        };
+
+      for ( auto&[ sp, ptcs ] : _particles ) {
+        for ( auto ptc : ptcs ) { // TODOL semantics
+          if ( ptc.is(particle::flag::empty) ) continue;
+          char mig_dir = 0;
+          for ( int i = 0; i < DGrid; ++i ) {
+            mig_dir += migrate_dir( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
+          }
+
+          if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
+            _migrators.emplace_back(std::move(ptc));
+            _migrators.back().extra() = mig_dir;
+          }
+        }
+      }
+
+      particle::migrate( _migrators, _ens_opt->inter, timestep );
+      for ( auto&& ptc : _migrators ) {
+        _particles[ptc.template get<particle::species>()].push_back( std::move(ptc) );
+      }
+      _migrators.resize(0);
+    }
+
   public:
     Simulator( const mani::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
@@ -151,39 +179,7 @@ namespace pic {
         (*_fbj)();
 
         // lgr::file % "migration" << std::endl;
-        { // migration
-          auto migrate_dir =
-            []( auto q, auto lb, auto ub ) noexcept {
-              return ( q >= lb ) + ( q > ub );
-            };
-
-          for ( auto&[ sp, ptcs ] : _particles ) {
-            for ( auto ptc : ptcs ) { // TODOL semantics
-              char mig_dir = 0;
-              for ( int i = 0; i < DGrid; ++i ) {
-                mig_dir += migrate_dir( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
-              }
-
-              if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
-                _migrators.emplace_back(std::move(ptc));
-                _migrators.back().extra() = mig_dir;
-              }
-            }
-          }
-
-          particle::migrate( _migrators, ens.inter, timestep );
-          for ( auto&& ptc : _migrators ) {
-            _particles[ptc.template get<particle::species>()].push_back( std::move(ptc) );
-          }
-          _migrators.resize(0);
-        }
-
-        // lgr::file % "reduce J" << std::endl;
-        // TODOL Opimize communication. Use persistent and buffer?
-        for ( int i = 0; i < 3; ++i ) {
-          auto& buffer = _J[i].data();
-          ens.intra.template reduce<mpi::IN_PLACE>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
-        }
+        migrate_particles( timestep );
 
         if ( _cart_opt ) {
           // lgr::file % "merge guard cells of J" << std::endl;

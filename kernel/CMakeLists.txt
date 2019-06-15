@@ -34,9 +34,9 @@ function(test_gen category name)
   add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
 endfunction()
 
-function(timer_gen category name)
-  set(test_target "time_${category}_${name}")
-  add_executable( ${test_target} "tests/time_${name}.cpp")
+function(msperf_gen category name)
+  set(test_target "msperf_${category}_${name}")
+  add_executable( ${test_target} "tests/msperf_${name}.cpp")
   target_include_directories(${test_target} PRIVATE ${KERNEL_DIR} ${CMAKE_SOURCE_DIR})
 
   set(link_testfw testfw)

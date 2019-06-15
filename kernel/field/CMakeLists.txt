@@ -11,4 +11,4 @@ test_gen(field field) # DONE
 test_gen(field mesh) # DONE
 test_gen(field communication mpipp) # DONE
 
-timer_gen(field updater mpipp old_field_solver field_communication)
+msperf_gen(field updater mpipp old_field_solver field_communication)

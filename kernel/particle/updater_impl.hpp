@@ -4,7 +4,6 @@
 #include "msh/mesh_shape_interplay.hpp"
 
 #include "manifold/grid.hpp"
-#include "logger/logger.hpp"
 
 // TODO a hotfix on multiple definition
 namespace particle {
@@ -102,10 +101,8 @@ namespace particle {
 
     for ( auto&[ sp, ptcs ] : particles ) {
       const auto old_size = ptcs.size();
-      lgr::file % "update " << properties.at(sp).name << ", count = " << old_size << std::endl;
       update_species( sp, ptcs, J, dt, E, B );
 
-      lgr::file % "tidy particle arrays after scattering" << std::endl;
       // Put particles where they belong after scattering
       for ( auto i = old_size; i < ptcs.size(); ++i ) {
         auto this_sp = ptcs[i].template get<species>();
@@ -115,7 +112,6 @@ namespace particle {
       }
     }
 
-    lgr::file % "integrate J" << std::endl;
     msh::integrate(J);
 
     { // NOTE rescale Jmesh back to real grid delta

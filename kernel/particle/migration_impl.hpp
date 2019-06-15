@@ -74,8 +74,11 @@ namespace particle :: impl {
 
         tot_num_recv = scan_recv_counts.back();
         // If recved more than space allows, store them in a temporary buffer then later merge with the primary buffer
-        Ptc* p_recv = buffer.data() + begE_run;
-        if ( tot_num_recv > buffer.capacity() - begE_run ) {
+        Ptc* p_recv = nullptr;
+        if ( begE_run + tot_num_recv <= buffer.capacity() ) {
+          buffer.resize(begE_run + tot_num_recv);
+          Ptc* p_recv = buffer.data() + begE_run;
+        } else {
           p_tmp.reset( new Ptc [tot_num_recv] );
           p_recv = p_tmp.get();
         }
@@ -89,7 +92,7 @@ namespace particle :: impl {
       mpi::waitall(reqs);
 
       // merge into buffer if needed.
-      if ( intercomms[1-lr] && ( tot_num_recv > buffer.capacity() - begE_run ) ) {
+      if ( intercomms[1-lr] && ( begE_run + tot_num_recv > buffer.capacity() ) ) {
         buffer.resize( begE_run + tot_num_recv );
         for ( int i = 0; i < tot_num_recv; ++i )
           buffer[begE_run + i] = p_tmp[i];

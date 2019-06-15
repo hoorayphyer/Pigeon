@@ -292,6 +292,7 @@ namespace io {
         tmp.reset();
         const auto& prop = particle::properties[sp];
         for ( const auto& ptc : ptcs ) {
+          if ( ptc.is(particle::flag::empty) ) continue;
           msh::deposit( tmp, {prop.charge_x}, msh::to_standard( grid, ptc.q() ), ShapeF() );
         }
         fold_back_at_axis(tmp);
@@ -299,7 +300,7 @@ namespace io {
         ens.reduce_to_chief( mpi::by::SUM, io_field[0].data().data(), io_field[0].data().size() );
         if ( cart_opt ) {
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
-          varname = std::string("n") + particle::properties[sp].name;
+          varname = std::string("rho_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
                 });
