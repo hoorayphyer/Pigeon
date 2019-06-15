@@ -46,13 +46,14 @@ namespace particle :: impl {
     // NOTE buffer may be relocated in response to size growing. DO NOT store its pointers or references
     int begE_run = begs[2]; // running begin of empty particles in buffer
     for ( int lr = 0; lr < 2; ++lr ) {
+      const int tag = 147 + lr;
       std::vector<mpi::Request> reqs;
       // sending
       if ( intercomms[lr] ) {
         const auto& send_comm = *intercomms[lr];
         int local_rank = send_comm.rank();
         int remote_dest = ( local_rank + shift ) % send_comm.remote_size();
-        reqs.push_back( send_comm.Isend( remote_dest, 147, buffer.data() + begs[lr], begs[lr+1] - begs[lr] ) );
+        reqs.push_back( send_comm.Isend( remote_dest, tag, buffer.data() + begs[lr], begs[lr+1] - begs[lr] ) );
       }
 
       // receiving
@@ -68,7 +69,7 @@ namespace particle :: impl {
         int src_rank = ( local_rank + local_size - (shift % local_size) ) % local_size;
         while ( src_rank < remote_size ) {
           remote_srcs.push_back(src_rank);
-          scan_recv_counts.push_back( scan_recv_counts.back() + recv_comm.probe( src_rank, 147, buffer[0] ) );
+          scan_recv_counts.push_back( scan_recv_counts.back() + recv_comm.probe( src_rank, tag, buffer[0] ) );
           src_rank += local_size;
         }
 
@@ -77,14 +78,14 @@ namespace particle :: impl {
         Ptc* p_recv = nullptr;
         if ( begE_run + tot_num_recv <= buffer.capacity() ) {
           buffer.resize(begE_run + tot_num_recv);
-          Ptc* p_recv = buffer.data() + begE_run;
+          p_recv = buffer.data() + begE_run;
         } else {
           p_tmp.reset( new Ptc [tot_num_recv] );
           p_recv = p_tmp.get();
         }
 
         for ( int i = 0; i < remote_srcs.size(); ++i ) {
-          reqs.push_back( recv_comm.Irecv( remote_srcs[i], 147, p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i] ) );
+          reqs.push_back( recv_comm.Irecv( remote_srcs[i], tag, p_recv + scan_recv_counts[i], scan_recv_counts[i+1] - scan_recv_counts[i] ) );
         }
 
       }
@@ -102,6 +103,7 @@ namespace particle :: impl {
     }
 
     // erase sent particles by shifting
+    // TODO optimize by swapping
     for ( int i = 0; i < begE_run - begs[2]; ++i )
       buffer[begs[0] + i] = buffer[begs[2] + i];
 
