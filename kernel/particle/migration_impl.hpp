@@ -102,10 +102,13 @@ namespace particle :: impl {
       begE_run += tot_num_recv;
     }
 
-    // erase sent particles by shifting
-    // TODO optimize by swapping
-    for ( int i = 0; i < begE_run - begs[2]; ++i )
-      buffer[begs[0] + i] = buffer[begs[2] + i];
+    { // erase sent particles
+      int itr = begs[0]; // forward iterator
+      int ritr = begE_run - 1; // reverse iterator
+      while( itr != begs[2] && ritr != begs[2] - 1 ) {
+        std::swap( buffer[itr++], buff[ritr--] );
+      }
+    }
 
     // NOTE It is essential to not have empty particles within buffer.size otherwise lcr_sort will fail.
     buffer.resize(begs[0] + begE_run - begs[2]);
