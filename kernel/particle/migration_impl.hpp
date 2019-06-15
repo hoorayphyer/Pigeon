@@ -106,7 +106,7 @@ namespace particle :: impl {
       int itr = begs[0]; // forward iterator
       int ritr = begE_run - 1; // reverse iterator
       while( itr != begs[2] && ritr != begs[2] - 1 ) {
-        std::swap( buffer[itr++], buff[ritr--] );
+        std::swap( buffer[itr++], buffer[ritr--] );
       }
     }
 
