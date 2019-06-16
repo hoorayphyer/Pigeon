@@ -8,6 +8,7 @@
 #include "field/communication.hpp"
 
 #include "particle/migration.hpp"
+#include "particle/sorter.hpp"
 #include "io/io.hpp"
 #include "dye/dynamic_balance.hpp"
 #include "ckpt/checkpoint.hpp"
@@ -126,6 +127,11 @@ namespace pic {
       _migrators.resize(0);
     }
 
+    template < typename MR >
+    inline bool is_do( const MR& mr, int timestep ) const noexcept {
+      return mr.is_on && timestep >= mr.init_ts && (timestep % mr.interval == 0 );
+    }
+
   public:
     Simulator( const mani::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
@@ -169,8 +175,11 @@ namespace pic {
           ens.intra.broadcast( ens.chief, _B[i].data().data(), _B[i].data().size() );
 
         _J.reset();
-        // if ( false )
-        //   sort_particles();
+
+        // if ( timestep >= pic::sort_particles_init_ts && (timestep % pic::interval::sort_particles == 0 ) ) {
+        if ( is_do(pic::sort_particles_mr, timestep) ) {
+          for ( auto&[ sp, ptcs ] : _particles ) particle::sort( ptcs );
+        }
 
         // lgr::file % "particle update" << std::endl;
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
@@ -200,12 +209,12 @@ namespace pic {
       // TODOL annihilation will affect deposition // NOTE one can deposit in the end
       // annihilate_mark_pairs( );
 
-      if ( timestep >= pic::data_export_init_ts && (timestep % pic::interval::data_export == 0 ) && _ens_opt ) {
+      if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
         // lgr::file % "export_data" << std::endl;
         io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF, pic::downsample_ratio>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
       }
 
-      if ( timestep >= pic::dlb_init_ts && (timestep % pic::interval::dlb == 0 ) ) {
+      if ( is_do(pic::dlb_mr, timestep) ) {
         // TODO has a few hyper parameters
         // TODO touch create is not multinode safe even buffer is used
         std::optional<int> old_label;
@@ -221,8 +230,8 @@ namespace pic {
         if ( old_label != new_label ) refresh(*_ens_opt);
       }
 
-      if ( timestep >= pic::checkpoint_init_ts && (timestep % pic::interval::checkpoint == 0 ) ) {
-        ckpt::save_checkpoint( this_run_dir, num_ckpt_parts, _ens_opt, timestep, _E, _B, _particles );
+      if ( is_do(pic::checkpoint_mr, timestep) ) {
+        ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
       }
 
       // TODOL

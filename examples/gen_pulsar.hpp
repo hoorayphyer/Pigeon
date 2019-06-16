@@ -3,6 +3,7 @@
 
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
+#include "module_range.hpp"
 
 #include "manifold/grid.hpp"
 
@@ -67,21 +68,17 @@ namespace pic {
 }
 
 namespace pic {
-  inline constexpr int pmpio_num_files = 2;
-  inline constexpr int data_export_init_ts = 0;
+  inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
+
+  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
+  inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
-  inline constexpr int checkpoint_init_ts = 0;
-  inline constexpr int num_ckpt_parts = 4;
+  inline constexpr ModuleRange checkpoint_mr { false, 0, 10000 };
+  inline constexpr int num_checkpoint_parts = 4;
 
-  inline constexpr int dlb_init_ts = 0;
+  inline constexpr ModuleRange dlb_mr { true, 0, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
-}
-
-namespace pic :: interval {
-  inline constexpr int data_export = 200;
-  inline constexpr int checkpoint = 10000;
-  inline constexpr int dlb = 1000;
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
