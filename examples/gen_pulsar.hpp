@@ -79,6 +79,8 @@ namespace pic {
 
   inline constexpr ModuleRange dlb_mr { true, 0, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
+
+  inline constexpr ModuleRange msperf_mr { true, 0, 100 };
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used

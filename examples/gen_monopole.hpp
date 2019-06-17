@@ -79,6 +79,8 @@ namespace pic {
 
   inline constexpr ModuleRange dlb_mr { true, 0, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
+
+  inline constexpr ModuleRange msperf_mr { true, 0, 100 };
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -101,8 +103,6 @@ namespace particle {
   void set_up_properties() {
     properties[species::electron] = {1,-1,"electron"};
     properties[species::positron] = {1,1,"positron"};
-    properties[species::ion] = { 5, 1, "ion"};
-    properties[species::photon] = { 0, 0, "photon" };
   }
 
   // NOTE called in particle updater
@@ -127,16 +127,6 @@ namespace particle {
       }
       {
         auto sp = species::positron;
-        Force force;
-        const auto& prop = properties.at(sp);
-
-        force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
-        force.add( gravity, gravity_strength );
-
-        fgen.Register( sp, force );
-      }
-      {
-        auto sp = species::ion;
         Force force;
         const auto& prop = properties.at(sp);
 

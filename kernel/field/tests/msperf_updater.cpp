@@ -58,7 +58,7 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
     }
     auto dur = t1.lapse();
     cart_opt->barrier();
-    WARN("Timing field updater per timestep = " << dur << "/" << N << " = " << dur / N << " ms" );
+    WARN("Timing field updater per timestep = " << dur.in_units_of("ms").val() << "/" << N << " = " << dur.in_units_of("ms").val() / N << dur.unit() );
   }
   mpi::world.barrier();
 }

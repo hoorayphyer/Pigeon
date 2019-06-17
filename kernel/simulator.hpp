@@ -18,6 +18,7 @@
 #include "gen.hpp"
 
 #include "logger/logger.hpp"
+#include "timer/timer.hpp"
 
 namespace pic {
   std::string this_run_dir;
@@ -164,39 +165,82 @@ namespace pic {
 
     // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
     void evolve( int timestep, Real dt ) {
+      std::optional<tmr::Timestamp> stamp_all;
+      std::optional<tmr::Timestamp> stamp;
+      if ( is_do(pic::msperf_mr, timestep) ) {
+        stamp_all.emplace();
+        stamp.emplace();
+        lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
+        lgr::file.indent_append("\t");
+      }
+
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
 
-        // lgr::file % "broadcast E and B" << std::endl;
+        if ( stamp ) {
+          lgr::file % "BroadcastEB" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         // TODOL reduce number of communications?
         for ( int i = 0; i < 3; ++i )
           ens.intra.broadcast( ens.chief, _E[i].data().data(), _E[i].data().size() );
         for ( int i = 0; i < 3; ++i )
           ens.intra.broadcast( ens.chief, _B[i].data().data(), _B[i].data().size() );
+        if ( stamp ) {
+          lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
 
         _J.reset();
 
         // if ( timestep >= pic::sort_particles_init_ts && (timestep % pic::interval::sort_particles == 0 ) ) {
         if ( is_do(pic::sort_particles_mr, timestep) ) {
+          if (stamp) {
+            lgr::file % "SortParticles" << "==>>" << std::endl;
+            stamp.emplace();
+          }
           for ( auto&[ sp, ptcs ] : _particles ) particle::sort( ptcs );
+          if (stamp) {
+            lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
+          }
+        }
+        if ( stamp && _particles.size() != 0 ) {
+          lgr::file % "ParticleCounts:" << std::endl;
+          for ( const auto&[ sp, ptcs ] : _particles )
+            lgr::file % "\t" << particle::properties.at(sp).name << " = " << ptcs.size() << std::endl;
         }
 
-        // lgr::file % "particle update" << std::endl;
+        if (stamp) {
+          lgr::file % "ParticleUpdate" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
 
         // lgr::file % "particle BC" << std::endl;
         (*_fbj)();
 
-        // lgr::file % "migration" << std::endl;
+        if (stamp) {
+          lgr::file % "MigrateParticles" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         migrate_particles( timestep );
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
 
         if ( _cart_opt ) {
-          // lgr::file % "merge guard cells of J" << std::endl;
+          if (stamp) {
+            lgr::file % "FieldUpdate" << "==>>" << std::endl;
+            stamp.emplace();
+          }
           field::merge_guard_cells_into_bulk( _J, *_cart_opt );
-          // lgr::file % "field update" << std::endl;
           (*_field_update)(_E, _B, _J, dt, timestep);
-          // lgr::file % "field BC" << std::endl;
           (*_fbc_axis)();
+          if (stamp) {
+            lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+          }
         }
 
         // lgr::file % "injection" << std::endl;
@@ -210,11 +254,21 @@ namespace pic {
       // annihilate_mark_pairs( );
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
-        // lgr::file % "export_data" << std::endl;
+        if (stamp) {
+          lgr::file % "ExportData" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF, pic::downsample_ratio>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
       }
 
       if ( is_do(pic::dlb_mr, timestep) ) {
+        if (stamp) {
+          lgr::file % "DynamicLoadBalance" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         // TODO has a few hyper parameters
         // TODO touch create is not multinode safe even buffer is used
         std::optional<int> old_label;
@@ -228,15 +282,29 @@ namespace pic {
         std::optional<int> new_label;
         if ( _ens_opt ) new_label.emplace(_ens_opt->label());
         if ( old_label != new_label ) refresh(*_ens_opt);
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
       }
 
       if ( is_do(pic::checkpoint_mr, timestep) ) {
+        if (stamp) {
+          lgr::file % "SaveCheckpoint" << "==>>" << std::endl;
+          stamp.emplace();
+        }
         ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
       }
 
       // TODOL
       // if (false)
       //   save_tracing();
+      if ( stamp_all ) {
+        lgr::file.indent_reset();
+        lgr::file << "  Total Lapse = " << stamp_all->lapse().in_units_of("ms") << std::endl;
+      }
     }
   };
 }

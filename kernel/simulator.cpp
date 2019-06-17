@@ -84,11 +84,8 @@ int main(int argc, char** argv) {
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
       if ( ts % 100 == 0 && mpi::world.rank() == 0 )
-        // lgr::file % "==== Timestep " << ts << " ====" << std::endl;
         std::cout << "==== Timestep " << ts << " ====" << std::endl;
-      lgr::file.indent_append("\t");
       sim.evolve( ts, pic::dt );
-      lgr::file.indent_reset();
 
       // occasionally barrier everyone to avoid idles running too fast
       if ( ts % 100 == 0 ) mpi::world.barrier();
