@@ -275,9 +275,10 @@ namespace pic {
         I += _Ib;
         apt::Vec<Real, Specs<Real>::Dim> q{};
         for ( int i = 0; i < DGrid; ++i )
-          q[i] = _grid[i].absc(I[i]);
+          q[i] = _grid[i].absc(I[i], 0.5);
 
         apt::Vec<Real,3> nB, J;
+        // TODOL use interpolated value
         for ( int i = 0; i < 3; ++i ) {
           nB[i] = _Bfield[i](I);
           J[i] = _Jfield[i](I);
@@ -294,7 +295,7 @@ namespace pic {
         for ( int n = 0; n < num; ++n ) {
           auto q_ptc = q;
           for ( int i = 0; i < DGrid; ++i )
-            q_ptc[i] += _grid[i].delta() * rng.uniform();
+            q_ptc[i] += _grid[i].delta() * rng.uniform( -0.5, 0.5 );
           auto p_ptc = p;
           p_ptc += nB * rng.gaussian( 0.0, v_th );
           *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon );

@@ -243,8 +243,7 @@ namespace io {
              typename Metric >
   struct ExportParticles {
   private:
-    template < typename RealExport >
-    void fold_back_at_axis ( field::Field<RealExport,1,DGrid>& field ) const {
+    void fold_back_at_axis ( field::Field<Real,1,DGrid>& field ) const {
       constexpr int axis_dir = 1;
       constexpr auto PI = std::acos(-1.0l);
       bool is_at_axis_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
@@ -290,16 +289,18 @@ namespace io {
       std::string varname;
       for ( const auto&[sp, ptcs] : particles ) {
         tmp.reset();
-        const auto& prop = particle::properties[sp];
+        const auto& prop = particle::properties.at(sp);
         for ( const auto& ptc : ptcs ) {
           if ( ptc.is(particle::flag::empty) ) continue;
           msh::deposit( tmp, {prop.charge_x}, msh::to_standard( grid, ptc.q() ), ShapeF() );
         }
-        fold_back_at_axis(tmp);
-        downsample<DSRatio>(io_field, tmp, 0, ShapeF());
-        ens.reduce_to_chief( mpi::by::SUM, io_field[0].data().data(), io_field[0].data().size() );
+        ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
         if ( cart_opt ) {
-          field::sync_guard_cells_from_bulk( io_field, *cart_opt );
+          field::merge_guard_cells_into_bulk( tmp, *cart_opt );
+          field::sync_guard_cells_from_bulk( tmp, *cart_opt );
+          fold_back_at_axis(tmp);
+
+          downsample<DSRatio>(io_field, tmp, 0, ShapeF());
           varname = std::string("rho_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -308,7 +309,6 @@ namespace io {
         }
       }
     }
-
   };
 
 }
