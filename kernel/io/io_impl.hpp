@@ -294,6 +294,7 @@ namespace io {
           if ( ptc.is(particle::flag::empty) ) continue;
           msh::deposit( tmp, {prop.charge_x}, msh::to_standard( grid, ptc.q() ), ShapeF() );
         }
+        // TODO to physical space
         ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
         if ( cart_opt ) {
           field::merge_guard_cells_into_bulk( tmp, *cart_opt );

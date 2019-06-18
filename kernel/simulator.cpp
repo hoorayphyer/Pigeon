@@ -46,6 +46,12 @@ std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, 
   return cart_opt;
 }
 
+
+// define here to avoid multiple definition
+namespace particle{
+  map<Properties> properties;
+}
+
 int main(int argc, char** argv) {
 
   auto cli_args = pic::parse_args(argc, argv);
@@ -75,6 +81,7 @@ int main(int argc, char** argv) {
     lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
     particle::set_up_properties();
+    particle::set_up<pic::real_t>();
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
       sim( pic::supergrid, cart_opt, pic::guard );

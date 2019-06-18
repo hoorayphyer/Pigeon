@@ -97,7 +97,10 @@ namespace pic {
       ens.is_at_boundary();
       if ( _cart_opt )
         _field_update.reset(new field::Updater<Real,DGrid,RealJ>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
-      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng ) );
+      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng,
+                                                                                             particle::properties,
+                                                                                             particle::force_gen<Real,PtcSpecs,particle::vParticle>,
+                                                                                             particle::scat_gen<Real,PtcSpecs>) );
     }
 
     void migrate_particles( int timestep ) {
@@ -220,6 +223,17 @@ namespace pic {
 
         // lgr::file % "particle BC" << std::endl;
         (*_fbj)();
+
+        if ( stamp ) {
+          lgr::file % "ReduceJmesh" << "==>>" << std::endl;
+          stamp.emplace();
+        }
+        // TODOL reduce number of communications?
+        for ( int i = 0; i < 3; ++i )
+          ens.reduce_to_chief( mpi::by::SUM, _J[i].data().data(), _J[i].data().size() );
+        if ( stamp ) {
+          lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
 
         if (stamp) {
           lgr::file % "MigrateParticles" << "==>>" << std::endl;

@@ -1,14 +1,6 @@
-#include "gen.hpp"
 #include "particle/updater.hpp"
-
 #include "msh/mesh_shape_interplay.hpp"
-
 #include "manifold/grid.hpp"
-
-// TODO a hotfix on multiple definition
-namespace particle {
-  map<Properties> properties;
-}
 
 namespace particle {
   template < int DGrid,
@@ -19,10 +11,10 @@ namespace particle {
              typename Metric
              >
   Updater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
-  ::Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng )
-    : _localgrid(localgrid), _rng(rng) {
-    set_up<Real>();
-  }
+  ::Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng,
+             const map<Properties>& properties,
+             const ForceGen_t& force_gen, const ScatGen_t& scat_gen )
+    : _localgrid(localgrid), _rng(rng), _properties(properties), _force_gen(force_gen), _scat_gen(scat_gen) {}
 }
 
 namespace particle {
@@ -43,13 +35,13 @@ namespace particle {
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
-    const auto& prop = properties.at(sp);
+    const auto& prop = _properties.at(sp);
 
     using Ptc = typename array<Real,PtcSpecs>::particle_type;
 
-    auto update_p = force_gen<Real,PtcSpecs,vParticle>(sp);
+    auto update_p = _force_gen(sp);
 
-    auto* scat = scat_gen<Real,PtcSpecs>(sp);
+    auto* scat = _scat_gen(sp);
 
     constexpr auto shapef = ShapeF();
     auto charge_over_dt = static_cast<Real>(prop.charge_x) / dt;
