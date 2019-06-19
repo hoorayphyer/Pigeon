@@ -22,6 +22,7 @@ function(test_gen category name)
   set(test_target "test_${category}_${name}")
   add_executable( ${test_target} "tests/test_${name}.cpp")
   target_include_directories(${test_target} PRIVATE ${KERNEL_DIR})
+  target_compile_options( ${test_target} PRIVATE -O0 ) # -Wmissing-braces
 
   set(link_testfw testfw)
   foreach( lib IN LISTS ARGN)
@@ -38,6 +39,7 @@ function(msperf_gen category name)
   set(test_target "msperf_${category}_${name}")
   add_executable( ${test_target} "tests/msperf_${name}.cpp")
   target_include_directories(${test_target} PRIVATE ${KERNEL_DIR} ${CMAKE_SOURCE_DIR})
+  target_compile_options( ${test_target} PRIVATE -O3 )
 
   set(link_testfw testfw)
   foreach( lib IN LISTS ARGN)
@@ -74,5 +76,6 @@ add_executable(pic "simulator.cpp")
 target_include_directories(pic PRIVATE ${KERNEL_DIR} )
 target_link_libraries(pic PRIVATE field_updater field_communication particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen io filesys logger ckpt particle_array timer)
 
-
-add_subdirectory(testfw)
+if(${ENABLE_TESTS})
+  add_subdirectory(testfw)
+endif()

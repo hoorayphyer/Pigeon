@@ -7,8 +7,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 add_library(field_updater SHARED "updater.cpp")
 target_link_libraries(field_updater PRIVATE field_communication picgen old_field_solver)
 
-test_gen(field field) # DONE
-test_gen(field mesh) # DONE
-test_gen(field communication mpipp) # DONE
-
-msperf_gen(field updater mpipp old_field_solver field_communication)
+if (${ENABLE_TESTS})
+  test_gen(field field) # DONE
+  test_gen(field mesh) # DONE
+  test_gen(field communication mpipp) # DONE
+  msperf_gen(field updater mpipp old_field_solver field_communication)
+endif()

@@ -17,14 +17,16 @@ add_library( particle_migration SHARED migration.cpp )
 target_include_directories(particle_migration PUBLIC ${KERNEL_DIR} PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(particle_migration PRIVATE mpipp picgen)
 
-test_gen(particle state) # DONE
-# test_gen(particle particle) # TODO some tests on this are in particle_array
-# test_gen(particle virtual_particle) # TODO
-# test_gen(particle c_particle) # TODO
-test_gen(particle array) # DONE
+if (${ENABLE_TESTS})
+  test_gen(particle state) # DONE
+  # test_gen(particle particle) # TODO some tests on this are in particle_array
+  # test_gen(particle virtual_particle) # TODO
+  # test_gen(particle c_particle) # TODO
+  test_gen(particle array) # DONE
+  test_gen(particle forces) # DONE
+  test_gen(particle migration mpipp) # TODO add test on buffer has size 0 and nonzero capacity
+  target_include_directories( test_particle_migration PRIVATE ${CMAKE_SOURCE_DIR}) # TODOL this is to include pic.hpp for Specs
 
-test_gen(particle forces) # DONE
-test_gen(particle migration mpipp) # TODO add test on buffer has size 0 and nonzero capacity
-target_include_directories( test_particle_migration PRIVATE ${CMAKE_SOURCE_DIR}) # TODOL this is to include pic.hpp for Specs
+  msperf_gen( particle updater )
+endif()
 
-# msperf_gen( particle updater particle_scattering )
