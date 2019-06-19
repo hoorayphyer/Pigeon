@@ -224,6 +224,16 @@ namespace pic {
         // lgr::file % "particle BC" << std::endl;
         (*_fbj)();
 
+        if (stamp) {
+          lgr::file % "MigrateParticles" << "==>>" << std::endl;
+          stamp.emplace();
+        }
+        migrate_particles( timestep );
+        if (stamp) {
+          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+        }
+
+        // ----- before this line _J is local on each cpu --- //
         if ( stamp ) {
           lgr::file % "ReduceJmesh" << "==>>" << std::endl;
           stamp.emplace();
@@ -233,15 +243,6 @@ namespace pic {
           ens.reduce_to_chief( mpi::by::SUM, _J[i].data().data(), _J[i].data().size() );
         if ( stamp ) {
           lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
-
-        if (stamp) {
-          lgr::file % "MigrateParticles" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        migrate_particles( timestep );
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
 
         if ( _cart_opt ) {
@@ -255,10 +256,10 @@ namespace pic {
           if (stamp) {
             lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
           }
-        }
 
-        // lgr::file % "injection" << std::endl;
-        (*_injector)( timestep, dt, _rng );
+          // TODO only primary does injection now
+          (*_injector)( timestep, dt, _rng );
+        }
       }
 
 
