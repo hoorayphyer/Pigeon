@@ -34,7 +34,7 @@ namespace particle {
     template < typename E1, typename E2, typename... Attrs >
     Particle( const apt::VecExpression<E1>& q, const apt::VecExpression<E2>& p, const Attrs&... attrs ) noexcept
       : _q(q), _p(p), _state(0) {
-      // NOTE need this before set because of dependent base lookup
+      // NOTE need "this" before set because of dependent base lookup
       if constexpr( sizeof...(Attrs) > 0 ) this->set(attrs...);
     }
 

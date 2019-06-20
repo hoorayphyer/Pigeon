@@ -7,23 +7,21 @@
 #include <tuple>
 
 namespace particle {
-  namespace trace {
-    struct birthplace {
-    private:
-      unsigned int _value;
-    public:
-      birthplace( unsigned int a) noexcept : _value(a) {}
-      operator unsigned int() noexcept { return _value; }
-    };
+  struct birthplace {
+  private:
+    unsigned int _value;
+  public:
+    birthplace( unsigned int a) noexcept : _value(a) {}
+    operator unsigned int() const noexcept { return _value; }
+  };
 
-    struct serial_number {
-    private:
-      unsigned int _value;
-    public:
-      serial_number( unsigned int a) noexcept : _value(a) {}
-      operator unsigned int() noexcept { return _value; }
-    };
-  }
+  struct serial_number {
+  private:
+    unsigned int _value;
+  public:
+    serial_number( unsigned int a) noexcept : _value(a) {}
+    operator unsigned int() const noexcept { return _value; }
+  };
 }
 
 namespace particle {
@@ -45,7 +43,7 @@ namespace particle {
 
   struct layout {
   private:
-    using ordering = std::tuple<species, flag, trace::birthplace, trace::serial_number>;
+    using ordering = std::tuple<species, flag, birthplace, serial_number>;
     static constexpr auto sizing = std::make_tuple(2, 16, 16, 30);
 
   public:
@@ -68,6 +66,20 @@ namespace particle {
 
   template < typename Ptc, typename T >
   struct StateExpression {
+  private:
+    inline void set_impl( const flag& attr ) noexcept {
+      state() |= ( 1 << (static_cast<std::underlying_type_t<flag>>(attr) + layout::begin<flag>() ) );
+    }
+
+    inline void set_impl( const species& attr ) noexcept {
+      setbits< layout::begin<species>(), layout::size<species>() >( state(), static_cast<std::underlying_type_t<species>>(attr) );
+    }
+
+    inline void set_impl( const birthplace& attr ) noexcept {
+      setbits< layout::begin<birthplace>(), layout::size<birthplace>() >( state(), static_cast<unsigned int>(attr) );
+    }
+
+  public:
     using self_t = StateExpression<Ptc, T>;
 
     constexpr T& state() noexcept { return static_cast<Ptc&>(*this).state(); }
@@ -75,15 +87,7 @@ namespace particle {
 
     template < typename Attr, typename... Attrs >
     inline self_t& set( const Attr& attr, const Attrs&... attrs ) noexcept {
-
-      if constexpr ( std::is_same_v<Attr, flag> ) {
-      state() |= ( 1 << (static_cast<std::underlying_type_t<Attr>>(attr) + layout::begin<flag>() ) );
-      } else if ( std::is_same_v<Attr, species>) {
-        setbits< layout::begin<Attr>(), layout::size<Attr>() >( state(), static_cast<std::underlying_type_t<Attr>>(attr) );
-      } else {
-        setbits< layout::begin<Attr>(), layout::size<Attr>() >( state(), (unsigned int)attr );
-      }
-
+      set_impl(attr);
       if constexpr( sizeof...(Attrs) > 0 ) set(attrs...);
       return *this;
     }
@@ -108,7 +112,6 @@ namespace particle {
 
 
   };
-
 
 }
 

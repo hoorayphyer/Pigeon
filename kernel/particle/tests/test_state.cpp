@@ -35,13 +35,13 @@ SCENARIO("setting flags", "[particle]") {
 }
 
 // TODO fix tracing, interface too bad
-// SCENARIO("setting tracing", "[particle]") {
-//   State s;
-//   trace::birthplace bp(265);
-//   trace::serial_number sn(5654654);
-//   s.set(bp);
-//   s.set(sn);
-//   // REQUIRE(s.get<trace::birthplace>() == 265);
-//   // REQUIRE(s.get<trace::serial_number>() == 5654654);
-// }
+SCENARIO("setting tracing", "[particle]") {
+  State s;
+  birthplace bp(265);
+  // serial_number sn(5654654);
+  s.set(bp);
+  // s.set(sn);
+  REQUIRE(s.get<birthplace>() == 265);
+  // REQUIRE(s.get<serial_number>() == 5654654);
+}
 

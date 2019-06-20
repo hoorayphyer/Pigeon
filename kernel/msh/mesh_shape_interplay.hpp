@@ -8,7 +8,7 @@
 namespace msh {
   // NOTE The standard grid of the bulk of the mesh is a rescaled and shifted version of the actual grid such that the spacing = 1 and the first cell has index = 0. This way, there is no need of grid information. "Standard" is borrowed from "standard normal distribution".
   template < typename Grid, typename Vec >
-  inline auto to_standard ( const Grid&grid, const Vec& qabs ) noexcept {
+  inline auto to_standard ( const Grid& grid, const Vec& qabs ) noexcept {
     constexpr int DGrid = Grid::NDim;
     constexpr int DVec = Vec::NDim;
     apt::array<apt::remove_cvref_t<typename Vec::element_type>, DVec> q_std; // NOTE DVec is used here

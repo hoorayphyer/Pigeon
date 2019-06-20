@@ -106,7 +106,7 @@ namespace pic {
     void migrate_particles( int timestep ) {
       constexpr auto migrate_dir =
         []( auto q, auto lb, auto ub ) noexcept {
-          return ( q >= lb ) + ( q > ub );
+          return ( q >= lb ) + ( q >= ub );
         };
 
       for ( auto&[ sp, ptcs ] : _particles ) {
@@ -212,6 +212,7 @@ namespace pic {
             lgr::file % "\t" << particle::properties.at(sp).name << " = " << ptcs.size() << std::endl;
         }
 
+        // ----- before this line particles are all within borders --- //
         if (stamp) {
           lgr::file % "ParticleUpdate" << "==>>" << std::endl;
           stamp.emplace();
@@ -222,7 +223,6 @@ namespace pic {
         }
 
         // lgr::file % "particle BC" << std::endl;
-        (*_fbj)();
 
         if (stamp) {
           lgr::file % "MigrateParticles" << "==>>" << std::endl;
@@ -233,7 +233,7 @@ namespace pic {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
 
-        // ----- before this line _J is local on each cpu --- //
+        // ----- after this line, particles are all within borders. particles before this line _J is local on each cpu --- //
         if ( stamp ) {
           lgr::file % "ReduceJmesh" << "==>>" << std::endl;
           stamp.emplace();
@@ -250,7 +250,9 @@ namespace pic {
             lgr::file % "FieldUpdate" << "==>>" << std::endl;
             stamp.emplace();
           }
+          (*_fbj)();
           field::merge_guard_cells_into_bulk( _J, *_cart_opt );
+          field::sync_guard_cells_from_bulk( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
           (*_fbc_axis)();
           if (stamp) {
@@ -258,7 +260,7 @@ namespace pic {
           }
 
           // TODO only primary does injection now
-          (*_injector)( timestep, dt, _rng );
+          (*_injector)( timestep, dt, _rng, _ens_opt->label() );
         }
       }
 
