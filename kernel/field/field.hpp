@@ -31,10 +31,11 @@ namespace field {
 
     inline T operator[] ( int i ) const { return _data[i]; }
 
-    inline const auto& offset() const noexcept { return _offset; }
-
     inline const auto& data() const noexcept { return _data; }
     inline auto& data() noexcept { return _data; }
+
+    inline const auto& offset() const noexcept { return _offset; }
+    inline const auto& mesh() const noexcept { return _mesh; }
   };
 }
 
