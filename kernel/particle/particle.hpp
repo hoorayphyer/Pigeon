@@ -44,8 +44,8 @@ namespace particle {
 
     template < typename E >
     Particle( PtcExpression<E>&& ptc ) noexcept
-      : _q(std::move(ptc.q())), _p(std::move(ptc.p())) {
-      std::swap( _state, ptc.state() );
+      : _q(std::move(ptc.q())), _p(std::move(ptc.p())), _state( ptc.state() ) {
+      ptc.set(flag::empty);
     }
   };
 

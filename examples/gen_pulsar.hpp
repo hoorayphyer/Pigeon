@@ -21,14 +21,6 @@
 
 #include "pic.hpp"
 
-namespace particle {
-  template < typename Real, template < typename > class Specs >
-  ScatGen<Real, Specs> scat_gen;
-
-  template < typename Real, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
-  ForceGen<Real, Specs,Ptc_t> force_gen;
-}
-
 // common parameters
 namespace pic {
   constexpr long double PI = std::acos(-1.0l);
@@ -207,6 +199,12 @@ namespace particle {
     properties[species::ion] = { 5, 1, "ion"};
     properties[species::photon] = { 0, 0, "photon" };
   }
+
+  template < typename Real, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
+  ForceGen<Real, Specs,Ptc_t> force_gen;
+
+  template < typename Real, template < typename > class Specs >
+  ScatGen<Real, Specs> scat_gen;
 
   // NOTE called in particle updater
   template < typename Real >
@@ -418,7 +416,7 @@ namespace pic {
       apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
-    void operator() ( int timestep, Real dt, util::Rng<Real>& rng ) {
+    void operator() ( int timestep, Real dt, util::Rng<Real>& rng, particle::birthplace birth ) {
       using namespace particle;
 
       constexpr Real v_th = 0.3;
@@ -476,8 +474,8 @@ namespace pic {
             q_ptc[i] += _grid[i].delta() * rng.uniform(-0.5, 0.5);
           auto p_ptc = p;
           p_ptc += nB * rng.gaussian( 0.0, v_th );
-          *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon );
-          *(itr_po++) = Particle<Real,Specs>( std::move(q_ptc), std::move(p_ptc), posion );
+          *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon, birth );
+          *(itr_po++) = Particle<Real,Specs>( std::move(q_ptc), std::move(p_ptc), posion, birth );
         }
       }
     }
