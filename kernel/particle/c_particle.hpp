@@ -36,6 +36,21 @@ namespace particle {
 
     cParticle() = default;
 
+    cParticle( const cParticle& ptc ) noexcept {
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, p(), ptc.p() );
+      _s = ptc.state();
+      _extra = ptc.extra();
+    }
+
+    cParticle( cParticle&& ptc ) noexcept {
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
+      std::swap( _s, ptc.state() );
+      std::swap( _extra, ptc.extra() );
+      ptc.set(flag::empty);
+    }
+
     template < typename E >
     cParticle( PtcExpression<E>&& ptc ) noexcept {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
@@ -44,11 +59,30 @@ namespace particle {
       ptc.set(flag::empty);
     }
 
+    cParticle& operator= ( const cParticle& ptc ) noexcept {
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, p(), ptc.p() );
+      _s = ptc.state();
+      _extra = ptc.extra();
+
+      return *this;
+    }
+
     template < typename E >
     cParticle& operator= ( const PtcExpression<E>& ptc ) noexcept {
-      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ a = b;}, q(), ptc.q() );
-      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ a = b;}, p(), ptc.p() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, p(), ptc.p() );
       _s = ptc.state();
+
+      return *this;
+    }
+
+    cParticle& operator= ( cParticle&& ptc ) noexcept {
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
+      std::swap( _s, ptc.state() );
+      std::swap( _extra, ptc.extra() );
+      ptc.set(flag::empty);
 
       return *this;
     }
