@@ -136,7 +136,13 @@ namespace dye::impl {
       if ( root != MPI_PROC_NULL )
         buf.reserve( count );
     }
-    buf.resize( buf.capacity() );
+
+    {
+      auto old_size = buf.size();
+      buf.resize( buf.capacity() );
+      for ( int i = old_size; i < buf.size(); ++i )
+        buf[i].set(particle::flag::empty);
+    }
 
     if ( root == MPI_ROOT ) {
       for ( int i = 0; i < ptc_array.size(); ++i )
@@ -305,7 +311,12 @@ namespace dye {
     for ( int i = 0; i < num_comms; ++i ) {
       int other_rank = instr[ 2 * i + 1 ];
       int num = instr[ 2 * i + 2 ];
-      buffer.resize(num);
+      {
+        auto old_size = buffer.size();
+        buffer.resize( num );
+        for ( int i = old_size; i < buffer.size(); ++i )
+          buffer[i].set(particle::flag::empty);
+      }
       int tag = 147;
       if ( impl::balance_code::send == instr[0] ) {
         position -= num;
