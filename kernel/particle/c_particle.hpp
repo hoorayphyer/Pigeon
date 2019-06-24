@@ -36,11 +36,10 @@ namespace particle {
 
     cParticle() = default;
 
-    cParticle( const cParticle& ptc ) noexcept {
+    cParticle( const cParticle& ptc ) noexcept
+      : _s(ptc.state()), _extra(ptc.extra()) {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, q(), ptc.q() );
       apt::foreach<0,Specs<T>::Dim>([](auto& a, const auto& b){ a = b;}, p(), ptc.p() );
-      _s = ptc.state();
-      _extra = ptc.extra();
     }
 
     cParticle( cParticle&& ptc ) noexcept {
@@ -48,7 +47,7 @@ namespace particle {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
       std::swap( _extra, ptc.extra() );
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
     }
 
     template < typename E >
@@ -56,7 +55,7 @@ namespace particle {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
     }
 
     cParticle& operator= ( const cParticle& ptc ) noexcept {
@@ -82,7 +81,7 @@ namespace particle {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
       std::swap( _extra, ptc.extra() );
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
 
       return *this;
     }
@@ -92,7 +91,7 @@ namespace particle {
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), ptc.q() );
       apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), ptc.p() );
       std::swap( _s, ptc.state() );
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
 
       return *this;
     }

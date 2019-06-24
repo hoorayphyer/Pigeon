@@ -9,10 +9,10 @@ namespace particle {
     int head = 0;
     int tail = ptcs.size() - 1;
     while( head < tail ) {
-      if ( !ptcs[head].is(flag::empty) ) {
+      if ( ptcs[head].is(flag::exist) ) {
         ++head;
       } else {
-        if ( ptcs[tail].is(flag::empty) ) {
+        if ( !ptcs[tail].is(flag::exist) ) {
           --tail;
         } else {
           ptcs[head] = std::move(ptcs[tail]);

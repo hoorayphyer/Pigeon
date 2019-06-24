@@ -13,7 +13,7 @@ namespace particle {
 
     apt::Vec<T, Specs<T>::Dim> _q;
     apt::Vec<T, Specs<T>::Dim> _p;
-    state_t _state;
+    state_t _state {};
 
   public:
     static constexpr int NDim = Specs<T>::Dim;
@@ -33,7 +33,8 @@ namespace particle {
 
     template < typename E1, typename E2, typename... Attrs >
     Particle( const apt::VecExpression<E1>& q, const apt::VecExpression<E2>& p, const Attrs&... attrs ) noexcept
-      : _q(q), _p(p), _state(0) {
+      : _q(q), _p(p) {
+      this->set(flag::exist);
       // NOTE need "this" before set because of dependent base lookup
       if constexpr( sizeof...(Attrs) > 0 ) this->set(attrs...);
     }
@@ -45,7 +46,7 @@ namespace particle {
     template < typename E >
     Particle( PtcExpression<E>&& ptc ) noexcept
       : _q(std::move(ptc.q())), _p(std::move(ptc.p())), _state( ptc.state() ) {
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
     }
   };
 

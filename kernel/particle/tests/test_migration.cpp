@@ -21,6 +21,7 @@ SCENARIO("Test sendrecv cparticle", "[particle][mpi][.]") {
     std::vector<cPtc_t> data;
     data.reserve(nptcs);
     data.resize(nptcs);
+    for ( auto& ptc : data ) ptc.set(flag::exist);
 
     if ( mpi::world.rank() == 0 ) {
       for ( int i = 0; i < nptcs; ++i ) {
@@ -235,6 +236,7 @@ SCENARIO("Stress Test" , "[particle][mpi]") {
           ptcs.resize(static_cast<std::size_t>(x));
           for ( auto& ptc : ptcs ) {
             do {
+              ptc.set(flag::exist);
               ptc.extra() = mig_dir_gen();
             } while ( ptc.extra() == (apt::pow3(DGrid) - 1) / 2 );
           }

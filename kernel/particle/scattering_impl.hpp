@@ -45,7 +45,7 @@ namespace particle::scat {
     *(itr++) = std::move(ptc_sec);
 
     // void this photon
-    photon.set(flag::empty);
+    photon.reset(flag::exist);
 
   }
 }

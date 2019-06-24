@@ -124,6 +124,7 @@ namespace io {
     return res;
   }
 
+  // TODO check type
   template < int DSRatio, typename RealExport, typename Real, int DGrid, int DField, typename ShapeF >
   void downsample ( field::Field<RealExport,1,DGrid>& io_field,
                     const field::Field<Real,DField,DGrid>& full_field, int comp, const ShapeF& shapef ) {
@@ -291,7 +292,7 @@ namespace io {
         tmp.reset();
         const auto& prop = particle::properties.at(sp);
         for ( const auto& ptc : ptcs ) {
-          if ( ptc.is(particle::flag::empty) ) continue;
+          if ( !ptc.is(particle::flag::exist) ) continue;
           msh::deposit( tmp, {prop.charge_x}, msh::to_standard( grid, ptc.q() ), ShapeF() );
         }
         // TODO to physical space

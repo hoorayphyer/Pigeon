@@ -136,23 +136,23 @@ SCENARIO("array erase", "[particle]") {
   THEN("erase will mark particles as empty but array size is unchanged yet") {
     WHEN("erase range is normal") {
       for ( int i = 10; i < 20; ++i )
-        REQUIRE_FALSE( arr[i].is(flag::empty) );
+        REQUIRE( arr[i].is(flag::exist) );
 
       arr.erase( 10, 20 );
 
       for ( int i = 10; i < 20; ++i )
-        REQUIRE( arr[i].is(flag::empty) );
+        REQUIRE_FALSE( arr[i].is(flag::exist) );
       REQUIRE( arr.size() == 50 );
     }
 
     WHEN("erase range is inverted") {
       for ( int i = 40; i > 30; --i )
-        REQUIRE_FALSE( arr[i].is(flag::empty) );
+        REQUIRE( arr[i].is(flag::exist) );
 
       arr.erase( 40, 30 );
 
       for ( int i = 40; i > 30; --i )
-        REQUIRE( arr[i].is(flag::empty) );
+        REQUIRE_FALSE( arr[i].is(flag::exist) );
       REQUIRE( arr.size() == 50 );
     }
 
@@ -178,10 +178,10 @@ SCENARIO("array resize", "[particle]") {
     arr.resize( 80 );
     REQUIRE(arr.size() == 80 );
     for ( int i = 0; i < 50; ++i )
-      REQUIRE_FALSE( arr[i].is(flag::empty) );
+      REQUIRE( arr[i].is(flag::exist) );
 
     for ( int i = 50; i < 80; ++i )
-      REQUIRE( arr[i].is(flag::empty) );
+      REQUIRE_FALSE( arr[i].is(flag::exist) );
   }
 
 }

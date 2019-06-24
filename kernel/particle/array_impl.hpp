@@ -12,7 +12,7 @@ namespace particle {
     from = min( from, size() );
     to = min( to, size() );
     for ( int i = from; i != to; ++i )
-      (*this)[i].set(flag::empty);
+      (*this)[i].reset(flag::exist);
   }
 
   template < typename T, template < typename > class Specs >
@@ -23,10 +23,5 @@ namespace particle {
       _p[i].resize( size, {} );
     }
     _state.resize(size, {});
-    // flag padded particles as empty
-    for ( auto i = old_size; i < size; ++i ) {
-      (*this)[i].set(flag::empty);
-    }
-
   }
 }

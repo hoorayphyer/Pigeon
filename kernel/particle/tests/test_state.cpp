@@ -28,8 +28,11 @@ SCENARIO("setting species", "[particle]") {
 
 SCENARIO("setting flags", "[particle]") {
   State s;
-  s.set(flag::empty);
-  REQUIRE( s.is(flag::empty));
+  s.set(flag::exist);
+  REQUIRE( s.is(flag::exist));
+  s.reset(flag::exist);
+  REQUIRE_FALSE( s.is(flag::exist));
+
   s.set(flag::traced);
   REQUIRE( s.is(flag::traced));
 }

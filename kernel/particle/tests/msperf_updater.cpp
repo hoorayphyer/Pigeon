@@ -112,7 +112,7 @@ SCENARIO("Time particle updater", "[particle]") {
     {
       auto& ptcs = particles[species::electron];
       for ( int i = 0; i < Nptc; ++i ) {
-        ptcs.push_back(Particle<Real,PtcSpecs>(apt::Vec<Real,PtcSpecs<Real>::Dim>{0.5, 0.5, 0.5}, apt::Vec<Real,PtcSpecs<Real>::Dim>{10.0, 10.0, 10.0}, species::electron));
+        ptcs.emplace_back( apt::Vec<Real,PtcSpecs<Real>::Dim>{0.5, 0.5, 0.5}, apt::Vec<Real,PtcSpecs<Real>::Dim>{10.0, 10.0, 10.0}, species::electron );
       }
     }
 

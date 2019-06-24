@@ -36,7 +36,7 @@ namespace particle {
 
     vParticle( vParticle&& ptc ) noexcept
       : _q( std::move(ptc._q)), _p( std::move(ptc._p) ), _state( ptc._state ) {
-      ptc.set(flag::empty);
+      ptc.reset(flag::exist);
     }
 
     vParticle() = delete;

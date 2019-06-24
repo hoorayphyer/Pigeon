@@ -111,7 +111,7 @@ namespace pic {
 
       for ( auto&[ sp, ptcs ] : _particles ) {
         for ( auto ptc : ptcs ) { // TODOL semantics
-          if ( ptc.is(particle::flag::empty) ) continue;
+          if ( !ptc.is(particle::flag::exist) ) continue;
           char mig_dir = 0;
           for ( int i = 0; i < DGrid; ++i ) {
             mig_dir += migrate_dir( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);

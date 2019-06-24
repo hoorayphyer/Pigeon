@@ -3,7 +3,7 @@
 
 namespace particle {
   enum class flag : unsigned int
-    { empty = 0, secondary, ignore_force,
+    { exist = 0, secondary, ignore_force,
       ignore_deposit, annihilate, ignore_em,
       delimiter, traced };
 }

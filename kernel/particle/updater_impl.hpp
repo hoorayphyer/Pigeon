@@ -52,26 +52,24 @@ namespace particle {
       };
 
     for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
-      if( ptc.is(flag::empty) ) continue;
+      if( !ptc.is(flag::exist) ) continue;
 
-      {
-        auto q0_std = msh::to_standard( _localgrid, ptc.q() );
-        auto E_itpl = msh::interpolate( E, q0_std, shapef );
-        auto B_itpl = msh::interpolate( B, q0_std, shapef );
+      auto q0_std = msh::to_standard( _localgrid, ptc.q() );
+      auto E_itpl = msh::interpolate( E, q0_std, shapef );
+      auto B_itpl = msh::interpolate( B, q0_std, shapef );
 
-        apt::Vec<Real,PtcSpecs<Real>::Dim> dp = -ptc.p();
-        update_p( ptc, dt, E_itpl, B_itpl );
-        if ( scat ) {
-          dp += ptc.p();
-          (*scat)( std::back_inserter(sp_ptcs), ptc, std::move(dp), dt, B_itpl, _rng );
-        }
-
-        // NOTE q is updated, starting from here, particles may be in the guard cells.
-        update_q( ptc, dt );
-        // TODO pusher handle boundary condition. Is it needed?
-        if ( prop.charge_x != 0 )
-          msh::deposit( J, charge_over_dt, shapef, q0_std, msh::to_standard(_localgrid, ptc.q()) );
+      apt::Vec<Real,PtcSpecs<Real>::Dim> dp = -ptc.p();
+      update_p( ptc, dt, E_itpl, B_itpl );
+      if ( scat ) {
+        dp += ptc.p();
+        (*scat)( std::back_inserter(sp_ptcs), ptc, std::move(dp), dt, B_itpl, _rng );
       }
+
+      // NOTE q is updated, starting from here, particles may be in the guard cells.
+      update_q( ptc, dt );
+      // TODO pusher handle boundary condition. Is it needed?
+      if ( prop.charge_x != 0 )
+        msh::deposit( J, charge_over_dt, shapef, q0_std, msh::to_standard(_localgrid, ptc.q()) );
 
     }
   }
