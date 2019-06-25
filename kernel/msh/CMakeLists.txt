@@ -9,4 +9,6 @@ target_link_libraries( msh_current_deposition PRIVATE picgen )
 if (${ENABLE_TESTS})
   test_gen(msh mesh_shape_interplay) # TODO
   test_gen(msh current_deposition) # DONE
+
+  msperf_gen(msh mesh_shape_interplay)
 endif()

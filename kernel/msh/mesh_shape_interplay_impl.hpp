@@ -9,14 +9,11 @@ namespace msh::impl {
     apt::Index<DGrid> _I_b {};
     apt::array<T,DGrid> _sep_b {};
     apt::array<T,DGrid> _wgt {};
-    const ShapeF& _shapef;
   public:
     // NOTE loc is the relative index
     constexpr WeightFinder( const apt::array<T, Dloc>& loc,
                             const apt::array< field::offset_t, DGrid >& offset,
-                            const ShapeF& shapef ) noexcept
-      : _shapef( shapef ) {
-
+                            const ShapeF& ) noexcept {
       apt::foreach<0,DGrid>
         ( []( auto& i_b, auto& s_b, auto l, const auto& ofs ) {
             l -= ofs; // now l is the native grid index
@@ -39,20 +36,19 @@ namespace msh::impl {
     constexpr T weight ( const apt::Index<DGrid>& I ) noexcept{
       T result = 1.0; // NOTE 1.0, not 0.0
 
-      auto update_wgt = // alternative to nested loops
-        [&]( const auto& I ) {
-          static_assert( DGrid > 0 );
-          _wgt[0] = _shapef( I[0] + _sep_b[0] );
-          if constexpr ( DGrid > 1 ) {
-              if( I[0] != 0 ) return; // no need to recalculate wgt[1]
-              _wgt[1] = _shapef( I[1] + _sep_b[1] );
-            }
-          if constexpr ( DGrid > 2 ) {
-              if( I[1] != 0 ) return;
-              _wgt[2] = _shapef( I[2] + _sep_b[2] );
-            }
-        };
-      update_wgt(I);
+      [&]() { // alternative to nested conditions. This version is easier to be further refactored as compile time loop or macro
+        static_assert( DGrid > 0 );
+        _wgt[0] = ShapeF()( I[0] + _sep_b[0] );
+        if constexpr ( DGrid > 1 ) {
+            if( I[0] != 0 ) return; // NOTE "return" is the key to avoid recalculation of wgt[1], wgt[2]...
+            _wgt[1] = ShapeF()( I[1] + _sep_b[1] );
+          }
+        if constexpr ( DGrid > 2 ) {
+            if( I[1] != 0 ) return;
+            _wgt[2] = ShapeF()( I[2] + _sep_b[2] );
+          }
+      } ();
+
       apt::foreach<0,DGrid>
         ( [&result]( auto w ){ result *= w; }, _wgt );
       return result;
@@ -61,22 +57,19 @@ namespace msh::impl {
 }
 
 namespace msh {
-
-  template < int DGrid, int Supp >
-  constexpr apt::Index<DGrid> ShapeExtent
-  ( [](){
-      apt::Index<DGrid> res;
-      for ( int i = 0; i < DGrid; ++i ) res[i] = Supp;
-      return res;}() );
-
   template < typename T, int DGrid, int Dq, typename ShapeF >
   T interpolate ( const typename field::Component<T,DGrid>& fcomp,
                   const apt::array<T,Dq>& q_std,
                   const ShapeF& shapef ) noexcept {
     T res{};
-
     auto wf = impl::WeightFinder( q_std, fcomp.offset(), shapef );
-    for ( const auto& I : apt::Block(ShapeExtent<DGrid, ShapeF::support()>) )
+
+    for ( const auto& I : apt::Block( []()
+                                      { // create extent filled with ShapeF::support
+                                        apt::Index<DGrid> res;
+                                        for ( int i = 0; i < DGrid; ++i ) res[i] = ShapeF::support();
+                                        return res;
+                                      }() ) )
       res += fcomp( wf.I_b() + I ) * wf.weight(I);
 
     return res;
@@ -87,7 +80,6 @@ namespace msh {
                                     const apt::array<T,Dq>& q_std,
                                     const ShapeF& shapef ) noexcept {
     apt::Vec<T, DField> result;
-    constexpr auto supp = ShapeF::support();
 
     apt::foreach<0,DField>
       ( [&] ( auto& res, const auto& comp ) {
@@ -105,19 +97,18 @@ namespace msh {
                  apt::array<T, DField> variable,
                  const apt::array<T, Dq>& q_std,
                  const ShapeF& shapef ) noexcept {
-    constexpr auto supp = ShapeF::support();
-
-    constexpr apt::Index<DGrid> ext
-      ( [supp](){
-          apt::Index<DGrid> res;
-          for ( int i = 0; i < DGrid; ++i ) res[i] = supp;
-          return res;}() );
-
     apt::foreach<0,DField>
       ( [&] ( const auto& var, auto comp ) { // TODOL comp is proxy, it breaks semantics
           auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
-          for ( const auto& I : apt::Block( ext ) )
+
+          for ( const auto& I : apt::Block( []()
+                                            { // create extent filled with ShapeF::support
+                                              apt::Index<DGrid> res;
+                                              for ( int i = 0; i < DGrid; ++i ) res[i] = ShapeF::support();
+                                              return res;
+                                            }() ) )
             comp( wf.I_b() + I ) += var * wf.weight(I);
+
         }, variable, field );
 
     return;
