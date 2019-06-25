@@ -10,10 +10,11 @@ namespace apt {
 }
 
 template < int D >
-constexpr apt::Index<D> operator+( apt::Index<D> ind_a, const apt::Index<D>& ind_b ) noexcept {
+constexpr apt::Index<D> operator+( const apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
+  apt::Index<D> res;
   apt::foreach<0,D>
-    ( []( auto& a, auto b ) { a += b; }, ind_a, ind_b );
-  return ind_a;
+    ( []( auto& r, auto a, auto b ) { r = a + b; }, res, ind_a, ind_b );
+  return res;
 }
 
 template < int D >
