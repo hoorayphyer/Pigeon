@@ -5,30 +5,21 @@
 #include <iterator>
 
 namespace apt {
-  template < int D >
+  // A wrapper over int so as to utilize type-safe checks
   struct BlockIteratorEnd {
   private:
-    apt::Index<D> _end{};
+    const int _end = 0;
 
   public:
-    constexpr BlockIteratorEnd( const Index<D>& extent ) noexcept {
-      // deal with empty or invalid block
-      for ( int i = 0; i < D; ++i ) {
-        if ( extent[i] < 1 ) return;
-      }
-      _end[D-1] = extent[D-1];
-    }
-
-    constexpr bool operator != ( const Index<D>& ijk ) const noexcept {
-      return ijk != _end;
-    }
+    constexpr BlockIteratorEnd( int end ) noexcept : _end(end) {}
+    constexpr operator int() const noexcept { return _end; }
   };
 
   template < int D >
   struct BlockIterator {
   private:
     Index<D> _ijk{};
-    const Index<D>& _extent;
+    Index<D> _extent;
 
   public:
     using difference_type = void;
@@ -40,8 +31,8 @@ namespace apt {
     constexpr BlockIterator( const Index<D>& extent ) noexcept
       : _extent( extent ) {}
 
-    constexpr bool operator!= ( const BlockIteratorEnd<D>& end ) const noexcept {
-      return end != _ijk;
+    constexpr bool operator!= ( const BlockIteratorEnd& end ) const noexcept {
+      return _ijk[D-1] != static_cast<int>(end);
     }
 
     // NOTE separating ++ ijk and ijk %= _extent is the key to make iteration stoppable
@@ -70,6 +61,7 @@ namespace apt {
   };
 }
 
+// NOTE to be used in range-based for, Block and BlockIterator has to be separated classes because there is auto __begin = __range.begin(), which prevents __range.begin() from returning itself as iterator
 namespace apt {
   template < int D >
   struct Block {
@@ -77,11 +69,17 @@ namespace apt {
     apt::Index<D> _extent{};
 
   public:
-    constexpr Block( apt::Index<D> extent ) noexcept : _extent(std::move(extent)) {}
+    constexpr Block( const apt::Index<D>& extent ) noexcept : _extent(extent) {}
 
     constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
 
-    constexpr auto end() const noexcept { return BlockIteratorEnd<D>(_extent); }
+    constexpr BlockIteratorEnd end() const noexcept {
+      // deal with empty or invalid block
+      for ( int i = 0; i < D; ++i ) {
+        if ( _extent[i] < 1 ) return {0};
+      }
+      return {_extent[D-1]};
+    }
 
   };
 }

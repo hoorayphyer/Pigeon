@@ -8,4 +8,6 @@ if (${ENABLE_TESTS})
   test_gen(apt numeric) # DONE
   test_gen(apt handle) # DONE
   test_gen(apt priority_queue) # DONE
+
+  msperf_gen(apt block)
 endif()

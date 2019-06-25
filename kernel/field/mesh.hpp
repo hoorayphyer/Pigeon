@@ -64,7 +64,7 @@ namespace field {
         constexpr ProjBlockIterator( apt::BlockIterator<D> bitr, const ProjBlock& projblock ) noexcept
           : _bitr(std::move(bitr)), _pb( projblock ) {}
 
-        constexpr bool operator!= ( const apt::BlockIteratorEnd<D>& end ) const noexcept {
+        constexpr bool operator!= ( const apt::BlockIteratorEnd& end ) const noexcept {
           return _bitr != end;
         }
 

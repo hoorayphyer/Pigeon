@@ -107,8 +107,7 @@ SCENARIO("Time particle updater", "[particle]") {
   { // measure
     const Real dt = 0.005;
 
-    tmr::Timestamp t1;
-    const int Nptc = 10000;
+    const int Nptc = 1000000;
     {
       auto& ptcs = particles[species::electron];
       for ( int i = 0; i < Nptc; ++i ) {
@@ -116,7 +115,8 @@ SCENARIO("Time particle updater", "[particle]") {
       }
     }
 
-    const int N = 100;
+    tmr::Timestamp t1;
+    const int N = 1;
     for ( int i = 0; i < N; ++i ) {
       pu( particles, J, E, B, dt, i );
     }

@@ -50,7 +50,6 @@ function(msperf_gen category name)
   endforeach()
   target_link_libraries( ${test_target} PRIVATE ${link_testfw} )
   target_link_libraries( ${test_target} PRIVATE timer logger )
-  add_test( NAME TEST_${category}_${name} COMMAND ${test_target} )
 endfunction()
 
 add_subdirectory(apt)

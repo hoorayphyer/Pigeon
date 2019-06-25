@@ -2,6 +2,7 @@
 #define _PARTICLE_ARRAY_HPP_
 
 #include "particle/virtual_particle.hpp"
+#include "particle/particle.hpp"
 #include <iterator>
 #include <vector>
 
@@ -98,6 +99,13 @@ namespace particle {
       apt::foreach<0,DPtc> ( f, _p, ptc.p() );
       f( _state, ptc.state() );
     }
+
+    template < typename... Args >
+    inline void emplace_back( Args&&... args ) {
+      push_back( Particle<T,Specs>(std::forward<Args>(args)...) );
+    }
+
+    // TODO emplace_back with braced-lists
 
     // NOTE from is inclusive, to is exclusive. from can be larger than to.
     void erase( unsigned int from, unsigned int to );
