@@ -143,7 +143,7 @@ namespace field {
 
   template < typename Real, int DGrid, typename RealJ >
   Updater<Real, DGrid, RealJ>::Updater( const mpi::CartComm& cart,
-                                        const mani::Grid<double,DGrid>& local_grid,
+                                        const mani::Grid<Real,DGrid>& local_grid,
                                         apt::array< apt::pair<bool>, DGrid > is_at_boundary,
                                         int guard ) : _cart(cart) {
     static_assert( DGrid == 2 );
@@ -220,7 +220,7 @@ namespace field {
   void Updater<Real,DGrid,RealJ>::operator() ( field_type& E,
                                                field_type& B,
                                                const J_type& Jmesh,
-                                               double dt, int timestep ) {
+                                               Real dt, int timestep ) {
     // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,
