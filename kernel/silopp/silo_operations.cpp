@@ -140,6 +140,7 @@ namespace silo {
   INSTANTIATE_PUTTER(double);
 
   INSTANTIATE_WRITE(int);
+  INSTANTIATE_WRITE(float);
   INSTANTIATE_WRITE(double);
   INSTANTIATE_WRITE(unsigned long long);
 }
