@@ -101,6 +101,9 @@ namespace pic {
                                                                                              particle::properties,
                                                                                              particle::force_gen<Real,PtcSpecs,particle::vParticle>,
                                                                                              particle::scat_gen<Real,PtcSpecs>) );
+      // NOTE TODO current implementation requires explicit touch-create before detailed balance. Also touch create is necessary to be consistent in data export
+      for ( const auto& [sp, ignore] : particle::properties )
+        const auto& x = _particles[sp];
     }
 
     void migrate_particles( int timestep ) {
@@ -291,9 +294,7 @@ namespace pic {
         std::optional<int> old_label;
         if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
-        // NOTE TODOL current implementation requires explicit touch-create before detailed balance
-        for ( const auto& [sp, ignore] : particle::properties )
-          const auto& x = _particles[sp];
+        // NOTE touch create is done in refresh()
         dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
 
         std::optional<int> new_label;

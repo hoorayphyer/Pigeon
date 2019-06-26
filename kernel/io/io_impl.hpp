@@ -8,6 +8,7 @@
 #include "dye/ensemble.hpp"
 #include "particle/properties.hpp"
 #include <cmath>
+#include "apt/numeric.hpp"
 
 #include <silo.h> // for an ad hoc DBPutQuadmesh
 
@@ -285,14 +286,14 @@ namespace io {
       std::vector<int> dims(DGrid);
       for ( int i = 0; i < DGrid; ++i ) dims[i] = io_field.mesh().extent()[i];
 
-      // number density
       std::string varname;
+      // number density
       for ( const auto&[sp, ptcs] : particles ) {
         tmp.reset();
         const auto& prop = particle::properties.at(sp);
         for ( const auto& ptc : ptcs ) {
           if ( !ptc.is(particle::flag::exist) ) continue;
-          msh::deposit( tmp, {prop.charge_x}, msh::to_standard( grid, ptc.q() ), ShapeF() );
+          msh::deposit( tmp, {1.0}, msh::to_standard( grid, ptc.q() ), ShapeF() );
         }
         // TODO to physical space
         ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
@@ -302,13 +303,38 @@ namespace io {
           fold_back_at_axis(tmp);
 
           downsample<DSRatio>(io_field, tmp, 0);
-          varname = std::string("rho_") + particle::properties[sp].name;
+          varname = std::string("n_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
                 });
           put_to_master( varname, cart_opt->size());
         }
       }
+
+      // Gamma density
+      for ( const auto&[sp, ptcs] : particles ) {
+        tmp.reset();
+        const auto& prop = particle::properties.at(sp);
+        for ( const auto& ptc : ptcs ) {
+          if ( !ptc.is(particle::flag::exist) ) continue;
+          msh::deposit( tmp, {std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) )}, msh::to_standard( grid, ptc.q() ), ShapeF() );
+        }
+        // TODO to physical space
+        ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
+        if ( cart_opt ) {
+          field::merge_guard_cells_into_bulk( tmp, *cart_opt );
+          field::sync_guard_cells_from_bulk( tmp, *cart_opt );
+          fold_back_at_axis(tmp);
+
+          downsample<DSRatio>(io_field, tmp, 0);
+          varname = std::string("energy_") + particle::properties[sp].name;
+          pmpio([&](auto& dbfile){
+                  dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
+                });
+          put_to_master( varname, cart_opt->size());
+        }
+      }
+
     }
   };
 

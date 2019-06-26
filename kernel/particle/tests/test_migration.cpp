@@ -5,9 +5,10 @@
 #include "dye/ensemble_impl.hpp"
 
 using namespace particle;
-using cPtc_t = cParticle<double,Specs>;
-using Ptc_t = Particle<double,Specs>;
-using Vec_t = apt::Vec<double,Specs<double>::Dim>;
+using Real = pic::real_t;
+using cPtc_t = cParticle<Real,Specs>;
+using Ptc_t = Particle<Real,Specs>;
+using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
 SCENARIO("Test sendrecv cparticle", "[particle][mpi][.]") {
   if ( mpi::world.size() > 1 && mpi::world.rank() < 2  ) {

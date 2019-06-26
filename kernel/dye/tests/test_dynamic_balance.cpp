@@ -9,6 +9,8 @@
 #include "logger/ofstream.hpp"
 
 using namespace particle;
+using Real = pic::real_t;
+
 SCENARIO("Test calc_new_nprocs", "[dye][.]") {
   if ( mpi::world.rank() == 0 ) {
     aio::unif_int<int> nens_gen( 1, 100 );
@@ -136,7 +138,7 @@ TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
     auto parent = *( mpi::world.split( mpi::world.rank() < nremotes + 2 ) );
     if ( mpi::world.rank() < nremotes + 2 ) {
       auto[intra, itc] = dye::impl::bifurcate( parent, mpi::world.rank() < 2 );
-      array<double,Specs> ptcs;
+      array<Real,Specs> ptcs;
       if ( mpi::world.rank() == 0 ) {
         ptcs.resize(1000);
         for ( int i = 0; i < ptcs.size(); ++i ) {
@@ -249,7 +251,7 @@ TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
         }
         intra->broadcast(0,loads.data(), loads.size());
 
-        array<double, Specs> ptcs;
+        array<Real, Specs> ptcs;
         ptcs.resize(loads[intra->rank()]);
 
         dye::detailed_balance( ptcs, *intra );
@@ -276,7 +278,7 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     nens *= cart_dims.back();
   }
   // NOTE TODOL current implementation requires explicit touch-create before detailed balance
-  map<array<double, Specs>> ptcs;
+  map<array<Real, Specs>> ptcs;
   map<std::vector<load_t>> loads;
   {
     auto& x = ptcs[species::electron];
