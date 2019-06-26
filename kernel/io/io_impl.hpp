@@ -124,17 +124,16 @@ namespace io {
     return res;
   }
 
-  // TODO check type
-  template < int DSRatio, typename RealExport, typename Real, int DGrid, int DField, typename ShapeF >
+  // TODO This doesn't interpolate to zone center yet. Also may need intermediate sync_guards when interpolating to center. NOTE downsampling interpolation has its own shape function
+  template < int DSRatio, typename RealExport, typename Real, int DGrid, int DField >
   void downsample ( field::Field<RealExport,1,DGrid>& io_field,
-                    const field::Field<Real,DField,DGrid>& full_field, int comp, const ShapeF& shapef ) {
+                    const field::Field<Real,DField,DGrid>& full_field, int comp ) {
     const auto& full_field_comp = full_field[comp];
-    for ( const auto& I : apt::Block( io_field.mesh().bulk_dims()) ) {
-      auto& f = io_field[0](I);
-      f = 0.0;
+    for ( const auto& I : apt::Block( io_field.mesh().bulk_dims() ) ) {
+      Real f = 0.0;
       for ( const auto& Isub : apt::Block(subext<DSRatio, DGrid>) )
-        f += msh::interpolate( full_field_comp, q_from_cell<Real>( Ifull<DSRatio>(I,Isub), ofs_export<DGrid> ), shapef );
-      f /= POW<DSRatio, DGrid>();
+        f += full_field_comp( Ifull<DSRatio>(I,Isub) );
+      io_field[0](I) = f / POW<DSRatio, DGrid>();
     }
   }
 
@@ -170,7 +169,7 @@ namespace io {
       std::string varname;
       for ( int comp = 0; comp < 3; ++comp ) {
         {
-          downsample<DSRatio>( io_field, Efield, comp, ShapeF() );
+          downsample<DSRatio>( io_field, Efield, comp );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "E" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -178,7 +177,7 @@ namespace io {
                 });
           put_to_master( varname, cart_opt->size());
 
-          downsample<DSRatio>( io_field, Bfield, comp, ShapeF() );
+          downsample<DSRatio>( io_field, Bfield, comp );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "B" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -221,7 +220,7 @@ namespace io {
                 tmp[0](I) = 0.0;
             }
           }
-          downsample<DSRatio>( io_field, tmp, 0, ShapeF() );
+          downsample<DSRatio>( io_field, tmp, 0 );
           field::sync_guard_cells_from_bulk( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -302,7 +301,7 @@ namespace io {
           field::sync_guard_cells_from_bulk( tmp, *cart_opt );
           fold_back_at_axis(tmp);
 
-          downsample<DSRatio>(io_field, tmp, 0, ShapeF());
+          downsample<DSRatio>(io_field, tmp, 0);
           varname = std::string("rho_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
