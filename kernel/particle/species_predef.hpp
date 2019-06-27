@@ -3,7 +3,7 @@
 
 namespace particle {
   enum class species : unsigned char
-    { electron = 0, positron, ion, photon };
+    { unknown=0, electron, positron, ion, photon };
 }
 
 #endif

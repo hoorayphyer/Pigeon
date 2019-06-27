@@ -60,9 +60,25 @@ namespace particle {
 
       apt::Vec<Real,PtcSpecs<Real>::Dim> dp = -ptc.p();
       update_p( ptc, dt, E_itpl, B_itpl );
+
       if ( scat ) {
-        dp += ptc.p();
-        (*scat)( std::back_inserter(sp_ptcs), ptc, std::move(dp), dt, B_itpl, _rng );
+        dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
+
+        bool is_eligible = true;
+        for ( const auto& elig : scat->eligs ) {
+          if ( !(*elig)(ptc) ) {
+            is_eligible = false;
+            break;
+          }
+        }
+        if ( is_eligible ) {
+          for ( const auto& chnl : scat->channels ) {
+            if ( auto param = (*chnl)(ptc, prop, dp, dt, B_itpl, _rng) ) {
+              scat->impl( std::back_inserter(_buf), ptc, *param );
+              break;
+            }
+          }
+        }
       }
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
@@ -90,16 +106,15 @@ namespace particle {
                  Real dt, int timestep ) {
 
     for ( auto&[ sp, ptcs ] : particles ) {
-      const auto old_size = ptcs.size();
       update_species( sp, ptcs, J, dt, E, B );
+    }
 
-      // Put particles where they belong after scattering
-      for ( auto i = old_size; i < ptcs.size(); ++i ) {
-        auto this_sp = ptcs[i].template get<species>();
-        if ( this_sp != sp ) {
-          particles[this_sp].push_back(std::move(ptcs[i]));
-        }
+    { // Put particles where they belong after scattering
+      for ( int i = 0; i < _buf.size(); ++i ) {
+        auto this_sp = _buf[i].template get<species>();
+        particles[this_sp].push_back(std::move(_buf[i]));
       }
+      _buf.resize(0);
     }
 
     msh::integrate(J);

@@ -19,7 +19,7 @@ inline auto FT_SpinUp (Scalar t) noexcept {
   return std::min(t / pic::spinup_duration, 1.0);
 }
 
-void Rotating_Monopole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
+void Rotating_Monopole_LogSph( FBC& bdry, Scalar mu0, Scalar final_omega ) {
   bdry.B1 = [mu0] (Scalar r_log, Scalar , Scalar )
             {return mu0 / std::exp(2*r_log); };
   bdry.B2 = [] (Scalar, Scalar, Scalar) { return 0.0; };
@@ -27,13 +27,13 @@ void Rotating_Monopole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
 
   // find out E by E = -( Omega x r ) x B
   bdry.E1 = [=, B2=bdry.B2]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return max_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
+              return final_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
   bdry.E2 = [=, B1=bdry.B1]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return - max_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
+              return - final_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
   bdry.E3 = []( Scalar, Scalar, Scalar ) {return 0.0;};
 }
 
-void Rotating_Dipole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
+void Rotating_Dipole_LogSph( FBC& bdry, Scalar mu0, Scalar final_omega ) {
   bdry.B1 = [mu0] (Scalar x, Scalar theta, Scalar)
        { return mu0 * 2.0 * std::cos(theta) / std::exp(3*x); };
   bdry.B2 = [mu0] (Scalar x, Scalar theta, Scalar)
@@ -42,9 +42,9 @@ void Rotating_Dipole_LogSph( FBC& bdry, Scalar mu0, Scalar max_omega ) {
 
   // find out E by E = -( Omega x r ) x B
   bdry.E1 = [=, B2=bdry.B2]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return max_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
+              return final_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
   bdry.E2 = [=, B1=bdry.B1]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return - max_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
+              return - final_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
   bdry.E3 = [=]( Scalar, Scalar, Scalar ) {return 0.0;};
 }
 
@@ -122,9 +122,9 @@ namespace field {
       fbc.indent = pic::ofs::indent[LOWER_1];
       fbc.ft = FT_SpinUp;
       if ( pic::ofs::magnetic_pole == 1 )
-        Rotating_Monopole_LogSph( fbc, pic::mu0, pic::omega_max );
+        Rotating_Monopole_LogSph( fbc, pic::mu0, pic::Omega );
       else if ( pic::ofs::magnetic_pole == 2 )
-        Rotating_Dipole_LogSph( fbc, pic::mu0, pic::omega_max );
+        Rotating_Dipole_LogSph( fbc, pic::mu0, pic::Omega );
     }
     { auto& fbc = fieldBC[UPPER_1];
       fbc.type = FieldBCType::DAMPING;

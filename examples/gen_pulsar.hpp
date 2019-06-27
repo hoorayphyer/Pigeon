@@ -44,12 +44,12 @@ namespace pic {
 namespace pic {
   // TODOL these will become free parameters
   inline constexpr real_t mu0 = 60000.0;
-  inline constexpr real_t omega_max = 1.0 / 6.0;
+  inline constexpr real_t Omega = 1.0 / 6.0;
 
   inline constexpr int spinup_duration = 10.0;
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
-    return std::min( time / pic::spinup_duration, 1.0 ) * pic::omega_max;
+    return std::min<real_t>( time / pic::spinup_duration, 1.0 ) * pic::Omega;
   }
   namespace ofs {
     inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
@@ -77,90 +77,6 @@ namespace pic {
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
 namespace particle {
-  template < typename T, template < typename > class Specs >
-  using Pat = typename array< T, Specs >::particle_type; // type of particle from array
-
-  template < typename T, template < typename > class Specs >
-  struct CurvatureRadiate : public scat::Channel<T, Specs> {
-    using Vec = apt::Vec<T,Specs<T>::Dim>;
-
-    constexpr T calc_Rc ( const Pat<T,Specs>& ptc, const Vec& dp, T dt, const Vec& B ) noexcept {
-      // TODOL uniform Rc is used here
-      return 1.0;
-
-
-
-      // qB / (\gamma m c) * dt < 2 \pi / 10
-      bool is_gyration_resolved =
-        std::sqrt( apt::sqabs(B) / ( (mass_x != 0) + apt::sqabs(ptc.p()) ) ) * abs_charge_x * dt / mass_x < (2 * std::acos(-1) / 10.0);
-
-      if ( is_gyration_resolved ) {
-        // find momentum at half time step
-        auto phalf = ptc.p() - dp * 0.5; // NOTE ptc.p() is already the updated p
-        auto v = phalf / std::sqrt( (mass_x != 0) + apt::sqabs(phalf) );
-        auto vv = apt::sqabs(v);
-        Vec a = dp / dt; // a is for now force, will be converted to dv/dt
-        // convert a to dv/dt
-        a = ( a - v * apt::dot(v,a) ) * std::sqrt( 1.0 - vv );
-        auto va = apt::dot(v,a); // get the real v dot a
-        return vv / std::max( std::sqrt( apt::sqabs(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
-      } else {
-        // Dipolar radius of curvature in LogSpherical
-        const auto& theta = ptc.q()[1];
-        auto tmp = 2.5 + 1.5 * std::cos( 2 * theta );
-        return std::exp(ptc.q()[0]) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
-      }
-    }
-
-    T (*sample_E_ph)() = nullptr;
-
-    unsigned int abs_charge_x{};
-    unsigned int mass_x{};
-
-    T K_thr{};
-    T gamma_off{};
-    T emission_rate{};
-
-    // return sampled energy if any
-    std::optional<T> operator() ( const Pat<T,Specs>& ptc, const Vec& dp, T dt,
-                                  const Vec& B, util::Rng<T>& rng ) override {
-      T Rc = calc_Rc( ptc, dp, dt, B );
-      T gamma = std::sqrt( (mass_x != 0) + apt::sqabs(ptc.p()) );
-
-      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < emission_rate * dt * gamma  / Rc ) {
-        return { std::min( sample_E_ph(), gamma - 1.0 ) };
-      } else return {};
-
-    }
-  };
-
-  template < typename T, template < typename > class Specs >
-  struct MagneticConvert : public scat::Channel<T,Specs> {
-    T B_thr{};
-    T mfp{};
-
-    std::optional<T> operator() ( const Pat<T,Specs>& photon, const apt::Vec<T,Specs<T>::Dim>& dp, T dt,
-                                  const apt::Vec<T,Specs<T>::Dim>& B, util::Rng<T>& rng ) override {
-      // prob_mag_conv = dt / mfp_mag_conv
-      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt; // NOTE return std::optional(0.0) so as to be treated true in boolean conversion
-    }
-  };
-
-  template < typename T, template < typename > class Specs >
-  struct TwoPhotonCollide : public scat::Channel<T,Specs> {
-    // TODO double check this implementation, it is not equivalent because the original one has some sort of gaussian in it. Use Monte Carlo
-    // inline T f_x ( T x ) {
-    //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
-    //   return std::sqrt( -2.0 * std::log(x) );
-    // }
-    T mfp{};
-
-    std::optional<T> operator() ( const Pat<T,Specs>& photon, const apt::Vec<T,Specs<T>::Dim>& dp, T dt,
-                                  const apt::Vec<T,Specs<T>::Dim>& B, util::Rng<T>& rng ) override {
-      // prob_mag_conv = dt / mfp_ph_ph
-      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
-    }
-  };
 
   // LogSpherical
   namespace force {
@@ -214,19 +130,19 @@ namespace particle {
       using Force = force::Force<real_t,Specs,vParticle>;
       constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      Real landau0_B_thr = 0.1 * pic::mu0;
+      real_t landau0_B_thr = 0.1 * pic::mu0;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
 
-      constexpr Real gravity_strength = 1.8;
+      constexpr real_t gravity_strength = 1.8;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
       {
         auto sp = species::electron;
         Force force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
+  //      force.add( landau0, landau0_B_thr );
 
         fgen.Register( sp, force );
       }
@@ -235,9 +151,9 @@ namespace particle {
         Force force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
+    //    force.add( landau0, landau0_B_thr );
 
         fgen.Register( sp, force );
       }
@@ -246,7 +162,7 @@ namespace particle {
         Force force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
@@ -254,52 +170,41 @@ namespace particle {
       }
     }
 
-
     {
-      scat::RadiationFromCharges<false,real_t,Specs> ep_scat;
+      scat::Scat<real_t,Specs> ep_scat;
 
-      {
-        struct InZone : public scat::Eligible<real_t,Specs> {
-          bool operator() ( const Pat<real_t,Specs>& ptc ) override {
-            return ptc.q()[0] < std::log(9.0);
-          }
-        };
-        ep_scat.add(InZone{});
-      }
+      // TODO check if lambda will become dangling
+      ep_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc){ return ptc.q()[0] < std::log(9.0); });
 
-      {
-        CurvatureRadiate<real_t,Specs> cr;
-        cr.abs_charge_x = 1u;
-        cr.mass_x = 1u;
-        cr.K_thr = 80.0;
-        cr.gamma_off = 15.0;
-        cr.emission_rate = 0.25;
-        cr.sample_E_ph = []() noexcept { return 14.0; };
+      scat::CurvatureRadiation<real_t,Specs>::K_thr = 20.0;
+      scat::CurvatureRadiation<real_t,Specs>::gamma_off = 15.0;
+      scat::CurvatureRadiation<real_t,Specs>::emission_rate = 0.25;
+      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.5; };
+      ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
-        ep_scat.add(cr);
-      }
+      ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
       scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
       scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
     }
 
-    {
-      scat::PhotonPairProduction<real_t,Specs> photon_scat;
-      // Photons are free to roam across all domain. They may produce pairs outside light cylinder
-      {
-        MagneticConvert<real_t,Specs> mc;
-        mc.B_thr = pic::mu0 / 10.0 ;
-        mc.mfp = 0.2;
-        photon_scat.add(mc);
-      }
-      {
-        TwoPhotonCollide<real_t,Specs> tc;
-        tc.mfp = 5.0;
-        photon_scat.add(tc);
-      }
+    //{
+    //  scat::PhotonPairProduction<real_t,Specs> photon_scat;
+    //  // Photons are free to roam across all domain. They may produce pairs outside light cylinder
+    //  {
+    //    MagneticConvert<real_t,Specs> mc;
+    //    mc.B_thr = pic::mu0 / 10.0 ;
+    //    mc.mfp = 0.0;
+    //    photon_scat.add(mc);
+    //  }
+    //  {
+    //    TwoPhotonCollide<real_t,Specs> tc;
+    //    tc.mfp = 0.0;
+    //    photon_scat.add(tc);
+    //  }
 
-      scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
-    }
+    //  scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
+    //}
   }
 
 }
@@ -420,8 +325,8 @@ namespace pic {
       using namespace particle;
 
       constexpr Real v_th = 0.3;
-      constexpr Real j_reg_x = 2.0;
-      constexpr Real Ninj = 5.0;
+      constexpr Real j_reg_x = 0.0;
+      constexpr Real Ninj = 1.0;
 
       constexpr auto posion = species::ion;
       constexpr auto negaon = species::electron;

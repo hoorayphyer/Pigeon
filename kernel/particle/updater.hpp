@@ -33,6 +33,8 @@ namespace particle {
     ForceGen_t _force_gen;
     ScatGen_t _scat_gen;
 
+    array<Real,PtcSpecs> _buf;
+
     void update_species( species sp,
                          array<Real,PtcSpecs>& sp_ptcs,
                          field::Field<RealJ,3,DGrid>& J,

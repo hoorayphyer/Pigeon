@@ -92,12 +92,22 @@ namespace particle {
     }
 
     template < typename Ptc >
-    void push_back( Ptc&& ptc ) {
-      auto f = []( auto& arr, auto&& x ) {
-                 arr.push_back(std::forward<decltype(x)>(x)); };
+    void push_back( const PtcExpression<Ptc>& ptc ) {
+      auto f = []( auto& arr, const auto& x ) {
+                 arr.push_back(x); };
       apt::foreach<0,DPtc> ( f, _q, ptc.q() );
       apt::foreach<0,DPtc> ( f, _p, ptc.p() );
       f( _state, ptc.state() );
+    }
+
+    template < typename Ptc >
+    void push_back( PtcExpression<Ptc>&& ptc ) {
+      auto f = []( auto& arr, const auto& x ) {
+                 arr.push_back(x); };
+      apt::foreach<0,DPtc> ( f, _q, ptc.q() );
+      apt::foreach<0,DPtc> ( f, _p, ptc.p() );
+      f( _state, ptc.state() );
+      ptc.reset(flag::exist);
     }
 
     template < typename... Args >

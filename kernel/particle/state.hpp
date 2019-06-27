@@ -44,7 +44,7 @@ namespace particle {
   struct layout {
   private:
     using ordering = std::tuple<species, flag, birthplace, serial_number>;
-    static constexpr auto sizing = std::make_tuple(2, 16, 16, 30);
+    static constexpr auto sizing = std::make_tuple(3, 16, 16, 30);
 
   public:
     template < typename Attr, std::size_t I = 0 >

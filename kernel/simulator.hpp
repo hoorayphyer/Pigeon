@@ -129,7 +129,8 @@ namespace pic {
 
       particle::migrate( _migrators, _ens_opt->inter, timestep );
       for ( auto&& ptc : _migrators ) {
-        _particles[ptc.template get<particle::species>()].push_back( std::move(ptc) );
+        auto sp = ptc.template get<particle::species>();
+        _particles[sp].push_back( std::move(ptc) );
       }
       _migrators.resize(0);
     }
@@ -198,7 +199,6 @@ namespace pic {
 
         _J.reset();
 
-        // if ( timestep >= pic::sort_particles_init_ts && (timestep % pic::interval::sort_particles == 0 ) ) {
         if ( is_do(pic::sort_particles_mr, timestep) ) {
           if (stamp) {
             lgr::file % "SortParticles" << "==>>" << std::endl;
@@ -209,6 +209,7 @@ namespace pic {
             lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
           }
         }
+
         if ( stamp && _particles.size() != 0 ) {
           lgr::file % "ParticleCounts:" << std::endl;
           for ( const auto&[ sp, ptcs ] : _particles )

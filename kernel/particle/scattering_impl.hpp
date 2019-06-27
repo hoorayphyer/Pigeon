@@ -3,12 +3,8 @@
 #include "apt/numeric.hpp"
 
 namespace particle::scat {
-
-  template < typename T, template < typename > class PtcSpecs >
-  using real_Ptc = Particle<T,PtcSpecs>;
-
-  template < bool Instant, typename T, template < typename > class PtcSpecs >
-  void RadiationFromCharges<Instant,T,PtcSpecs>::impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr, Ptc_t<T,PtcSpecs>& ptc, T E_ph ) {
+  template < bool Instant, typename T, template < typename > class S >
+  void RadiationFromCharges ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T E_ph ) {
     {
       auto gamma_ptc = std::sqrt( 1.0 + apt::sqabs(ptc.p()) );
       // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
@@ -19,26 +15,31 @@ namespace particle::scat {
         // recycle Rc for gamma_sec
         E_ph /= 2.0;
         // append electron and positron
-        auto ptc_sec = real_Ptc<T,PtcSpecs> ( ptc.q(),
-                                              ptc.p() * ( std::sqrt( E_ph * E_ph - 1.0 ) / apt::sqabs(ptc.p()) ),
-                                              flag::secondary );
+        Particle<T,S> ptc_sec ( ptc.q(),
+                                ptc.p() * ( std::sqrt( E_ph * E_ph - 1.0 ) / apt::sqabs(ptc.p()) ),
+                                flag::secondary,
+                                ptc.template get<birthplace>() );
         ptc_sec.set(species::electron);
         *(itr++) = ptc_sec;
         ptc_sec.set(species::positron);
         *(itr++) = std::move(ptc_sec);
 
       } else {
-      *(itr++) = real_Ptc<T,PtcSpecs> ( ptc.q(),
-                                        ptc.p() * ( E_ph / apt::abs(ptc.p()) ),
-                                        species::photon );
+      *(itr++) = Particle<T,S> ( ptc.q(),
+                                 ptc.p() * ( E_ph / apt::abs(ptc.p()) ),
+                                 species::photon,
+                                 ptc.template get<birthplace>()
+                                 );
     }
   }
 
-  template < typename T, template < typename > class PtcSpecs >
-  void PhotonPairProduction<T, PtcSpecs>::impl( std::back_insert_iterator<array<T,PtcSpecs>> itr, Ptc_t<T,PtcSpecs>& photon, T ) {
-    auto ptc_sec = real_Ptc<T,PtcSpecs> ( photon.q(),
-                                          photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
-                                          flag::secondary );
+  template < typename T, template < typename > class S >
+  void PhotonPairProduction ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& photon, T ) {
+    Particle<T,S> ptc_sec ( photon.q(),
+                            photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
+                            flag::secondary,
+                            photon.template get<birthplace>()
+                            );
     ptc_sec.set(species::electron);
     *(itr++) = ptc_sec;
     ptc_sec.set(species::positron);
@@ -46,29 +47,27 @@ namespace particle::scat {
 
     // void this photon
     photon.reset(flag::exist);
-
   }
 }
-
 
 #include "particle/map.hpp"
 
 namespace particle {
-  template < typename T, template < typename > class PtcSpecs >
-  map<std::unique_ptr<scat::Scat<T,PtcSpecs>>> scat_map;
+  template < typename T, template < typename > class S >
+  map<scat::Scat<T,S>> scat_map;
 
-  template < typename T, template < typename > class PtcSpecs >
-  void ScatGen<T,PtcSpecs>::Register( species sp, const scat::Scat<T,PtcSpecs>& scat ) {
-    scat_map<T,PtcSpecs>[sp].reset( new scat::Scat<T,PtcSpecs>(scat) ); // NOTE use copy constructor
+  template < typename T, template < typename > class S >
+  void ScatGen<T,S>::Register( species sp, const scat::Scat<T,S>& scat ) {
+    scat_map<T,S>[sp] = scat;
   }
 
-  template < typename T, template < typename > class PtcSpecs >
-  void ScatGen<T,PtcSpecs>::Unregister( species sp ) {
-    scat_map<T,PtcSpecs>.erase(sp);
+  template < typename T, template < typename > class S >
+  void ScatGen<T,S>::Unregister( species sp ) {
+    scat_map<T,S>.erase(sp);
   }
 
-  template < typename T, template < typename > class PtcSpecs >
-  scat::Scat<T,PtcSpecs>* ScatGen<T,PtcSpecs>::operator() ( species sp ) {
-    return scat_map<T,PtcSpecs>.has(sp) ? scat_map<T,PtcSpecs>.at(sp).get() : nullptr;
+  template < typename T, template < typename > class S >
+  scat::Scat<T,S>* ScatGen<T,S>::operator() ( species sp ) {
+    return scat_map<T,S>.has(sp) ? &(scat_map<T,S>.at(sp)) : nullptr;
   }
 }

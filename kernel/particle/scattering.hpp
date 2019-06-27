@@ -2,103 +2,125 @@
 #define _PARTICLE_SCATTERING_HPP_
 
 #include "particle/array.hpp"
+#include "particle/properties.hpp"
 #include "apt/vec.hpp"
+#include "apt/numeric.hpp"
 #include <optional>
 #include <memory>
 #include "random/rng.hpp"
 
 namespace particle::scat {
-  template < typename T, template < typename > class PtcSpecs >
-  using Ptc_t = typename array<T,PtcSpecs>::particle_type;
+  template < typename T, template < typename > class S >
+  using Ptc_t = typename array<T,S>::particle_type;
 
-  template < typename T, template < typename > class PtcSpecs >
-  struct Eligible {
-    virtual bool operator() ( const Ptc_t<T,PtcSpecs>& ) { return true; }
-  };
+  template < typename T, template < typename > class S >
+  using Eligible_t = bool (*) ( const Ptc_t<T,S>& );
 
-  template < typename T, template < typename > class PtcSpecs >
-  struct Channel {
-    virtual std::optional<T> operator() ( const Ptc_t<T,PtcSpecs>& ptc, const apt::Vec<T,PtcSpecs<T>::Dim>& dp, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& B, util::Rng<T>& rng ) { return {}; }
-  };
+  template < typename T, template < typename > class S >
+  using Channel_t = std::optional<T> (*)( const Ptc_t<T,S>& ptc, const Properties& props, const apt::Vec<T,S<T>::Dim>& dp, T dt, const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng );
 
-  template < typename T, template < typename > class PtcSpecs >
+  template < typename T, template < typename > class S >
   struct Scat {
-  protected:
-    using Ptc = Ptc_t<T,PtcSpecs>;
+    std::vector<Eligible_t<T,S>> eligs;
+    std::vector<Channel_t<T,S>> channels;
 
-  private:
-    std::vector<std::unique_ptr<Eligible<T,PtcSpecs>>> _eligs;
-    std::vector<std::unique_ptr<Channel<T,PtcSpecs>>> _channels;
-
-    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
-                        Ptc& ptc, T param0 ) {};
-
-  public:
-    Scat() = default;
-    // NOTE deepcopy unique_ptr
-    Scat( const Scat& other ) {
-      _eligs.resize( other._eligs.size() );
-      for ( int i = 0; i < _eligs.size(); ++i ) {
-        if ( other._eligs[i] )
-          _eligs[i].reset( new Eligible( *other._eligs[i] ) );
-      }
-      _channels.resize( other._channels.size() );
-      for ( int i = 0; i < _channels.size(); ++i ) {
-        if ( other._channels[i] )
-          _channels[i].reset( new Channel( *other._channels[i] ) );
-      }
-    }
-
-
-    Scat& add( const Eligible<T,PtcSpecs>& elig ) {
-      _eligs.emplace_back( new Eligible(elig) );
-      return *this;
-    }
-
-    Scat& add( const Channel<T,PtcSpecs>& channel ) {
-      _channels.emplace_back( new Channel(channel) );
-      return *this;
-    }
-
-    void operator() ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
-                      Ptc& ptc, const apt::Vec<T,PtcSpecs<T>::Dim>& dp, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& B, util::Rng<T>& rng ) {
-      for ( const auto& elig : _eligs ) if ( !(*elig)(ptc) ) return;
-      for ( const auto& chnl : _channels ) {
-        if ( auto param = (*chnl)(ptc, dp, dt, B, rng) ) {
-          impl( itr, ptc, *param );
-          return;
-        }
-      }
-      return;
-    }
-
+    void (*impl) ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T ) = nullptr;
   };
 }
 
+// Channels
 namespace particle::scat {
-  template < bool Instant, typename T, template < typename > class PtcSpecs >
-  class RadiationFromCharges : public Scat<T,PtcSpecs> {
-    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
-                        Ptc_t<T,PtcSpecs>& ptc, T param0 ) override;
-  public:
-    using Scat<T,PtcSpecs>::Scat;
+  template < typename T, template < typename > class S >
+  struct CurvatureRadiation {
+    using Vec = apt::Vec<T,S<T>::Dim>;
+
+    static constexpr T calc_Rc ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt, const Vec& B ) noexcept {
+      // TODOL uniform Rc is used here
+      return 1.0;
+
+      // qB / (\gamma m c) * dt < 2 \pi / 10
+      bool is_gyration_resolved =
+        std::sqrt( apt::sqabs(B) / ( (props.mass_x != 0) + apt::sqabs(ptc.p()) ) ) * std::abs(props.charge_x) * dt / props.mass_x < (2 * std::acos(-1) / 10.0);
+
+      if ( is_gyration_resolved ) {
+        // find momentum at half time step
+        auto phalf = ptc.p() - dp * 0.5; // NOTE ptc.p() is already the updated p
+        auto v = phalf / std::sqrt( (props.mass_x != 0) + apt::sqabs(phalf) );
+        auto vv = apt::sqabs(v);
+        Vec a = dp / dt; // a is for now force, will be converted to dv/dt
+        // convert a to dv/dt
+        a = ( a - v * apt::dot(v,a) ) * std::sqrt( 1.0 - vv );
+        auto va = apt::dot(v,a); // get the real v dot a
+        return vv / std::max( std::sqrt( apt::sqabs(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
+      } else {
+        // Dipolar radius of curvature in LogSpherical
+        const auto& theta = ptc.q()[1];
+        auto tmp = 2.5 + 1.5 * std::cos( 2 * theta );
+        return std::exp(ptc.q()[0]) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
+      }
+    }
+
+    static T K_thr;
+    static T gamma_off;
+    static T emission_rate;
+    // TODO move calc_Rc out too
+    // static T (*calc_Rc) ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt, const Vec& B );
+    static T (*sample_E_ph)();
+
+    // return sampled energy if any
+    static constexpr std::optional<T> test ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt,
+                                             const Vec& B, util::Rng<T>& rng ) noexcept {
+      T Rc = calc_Rc( ptc, props, dp, dt, B );
+      T gamma = std::sqrt( (props.mass_x != 0) + apt::sqabs(ptc.p()) );
+
+      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < emission_rate * dt * gamma  / Rc ) {
+        return { std::min<T>( sample_E_ph(), gamma - 1.0 ) };
+      } else return {};
+    }
   };
 
-  template < typename T, template < typename > class PtcSpecs >
-  class PhotonPairProduction : public Scat<T,PtcSpecs> {
-    virtual void impl ( std::back_insert_iterator<array<T,PtcSpecs>> itr,
-                        Ptc_t<T,PtcSpecs>& photon, T ) override;
-  public:
-    using Scat<T,PtcSpecs>::Scat;
+  template < typename T, template < typename > class S >
+  struct MagneticConvert {
+    static T B_thr;
+    static T mfp;
+
+    static constexpr std::optional<T> test ( const Ptc_t<T,S>& photon, const Properties&, const apt::Vec<T,S<T>::Dim>& dp, T dt,
+                                         const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng ) noexcept {
+      return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(1.0) : std::nullopt; // NOTE return std::optional(1.0) so as to be treated true in boolean conversion
+    }
   };
+
+  template < typename T, template < typename > class S >
+  struct TwoPhotonCollide {
+    // TODO double check this implementation, it is not equivalent because the original one has some sort of gaussian in it. Use Monte Carlo
+    // inline T f_x ( T x ) {
+    //   // distribution of x*exp(-x^2/2), which peaks at x = 1.
+    //   return std::sqrt( -2.0 * std::log(x) );
+    // }
+    static T mfp;
+
+    static constexpr std::optional<T> test ( const Ptc_t<T,S>& photon, const Properties&, const apt::Vec<T,S<T>::Dim>& dp, T dt,
+                                                   const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng ) noexcept {
+      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
+    }
+  };
+}
+
+// Impls
+namespace particle::scat {
+  template < bool Instant, typename T, template < typename > class S >
+  void RadiationFromCharges ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T E_ph );
+
+  template < typename T, template < typename > class S >
+  void PhotonPairProduction ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& photon, T );
 }
 
 namespace particle {
-  template < typename T, template < typename > class PtcSpecs >
+  template < typename T, template < typename > class S >
   struct ScatGen {
-    void Register( species sp, const scat::Scat<T,PtcSpecs>& scat );
+    void Register( species sp, const scat::Scat<T,S>& scat );
     void Unregister( species sp );
-    scat::Scat<T,PtcSpecs>* operator() ( species sp );
+    scat::Scat<T,S>* operator() ( species sp );
   };
 }
 

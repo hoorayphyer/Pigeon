@@ -318,7 +318,7 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
   const int num_procs = mpi::world.size();
   const int num_cycles = 1000;
   // NOTE TODOL current implementation requires explicit touch-create before detailed balance
-  map<array<double, Specs>> particles;
+  map<array<Real, Specs>> particles;
   {
     auto& x = particles[species::electron];
     auto& y = particles[species::ion];

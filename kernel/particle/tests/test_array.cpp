@@ -19,7 +19,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
     arr.push_back(ptc0);
     REQUIRE( arr.size() == 1 );
     AND_WHEN("by copy") {
-      auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
+      auto ptc = arr[0]; // TODOL semantics NOTE ptc is a proxy hence no ref
       REQUIRE( ptc.q()[0] == 15 );
       REQUIRE( ptc.q()[1] == 6 );
       REQUIRE( ptc.q()[2] == 73 );
@@ -34,9 +34,10 @@ SCENARIO("array push_back and iterator", "[particle]") {
 
     Ptc ptc1 ( Vec(-45,10,-76), Vec(-13,-58,97), species::photon, flag::traced );
     arr.push_back(std::move(ptc1));
+    REQUIRE_FALSE( ptc1.is(flag::exist) );
     REQUIRE( arr.size() == 2 );
     AND_WHEN("by move") {
-      auto ptc = arr[1]; // NOTE ptc is a proxy hence no ref
+      auto ptc = arr[1]; // TODOL semantics NOTE ptc is a proxy hence no ref
       REQUIRE( ptc.q()[0] == -45 );
       REQUIRE( ptc.q()[1] == 10 );
       REQUIRE( ptc.q()[2] == -76 );
@@ -50,26 +51,24 @@ SCENARIO("array push_back and iterator", "[particle]") {
     }
   }
 
-  WHEN("push back virtual particle") {
+  WHEN("push back virtual particle only by move") {
     apt::array<double,3> q { 15,6,73 };
     apt::array<double,3> p { 20,-3,-5 };
     unsigned long long state = 147;
     vPtc ptc0 ( q, p, state );
-    arr.push_back(std::move(ptc0));
+    arr.push_back(std::move(ptc0)); // NOTE no push_back by copy for virtual particle in order to preserve semantics
+    REQUIRE_FALSE( ptc0.is(flag::exist) );
     REQUIRE( arr.size() == 1 );
-    // NOTE no push_back by copy for virtual particle in order to preserve semantics
-    AND_WHEN("by move") {
-      auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
-      REQUIRE( ptc.q()[0] == 15 );
-      REQUIRE( ptc.q()[1] == 6 );
-      REQUIRE( ptc.q()[2] == 73 );
+    auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
+    REQUIRE( ptc.q()[0] == 15 );
+    REQUIRE( ptc.q()[1] == 6 );
+    REQUIRE( ptc.q()[2] == 73 );
 
-      REQUIRE( ptc.p()[0] == 20 );
-      REQUIRE( ptc.p()[1] == -3 );
-      REQUIRE( ptc.p()[2] == -5 );
+    REQUIRE( ptc.p()[0] == 20 );
+    REQUIRE( ptc.p()[1] == -3 );
+    REQUIRE( ptc.p()[2] == -5 );
 
-      REQUIRE( ptc.state() == 147 );
-    }
+    REQUIRE( ptc.state() == 147 );
   }
 
   WHEN("push back c particle") {
@@ -92,6 +91,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
 
     cPtc ptc1 ( Ptc(Vec(-45,10,-76), Vec(-13,-58,97), species::photon, flag::traced) );
     arr.push_back(std::move(ptc1));
+    REQUIRE_FALSE( ptc1.is(flag::exist) );
     REQUIRE( arr.size() == 2 );
     AND_WHEN("by move") {
       auto ptc = arr[1]; // NOTE ptc is a proxy hence no ref
