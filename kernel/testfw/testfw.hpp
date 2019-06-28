@@ -17,7 +17,8 @@ namespace aio {
     eng_t _eng {now()};
 
   public:
-    using Distribution<T>::Distribution;
+    template < typename... Args >
+    Dist(Args&&... args) : Distribution<T>( std::forward<Args>(args)... ) {}
 
     inline void seed( std::size_t s ) { _eng.seed(s); }
 
