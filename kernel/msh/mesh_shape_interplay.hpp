@@ -14,6 +14,10 @@ namespace msh {
       ( [](auto& q, auto q_abs, const auto& g ) noexcept {
           q = ( q_abs - g.lower() ) / g.delta();
         }, q_std, qabs, grid );
+    apt::foreach<Grid::NDim, Vec::NDim>
+      ( [](auto& q, auto q_abs) noexcept {
+          q = q_abs;
+        }, q_std, qabs );
     return q_std;
   }
 }
