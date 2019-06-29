@@ -34,7 +34,7 @@ SCENARIO("LogSpherical special cases", "[metric]") {
   aio::unif_real<double> unif;
 
   WHEN("velocity is radial") {
-    int N = 10000;
+    int N = 100000;
     while(N--) {
       double dt = 0.001;
       Vec<double,3> x_old( unif() * 3.0, unif() * (PI<double>-0.2) + 0.1, unif() * 2 * PI<double> );
@@ -45,9 +45,9 @@ SCENARIO("LogSpherical special cases", "[metric]") {
 
       Coord::geodesic_move( x, p, dt, is_massive );
 
-      CAPTURE( dt, x_old, p_old, x, p, is_massive );
+      CAPTURE( N, dt, x_old, p_old, x, p, is_massive );
 
-      auto v_old = p_old / std::sqrt( is_massive + apt::sqabs(p_old) );
+      Vec<double,3> v_old = p_old / std::sqrt( is_massive + apt::sqabs(p_old) );
       REQUIRE( exp(x[0]) == Approx( v_old[0] * dt + exp(x_old[0]) ));
       REQUIRE( x[1] == Approx( x_old[1] ) );
       REQUIRE( x[2] == Approx( x_old[2] ) );
@@ -59,7 +59,7 @@ SCENARIO("LogSpherical special cases", "[metric]") {
 
   WHEN("velocity is in meridional plane") {
     double dt = 0.001;
-    int N = 10000;
+    int N = 100000;
     while(N--) {
       Vec<double,3> x_old( unif() * 3.0, unif() * (PI<double>-0.2) + 0.1, unif() * 2 * PI<double> );
       Vec<double,3> p_old( 2.0 * ( 2 * unif() - 1 ), 2.0 * ( 2 * unif() - 1 ), 0.0 );
@@ -100,7 +100,7 @@ SCENARIO("LogSpherical special cases", "[metric]") {
 
   WHEN("location is at equator, velocity is in the plane") {
     double dt = 0.001;
-    int N = 10000;
+    int N = 100000;
     while(N--) {
       Vec<double,3> x_old( unif() * 3.0, PI<double> / 2.0, unif() * 2 * PI<double> );
       Vec<double,3> p_old( 2.0 * ( 2 * unif() - 1 ), 0.0, 2.0 * ( 2 * unif() - 1 ) );
@@ -144,7 +144,7 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
   using Coord = mani::coord<mani::coordsys::LogSpherical>;
   aio::unif_real<double> unif;
 
-  int N = 100000;
+  int N = 1000000;
   const double dt = 0.001;
   while (N--) {
     Vec<double,3> x1( unif() * 3.0, unif() * PI<double>, unif() * 2 * PI<double> );
