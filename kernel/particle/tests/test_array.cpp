@@ -11,6 +11,17 @@ using vPtc = vParticle<double,aio::Specs>;
 using cPtc = cParticle<double,aio::Specs>;
 using Vec = apt::Vec<double,aio::Specs<double>::Dim>;
 
+SCENARIO("test Particle constructors and flag::exist", "[particle]") {
+  WHEN("constructed with parameters, particle exists") {
+    Ptc x ( {}, {}, species::ion );
+    REQUIRE(x.is(flag::exist));
+  }
+  WHEN("default constructor, particle is empty") {
+    Ptc x;
+    REQUIRE_FALSE(x.is(flag::exist));
+  }
+}
+
 SCENARIO("array push_back and iterator", "[particle]") {
   ptc_array arr;
 

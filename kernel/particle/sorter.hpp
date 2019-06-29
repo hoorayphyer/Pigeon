@@ -8,7 +8,7 @@ namespace particle {
   void sort(  array<T,Spec>& ptcs ) {
     int head = 0;
     int tail = ptcs.size() - 1;
-    while( head < tail ) {
+    while( head <= tail ) {
       if ( ptcs[head].is(flag::exist) ) {
         ++head;
       } else {

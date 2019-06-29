@@ -39,6 +39,15 @@ namespace particle {
       if constexpr( sizeof...(Attrs) > 0 ) this->set(attrs...);
     }
 
+    // this version is to enable brace-init
+    template < typename... Attrs >
+    Particle( const vec_type& q, const vec_type& p, const Attrs&... attrs ) noexcept
+      : _q(q), _p(p) {
+      this->set(flag::exist);
+      // NOTE need "this" before set because of dependent base lookup
+      if constexpr( sizeof...(Attrs) > 0 ) this->set(attrs...);
+    }
+
     template < typename E >
     Particle( const PtcExpression<E>& ptc )
       : _q(ptc.q()), _p(ptc.p()), _state( ptc.state() ) {}

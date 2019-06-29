@@ -24,6 +24,7 @@ if (${ENABLE_TESTS})
   # test_gen(particle c_particle) # TODO
   test_gen(particle array) # DONE
   test_gen(particle forces) # DONE
+  test_gen(particle sorter)
   test_gen(particle migration mpipp) # TODO add test on buffer has size 0 and nonzero capacity
   target_include_directories( test_particle_migration PRIVATE ${CMAKE_SOURCE_DIR}) # TODOL this is to include pic.hpp for Specs
 

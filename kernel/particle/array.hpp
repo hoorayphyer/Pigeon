@@ -110,12 +110,15 @@ namespace particle {
       ptc.reset(flag::exist);
     }
 
-    template < typename... Args >
-    inline void emplace_back( Args&&... args ) {
-      push_back( Particle<T,Specs>(std::forward<Args>(args)...) );
+    // TODO emplace_back with braced-lists
+    template < typename... Attrs >
+    inline void emplace_back( const apt::Vec<T,DPtc>& q, const apt::Vec<T,DPtc>& p, Attrs&&... attrs ) {
+      push_back( Particle<T,Specs>( q, p, std::forward<Attrs>(attrs)...) );
     }
 
-    // TODO emplace_back with braced-lists
+    inline void emplace_back() {
+      push_back( Particle<T,Specs>() );
+    }
 
     // NOTE from is inclusive, to is exclusive. from can be larger than to.
     void erase( unsigned int from, unsigned int to );

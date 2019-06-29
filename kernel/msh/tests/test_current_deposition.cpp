@@ -3,6 +3,8 @@
 #include "particle/shapef.hpp"
 #include "apt/pair.hpp"
 
+#include "silopp/silo++.hpp"
+
 using namespace field;
 using namespace msh;
 using apt::array;
@@ -161,13 +163,27 @@ void direct_deposit( Field<RealJ,3,DGrid>& J,
     }
   }
 
-  // integrate W right away
-  for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
-    for ( auto trI : W.mesh().project(i_dim, W.mesh().origin(), W.mesh().extent() ) ) {
-      // J[i+1] = J[i] - W[i], or J[i] = J[i+1] + W[i]. NOTE J is for this particle only
-      for ( int n = W.mesh().extent()[i_dim] - 2; n > W.mesh().origin()[i_dim]-1; --n )
-        W[i_dim][trI | n ] += W[i_dim][ trI | n+1 ];
+  { // integrate W right away. J[i+1] = J[i] - W[i], or J[i] = J[i+1] + W[i], where J is for this particle only, and we will store it in W
+
+    for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
+      for ( auto trI : W.mesh().project(i_dim, W.mesh().origin(), W.mesh().extent() ) ) {
+        for ( int n = W.mesh().extent()[i_dim] - 2; n > W.mesh().origin()[i_dim]-1; --n )
+          W[i_dim][trI | n ] += W[i_dim][ trI | n+1 ];
+      }
     }
+
+    // NOTE the following alternative implementation uses traditional loops
+    // if constexpr ( DGrid == 2 ) {
+    //     for ( int j = 0; j < ext[1]; ++j ) {
+    //       for ( int i = ext[0] - 2; i > -1; --i )
+    //         W[0]({i,j}) += W[0]( {i+1, j} );
+    //     }
+
+    //     for ( int i = 0; i < ext[0]; ++i ) {
+    //       for ( int j = ext[1] - 2; j > -1; --j )
+    //         W[1]({i,j}) += W[1]( {i, j+1} );
+    //     }
+    //   }
   }
 
   // deposit
@@ -177,15 +193,15 @@ void direct_deposit( Field<RealJ,3,DGrid>& J,
   }
 }
 
-TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation BrutalForce_dJ_Field", "[field][mpi]"
-                   , (aio::IndexType<4,4>)
-                   , (aio::IndexType<8,8>)
-                   , (aio::IndexType<16,16>)
-                   , (aio::IndexType<32,32>)
+TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation BrutalForce_dJ_Field", "[field]"
+                   // , (aio::IndexType<4,4>)
+                   // , (aio::IndexType<8,8>)
+                   // , (aio::IndexType<16,16>)
+                   // , (aio::IndexType<32,32>)
                    , (aio::IndexType<64,64>)
-                   , (aio::IndexType<128,128>)
-                   , (aio::IndexType<256,256>)
-                   , (aio::IndexType<512,512>)
+                   // , (aio::IndexType<128,128>)
+                   // , (aio::IndexType<256,256>)
+                   // , (aio::IndexType<512,512>)
                    ) {
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
   constexpr ShapeF shapef;
@@ -232,8 +248,45 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
     const auto& j_std = J_std[iJ].data();
     const auto& j_direct = J_direct[iJ].data();
     for ( int i = 0; i < mesh_size; ++i ) {
-      // CAPTURE( j_std[i] , j_direct[i] );
       REQUIRE( j_std[i] == Approx(j_direct[i]).margin(1e-12) );
+    }
+  }
+
+  if ( false ) { // write to silo to visualize the result
+    using namespace silo;
+    auto dbfile = open("test_current_deposition.silo", Mode::Write);
+    { // put a quad mesh
+      apt::array<int,DGrid> dims; // number of silo nodes
+      std::vector<int> lo_ofs (DGrid);
+      std::vector<int> hi_ofs (DGrid);
+      for ( int i = 0; i < DGrid; ++i ) {
+        dims[i] = bulk_dims[0] + 2 * guard + 1;
+        lo_ofs[i] = guard;
+        hi_ofs[i] = guard;
+      }
+
+      std::vector<std::vector<double>> coords(dims.size());
+      for ( int i = 0; i < 2; ++i ) {
+        coords[i].resize(dims[i]);
+        for ( int j = 0; j < dims[i]; ++j ) {
+          coords[i][j] =  j - lo_ofs[i];
+        }
+      }
+
+      OptList optlist;
+      // optlist[Opt::LO_OFFSET] = lo_ofs;
+      // optlist[Opt::HI_OFFSET] = hi_ofs;
+
+      dbfile.put_mesh( "mesh", coords, MeshType::Rect, optlist );
+    }
+    { // put J fields
+      std::vector<int> data_dims(DGrid);
+      for ( int i = 0; i < DGrid; ++i ) data_dims[i] = J_std.mesh().extent()[i];
+
+      dbfile.put_var("J1_std", "mesh", J_std[0].data().data(), data_dims);
+      dbfile.put_var("J1_direct", "mesh", J_direct[0].data().data(), data_dims);
+      dbfile.put_var("J2_std", "mesh", J_std[1].data().data(), data_dims);
+      dbfile.put_var("J2_direct", "mesh", J_direct[1].data().data(), data_dims);
     }
   }
 }
