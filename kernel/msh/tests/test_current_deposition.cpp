@@ -240,7 +240,7 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
     }
   }
 
-  integrate(J_std);
+  // integrate(J_std);
 
   const auto mesh_size = J_std.mesh().stride(DGrid);
 

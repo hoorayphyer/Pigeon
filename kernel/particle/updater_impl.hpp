@@ -117,8 +117,6 @@ namespace particle {
       _buf.resize(0);
     }
 
-    msh::integrate(J);
-
     { // NOTE rescale Jmesh back to real grid delta
       Real dV = 1.0;
       for ( int i = 0; i < DGrid; ++i ) dV *= _localgrid[i].delta();

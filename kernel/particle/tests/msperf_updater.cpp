@@ -108,15 +108,25 @@ SCENARIO("Time particle updater", "[particle]") {
     const Real dt = 0.005;
 
     const int Nptc = 1000000;
+    aio::unif_real<Real> unif;
     {
       auto& ptcs = particles[species::electron];
       for ( int i = 0; i < Nptc; ++i ) {
-        ptcs.emplace_back( apt::Vec<Real,PtcSpecs<Real>::Dim>{0.5, 0.5, 0.5}, apt::Vec<Real,PtcSpecs<Real>::Dim>{10.0, 10.0, 10.0}, species::electron );
+        ptcs.emplace_back( {unif(), unif(), 0.0},
+                           {10.0*(2*unif()-1), 10.0*(2*unif()-1), 10.0*(2*unif()-1)},
+                           species::electron );
+      }
+    }
+    {
+      for ( int C = 0; C < 3; ++C ) {
+        for ( auto& x : E[C].data() ) x = 1000 * (2 * unif() - 1) ;
+        for ( auto& x : B[C].data() ) x = 1000 * (2 * unif() - 1) ;
       }
     }
 
-    tmr::Timestamp t1;
     const int N = 1;
+
+    tmr::Timestamp t1;
     for ( int i = 0; i < N; ++i ) {
       pu( particles, J, E, B, dt, i );
     }

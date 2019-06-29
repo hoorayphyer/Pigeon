@@ -60,51 +60,96 @@ namespace msh {
 
     const auto[I_b, extent] = impl::deposit_range<DGrid>( q0_std, q1_std, shapef );
 
-    apt::array<U,3> W{};
-    apt::array<U,DGrid> s0{};
-    apt::array<U,DGrid> s1{};
-
-    auto calc_s =
-      [&shapef] ( auto& s, int i, auto q ) noexcept {
-        s = shapef(i + 0.5 - q);
+    constexpr auto s =
+      [] ( int i, auto q ) noexcept {
+        return ShapeF()(i + 0.5 - q);
       };
 
-    for ( auto I : apt::Block(extent) ) {
-      I += I_b;
-      // TODOL use normalization?? er ci xing zheng ze hua
-      apt::foreach<0,DGrid> ( calc_s, s0, I, q0_std );
-      apt::foreach<0,DGrid> ( calc_s, s1, I, q1_std );
+    static_assert( DGrid == 2 ); // TODO DGrid == 3 not implemented yet
 
-      if constexpr ( DGrid == 2 ) {
-          W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1] );
-          W[1] = ( s1[1] - s0[1] ) * Wesir( s0[0], s1[0] );
-          W[2] = (q1_std[2] - q0_std[2]) * Wesir( s0[0], s1[0], s0[1], s1[1] );
-        } else {
-        W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1], s0[2], s1[2] );
-        W[1] = ( s1[1] - s0[1] ) * Wesir( s0[2], s1[2], s0[0], s1[0] );
-        W[2] = ( s1[2] - s0[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+    const auto& mesh = _J.mesh();
+    if constexpr ( DGrid == 2 ) {
+        for ( int n = 0; n < 2; ++n ) { // n is normal direction, 1 - n is transverse
+          int n_stride = mesh.stride(n);
+          for ( int tr = I_b[1-n]; tr < I_b[1-n] + extent[1-n]; ++ tr ) {
+            int trIdx = (tr + mesh.guard()) * mesh.stride(1-n) + mesh.guard() * n_stride; // trIdx includes guard cells
+            U Wform = Wesir( s(tr,q0_std[1-n]), s(tr,q1_std[1-n]) ) * charge_over_dt;
+            U jsum = 0.0;
+            for ( int i = I_b[n] + extent[n] - 1; i > I_b[n]; --i ) { // NOTE current at I_b[n] is zero by the normalization of shape function, so skip it
+              jsum += s(i,q1_std[n]) - s(i,q0_std[n]);
+              _J[n][i*n_stride + trIdx] += jsum * Wform;
+            }
+          }
+        }
+
+        for ( int j = I_b[1]; j < I_b[1] + extent[1]; ++j ) {
+          for ( int i = I_b[0]; i < I_b[0] + extent[0]; ++i ) {
+            _J[2]({i,j}) += (q1_std[2] - q0_std[2]) * Wesir( s(i,q0_std[0]), s(i,q1_std[0]), s(j,q0_std[1]), s(j,q1_std[1]) ) * charge_over_dt;
+          }
+        }
+
       }
 
-      // NOTE: Before this line, there is no massive number of additions hence no loss of precision, which may only happen during the following +=. The fact that dj has higher precision takes care of all that.
-      apt::foreach<0, DField> // NOTE it is DField here, not DGrid
-        ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _J, W ); // TODOL semantics on dj
-    }
-
-    return;
   }
 
 }
 
-namespace msh {
-  template < typename RealJ, int DField, int DGrid >
-  void integrate( field::Field<RealJ,DField,DGrid>& J ) {
-    const auto& mesh = J.mesh();
-    for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) { // NOTE it is DGrid not DField
-      auto comp = J[i_dim]; // TODOL semantics
-      for ( auto trI : mesh.project( i_dim, mesh.origin(), mesh.extent() ) ) {
-        for ( int n = mesh.bulk_dim(i_dim) + mesh.guard() - 2; n > -mesh.guard() - 1; --n )
-          comp[trI | n] += comp[trI | n+1];
-      }
-    }
-  }
-}
+// old depositdJ and intergratedJ. The reason it is abandoned is because integration inevitibly carries early calculational error to all subsequent cells. In addition, it is harder to impose the equality \Sigma_i S(i) = 1, where S is shape function.
+
+// namespace msh {
+//   template < typename RealJ, int DField, int DGrid, typename ShapeF, typename U >
+//   void depositdJ ( field::Field<RealJ,DField,DGrid>& _J,
+//                    U charge_over_dt,
+//                    const ShapeF& shapef,
+//                    const apt::array<U,DField>& q0_std,
+//                    const apt::array<U,DField>& q1_std ) {
+//     static_assert( DField == 3 );
+//     static_assert( DGrid > 1 && DGrid < 4 );
+
+//     const auto[I_b, extent] = impl::deposit_range<DGrid>( q0_std, q1_std, shapef );
+
+//     apt::array<U,3> W{};
+//     apt::array<U,DGrid> s0{};
+//     apt::array<U,DGrid> s1{};
+
+//     auto calc_s =
+//       [] ( auto& s, int i, auto q ) noexcept {
+//         s = ShapeF()(i + 0.5 - q);
+//       };
+
+//     for ( auto I : apt::Block(extent) ) {
+//       I += I_b;
+//       // TODOL use normalization?? er ci xing zheng ze hua
+//       apt::foreach<0,DGrid> ( calc_s, s0, I, q0_std );
+//       apt::foreach<0,DGrid> ( calc_s, s1, I, q1_std );
+
+//       if constexpr ( DGrid == 2 ) {
+//           W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1] );
+//           W[1] = ( s1[1] - s0[1] ) * Wesir( s0[0], s1[0] );
+//           W[2] = (q1_std[2] - q0_std[2]) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+//         } else {
+//         W[0] = ( s1[0] - s0[0] ) * Wesir( s0[1], s1[1], s0[2], s1[2] );
+//         W[1] = ( s1[1] - s0[1] ) * Wesir( s0[2], s1[2], s0[0], s1[0] );
+//         W[2] = ( s1[2] - s0[2] ) * Wesir( s0[0], s1[0], s0[1], s1[1] );
+//       }
+
+//       // NOTE: Before this line, there is no massive number of additions hence no loss of precision, which may only happen during the following +=. The fact that dj has higher precision takes care of all that.
+//       apt::foreach<0, DField> // NOTE it is DField here, not DGrid
+//         ( [&]( auto dj, auto w ) { dj(I) += w * charge_over_dt; } , _J, W ); // TODOL semantics on dj
+//     }
+
+//     return;
+//   }
+
+//   template < typename RealJ, int DField, int DGrid >
+//   void integrate( field::Field<RealJ,DField,DGrid>& J ) {
+//     const auto& mesh = J.mesh();
+//     for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) { // NOTE it is DGrid not DField
+//       auto comp = J[i_dim]; // TODOL semantics
+//       for ( auto trI : mesh.project( i_dim, mesh.origin(), mesh.extent() ) ) {
+//         for ( int n = mesh.bulk_dim(i_dim) + mesh.guard() - 2; n > -mesh.guard() - 1; --n )
+//           comp[trI | n] += comp[trI | n+1];
+//       }
+//     }
+//   }
+// }
