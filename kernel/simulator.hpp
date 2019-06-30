@@ -177,6 +177,8 @@ namespace pic {
       if ( is_do(pic::msperf_mr, timestep) ) {
         stamp_all.emplace();
         stamp.emplace();
+        if ( msperf_max_entries &&
+             ( timestep - msperf_mr.init_ts > *msperf_max_entries * msperf_mr.interval )  ) lgr::file.clear();
         lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
         lgr::file.indent_append("\t");
       }

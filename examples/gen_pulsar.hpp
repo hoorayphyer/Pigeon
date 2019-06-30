@@ -25,28 +25,28 @@
 namespace pic {
   constexpr long double PI = std::acos(-1.0l);
 
-  inline constexpr const char* project_name = "Pulsar";
+  inline constexpr const char* project_name = "Pulsar256";
   inline constexpr const char* datadir_prefix = "../Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 1000;
-  inline constexpr real_t dt = 0.001;
+  inline constexpr int total_timesteps = 20000;
+  inline constexpr real_t dt = 0.003;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, std::log(30.0), 128 }, { 0.0, PI, 128 } }};
+  = {{ { 0.0, std::log(30.0), 256 }, { 0.0, PI, 256 } }};
   inline constexpr int guard = 1;
 
-  inline constexpr int Np = 5;
+  inline constexpr int Np = 1;
   inline constexpr real_t epsilon = 1.0 / 5.0;
 }
 
 namespace pic {
   // TODOL these will become free parameters
-  inline constexpr real_t mu0 = 60000.0;
+  inline constexpr real_t mu0 = 3750.0;
   inline constexpr real_t Omega = 1.0 / 6.0;
 
-  inline constexpr int spinup_duration = 10.0;
+  inline constexpr int spinup_duration = 4.0;
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / pic::spinup_duration, 1.0 ) * pic::Omega;
@@ -62,17 +62,18 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 200 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
   inline constexpr ModuleRange checkpoint_mr { false, 0, 10000 };
   inline constexpr int num_checkpoint_parts = 4;
 
-  inline constexpr ModuleRange dlb_mr { true, 0, 1000 };
+  inline constexpr ModuleRange dlb_mr { false, 0, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
 
   inline constexpr ModuleRange msperf_mr { true, 0, 100 };
+  inline constexpr std::optional<int> msperf_max_entries {};
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -133,7 +134,7 @@ namespace particle {
       real_t landau0_B_thr = 0.1 * pic::mu0;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
 
-      constexpr real_t gravity_strength = 1.8;
+      constexpr real_t gravity_strength = 0.5;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
       {
         auto sp = species::electron;
@@ -173,19 +174,18 @@ namespace particle {
     {
       scat::Scat<real_t,Specs> ep_scat;
 
-      // TODO check if lambda will become dangling
       ep_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc){ return ptc.q()[0] < std::log(9.0); });
 
-      scat::CurvatureRadiation<real_t,Specs>::K_thr = 20.0;
-      scat::CurvatureRadiation<real_t,Specs>::gamma_off = 15.0;
+      scat::CurvatureRadiation<real_t,Specs>::K_thr = 10.0;
+      scat::CurvatureRadiation<real_t,Specs>::gamma_off = 5.0;
       scat::CurvatureRadiation<real_t,Specs>::emission_rate = 0.25;
-      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.5; };
+      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.0; };
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
       ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
-      scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
-      scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
+     // scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
+     // scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
     }
 
     //{
