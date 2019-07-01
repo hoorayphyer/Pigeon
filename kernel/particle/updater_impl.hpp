@@ -48,7 +48,7 @@ namespace particle {
 
     auto update_q =
       [is_massive=(prop.mass_x != 0)] ( auto& ptc, Real dt ) {
-        Metric::geodesic_move( ptc.q(), ptc.p(), dt, is_massive );
+        return Metric::geodesic_move( ptc.q(), ptc.p(), dt, is_massive );
       };
 
     for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
@@ -82,10 +82,18 @@ namespace particle {
       }
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
-      update_q( ptc, dt );
+      auto dq = update_q( ptc, dt );
       // TODO pusher handle boundary condition. Is it needed?
-      if ( prop.charge_x != 0 )
-        msh::deposit( J, charge_over_dt, shapef, q0_std, msh::to_standard(_localgrid, ptc.q()) );
+      if ( prop.charge_x != 0 ) {
+        // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()
+        for ( int i = 0; i < DGrid; ++i ) {
+          dq[i] /= _localgrid[i].delta();
+          dq[i] += q0_std[i];
+        }
+        for ( int i = DGrid; i < PtcSpecs<Real>::Dim; ++i )
+          dq[i] += q0_std[i];
+        msh::deposit( J, charge_over_dt, shapef, q0_std, std::move(dq) );
+      }
 
     }
   }

@@ -147,6 +147,7 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
   int N = 1000000;
   const double dt = 0.001;
   while (N--) {
+    // --- set up ----
     Vec<double,3> x1( unif() * 3.0, unif() * PI<double>, unif() * 2 * PI<double> );
     Vec<double,3> p1( 10.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ) );
     bool is_massive = unif() > 0.5;
@@ -154,9 +155,15 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
     auto x2 = x1;
     Vec<double,3> v2 = p1 / std::sqrt( is_massive + apt::sqabs(p1) );
 
-    Coord::geodesic_move( x1, p1, dt, is_massive );
+    const auto x_old = x1;
+    // det is a determinant that plays a role in getting correct dx when axis crossing happens
+    auto det = ( std::exp( x2[0] ) + v2[0] * dt ) * std::sin(x2[1]) + v2[1] * dt * std::cos(x2[1] );
+
+    // --- run ----
+    auto dx = Coord::geodesic_move( x1, p1, dt, is_massive );
     OLD_geodesic_move( x2, v2, dt );
 
+    // --- test ---
     CAPTURE( dt, x1, p1, is_massive );
 
 
@@ -165,72 +172,62 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
 
     REQUIRE( PV(x1[2]) == Approx(PV(x2[2])));
 
-
     Vec<double,3> v1 = p1 / std::sqrt( is_massive + apt::sqabs(p1) );
     REQUIRE( v1[0] == Approx(v2[0]));
     REQUIRE( v1[1] == Approx(v2[1]));
     REQUIRE( v1[2] == Approx(v2[2]));
 
+    // test dx
+    REQUIRE( dx[0] == Approx(x1[0] - x_old[0]) );
+    if ( det > 0 ) {
+      REQUIRE( dx[1] == Approx(x1[1] - x_old[1]) );
+      REQUIRE( dx[2] == Approx(x1[2] - x_old[2]) );
+    }
+
+
   }
 
 }
 
-#include <chrono>
-using namespace std::chrono;
+SCENARIO("LogSpherical, test dx under axis crossing", "[metric]") {
+  using Coord = mani::coord<mani::coordsys::LogSpherical>;
+  aio::unif_real<double> unif;
 
-// SCENARIO("measure performance of LogSpherical", "[mani]") {
-//   using Coord = mani::coord<mani::coordsys::LogSpherical>;
-//   util::Rng<double> rng;
-//   rng.set_seed(std::time(0));
+  int N = 100000;
+  const double dt = 0.001;
+  while (N) {
+    // --- set up ----
+    auto theta = unif() * dt * 0.1;
+    if ( unif() > 0.5 ) theta = PI<double> - theta;
 
-//   const double dt = 0.001;
-//   int MIL = 1000*1000;
-//   std::vector<double> rdn ( MIL * 6 );
-//   for ( int i = 0; i < MIL; ++i ) {
-//     rdn[6*i + 0] = rng.uniform(0,3);
-//     rdn[6*i + 1] = rng.uniform(0,PI<double>);
-//     rdn[6*i + 2] = rng.uniform(0,2*PI<double>);
+    // NOTE r and pr are chosen to increase axis crossing
+    Vec<double,3> x1( unif() * 0.05, theta, unif() * 2 * PI<double> );
+    Vec<double,3> p1( 1.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ), 10.0 * ( 2 * unif() - 1 ) );
+    bool is_massive = unif() > 0.5;
 
-//     rdn[6*i + 3] = rng.uniform(-10,10);
-//     rdn[6*i + 4] = rng.uniform(-10,10);
-//     rdn[6*i + 5] = rng.uniform(-10,10);
+    const auto x_old = x1;
+    Vec<double,3> v_old = p1 / std::sqrt( is_massive + apt::sqabs(p1) );
+    // det is a determinant that plays a role in getting correct dx when axis crossing happens
+    auto det = ( std::exp( x_old[0] ) + v_old[0] * dt ) * std::sin(x_old[1]) + v_old[1] * dt * std::cos(x_old[1] );
+    if ( det > 0 ) continue;
+    else --N;
 
-//     double gamma
-//       = std::sqrt( 1.0 + rdn[6*i + 3] * rdn[6*i + 3]
-//                    + rdn[6*i + 4] * rdn[6*i + 4]
-//                    + rdn[6*i + 5] * rdn[6*i + 5]  );
+    // --- run ----
+    auto dx = Coord::geodesic_move( x1, p1, dt, is_massive );
 
-//     rdn[6*i + 3] /= gamma;
-//     rdn[6*i + 4] /= gamma;
-//     rdn[6*i + 5] /= gamma;
-//   }
+    // --- test ---
+    CAPTURE( dt, x1, p1, is_massive );
 
-//   int X = 100;
-//   { // new geodesic_move
-//     auto ti = high_resolution_clock::now();
-//     for ( int I = 0; I < X * MIL; ++I ) {
-//       int i = I % MIL;
-//       Vec<double,3> x( rdn[6*i + 0], rdn[6*i + 1], rdn[6*i + 2] );
-//       Vec<double,3> v( rdn[6*i + 3], rdn[6*i + 4], rdn[6*i + 5] );
+    // test dx
+    REQUIRE( dx[0] == Approx(x1[0] - x_old[0]) );
+    if ( det > 0 )
+      REQUIRE( dx[1] == Approx(x1[1] - x_old[1]) );
+    else if ( theta < PI<double> / 2.0 )
+      REQUIRE( dx[1] == Approx( -x1[1] - x_old[1] ) );
+    else
+      REQUIRE( dx[1] == Approx( 2 * PI<double> -x1[1] - x_old[1] ) );
 
-//       Coord::geodesic_move( x, v, dt );
-//     }
-//     auto tf = high_resolution_clock::now();
-//     auto dur = duration_cast<milliseconds>(tf - ti);
-//     std::cout << "T1 = " << dur.count() << " ms" << std::endl;
-//   }
+    REQUIRE( dx[2] == Approx(std::atan( v_old[2] * dt / det ) ) );
+  }
 
-//   { // the old caldisp
-//     auto ti = high_resolution_clock::now();
-//     for ( int I = 0; I < X * MIL; ++I ) {
-//       int i = I % MIL;
-//       Vec3<double> x( rdn[6*i + 0], rdn[6*i + 1], rdn[6*i + 2] );
-//       Vec3<double> v( rdn[6*i + 3], rdn[6*i + 4], rdn[6*i + 5] );
-
-//       logsph_geodesic_move_old( x, v, dt );
-//     }
-//     auto tf = high_resolution_clock::now();
-//     auto dur = duration_cast<milliseconds>(tf - ti);
-//     std::cout << "T2 = " << dur.count() << " ms" << std::endl;
-//   }
-// }
+}
