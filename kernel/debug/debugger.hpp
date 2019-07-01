@@ -1,8 +1,11 @@
-#ifndef _MISC_HPP_
-#define _MISC_HPP_
+#ifndef _DEBUGGER_HPP_
+#define _DEBUGGER_HPP_
 #include <cmath>
+#include <vector>
+#include <string>
+#include "apt/block.hpp"
 
-namespace misc {
+namespace debug {
   template < typename T, int DField, int DGrid, template < typename, int, int > class Field >
   inline int num_nan( const Field<T,DField,DGrid>& f ) {
     int res = 0;
@@ -45,6 +48,14 @@ namespace misc {
     }
     return res;
   }
+}
+
+namespace debug {
+  extern int timestep;
+  extern std::vector<double> dbls;
+  extern std::vector<int> ints;
+  extern std::vector<float> flts;
+  extern std::vector<std::string> strs;
 }
 
 #endif

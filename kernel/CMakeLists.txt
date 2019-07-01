@@ -71,6 +71,8 @@ add_subdirectory(dye)
 add_subdirectory(io)
 add_subdirectory(ckpt)
 
+add_subdirectory(debug)
+
 add_executable(pic "simulator.cpp")
 target_include_directories(pic PRIVATE ${KERNEL_DIR} )
 target_link_libraries(pic PRIVATE field_updater field_communication particle_updater particle_migration particle_forces particle_scattering dye mpipp picgen io filesys logger ckpt particle_array timer)
