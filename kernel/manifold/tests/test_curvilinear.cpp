@@ -1,5 +1,5 @@
 #include "testfw/testfw.hpp"
-#include "manifold/curvilinear.hpp"
+#include "manifold/curvilinear_impl.hpp"
 
 using namespace apt;
 
@@ -30,7 +30,7 @@ auto PV = []( auto phi ) {
           };
 
 SCENARIO("LogSpherical special cases", "[metric]") {
-  using Coord = mani::coord<mani::coordsys::LogSpherical>;
+  using Coord = mani::LogSphericalCoordSys;
   aio::unif_real<double> unif;
 
   WHEN("velocity is radial") {
@@ -141,7 +141,7 @@ SCENARIO("LogSpherical special cases", "[metric]") {
 }
 
 SCENARIO("LogSpherical, test against with old geodesic mover, which presumably is correct", "[metric]") {
-  using Coord = mani::coord<mani::coordsys::LogSpherical>;
+  using Coord = mani::LogSphericalCoordSys;
   aio::unif_real<double> unif;
 
   int N = 1000000;
@@ -190,7 +190,7 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
 }
 
 SCENARIO("LogSpherical, test dx under axis crossing", "[metric]") {
-  using Coord = mani::coord<mani::coordsys::LogSpherical>;
+  using Coord = mani::LogSphericalCoordSys;
   aio::unif_real<double> unif;
 
   int N = 100000;

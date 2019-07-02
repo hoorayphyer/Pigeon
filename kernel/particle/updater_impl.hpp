@@ -1,5 +1,6 @@
 #include "particle/updater.hpp"
 #include "msh/mesh_shape_interplay.hpp"
+#include "manifold/curvilinear_impl.hpp"
 #include "manifold/grid.hpp"
 
 namespace particle {

@@ -28,7 +28,7 @@ SCENARIO("Time particle updater", "[particle]") {
   constexpr int DGrid = 2;
   using Real = double;
   using Real_J = double;
-  using Metric = mani::coord<mani::coordsys::LogSpherical>;
+  using Metric = mani::LogSphericalCoordSys;
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
   properties[species::electron] = {1,-1,"electron"};

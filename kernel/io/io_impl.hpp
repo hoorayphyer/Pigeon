@@ -9,6 +9,7 @@
 #include "particle/properties.hpp"
 #include <cmath>
 #include "apt/numeric.hpp"
+#include "manifold/curvilinear_impl.hpp"
 
 #include <silo.h> // for an ad hoc DBPutQuadmesh
 
