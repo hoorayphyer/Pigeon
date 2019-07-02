@@ -6,8 +6,6 @@
 #include "apt/vec.hpp"
 #include "apt/virtual_vec.hpp"
 
-#include <iostream>
-
 template < typename T >
 inline constexpr T PI = std::acos(-1.0L);
 
@@ -89,8 +87,6 @@ namespace mani {
         dx[i] = p[i] * dt;
       // now dx holds displacements under the local cartesian frame
 
-      std::cout << "a" << std::endl;
-
       { // compute final coordiantes. In this section, x remains untouched
         rot.set_angle(x[1]);
         dx[0] += std::exp( x[0] ); // dx[0] = r_i + d_r
@@ -98,12 +94,16 @@ namespace mani {
         is_massive = ( dt < 0 ); // NOTE is_massive now stores whether axis crossing happened when displacing in the theta direction
         dt = std::atan( dx[2] / dt ) + PI<T> * is_massive;
         dx[2] = std::sqrt( dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]);
-        dx[1] = std::acos( ( dx[0]*rot.cos() - dx[1]*rot.sin() ) / dx[2] );
+
+        dx[0] *= rot.cos();
+        dx[1] *= rot.sin();
+
+        dx[1] = ( dx[0]*dx[0] - dx[1]*dx[1] ) / ( dx[0] + dx[1] );
+        dx[1] = std::acos( dx[1] / dx[2] );
         std::swap( dt, dx[2] );
         dt = std::log(dt);
         // by now, dt = ln(r_final), dx[0] is free, dx[1] = \theta_final, dx[2] = \phi_final - \phi_init
       }
-      std::cout << "b" << std::endl;
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
         rot.set_angle( x[1] - PI<T> / 2.0 );
@@ -118,7 +118,6 @@ namespace mani {
         rot.rotate( p[0], p[1] );
       }
 
-      std::cout << "c" << std::endl;
       { // in this block we update x
         // NOTE we don't normalize cyclic coordinates such as \phi in spherical. This operation is designated to mesh_shape_interplay
         dx[0] = dt - x[0];
@@ -132,7 +131,6 @@ namespace mani {
         dx[2] -= PI<T> * is_massive;
 
       }
-      std::cout << "d" << std::endl;
 
       return dx;
     }
