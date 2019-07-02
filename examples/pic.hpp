@@ -24,9 +24,9 @@ namespace pic {
 
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
-  using Metric = mani::coord<mani::coordsys::Cartesian>;
+  using Metric = mani::CartesianCoordSys;
 
-  using real_j_t = long double;
+  using real_j_t = double;
 
   using real_export_t = float;
 };

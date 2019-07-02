@@ -2,7 +2,7 @@
 #include "field/communication_impl.hpp"
 #include "mpipp/mpi++.hpp"
 #include <algorithm> // for std::min
-#include "misc/nan.hpp"
+#include "debug/nan.hpp"
 
 // RATIONALE each node has a field::Field<int,3,2>, whose bulk is filled with its linearized cartesian carcoordinate.
 // TODOL test on DGrid = 3
@@ -29,11 +29,11 @@ void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
     }
   }
 
-  REQUIRE( misc::num_nan(vf) == 0 );
+  REQUIRE( debug::num_nan(vf) == 0 );
 
   sync_guard_cells_from_bulk(vf, cart);
 
-  REQUIRE( misc::num_nan(vf) == 0 );
+  REQUIRE( debug::num_nan(vf) == 0 );
 
   // return Ib_bulk and ext
   auto region_begin_extent =
@@ -85,11 +85,11 @@ void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
     for( auto& x : vf[i].data() ) x = val;
   }
 
-  REQUIRE( misc::num_nan(vf) == 0 );
+  REQUIRE( debug::num_nan(vf) == 0 );
 
   merge_guard_cells_into_bulk(vf, cart);
 
-  REQUIRE( misc::num_nan(vf) == 0 );
+  REQUIRE( debug::num_nan(vf) == 0 );
   { // Check bulk value
 
     // return Ib_bulk and ext

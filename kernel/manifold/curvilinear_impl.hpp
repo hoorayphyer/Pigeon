@@ -92,14 +92,14 @@ namespace mani {
         dx[0] += std::exp( x[0] ); // dx[0] = r_i + d_r
         dt = dx[0] * rot.sin() + dx[1] * rot.cos(); // NOTE now dt stores an important determinant
         is_massive = ( dt < 0 ); // NOTE is_massive now stores whether axis crossing happened when displacing in the theta direction
+
+        // rotate dx[0], dx[1] by x[1]. This solves the loss of significance under some circumstances when compiler optimization is strong, which results in either std::sqrt-ing a negative number or std::acos-ing a number larger than 1, causing NAN error
+        dx[0] = dx[0] * rot.cos() - dx[1] * rot.sin();
+        dx[1] = dt;
+
         dt = std::atan( dx[2] / dt ) + PI<T> * is_massive;
         dx[2] = std::sqrt( dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]);
-
-        dx[0] *= rot.cos();
-        dx[1] *= rot.sin();
-
-        dx[1] = ( dx[0]*dx[0] - dx[1]*dx[1] ) / ( dx[0] + dx[1] );
-        dx[1] = std::acos( dx[1] / dx[2] );
+        dx[1] = std::acos( dx[0] / dx[2] );
         std::swap( dt, dx[2] );
         dt = std::log(dt);
         // by now, dt = ln(r_final), dx[0] is free, dx[1] = \theta_final, dx[2] = \phi_final - \phi_init
