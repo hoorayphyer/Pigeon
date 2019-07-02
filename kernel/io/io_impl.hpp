@@ -3,7 +3,7 @@
 #include "mpipp/mpi++.hpp"
 #include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
-#include "field/communication.hpp"
+#include "field/sync.hpp"
 #include "msh/mesh_shape_interplay.hpp"
 #include "dye/ensemble.hpp"
 #include "particle/properties.hpp"
@@ -172,7 +172,7 @@ namespace io {
       for ( int comp = 0; comp < 3; ++comp ) {
         {
           downsample<DSRatio>( io_field, Efield, comp );
-          field::sync_guard_cells_from_bulk( io_field, *cart_opt );
+          field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "E" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -180,7 +180,7 @@ namespace io {
           put_to_master( varname, cart_opt->size());
 
           downsample<DSRatio>( io_field, Bfield, comp );
-          field::sync_guard_cells_from_bulk( io_field, *cart_opt );
+          field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "B" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -223,7 +223,7 @@ namespace io {
             }
           }
           downsample<DSRatio>( io_field, tmp, 0 );
-          field::sync_guard_cells_from_bulk( io_field, *cart_opt );
+          field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -299,8 +299,7 @@ namespace io {
         // TODO to physical space
         ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
         if ( cart_opt ) {
-          field::merge_guard_cells_into_bulk( tmp, *cart_opt );
-          field::sync_guard_cells_from_bulk( tmp, *cart_opt );
+          field::merge_sync_guard_cells( tmp, *cart_opt );
           fold_back_at_axis(tmp);
 
           downsample<DSRatio>(io_field, tmp, 0);
@@ -323,8 +322,7 @@ namespace io {
         // TODO to physical space
         ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].data().size() );
         if ( cart_opt ) {
-          field::merge_guard_cells_into_bulk( tmp, *cart_opt );
-          field::sync_guard_cells_from_bulk( tmp, *cart_opt );
+          field::merge_sync_guard_cells( tmp, *cart_opt );
           fold_back_at_axis(tmp);
 
           downsample<DSRatio>(io_field, tmp, 0);
@@ -511,7 +509,7 @@ namespace io {
       //   for ( const auto& I : apt::Block(export_mesh.bulk().extent()) ) {
       //     exfd[0]( I ) = (*exportee)( I, export_mesh );
       //   }
-      //   sync_guard_cells_from_bulk( *primary, exfd );
+      //   copy_sync_guard_cells( *primary, exfd );
       //   dbfile.put_var( name, meshname, exfd );
       // }
 
@@ -530,8 +528,7 @@ namespace io {
 
       //   ens.intra.reduce( ens.chief, exfd.data().data(), exfd.data.size() );
       //   if ( primary ) {
-      //     merge_guard_cells_into_bulk( exfd, primary );
-      //     sync_guard_cells_from_bulk( exfd, primary );
+      //     merge_sync_guard_cells( exfd, primary );
       //     dbfile.put_var( name, meshname, exfd );
       //   }
       // }

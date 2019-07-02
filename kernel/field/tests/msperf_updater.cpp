@@ -1,6 +1,6 @@
 #include "testfw/testfw.hpp"
 #include "field/updater_impl.hpp"
-#include "field/communication_impl.hpp"
+#include "field/sync_impl.hpp"
 #include "timer/timer.hpp"
 #include "mpipp/mpi++.hpp"
 

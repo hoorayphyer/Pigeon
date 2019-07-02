@@ -1,7 +1,7 @@
 #include "field/updater.hpp"
 
 #include "field/field.hpp"
-#include "field/communication.hpp"
+#include "field/sync.hpp"
 
 #include "old_field_solver/FieldUpdater.h"
 #include "old_field_solver/FieldCommunicator.h"
@@ -315,8 +315,8 @@ namespace field {
         };
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
-      field::sync_guard_cells_from_bulk( E, _cart );
-      field::sync_guard_cells_from_bulk( B, _cart );
+      field::copy_sync_guard_cells( E, _cart );
+      field::copy_sync_guard_cells( B, _cart );
     }
   }
 }

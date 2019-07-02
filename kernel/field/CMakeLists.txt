@@ -1,15 +1,15 @@
-add_library( field_communication SHARED communication.cpp )
-target_include_directories( field_communication PUBLIC ${KERNEL_DIR} ${CMAKE_SOURCE_DIR} )
-target_link_libraries( field_communication PRIVATE picgen mpipp )
+add_library( field_sync SHARED sync.cpp )
+target_include_directories( field_sync PUBLIC ${KERNEL_DIR} ${CMAKE_SOURCE_DIR} )
+target_link_libraries( field_sync PRIVATE picgen mpipp )
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 
 add_library(field_updater SHARED "updater.cpp")
-target_link_libraries(field_updater PRIVATE field_communication picgen old_field_solver)
+target_link_libraries(field_updater PRIVATE field_sync picgen old_field_solver)
 
 if (${ENABLE_TESTS})
   test_gen(field field) # DONE
   test_gen(field mesh) # DONE
-  test_gen(field communication mpipp) # DONE
-  msperf_gen(field updater mpipp old_field_solver field_communication)
+  test_gen(field sync mpipp) # DONE
+  msperf_gen(field updater mpipp old_field_solver field_sync)
 endif()

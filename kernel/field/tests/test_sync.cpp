@@ -1,5 +1,5 @@
 #include "testfw/testfw.hpp"
-#include "field/communication_impl.hpp"
+#include "field/sync_impl.hpp"
 #include "mpipp/mpi++.hpp"
 #include <algorithm> // for std::min
 #include "debug/nan.hpp"
@@ -17,7 +17,7 @@ double field_value( const std::vector<int>& coords, int comp ) {
   return res;
 }
 
-void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
+void test_copy_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
   const auto[ my_coords, dims, periodic] = cart.coords_dims_periodic();
   VF vf( mesh );
 
@@ -31,7 +31,7 @@ void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
 
   REQUIRE( debug::num_nan(vf) == 0 );
 
-  sync_guard_cells_from_bulk(vf, cart);
+  copy_sync_guard_cells(vf, cart);
 
   REQUIRE( debug::num_nan(vf) == 0 );
 
@@ -64,7 +64,7 @@ void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
         at_bdry = ( at_bdry || !(cart.shift(i_dim)[ 1 == lcr[i_dim] ]) );
       }
 
-      INFO("checking bulk areas in sync_guard");
+      INFO("checking bulk areas in copy_sync");
       for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
         double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
         CAPTURE( mpi::world.rank(), i_fld_dim, Ib, ext, lcr, at_bdry );
@@ -75,7 +75,7 @@ void test_sync_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
   }
 }
 
-void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
+void test_merge_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
   const auto[ my_coords, dims, periodic] = cart.coords_dims_periodic();
   VF vf( mesh );
 
@@ -87,7 +87,7 @@ void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
 
   REQUIRE( debug::num_nan(vf) == 0 );
 
-  merge_guard_cells_into_bulk(vf, cart);
+  merge_sync_guard_cells(vf, cart);
 
   REQUIRE( debug::num_nan(vf) == 0 );
   { // Check bulk value
@@ -127,7 +127,7 @@ void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
             }
           }
 
-          INFO("checking bulk areas in merge_guard");
+          INFO("checking bulk areas in merge_sync");
           CAPTURE( mpi::world.rank(), i_fld_dim, Ib, ext, lcr  );
           // NOTE since there is addition involved, we have to use Approx
           for ( auto I : apt::Block( ext ) )
@@ -136,41 +136,18 @@ void test_merge_guard ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
       }
     }
   }
-
-  { // Check guard cells as they need to be all cleared to avoid double depositing. // NOTE this check is very much the same as that in test_sync_guard
-    // return Ib_bulk and ext
-    auto region_begin_extent =
-      []( int region_coord, int mesh_ext, int g ) -> std::tuple<int,int>
-      {
-       switch (region_coord) {
-       case -1 : return {-g, g};
-       case 0 : return {0, mesh_ext - 2 * g};
-       case 1 : return {mesh_ext - 2*g, g};
-       }
-      };
-
-    apt::Index<2> Ib;
-    apt::Index<2> ext;
-    apt::Index<2> region;
-    // region[ith_dim] can be -1, 0, 1, corresponding to left part in bulk of width guard, bulk, right part in bulk of width guard
-    for ( region[1] = -1; region[1] < 2; ++region[1] ) {
-      std::tie(Ib[1], ext[1]) = region_begin_extent( region[1], mesh.extent()[1], mesh.guard() );
-      for ( region[0] = -1; region[0] < 2; ++region[0] ) {
-        std::tie(Ib[0], ext[0]) = region_begin_extent( region[0], mesh.extent()[0], mesh.guard() );
-        if ( region[0] == 0 && region[1] == 0 ) continue; // only check guard cells
-        bool at_bdry = false;
-        for ( int i = 0; i < 2; ++i ) {
-          if ( 0 == region[i] ) continue;
-          at_bdry = ( at_bdry || !(cart.shift(i)[ 1 == region[i] ]) );
+  { // Check guard cells by comparing with result from copy_sync
+    auto vf_dup = vf;
+    copy_sync_guard_cells(vf_dup, cart);
+    for ( int D = 0; D < 2; ++D ) {
+      for ( const auto& trI : mesh.project(D,mesh.origin(),mesh.extent()) ) {
+        for ( int n = -mesh.guard(); n < 0; ++n ) {
+          for ( int c = 0; c < VF::NDim; ++c )
+            REQUIRE( vf[c][trI|n] == vf_dup[c][trI|n] );
         }
-        // NOTE when the guard cell region is at the cartesian topology boundary. The values are not checked. This is because these values in practice are first taken care of by boundary conditions, which will set them to zero.
-        if ( at_bdry ) continue;
-
-        for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
-          INFO("checking guard cells in merge_guard");
-          CAPTURE( mpi::world.rank(), i_fld_dim, Ib, ext, region, at_bdry );
-          for ( auto I : apt::Block( ext ) )
-            REQUIRE( vf[i_fld_dim](I + Ib) == 0.0 );
+        for ( int n = mesh.bulk_dim(D); n < mesh.bulk_dim(D) + mesh.guard(); ++n ) {
+          for ( int c = 0; c < VF::NDim; ++c )
+            REQUIRE( vf[c][trI|n] == vf_dup[c][trI|n] );
         }
       }
     }
@@ -212,15 +189,15 @@ TEMPLATE_TEST_CASE("field commuication on cartesian topology", "[field][mpi]"
   }
 
   // NOTE somehow using same cart_opt across sync and merge tests cause the program to crash
-  WHEN("syncing guard") {
+  WHEN("copy syncing guard") {
     auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
-    if ( cart_opt ) test_sync_guard(mesh, *cart_opt);
+    if ( cart_opt ) test_copy_sync(mesh, *cart_opt);
   }
   mpi::world.barrier();
 
   WHEN("merging guard") {
     auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
-    if ( cart_opt) test_merge_guard(mesh, *cart_opt);
+    if ( cart_opt) test_merge_sync(mesh, *cart_opt);
   }
   mpi::world.barrier();
 

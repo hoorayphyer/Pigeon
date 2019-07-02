@@ -5,7 +5,7 @@
 
 #include "field/updater.hpp"
 #include "particle/updater.hpp"
-#include "field/communication.hpp"
+#include "field/sync.hpp"
 
 #include "particle/migration.hpp"
 #include "particle/sorter.hpp"
@@ -159,9 +159,9 @@ namespace pic {
         IC ic( _grid, _E, _B, _J, _particles );
         ic();
         init_ts = ic.initial_timestep();
-        field::sync_guard_cells_from_bulk(_E, *_cart_opt);
-        field::sync_guard_cells_from_bulk(_B, *_cart_opt);
-        field::sync_guard_cells_from_bulk(_J, *_cart_opt);
+        field::copy_sync_guard_cells(_E, *_cart_opt);
+        field::copy_sync_guard_cells(_B, *_cart_opt);
+        field::copy_sync_guard_cells(_J, *_cart_opt);
       }
       // broadcast to ensure uniformity
       mpi::world.broadcast( 0, &init_ts, 1 );
@@ -257,8 +257,7 @@ namespace pic {
             stamp.emplace();
           }
           (*_fbj)();
-          field::merge_guard_cells_into_bulk( _J, *_cart_opt );
-          field::sync_guard_cells_from_bulk( _J, *_cart_opt );
+          field::merge_sync_guard_cells( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
           (*_fbc_axis)();
           if (stamp) {

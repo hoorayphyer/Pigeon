@@ -1,5 +1,4 @@
 #include "msh/mesh_shape_interplay.hpp"
-#include "field/communication.hpp"
 #include "apt/block.hpp"
 
 namespace msh:: impl {
