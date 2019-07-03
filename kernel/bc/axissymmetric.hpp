@@ -28,22 +28,45 @@ namespace bc {
     }
 
     void operator() () {
-      // TODO Guard cells values are needed when doing interpolating E and B
+      // NOTE Guard cells values are needed when interpolating E and B
       // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
       const auto& mesh = _Efield.mesh();
       if ( _is_at_axis_lower ) {
-        int n = 0;
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-          _Efield[1][trI | n] = 0.0;
-          _Bfield[2][trI | n] = 0.0;
+        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
+          for ( int n = mesh.origin()[axis_dir]; n < 0; ++n ) {
+            // MIDWAY in axis_dir
+            _Efield[0][trI | n] = _Efield[0][ trI | ( -n - 1 ) ];
+            _Efield[2][trI | n] = - _Efield[2][ trI | ( -n - 1 ) ];
+            _Bfield[1][trI | n] = - _Bfield[1][ trI | ( -n - 1 ) ];
+
+            // INSITU in axis_dir
+            _Efield[1][trI | n] = - _Efield[1][ trI | -n ];
+            _Bfield[0][trI | n] = _Bfield[0][ trI | -n ];
+            _Bfield[2][trI | n] = - _Bfield[2][ trI | -n ];
+          }
+
+          _Efield[1][trI | 0] = 0.0;
+          _Bfield[2][trI | 0] = 0.0;
         }
       }
 
       if ( _is_at_axis_upper ) {
-        int n = _grid[1].dim();
-        for ( const auto& trI : mesh.project(1, {}, mesh.extent() ) ) {
-          _Efield[1][trI | n] = 0.0;
-          _Bfield[2][trI | n] = 0.0;
+        int bulk = mesh.bulk_dim(axis_dir);
+        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
+          for ( int n = bulk; n < bulk + mesh.guard(); ++n ) {
+            // MIDWAY in axis_dir
+            _Efield[0][trI | n] = _Efield[0][ trI | ( 2*bulk - 1 - n ) ];
+            _Efield[2][trI | n] = - _Efield[2][ trI | ( 2*bulk - 1 - n ) ];
+            _Bfield[1][trI | n] = - _Bfield[1][ trI | ( 2*bulk - 1 - n ) ];
+
+            // INSITU in axis_dir
+            _Efield[1][trI | n] = - _Efield[1][ trI | ( 2*bulk -n ) ];
+            _Bfield[0][trI | n] = _Bfield[0][ trI | ( 2*bulk -n ) ];
+            _Bfield[2][trI | n] = - _Bfield[2][ trI | ( 2*bulk -n ) ];
+          }
+
+          _Efield[1][trI | bulk] = 0.0;
+          _Bfield[2][trI | bulk] = 0.0;
         }
       }
     }
