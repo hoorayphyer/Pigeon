@@ -51,7 +51,7 @@ namespace bc {
       }
 
       if ( _is_at_axis_upper ) {
-        int bulk = mesh.bulk_dim(axis_dir);
+        const int bulk = mesh.bulk_dim(axis_dir);
         for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
           for ( int n = bulk; n < bulk + mesh.guard(); ++n ) {
             // MIDWAY in axis_dir

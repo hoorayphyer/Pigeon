@@ -31,31 +31,46 @@ namespace bc {
       const auto& mesh = _Jmesh.mesh();
       const int guard = mesh.guard();
 
+      auto fold_add =
+        []( auto& a, auto& b ) noexcept {
+          a += b;
+          b = a;
+        };
+
+      auto fold_sub =
+        []( auto& a, auto& b ) noexcept {
+          a -= b;
+          b = -a;
+        };
+
       if ( _is_at_axis_lower ) {
         for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n ) {
-            _Jmesh[0][ trI | n ] += _Jmesh[0][ trI | -1 - n ];
-            _Jmesh[2][ trI | n ] -= _Jmesh[0][ trI | -1 - n ];
+          for ( int n = mesh.origin()[axis_dir]; n < 0; ++n ) {
+            // MIDWAY in axis_dir
+            fold_add( _Jmesh[0][ trI | n ], _Jmesh[0][ trI | (-1-n) ] );
+            fold_sub( _Jmesh[2][ trI | n ], _Jmesh[2][ trI | (-1-n) ] );
+
+            // INSITU in axis_dir
+            fold_sub( _Jmesh[1][ trI | n ], _Jmesh[1][ trI | -n ] );
           }
 
           _Jmesh[1][trI | 0] = 0.0;
-          // TODO check the negative sign here
-          for ( int n = 0; n < guard; ++n )
-            _Jmesh[1][ trI | 1 + n ] -= _Jmesh[1][ trI | -1 - n ];
         }
       }
 
       if ( _is_at_axis_upper ) {
-        const int dim = mesh.bulk_dim(1);
+        const int bulk = mesh.bulk_dim(axis_dir);
         for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n ) {
-            _Jmesh[0][ trI | dim - 1 - n ] += _Jmesh[0][ trI | dim + n ];
-            _Jmesh[2][ trI | dim - 1 - n ] -= _Jmesh[0][ trI | dim + n ];
+          for ( int n = bulk; n < bulk + mesh.guard(); ++n ) {
+            // MIDWAY in axis_dir
+            fold_add( _Jmesh[0][ trI | n ], _Jmesh[0][ trI | (2*bulk-1-n) ] );
+            fold_sub( _Jmesh[2][ trI | n ], _Jmesh[2][ trI | (2*bulk-1-n) ] );
+
+            // INSITU in axis_dir
+            fold_sub( _Jmesh[1][ trI | n ], _Jmesh[1][ trI | 2*bulk-n ] );
           }
 
-          _Jmesh[1][trI | dim] = 0.0;
-          for ( int n = 0; n < guard - 1; ++n ) // NOTE -1 is because of the favoring-lower convention
-            _Jmesh[1][ trI | dim-1-n ] -= _Jmesh[1][ trI | dim+1+n ];
+          _Jmesh[1][trI | bulk] = 0.0;
 
         }
       }
