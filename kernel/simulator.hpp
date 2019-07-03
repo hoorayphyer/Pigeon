@@ -101,9 +101,6 @@ namespace pic {
                                                                                              particle::properties,
                                                                                              particle::force_gen<Real,PtcSpecs,particle::vParticle>,
                                                                                              particle::scat_gen<Real,PtcSpecs>) );
-      // NOTE TODO current implementation requires explicit touch-create before detailed balance. Also touch create is necessary to be consistent in data export
-      for ( const auto& [sp, ignore] : particle::properties )
-        const auto& x = _particles[sp];
     }
 
     void migrate_particles( int timestep ) {
@@ -145,6 +142,13 @@ namespace pic {
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
       _grid = supergrid;
       _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
+
+      // NOTE all species in the game should be created regardless of whether they appear on certain processes. This is to make the following work
+      // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
+      // 2. data export. PutMultivar requires every patch to output every species
+      for ( const auto& [sp, ignore] : particle::properties )
+        _particles.emplace( sp, particle::array<Real, PtcSpecs>() );
+
       if ( !_ens_opt ) return;
 
       const auto& ens = *_ens_opt;
