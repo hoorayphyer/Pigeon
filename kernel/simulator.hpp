@@ -182,7 +182,6 @@ namespace pic {
     void evolve( int timestep, Real dt ) {
 #ifdef PIC_DEBUG
       debug::timestep = timestep;
-      std::cout << debug::timestep << std::endl;
 #endif
 
       std::optional<tmr::Timestamp> stamp_all;
