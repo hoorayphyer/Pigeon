@@ -20,6 +20,10 @@
 #include "logger/logger.hpp"
 #include "timer/timer.hpp"
 
+#ifdef PIC_DEBUG
+#include "debug/debugger.hpp"
+#endif
+
 namespace pic {
   std::string this_run_dir;
 
@@ -176,6 +180,11 @@ namespace pic {
 
     // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
     void evolve( int timestep, Real dt ) {
+#ifdef PIC_DEBUG
+      debug::timestep = timestep;
+      std::cout << debug::timestep << std::endl;
+#endif
+
       std::optional<tmr::Timestamp> stamp_all;
       std::optional<tmr::Timestamp> stamp;
       if ( is_do(pic::msperf_mr, timestep) ) {

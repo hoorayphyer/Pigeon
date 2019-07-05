@@ -52,6 +52,11 @@ function(msperf_gen category name)
   target_link_libraries( ${test_target} PRIVATE timer logger )
 endfunction()
 
+if (${ENABLE_DEBUG})
+  add_subdirectory(debug)
+  link_libraries(debugger)
+endif()
+
 add_subdirectory(apt)
 add_subdirectory(timer)
 
@@ -70,8 +75,6 @@ add_subdirectory(particle)
 add_subdirectory(dye)
 add_subdirectory(io)
 add_subdirectory(ckpt)
-
-add_subdirectory(debug)
 
 add_executable(pic "simulator.cpp")
 target_include_directories(pic PRIVATE ${KERNEL_DIR} )

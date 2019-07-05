@@ -1,10 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
 project () # specify your project name here
 option(ENABLE_TESTS "Enable tests" ON)
+option(ENABLE_DEBUG "Enable debug" OFF)
 
 # message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
 if (${ENABLE_TESTS})
     enable_testing()
+endif()
+
+if (${ENABLE_DEBUG})
+  add_compile_definitions(PIC_DEBUG)
 endif()
 
 # Set CXX flags
