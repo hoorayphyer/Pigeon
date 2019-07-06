@@ -38,82 +38,31 @@ namespace dye::impl {
 namespace dye::impl {
   // loads = [ ens_tot_load_0, ens_size_0, ens_tot_load_1, ens_size_1... ]
   std::vector<int> calc_new_nprocs( const std::vector<particle::load_t>& loads_and_nprocs, particle::load_t target_load, const unsigned int max_nprocs ) {
-    // RATIONALE The following gives a close to the, if not THE, most optimal deployment
-    // 1. Priority Queue is used to accommodate excess or leftover of processes if any
-    // 2. Edge cases:
-    //    - make sure every ensemble retains at least one process
-    //    - when the load is below target_load, priority queue should do nothing to that ensemble even when there's idles. This is to save computational resources when the load is not that intense
-    //    - if load = 0 on some ensembles
-    //    - if total_load = 0
-    //    - if total_load < total_nprocs, this may result in ave_load_least_possible being zero
-    //    - only one ensemble
-
-    // first split loads into loads and nprocs
     const auto nens = loads_and_nprocs.size() / 2;
     std::vector<int> nproc;
     nproc.reserve(nens);
     nproc.resize(nens, 1);
 
-    particle::load_t total_load = 0;
-    unsigned int total_nfp = 0; // nfp means number of free procs, which excludes those that have to stay in the ensemble because there needs to be one at least
+    apt::priority_queue<long double> pq; // store average load in pq
+    // start with one process per ensemble
+    for ( int i = 0; i < nens; ++i )
+      pq.push( i, static_cast<long double>(loads_and_nprocs[2*i]) );
 
-    std::vector<particle::load_t> load;
-    {
-      load.reserve(nens);
-      load.resize(nens, 0);
+    int total_nprocs = 0;
+    for ( int i = 0; i < nens; ++i )
+      total_nprocs += loads_and_nprocs[2*i+1];
+    total_nprocs = std::max<int>(total_nprocs, max_nprocs);
 
-      for ( int i = 0; i < nens; ++i ) {
-        load[i] = loads_and_nprocs[2*i];
-        total_load += load[i];
-      }
+    int nfree = std::max<int>( total_nprocs - nens, 0 );
 
-      if ( 0 == total_load ) return nproc;
-
-      for ( int i = 0; i < nens; ++i ) {
-        nproc[i] = loads_and_nprocs[2*i+1];
-        total_nfp += nproc[i];
-      }
-
-      if ( nens == 1 ) return nproc;
-
-      // actual available number of procs = max( total_num_procs, accummulated_value_from_loads)
-      total_nfp = ( total_nfp > max_nprocs ? total_nfp : max_nprocs );
-      // we take out the primaries and proceed as if they were not there but the loads are the same
-      total_nfp -= nens;
+    while ( nfree ) {
+      auto[i, l] = pq.top();
+      pq.pop();
+      if ( l <= target_load ) break;
+      ++nproc[i];
+      --nfree;
+      pq.push( i, static_cast<long double>(loads_and_nprocs[2*i]) / nproc[i] );
     }
-
-    {
-      const particle::load_t ave_load_least_possible = (total_load / total_nfp) + 1; // a-bit-larger-than-ceiling. +1 to ensure it's not 0
-      // generate a tentative deployment that utilizes all total_nprocs
-      int surplus = total_nfp;
-      apt::priority_queue<long double> pq; // store average load in pq
-
-      // NOTE from here on nproc will hold number of free processes
-      for ( int i = 0; i < nens; ++i ) {
-        auto ave_load = static_cast<long double>(load[i]) / nproc[i]; // here nproc[i] includes primary
-        if ( ave_load <= target_load ) {
-          --nproc[i]; // take out the primary
-          continue;
-        }
-
-        nproc[i] = load[i] / ave_load_least_possible; // nproc[i] only has free processes
-        ave_load = static_cast<long double>(load[i]) / (nproc[i] + 1);
-        if ( ave_load > target_load ) pq.push( i, ave_load );
-        surplus -= nproc[i];
-      }
-      // NOTE one can show that by now surplus >= 0
-      while( surplus > 0 && !pq.empty() ) {
-        auto [i,avld] = pq.top(); // avld means ave_load
-        pq.pop();
-        ++nproc[i];
-        auto avld_new = static_cast<long double>(load[i]) / (nproc[i] + 1);
-        if ( avld_new > target_load ) pq.push( i, avld_new );
-        --surplus;
-      }
-    }
-
-    // add back primaries
-    for ( auto& x : nproc ) ++x;
 
     return nproc;
   }
@@ -351,13 +300,12 @@ namespace dye {
         intra.template reduce< mpi::IN_PLACE >( mpi::by::SUM, ens_opt->chief, &my_tot_load, 1 );
         int new_ens_size = 0;
         if ( cart_opt ) {
-          auto& nprocs_new = nproc_deficit;
-          nprocs_new.reserve(cart_opt->size());
-          nprocs_new.resize(cart_opt->size());
+          nproc_deficit.reserve(cart_opt->size());
+          nproc_deficit.resize(cart_opt->size());
           particle::load_t my_load[2] = { my_tot_load, intra.size() };
           auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
-          nprocs_new = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
-          new_ens_size = nprocs_new[cart_opt->rank()];
+          nproc_deficit = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
+          new_ens_size = nproc_deficit[cart_opt->rank()];
           for ( int i = 0; i < nproc_deficit.size(); ++i )
             nproc_deficit[i] -= loads_and_nprocs[2*i+1];
         }
