@@ -6,6 +6,7 @@
 
 namespace debug {
   extern int timestep;
+  extern int world_rank;
   extern std::vector<double> dbls;
   extern std::vector<int> ints;
   extern std::vector<float> flts;
