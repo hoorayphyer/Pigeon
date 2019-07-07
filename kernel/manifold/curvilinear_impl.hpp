@@ -61,40 +61,24 @@ namespace mani {
     static inline auto geodesic_move( X& x, P& p, T dt, bool is_massive ) noexcept {
       apt::array<T, P::NDim> dx;
 
-      // TODOL: in implementing this, we assumed 1) no crossing through center and 2) no crossing through symmetry axes
-      class Rotator {
-      private:
-        T _cos = 0.0;
-        T _sin = 0.0;
-      public:
-        inline void set_angle( T angle ) noexcept {
-          _cos = std::cos(angle);
-          _sin = std::sin(angle);
-        }
-
-        // in-place rotation
-        inline void rotate( T& v1, T& v2 ) const noexcept {
-          v1 = _cos * v1 - _sin * v2;
-          v2 = ( _sin * v1 + v2 ) / _cos;
-        }
-
-        inline T cos() const noexcept { return _cos; }
-        inline T sin() const noexcept { return _sin; }
-      } rot;
+      // TODOL: in implementing this, we assumed no crossing through center
 
       dt /= std::sqrt( is_massive + apt::sqabs(p) );
       for ( int i = 0; i < P::NDim; ++i )
         dx[i] = p[i] * dt;
       // now dx holds displacements under the local cartesian frame
 
+      T cos = 0.0;
+      T sin = 0.0;
       { // compute final coordiantes. In this section, x remains untouched
-        rot.set_angle(x[1]);
+        cos = std::cos(x[1]);
+        sin = std::sin(x[1]);
         dx[0] += std::exp( x[0] ); // dx[0] = r_i + d_r
-        dt = dx[0] * rot.sin() + dx[1] * rot.cos(); // NOTE now dt stores an important determinant
+        dt = dx[0] * sin + dx[1] * cos; // NOTE now dt stores an important determinant
         is_massive = ( dt < 0 ); // NOTE is_massive now stores whether axis crossing happened when displacing in the theta direction
 
         // rotate dx[0], dx[1] by x[1]. This solves the loss of significance under some circumstances when compiler optimization is strong, which results in either std::sqrt-ing a negative number or std::acos-ing a number larger than 1, causing NAN error
-        dx[0] = dx[0] * rot.cos() - dx[1] * rot.sin();
+        dx[0] = dx[0] * cos - dx[1] * sin;
         dx[1] = dt;
 
         dt = std::atan( dx[2] / dt ) + PI<T> * is_massive;
@@ -106,16 +90,25 @@ namespace mani {
       }
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
-        rot.set_angle( x[1] - PI<T> / 2.0 );
-        rot.rotate( p[0], p[1] );
+        cos = std::cos( x[1] - PI<T> / 2.0 );
+        sin = std::sin( x[1] - PI<T> / 2.0 );
+        dx[0] = p[0];
+        p[0] = dx[0] * cos - p[1] * sin;
+        p[1] = dx[0] * sin + p[1] * cos;
 
         // then rotate in r-phi plane. Location is rotated by dphi, so velocity components are rotated -dphi
-        rot.set_angle( -dx[2] );
-        rot.rotate( p[0], p[2] );
+        cos = std::cos( -dx[2] );
+        sin = std::sin( -dx[2] );
+        dx[0] = p[0];
+        p[0] = dx[0] * cos - p[2] * sin;
+        p[2] = dx[0] * sin + p[2] * cos;
 
         // last rotate in r-theta plane to new location. Location is rotated by theta_new - PI/2, so velocity components are rotated by PI/2 - theta_new
-        rot.set_angle( PI<T> / 2.0 - dx[1] );
-        rot.rotate( p[0], p[1] );
+        cos = std::cos( PI<T> / 2.0 - dx[1] );
+        sin = std::sin( PI<T> / 2.0 - dx[1] );
+        dx[0] = p[0];
+        p[0] = dx[0] * cos - p[1] * sin;
+        p[1] = dx[0] * sin + p[1] * cos;
       }
 
       { // in this block we update x
