@@ -3,6 +3,11 @@
 #include "manifold/curvilinear_impl.hpp"
 #include "manifold/grid.hpp"
 
+#ifdef PIC_DEBUG
+#include "debug/debugger.hpp"
+#include "logger/logger.hpp"
+#endif
+
 namespace particle {
   template < int DGrid,
              typename Real,
@@ -54,6 +59,32 @@ namespace particle {
 
     for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
       if( !ptc.is(flag::exist) ) continue;
+#ifdef PIC_DEBUG
+      apt::Vec<Real,PtcSpecs<Real>::Dim> q0 = ptc.q();
+      apt::Vec<Real,PtcSpecs<Real>::Dim> p0 = ptc.p();
+
+      auto show_ptc =
+        [&](const auto& ptc) {
+          lgr::file << "ptc.q() = (" << ptc.q()[0];
+          for ( int i = 1; i < PtcSpecs<Real>::Dim; ++i )
+            lgr::file << ", " << ptc.q()[i];
+          lgr::file << ")" << std::endl;
+
+          lgr::file << "ptc.p() = (" << ptc.p()[0];
+          for ( int i = 1; i < PtcSpecs<Real>::Dim; ++i )
+            lgr::file << ", " << ptc.p()[i];
+          lgr::file << ")" << std::endl;
+
+          lgr::file << "ptc q0 = " << q0 << std::endl;
+          lgr::file << "ptc p0 = " << p0 << std::endl;
+        };
+
+      if(debug::has_nan(ptc)) {
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANBEGINNING, code=" << debug::has_nan(ptc);
+        show_ptc(ptc);
+        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+      }
+#endif
 
       auto q0_std = msh::to_standard( _localgrid, ptc.q() );
       auto E_itpl = msh::interpolate( E, q0_std, shapef );
@@ -61,6 +92,13 @@ namespace particle {
 
       apt::Vec<Real,PtcSpecs<Real>::Dim> dp = -ptc.p();
       update_p( ptc, dt, E_itpl, B_itpl );
+#ifdef PIC_DEBUG
+      if(debug::has_nan(ptc)) {
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;;
+        show_ptc(ptc);
+        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+      }
+#endif
 
       if ( scat ) {
         dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
@@ -80,10 +118,24 @@ namespace particle {
             }
           }
         }
+#ifdef PIC_DEBUG
+        if(debug::has_nan(ptc)) {
+          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANSCAT, code=" << debug::has_nan(ptc) << std::endl;;
+          show_ptc(ptc);
+          throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+        }
+#endif
       }
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
       auto dq = update_q( ptc, dt );
+#ifdef PIC_DEBUG
+      if(debug::has_nan(ptc)) {
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;;
+        show_ptc(ptc);
+        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+      }
+#endif
       // TODO pusher handle boundary condition. Is it needed?
       if ( prop.charge_x != 0 ) {
         // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()

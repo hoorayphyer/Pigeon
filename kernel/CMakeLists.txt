@@ -52,18 +52,19 @@ function(msperf_gen category name)
   target_link_libraries( ${test_target} PRIVATE timer logger )
 endfunction()
 
+add_subdirectory(apt)
+add_subdirectory(logger)
+
 if (${ENABLE_DEBUG})
   add_subdirectory(debug)
-  link_libraries(debugger)
+  link_libraries(debugger logger)
 endif()
 
-add_subdirectory(apt)
 add_subdirectory(timer)
 
 add_subdirectory(filesys)
 add_subdirectory(mpipp)
 add_subdirectory(silopp)
-add_subdirectory(logger)
 add_subdirectory(random)
 
 add_subdirectory(manifold)
