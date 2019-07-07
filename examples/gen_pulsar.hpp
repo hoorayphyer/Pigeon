@@ -182,29 +182,27 @@ namespace particle {
       scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.0; };
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
-      ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
+      ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
 
-     // scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
-     // scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
+      scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
+      scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
     }
 
-    //{
-    //  scat::PhotonPairProduction<real_t,Specs> photon_scat;
-    //  // Photons are free to roam across all domain. They may produce pairs outside light cylinder
-    //  {
-    //    MagneticConvert<real_t,Specs> mc;
-    //    mc.B_thr = pic::mu0 / 10.0 ;
-    //    mc.mfp = 0.0;
-    //    photon_scat.add(mc);
-    //  }
-    //  {
-    //    TwoPhotonCollide<real_t,Specs> tc;
-    //    tc.mfp = 0.0;
-    //    photon_scat.add(tc);
-    //  }
+    {
+      scat::Scat<real_t,Specs> photon_scat;
+      // Photons are free to roam across all domain. They may produce pairs outside light cylinder
+      photon_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc) { return true; });
+      scat::MagneticConvert<real_t,Specs>::B_thr = pic::mu0 / 10.0;
+      scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
+      photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
-    //  scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
-    //}
+      scat::TwoPhotonCollide<real_t,Specs>::mfp = 5.0;;
+      photon_scat.channels.push_back( scat::TwoPhotonCollide<real_t,Specs>::test );
+
+      photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
+
+      scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
+    }
   }
 
 }

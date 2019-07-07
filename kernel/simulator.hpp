@@ -182,6 +182,7 @@ namespace pic {
     void evolve( int timestep, Real dt ) {
 #ifdef PIC_DEBUG
       debug::timestep = timestep;
+      debug::world_rank = mpi::world.rank();
 #endif
 
       std::optional<tmr::Timestamp> stamp_all;
