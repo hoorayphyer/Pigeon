@@ -9,7 +9,7 @@ namespace silo {
     else if ( std::is_same_v<T, short> ) return DB_SHORT;
     else if ( std::is_same_v<T, int> ) return DB_INT;
     else if ( std::is_same_v<T, long> ) return DB_LONG;
-    else if ( std::is_same_v<T, unsigned long long> ) return DB_LONG_LONG; // TODO check this
+    else if ( std::is_same_v<T, long long> ) return DB_LONG_LONG;
     else if ( std::is_same_v<T, float> ) return DB_FLOAT;
     else if ( std::is_same_v<T, double> ) return DB_DOUBLE;
     else return DB_NOTYPE;
@@ -139,8 +139,9 @@ namespace silo {
   INSTANTIATE_PUTTER(float);
   INSTANTIATE_PUTTER(double);
 
+  INSTANTIATE_WRITE(char);
   INSTANTIATE_WRITE(int);
   INSTANTIATE_WRITE(float);
   INSTANTIATE_WRITE(double);
-  INSTANTIATE_WRITE(unsigned long long);
+  INSTANTIATE_WRITE(long long);
 }

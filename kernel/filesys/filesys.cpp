@@ -73,3 +73,30 @@ namespace fs {
   }
 
 }
+
+namespace fs {
+  using std_dir_itr = filesystem::directory_iterator;
+
+  directory_iterator::directory_iterator()
+    : _itr( std_dir_itr() ) {}
+
+  directory_iterator::directory_iterator( std::string dir )
+    : _itr( std_dir_itr(filesystem::path(dir)) ) {}
+
+  bool directory_iterator::operator!=( const directory_iterator& other ) const {
+    return std::any_cast<const std_dir_itr&>(_itr) != std::any_cast<const std_dir_itr&>(other._itr);
+  }
+
+  directory_iterator::value_type directory_iterator::operator*() const {
+    return (*(std::any_cast<const std_dir_itr&>(_itr))).path();
+  }
+
+  directory_iterator& directory_iterator::operator++() {
+    ++(std::any_cast<std_dir_itr&>(_itr));
+    return *this;
+  }
+
+  directory_iterator directory_iterator::end() const noexcept {
+    return {};
+  }
+}

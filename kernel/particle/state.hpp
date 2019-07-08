@@ -28,15 +28,12 @@ namespace particle {
   // convention: Pos counts from the right. (Pos+N, Pos].
   template < std::size_t Pos, std::size_t N, typename T >
   constexpr auto getbits( const T& x ) noexcept {
-    static_assert(std::is_unsigned_v<T>);
     return ( x >> Pos ) & ~( ~0u << N );
   }
 
   template < std::size_t Pos, std::size_t N,
              typename T, typename U >
   constexpr void setbits( T& x, U y ) noexcept {
-    static_assert(std::is_unsigned_v<T>);
-    static_assert(std::is_unsigned_v<U>);
     x &= ~( ~( ~0u << N ) << Pos );
     x |= ( ( y &= ~( ~0u << N ) ) << Pos );
   }
