@@ -168,12 +168,14 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                 for ( auto sp : sps_exist ) {
                   REQUIRE( sf.var_exists(properties[sp].name) );
                   sf.cd(properties[sp].name);
+                  auto load = sf.read1<load_t>("load");
+                  REQUIRE( load == ens[l].rank[r][sp] );
                   for ( int i = 0; i < S<Real>::Dim; ++i ) {
                     {
                       std::string var = "q" + std::to_string(i+1);
                       REQUIRE( sf.var_exists(var) );
                       auto qs = sf.read1d<Real>(var);
-                      REQUIRE( qs.size() == ens[l].rank[r][sp] );
+                      REQUIRE( qs.size() == load );
                       for ( int j = 0; j < qs.size(); ++j )
                         REQUIRE( qs[j] == j * fq(i) );
                     }
@@ -181,7 +183,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                       std::string var = "p" + std::to_string(i+1);
                       REQUIRE( sf.var_exists(var) );
                       auto ps = sf.read1d<Real>(var);
-                      REQUIRE( ps.size() == ens[l].rank[r][sp] );
+                      REQUIRE( ps.size() == load );
                       for ( int j = 0; j < ps.size(); ++j )
                         REQUIRE( ps[j] == - j * fp(i) );
                     }
@@ -191,7 +193,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                     StateClass state;
                     state.set( sp, flag::exist );
                     auto ss = sf.read1d<State_t>("state");
-                    REQUIRE( ss.size() == ens[l].rank[r][sp] );
+                    REQUIRE( ss.size() == load );
                     for ( auto s : ss ) REQUIRE( s == state.s );
                   }
                   sf.cd("..");

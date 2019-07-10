@@ -34,10 +34,12 @@ namespace ckpt {
   template < typename T, template < typename > class PtcSpecs >
   struct ParticleArrayCkpt {
     void save( silo::file_t& dbfile, const particle::species& sp, const particle::array<T,PtcSpecs>& ptcs ) {
-      // if ( ptcs.size() == 0 ) return; // TODO for uniformity, construct all the structures anyway
-      constexpr auto DPtc = PtcSpecs<T>::Dim;
       dbfile.mkcd(particle::properties.at(sp).name);
-      {
+      particle::load_t num = ptcs.size();
+      // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
+      dbfile.write("load", num);
+      if ( num != 0 ) {
+        constexpr auto DPtc = PtcSpecs<T>::Dim;
         for ( int i = 0; i < DPtc; ++i ) {
           dbfile.write("q"+std::to_string(i+1), ptcs._q[i].data(), {ptcs._q[i].size()} );
           dbfile.write("p"+std::to_string(i+1), ptcs._p[i].data(), {ptcs._p[i].size()} );
@@ -49,21 +51,22 @@ namespace ckpt {
 
     void load( silo::file_t& dbfile, const particle::species& sp, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
       dbfile.cd( particle::properties.at(sp).name );
-      particle::load_t N = dbfile.var_length("q1");
-      if ( 0 == N ) return;
+      auto N = dbfile.read1<particle::load_t>("load");
 
-      auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
-      auto size_old = ptcs.size();
-      ptcs.resize(size_old + num);
+      if ( 0 != N ) {
+        auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
+        auto size_old = ptcs.size();
+        ptcs.resize(size_old + num);
 
-      constexpr auto DPtc = PtcSpecs<T>::Dim;
-      apt::array<int, 3> slice { from, num, 1 };
-      {
-        for ( int i = 0; i < DPtc; ++i ) {
-          dbfile.readslice("q"+std::to_string(i+1), slice, ptcs._q[i].data() + size_old );
-          dbfile.readslice("p"+std::to_string(i+1), slice, ptcs._p[i].data() + size_old );
+        constexpr auto DPtc = PtcSpecs<T>::Dim;
+        apt::array<int, 3> slice { from, num, 1 };
+        {
+          for ( int i = 0; i < DPtc; ++i ) {
+            dbfile.readslice("q"+std::to_string(i+1), slice, ptcs._q[i].data() + size_old );
+            dbfile.readslice("p"+std::to_string(i+1), slice, ptcs._p[i].data() + size_old );
+          }
+          dbfile.readslice("state", slice, ptcs._state.data() + size_old );
         }
-        dbfile.readslice("state", slice, ptcs._state.data() + size_old );
       }
       dbfile.cd("..");
     }
