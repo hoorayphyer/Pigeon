@@ -30,15 +30,14 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 20000;
+  inline constexpr int total_timesteps = 200000;
   inline constexpr real_t dt = 0.003;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
   = {{ { 0.0, std::log(30.0), 256 }, { 0.0, PI, 256 } }};
   inline constexpr int guard = 1;
 
-  inline constexpr int Np = 1;
-  inline constexpr real_t epsilon = 1.0 / 5.0;
+  inline constexpr real_t wdt_pic = 1.0 / 30.0;
 }
 
 namespace pic {
@@ -68,6 +67,7 @@ namespace pic {
 
   inline constexpr ModuleRange checkpoint_mr { false, 0, 10000 };
   inline constexpr int num_checkpoint_parts = 4;
+  inline constexpr std::optional<float> checkpoint_hourly;
 
   inline constexpr ModuleRange dlb_mr { false, 0, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
