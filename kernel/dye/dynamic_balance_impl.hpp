@@ -2,7 +2,6 @@
 #include "mpipp/mpi++.hpp"
 #include "particle/c_particle.hpp"
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
-#include "particle/load_type.hpp"
 
 // bifurcate
 namespace dye::impl {
@@ -277,44 +276,81 @@ namespace dye {
 
 // dynamic_load_balance
 namespace dye {
-  template < typename T, template < typename > class PtcSpecs, int DGrid >
-  void dynamic_load_balance( particle::map<particle::array<T, PtcSpecs>>& particles,
-                             std::optional<Ensemble<DGrid>>& ens_opt,
-                             const std::optional<mpi::CartComm>& cart_opt,
-                             unsigned int target_load ) {
+  template < int DGrid >
+  std::optional<Ensemble<DGrid>>
+  deploy ( particle::load_t my_tot_load,
+           const std::optional<Ensemble<DGrid>>& ens_opt_old,
+           const std::optional<mpi::CartComm>& cart_opt,
+           unsigned int target_load ) {
+    std::optional<Ensemble<DGrid>> ens_opt_new;
+
     // NOTE deficit = desired number - current number
     std::vector<int> nproc_deficit; // significant only at primaries
+    bool is_active = ens_opt_old;
 
-    bool is_leaving = false;
     { // Step 1. based on particle load, primaries figure out the surpluses. If an ensemble has surplus > 0, the primary will flag the last few processes to be leaving the ensemble.
-      if ( ens_opt ) {
-        particle::load_t my_tot_load = 0; // a process within an ensemble
-        for ( auto&[sp,ptcs] : particles ) {
-          if ( sp == particle::species::photon )
-            my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
-          else
-            my_tot_load += ptcs.size();
-        }
-
-        const auto& intra = ens_opt -> intra;
-        intra.template reduce< mpi::IN_PLACE >( mpi::by::SUM, ens_opt->chief, &my_tot_load, 1 );
+      if ( ens_opt_old ) {
+        const auto& ens = *ens_opt_old;
+        ens.intra.template reduce< mpi::IN_PLACE >( mpi::by::SUM, ens.chief, &my_tot_load, 1 );
         int new_ens_size = 0;
         if ( cart_opt ) {
-          nproc_deficit.reserve(cart_opt->size());
-          nproc_deficit.resize(cart_opt->size());
-          particle::load_t my_load[2] = { my_tot_load, intra.size() };
+          particle::load_t my_load[2] = { my_tot_load, ens.intra.size() };
           auto loads_and_nprocs = cart_opt->allgather(my_load, 2);
           nproc_deficit = impl::calc_new_nprocs( loads_and_nprocs, target_load, mpi::world.size() );
           new_ens_size = nproc_deficit[cart_opt->rank()];
           for ( int i = 0; i < nproc_deficit.size(); ++i )
             nproc_deficit[i] -= loads_and_nprocs[2*i+1];
         }
-        intra.broadcast(ens_opt->chief, &new_ens_size, 1);
-        if ( intra.rank() >= new_ens_size ) is_leaving = true;
+        ens.intra.broadcast(ens.chief, &new_ens_size, 1);
+        if ( ens.intra.rank() >= new_ens_size ) is_active = false;
+        if ( cart_opt ) { // clear negative deficits
+          for ( auto& x : nproc_deficit ) x = ( x > 0 ) ? x : 0;
+        }
       }
     }
 
-    { // Step 2. Leaving processes clear up and return to idle
+    { // Step 2. Assign ensemble labels to all processes and create new ensemble. Need an intercommunicator between all primaries and all idles
+      std::optional<unsigned int> new_label;
+      bool is_replica = is_active && !cart_opt;
+      auto prmy_idle_comm = std::get<0>( impl::bifurcate( mpi::world, is_replica ) );
+      if ( is_replica ) new_label.emplace(ens_opt_old->label());
+      else {
+        // treat primaries and idles here
+        std::optional<unsigned int> cur_label;
+        if ( cart_opt ) cur_label.emplace( ens_opt_old->label() );
+
+        auto[comm, job_market] = impl::bifurcate( prmy_idle_comm, is_active );
+        new_label = impl::assign_labels( job_market, nproc_deficit, cur_label );
+      }
+      auto new_ens_intra_opt = mpi::world.split( new_label );
+
+      ens_opt_new = create_ensemble<DGrid>( cart_opt, new_ens_intra_opt );
+    }
+
+    return ens_opt_new;
+  }
+
+  template < typename T, template < typename > class PtcSpecs, int DGrid >
+  void dynamic_load_balance( particle::map<particle::array<T, PtcSpecs>>& particles,
+                             std::optional<Ensemble<DGrid>>& ens_opt,
+                             const std::optional<mpi::CartComm>& cart_opt,
+                             unsigned int target_load ) {
+    std::optional<Ensemble<DGrid>> ens_opt_new;
+    { // Deploy
+      particle::load_t my_tot_load = 0;
+      if ( ens_opt ) {
+        for ( auto&[sp,ptcs] : particles ) {
+          if ( sp == particle::species::photon )
+            my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
+          else
+            my_tot_load += ptcs.size();
+        }
+      }
+      ens_opt_new = deploy( my_tot_load, ens_opt, cart_opt, target_load );
+    }
+
+    { // Leaving processes clear up
+      bool is_leaving = ens_opt && ( !ens_opt_new || ( ens_opt->label() != ens_opt_new->label() ) );
       if ( ens_opt ) {
         auto[comm, itc_opt] = impl::bifurcate( ens_opt->intra, is_leaving );
         if ( itc_opt ) {
@@ -333,42 +369,13 @@ namespace dye {
           }
         }
       }
-      if ( cart_opt ) { // clear negative deficits
-        for ( auto& x : nproc_deficit ) x = ( x > 0 ) ? x : 0;
-      }
-
-      // clear ens_opt properly, which needs 1. we do the following outside the above scope so as to make sure [comm, itc_opt] are deallocated, 2. freeing communicator is collective though implemented as local operation, 3. we'd like to enforce the rule that idles have empty ens_opt.
-      if ( ens_opt ) {
-        for ( auto& itc : ens_opt->inter ) {
-          itc[LFT].reset();
-          itc[RGT].reset();
-        }
-        ens_opt->intra.reset();
-      }
-      if ( is_leaving ) ens_opt.reset();
+    }
+    { // clear ens_opt properly, which needs 1. we do the following outside the above scope so as to make sure [comm, itc_opt] are deallocated, 2. freeing communicator is collective though implemented as local operation, so everyone needs to call.
+      ens_opt.reset();
+      ens_opt.swap(ens_opt_new);
     }
 
-    { // Step 3. Assign ensemble labels to all processes and update Ensemble. Need an intercommunicator between all primaries and all idles
-      std::optional<unsigned int> new_label;
-      bool is_replica = ens_opt && !cart_opt;
-      auto prmy_idle_comm = std::get<0>( impl::bifurcate( mpi::world, is_replica ) );
-      if ( is_replica ) new_label.emplace(ens_opt->label());
-      else {
-        // treat primaries and idles here
-        std::optional<unsigned int> cur_label;
-        if ( cart_opt ) cur_label.emplace( ens_opt->label() );
-
-        bool is_idle = !ens_opt;
-        auto[comm, job_market] = impl::bifurcate( prmy_idle_comm, is_idle );
-        new_label = impl::assign_labels( job_market, nproc_deficit, cur_label );
-      }
-      auto new_ens_intra_opt = mpi::world.split( new_label );
-
-      auto new_ens_opt = create_ensemble<DGrid>( cart_opt, new_ens_intra_opt );
-      ens_opt.swap(new_ens_opt);
-    }
-
-    { // Step 4. Perform a complete rebalance on all ensembles together. NOTE TODOL touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we assume all species are touch created before dynamic_load_balance.
+    { // Perform a complete rebalance on all ensembles together. NOTE TODOL touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we assume all species are touch created before dynamic_load_balance.
       if ( ens_opt ) {
         for ( auto&[sp, ptcs] : particles ) {
           detailed_balance(ptcs, ens_opt->intra);

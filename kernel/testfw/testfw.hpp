@@ -97,9 +97,26 @@ namespace aio {
   }
 }
 
-// #include "logger/logger.hpp"
-// namespace aio {
-  
-// }
+namespace aio {
+  std::optional<int> color_from_nprocs( std::vector<int> nprocs, const int rank ) {
+    std::optional<int> color;
+    auto num_ens = nprocs.size();
+    if ( rank < num_ens ) color.emplace(rank);
+    else {
+      int count = num_ens;
+      for ( int i = 0; i < num_ens; ++i ) {
+        if ( rank >= count && rank < count + nprocs[i] ) {
+          color.emplace(i);
+          break;
+        } else {
+          count += nprocs[i];
+        }
+      }
+    }
+
+    return color;
+  }
+}
+
 
 #endif

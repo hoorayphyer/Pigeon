@@ -19,15 +19,25 @@ namespace ckpt {
   template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs >
-  void save_checkpoint( std::string prefix, const int num_parts,
-                        const std::optional<dye::Ensemble<DGrid>>& ens_opt,
-                        int timestep,
-                        const field::Field<Real, 3, DGrid>& E,
-                        const field::Field<Real, 3, DGrid>& B,
-                        const particle::map<particle::array<Real,PtcSpecs>>& particles
-                        );
+  std::string save_checkpoint( std::string prefix, const int num_parts,
+                               const std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                               int timestep,
+                               const field::Field<Real, 3, DGrid>& E,
+                               const field::Field<Real, 3, DGrid>& B,
+                               const particle::map<particle::array<Real,PtcSpecs>>& particles
+                               );
 
-  // void save_tracing();
+  template < int DGrid,
+             typename Real,
+             template < typename > class PtcSpecs >
+  int load_checkpoint( std::string dir,
+                       std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                       const std::optional<mpi::CartComm>& cart_opt,
+                       field::Field<Real, 3, DGrid>& E,
+                       field::Field<Real, 3, DGrid>& B,
+                       particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       int target_load
+                       );
 }
 
 #endif

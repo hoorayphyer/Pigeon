@@ -4,6 +4,11 @@
 #include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
 #include "particle/properties.hpp"
+#include "particle/load_type.hpp"
+#include "field/field.hpp"
+#include <cassert>
+#include "dye/dynamic_balance.hpp"
+#include "dye/scatter_load.hpp"
 
 // auxilliary
 namespace ckpt {
@@ -11,7 +16,6 @@ namespace ckpt {
   struct FieldCkpt {
     template < int DField >
     void save( silo::file_t& dbfile, const std::string& name, const field::Field<T,DField,DGrid>& f ) {
-      std::vector<int> dims(DGrid);
       for ( int comp = 0; comp < DField; ++comp ) {
         auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
         dbfile.write( n, f._comps[comp] );
@@ -19,13 +23,18 @@ namespace ckpt {
     }
 
     template < int DField >
-    void load( silo::file_t& dbfile, const std::string& name, const field::Field<T,DField,DGrid>& f ) {}
+    void load( silo::file_t& dbfile, const std::string& name, field::Field<T,DField,DGrid>& f ) {
+      for ( int comp = 0; comp < DField; ++comp ) {
+        auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
+        dbfile.read( n, f._comps[comp] );
+      }
+    }
   };
 
   template < typename T, template < typename > class PtcSpecs >
   struct ParticleArrayCkpt {
     void save( silo::file_t& dbfile, const particle::species& sp, const particle::array<T,PtcSpecs>& ptcs ) {
-      if ( ptcs.size() == 0 ) return;
+      // if ( ptcs.size() == 0 ) return; // TODO for uniformity, construct all the structures anyway
       constexpr auto DPtc = PtcSpecs<T>::Dim;
       dbfile.mkcd(particle::properties.at(sp).name);
       {
@@ -38,26 +47,48 @@ namespace ckpt {
       dbfile.cd("..");
     }
 
-    void load( silo::file_t& dbfile, const particle::species& sp, const particle::array<T,PtcSpecs>& ptcs ) {
+    void load( silo::file_t& dbfile, const particle::species& sp, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
+      dbfile.cd( particle::properties.at(sp).name );
+      particle::load_t N = dbfile.var_length("q1");
+      if ( 0 == N ) return;
+
+      auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
+      auto size_old = ptcs.size();
+      ptcs.resize(size_old + num);
+
+      constexpr auto DPtc = PtcSpecs<T>::Dim;
+      apt::array<int, 3> slice { from, num, 1 };
+      {
+        for ( int i = 0; i < DPtc; ++i ) {
+          dbfile.readslice("q"+std::to_string(i+1), slice, ptcs._q[i].data() + size_old );
+          dbfile.readslice("p"+std::to_string(i+1), slice, ptcs._p[i].data() + size_old );
+        }
+        dbfile.readslice("state", slice, ptcs._state.data() + size_old );
+      }
+      dbfile.cd("..");
     }
 
   };
 }
 
 namespace ckpt {
+  // TODO save random seed
   template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs >
-  void save_checkpoint( std::string prefix, const int num_parts,
-                      const std::optional<dye::Ensemble<DGrid>>& ens_opt,
-                      int timestep,
-                      const field::Field<Real, 3, DGrid>& E,
-                      const field::Field<Real, 3, DGrid>& B,
-                      const particle::map<particle::array<Real,PtcSpecs>>& particles
-                      ) {
+  std::string save_checkpoint( std::string prefix, const int num_parts,
+                               const std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                               int timestep,
+                               const field::Field<Real, 3, DGrid>& E,
+                               const field::Field<Real, 3, DGrid>& B,
+                               const particle::map<particle::array<Real,PtcSpecs>>& particles
+                               ) {
     bool is_idle = !ens_opt;
-    auto active = mpi::world.split( {is_idle} );
-    if ( is_idle ) return;
+    int key = 0;
+    if ( !is_idle ) key = ens_opt -> label();
+    // use ensemble label to put same ensemble processes together
+    auto active = mpi::world.split( {is_idle}, key );
+    if ( is_idle ) return "";
     const auto& ens = *ens_opt;
 
     char str_ts [10];
@@ -66,11 +97,14 @@ namespace ckpt {
     prefix = prefix + "/checkpoints/checkpoint_timestep" + str_ts;
 
     silo::Pmpio pmpio;
+
+    int num_per_part = active->size() / num_parts + ( active->size() % num_parts != 0 );
+
     {
-      pmpio.filename = prefix + "/part" + std::to_string( active->rank() % num_parts ) + ".silo";
+      pmpio.filename = prefix + "/part" + std::to_string( active->rank() / num_per_part ) + ".silo";
       pmpio.dirname = "/ensemble" + std::to_string(ens.label());
 
-      pmpio.comm = active -> split( active->rank() % num_parts );
+      pmpio.comm = active -> split( active->rank() / num_per_part );
       fs::mpido(*active, [&](){fs::create_directories(prefix);} );
     }
 
@@ -85,14 +119,37 @@ namespace ckpt {
               if ( !dbfile.exists("/cartesian_partition") ) {
                 dbfile.write( "/cartesian_partition", ens.cart_dims.begin(), {DGrid} );
               }
+              if ( !dbfile.exists("/species") ) {
+                using T = std::underlying_type_t<particle::species>;
+                std::vector<T> sps;
+                for ( const auto& [sp, ptcs] : particles )
+                  sps.push_back( static_cast<T>(sp) );
+                dbfile.write( "/species", sps  );
+              }
             }
 
             { // write ensemble-wise data
+              if ( !dbfile.exists("label") ) {
+                dbfile.write( "label", ens.label() );
+              }
+
               if ( !dbfile.exists("cartesian_coordinates") ) {
                 dbfile.write( "cartesian_coordinates", ens.cart_coords.begin(), {DGrid} );
               }
+
+              std::vector<particle::load_t> loads;
+              loads.reserve(particles.size());
+              for ( const auto& [sp, ptcs] : particles )
+                loads.push_back(ptcs.size());
+
+              ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
+
               FieldCkpt<Real,DGrid> ckpt;
               if ( ens.intra.rank() == ens.chief ) {
+                int idx = 0;
+                for ( const auto& [sp, ptcs] : particles )
+                  dbfile.write( particle::properties[sp].name + "_load", loads[idx++] );
+
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
               }
@@ -100,6 +157,8 @@ namespace ckpt {
 
             dbfile.mkcd( "rank" + std::to_string(ens.intra.rank()) );
             { // write process specific data
+              int r = ens.intra.rank();
+              dbfile.write( "r", r );
               ParticleArrayCkpt<Real, PtcSpecs> ckpt;
               for ( const auto& [sp, ptcs] : particles ) {
                 ckpt.save( dbfile, sp, ptcs );
@@ -109,6 +168,131 @@ namespace ckpt {
           }
       );
 
+    return prefix;
+
+  }
+
+  template < int DGrid,
+             typename Real,
+             template < typename > class PtcSpecs >
+  int load_checkpoint( std::string dir,
+                       std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                       const std::optional<mpi::CartComm>& cart_opt,
+                       field::Field<Real, 3, DGrid>& E,
+                       field::Field<Real, 3, DGrid>& B,
+                       particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       int target_load
+                       ) {
+    int resume_ts = 0;
+    using T = std::underlying_type_t<particle::species>;
+    int num_sps = 0;
+    std::vector<T> sps;
+    int num_ens = 0;
+    particle::load_t myload = 0;
+
+    // rank0 read data
+    if ( mpi::world.rank() == 0 ) {
+      auto dir_itr = fs::directory_iterator(dir);
+      // TODO what if there is no file?
+      auto dbfile = silo::open(*dir_itr, silo::Mode::Read);
+      assert( dbfile.var_exists("/timestep") );
+      assert( dbfile.var_exists("/cartesian_partition") );
+      assert( dbfile.var_exists("/species") );
+
+      dbfile.read("/timestep", &resume_ts);
+      {
+        int ndims = dbfile.var_length("/cartesian_partition");
+        std::vector<int> parts(ndims);
+        dbfile.read("/cartesian_partition", parts.data());
+        num_ens = 1;
+        for ( auto x : parts ) num_ens *= x;
+      }
+      {
+        num_sps = dbfile.var_length("/species");
+        sps.resize( num_sps );
+        dbfile.read("/species", sps.data() );
+      }
+    }
+    // rank0 broadcast data
+    {
+      int buf[3] = {resume_ts, num_sps, num_ens };
+      mpi::world.broadcast( 0, buf, 3 );
+      if ( mpi::world.rank() != 0 ) {
+        resume_ts = buf[0];
+        num_sps = buf[1];
+        num_ens = buf[2];
+        sps.resize(num_sps);
+      }
+      mpi::world.broadcast( 0, sps.data(), sps.size() );
+    }
+    // each primary figure out its load
+    if ( cart_opt ) {
+      assert( ens_opt );
+      const int mylabel = ens_opt->label();
+      for ( auto f : fs::directory_iterator(dir) ) {
+        bool is_found = false;
+        auto sf = silo::open(f, silo::Mode::Read);
+        for ( const auto& dname : sf.toc_dir() ) {
+          if ( sf.var_exists( dname + "/rank0" ) ) {
+            int l = sf.read1<int>(dname+"/label");
+            if ( mylabel == l ) {
+              sf.cd(dname);
+              for ( int i = 0; i < num_sps; ++i ) {
+                auto sp = static_cast<particle::species>(sps[i]);
+                std::string entry = particle::properties[sp].name + "_load";
+                assert( sf.var_exists(entry) );
+                myload += sf.read1<particle::load_t>(entry);
+              }
+              is_found = true;
+              sf.cd("..");
+              break;
+            }
+          }
+        }
+        if ( is_found ) break;
+      }
+    }
+
+    // dynamic assign computational resources
+    {
+      auto ens_opt_new = dye::deploy(myload, ens_opt, cart_opt, target_load);
+      ens_opt.swap(ens_opt_new);
+    }
+
+    // by this step, all processes should have ens_opt set properly. The real loading begins now
+    if ( !ens_opt ) return resume_ts;
+    {
+      const int mylabel = ens_opt->label();
+      const int myrank = ens_opt->rank();
+      const auto ens_size = ens_opt->size();
+
+      FieldCkpt<Real,DGrid> f_ckpt;
+      ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;
+      for ( auto f : fs::directory_iterator(dir) ) {
+        auto sf = silo::open(f, silo::Mode::Read);
+        for ( const auto& dname : sf.toc_dir() ) {
+          if ( dname.find("ensemble") != 0 ) continue;
+          int l = sf.read1<int>(dname+"/label");
+          if ( l != mylabel ) continue;
+          sf.cd(dname);
+          for ( const auto& rdir : sf.toc_dir() ) {
+            if ( rdir.find("rank") != 0 ) continue;
+            sf.cd(rdir);
+            int r = sf.read1<int>("r");
+            if ( 0 == r && 0 == myrank ) {
+              f_ckpt.load( sf, "E", E );
+              f_ckpt.load( sf, "B", B );
+            }
+            for ( auto i : sps ) {
+              auto sp = static_cast<particle::species>(i);
+              p_ckpt.load( sf, sp, particles.at(sp), myrank + r, ens_size );
+            }
+            sf.cd("..");
+          }
+          sf.cd("..");
+        }
+      }
+    }
 
   }
 }

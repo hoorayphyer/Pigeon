@@ -126,12 +126,7 @@ namespace dye {
 namespace dye {
   template < int DGrid >
   int Ensemble<DGrid>::label() const noexcept {
-    int i = DGrid - 1;
-    int result = cart_coords[i];
-    for ( --i; i > -1; --i )
-      result = cart_coords[i] + result * cart_dims[i];
-
-    return result;
+    return chief_cart_rank;
   }
 
 

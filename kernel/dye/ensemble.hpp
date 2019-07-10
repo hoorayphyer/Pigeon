@@ -39,7 +39,7 @@ namespace dye {
   std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart, const std::optional<mpi::Comm>& intra );
 
   template < int DGrid >
-  std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart ); // create ensemble only consists of chief itself
+  std::optional<Ensemble<DGrid>> create_ensemble( const std::optional<mpi::CartComm>& cart ); // create ensemble that only consists of chief itself
 
 }
 
