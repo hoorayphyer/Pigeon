@@ -1,0 +1,36 @@
+#! /bin/bash
+tnow=`date +%F-%H-%M-%S`
+project_name=${PWD##*/} # the current direcoty name. copied from https://stackoverflow.com/questions/1371261/get-current-directory-name-without-full-path-in-a-bash-script
+
+stage_dir=".stages"
+if [[ ! -d $stage_dir ]]; then
+    mkdir $stage_dir
+fi
+
+while [[ -d $stage_dir/$tnow ]]; do
+    tnow=${tnow}x
+done
+
+mkdir $stage_dir/$tnow
+cp bin/pic CMakeLists.txt pic.hpp gen.hpp $stage_dir/$tnow/
+
+if [[ -f job.sh ]]; then
+    cp job.sh $stage_dir/$tnow/
+fi
+
+tmp=".tmp_message$tnow"
+printf "%s\n" "## Write message below." > $tmp
+vim $tmp
+message=`tail -n "+2" $tmp`
+rm $tmp
+
+cd $stage_dir/$tnow
+jobID=$( echo "$@")
+
+journal_file="journal.txt"
+printf "%s\n" \
+       "Project := $project_name"\
+       "StageTime := $tnow"\
+       "Message := $message"\
+       "JobID := $jobID"\
+       > $journal_file

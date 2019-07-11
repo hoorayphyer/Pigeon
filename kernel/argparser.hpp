@@ -4,7 +4,7 @@
 namespace pic {
 
   struct CLIArgs {
-    std::string journal_file = ".journal_default";
+    std::string journal_file = "journal.txt";
     std::string parameters_file{};
   };
 

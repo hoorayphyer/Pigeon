@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
     // journaling
     fs::mpido( mpi::world, [&](){
                              std::ofstream out;
-                             out.open(cli_args.journal_file);
-                             out << "ThisRunDir=" << pic::this_run_dir << std::endl;
+                             out.open(cli_args.journal_file, std::ios_base::app);
+                             out << "DataDir := " << pic::this_run_dir << std::endl;
                              out.close();
                            } );
 
@@ -94,10 +94,9 @@ int main(int argc, char** argv) {
         std::cout << "==== Timestep " << ts << " ====" << std::endl;
       sim.evolve( ts, pic::dt );
 
-      // occasionally barrier everyone to avoid idles running too fast
-      if ( ts % 100 == 0 ) mpi::world.barrier();
     }
     lgr::file.close();
+    // barrier everyone to avoid idles calling mpi::finalize() prematurely
     mpi::world.barrier();
   }
 
