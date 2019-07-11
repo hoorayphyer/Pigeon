@@ -25,7 +25,8 @@ message=`tail -n "+2" $tmp`
 rm $tmp
 
 cd $stage_dir/$tnow
-jobID=$( echo "$@")
+exec 5>&1 # save stdout of current session to fd5
+jobID=$( echo "$@" |tee >(cat - >&5))
 
 journal_file="journal.txt"
 printf "%s\n" \
