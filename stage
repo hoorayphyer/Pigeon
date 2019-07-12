@@ -11,6 +11,11 @@ while [[ -d $stage_dir/$tnow ]]; do
     tnow=${tnow}x
 done
 
+oe_dir=`pwd`/oe # need an abosulte path
+if [[ ! -d $oe_dir ]]; then
+    mkdir $oe_dir
+fi
+
 mkdir $stage_dir/$tnow
 cp bin/pic CMakeLists.txt pic.hpp gen.hpp $stage_dir/$tnow/
 
