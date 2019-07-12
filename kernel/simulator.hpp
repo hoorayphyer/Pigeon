@@ -183,6 +183,7 @@ namespace pic {
 #ifdef PIC_DEBUG
       debug::timestep = timestep;
       debug::world_rank = mpi::world.rank();
+      if ( _ens_opt ) debug::ens_label = _ens_opt -> label();
 #endif
 
       std::optional<tmr::Timestamp> stamp_all;

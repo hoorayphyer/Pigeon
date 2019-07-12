@@ -82,7 +82,8 @@ namespace particle {
         };
 
       if(debug::has_nan(ptc)) {
-        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANBEGINNING, code=" << debug::has_nan(ptc) << std::endl;
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        lgr::file << "NANBEGINNING, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
@@ -96,7 +97,8 @@ namespace particle {
       update_p( ptc, dt, E_itpl, B_itpl );
 #ifdef PIC_DEBUG
       if(debug::has_nan(ptc)) {
-        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
@@ -122,7 +124,8 @@ namespace particle {
         }
 #ifdef PIC_DEBUG
         if(debug::has_nan(ptc)) {
-          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
+          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+          lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
           show_ptc(ptc);
           throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
         }
@@ -133,7 +136,8 @@ namespace particle {
       auto dq = update_q( ptc, dt );
 #ifdef PIC_DEBUG
       if(debug::has_nan(ptc)) {
-        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << " NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        lgr::file << "NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
