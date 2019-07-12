@@ -54,7 +54,7 @@ namespace particle{
 
 int main(int argc, char** argv) {
 
-  auto cli_args = pic::parse_args(argc, argv);
+  auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
   mpi::initialize();
 
@@ -65,9 +65,11 @@ int main(int argc, char** argv) {
     // journaling
     fs::mpido( mpi::world, [&](){
                              std::ofstream out;
-                             out.open(cli_args.journal_file, std::ios_base::app);
+                             out.open("journal.txt"); // open the file fresh new
                              out << "DataDir := " << pic::this_run_dir << std::endl;
                              out.close();
+                             fs::rename( "journal.txt", pic::this_run_dir+"/journal.txt" );
+                             fs::create_directory_symlink(pic::this_run_dir+"/journal.txt", "journal.txt");
                            } );
 
     fs::mpido( mpi::world, [&](){

@@ -21,6 +21,7 @@ namespace fs {
 
   void copy_file( std::string target, std::string dest );
 
+  void rename( std::string old_path, std::string new_path );
 }
 
 namespace fs {

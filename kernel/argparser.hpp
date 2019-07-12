@@ -4,7 +4,7 @@
 namespace pic {
 
   struct CLIArgs {
-    std::string journal_file = "journal.txt";
+    // std::string journal_file = "journal.txt";
     std::string parameters_file{};
   };
 
@@ -19,10 +19,11 @@ namespace pic {
     }
 
     for ( int i = 1; i < args.size(); ) {
-      if ( "--journal" == args[i] ) {
-        res.journal_file = args[i + 1];
-        i += 2;
-      } else if ( "--params" == args[i] ) {
+      // if ( "--journal" == args[i] ) {
+      //   res.journal_file = args[i + 1];
+      //   i += 2;
+      // } else
+      if ( "--params" == args[i] ) {
         res.parameters_file = args[i + 1];
         i += 2;
       }
