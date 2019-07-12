@@ -188,7 +188,7 @@ namespace pic {
 
       std::optional<tmr::Timestamp> stamp_all;
       std::optional<tmr::Timestamp> stamp;
-      if ( is_do(pic::msperf_mr, timestep) ) {
+      if ( is_do(pic::msperf_mr, timestep) && pic::msperf_qualified(_ens_opt) ) {
         stamp_all.emplace();
         stamp.emplace();
         if ( msperf_max_entries &&

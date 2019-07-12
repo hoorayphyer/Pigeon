@@ -19,6 +19,8 @@
 #include "bc/fold_back_J.hpp"
 #include "bc/axissymmetric.hpp"
 
+#include "dye/ensemble.hpp"
+
 #include "pic.hpp"
 
 // common parameters
@@ -26,7 +28,7 @@ namespace pic {
   constexpr long double PI = std::acos(-1.0l);
 
   inline constexpr const char* project_name = "Pulsar256";
-  inline constexpr const char* datadir_prefix = "../Data/";
+  inline constexpr const char* datadir_prefix = "/home/hooray/Projects/Pigeon/Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
@@ -74,6 +76,8 @@ namespace pic {
 
   inline constexpr ModuleRange msperf_mr { true, 0, 100 };
   inline constexpr std::optional<int> msperf_max_entries {};
+  inline constexpr auto msperf_qualified =
+    []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
