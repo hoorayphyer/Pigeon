@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
     // journaling
     fs::mpido( mpi::world, [&](){
                              std::ofstream out;
-                             out.open("journal.txt"); // open the file fresh new
+                             out.open("journal.txt", std::ios_base::app);
                              out << "DataDir := " << pic::this_run_dir << std::endl;
                              out.close();
                              // NOTE fs::rename doesn't work on some platforms because of cross-device link.
