@@ -68,8 +68,8 @@ int main(int argc, char** argv) {
                              out.open("journal.txt"); // open the file fresh new
                              out << "DataDir := " << pic::this_run_dir << std::endl;
                              out.close();
-                             fs::rename( "journal.txt", pic::this_run_dir+"/journal.txt" );
-                             fs::create_directory_symlink(pic::this_run_dir+"/journal.txt", "journal.txt");
+                             // NOTE fs::rename doesn't work on some platforms because of cross-device link.
+                             fs::copy_file( "journal.txt", pic::this_run_dir+"/journal.txt" );
                            } );
 
     fs::mpido( mpi::world, [&](){
