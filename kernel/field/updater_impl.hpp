@@ -52,33 +52,23 @@ void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
   // static so that it can be used in lambda functions
   static typename CoordToScales<CoordType::LOG_SPHERICAL>::type coord;
 
-  const auto dim = grid.dimension;
-
   // define a function pointer.
   Scalar (*h_func) ( std::array<Scalar,3> q ) = nullptr;
 
-  for ( int comp = 0; comp < dim; ++comp ) {
+  for ( int comp = 0; comp < 3; ++comp ) {
     Index stagJ;
     // NOTE only non-capture lambda can be assigned to function pointer
-    if ( comp < dim ) {
-      stagJ = GetStagProperty(FieldType::ETYPE, comp);
-      switch(comp) {
-      case 0 : h_func =
-          [] ( std::array<Scalar,3> q ) {
-            return coord.h2( q[0], q[1], q[2] ) * coord.h3( q[0], q[1], q[2] ); }; break;
-      case 1 : h_func =
-          [] ( std::array<Scalar,3> q ) {
-            return coord.h3( q[0], q[1], q[2] ) * coord.h1( q[0], q[1], q[2] ); }; break;
-      case 2 : h_func =
-          [] ( std::array<Scalar,3> q ) {
-            return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] ); }; break;
-      }
-    } else {
-      stagJ = Index(0, 0, 0);
-      h_func =
+    stagJ = GetStagProperty(FieldType::ETYPE, comp);
+    switch(comp) {
+    case 0 : h_func =
         [] ( std::array<Scalar,3> q ) {
-          return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] )
-            * coord.h3( q[0], q[1], q[2] ); };
+          return coord.h2( q[0], q[1], q[2] ) * coord.h3( q[0], q[1], q[2] ); }; break;
+    case 1 : h_func =
+        [] ( std::array<Scalar,3> q ) {
+          return coord.h3( q[0], q[1], q[2] ) * coord.h1( q[0], q[1], q[2] ); }; break;
+    case 2 : h_func =
+        [] ( std::array<Scalar,3> q ) {
+          return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] ); }; break;
     }
 
     std::array<Scalar,3> q = { 0, 0, 0 };
@@ -89,7 +79,6 @@ void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
         for( int i = grid.guard[0]; i < grid.dims[0] - grid.guard[0]; ++i ) {
           q[0] = grid.pos( 0, i, stagJ[0]);
 
-          // FIXME is it OK to leave out check on h_func(q) being nearly zero?
           if ( std::abs(h_func(q)) > 1e-12 )
             JField( comp, i, j, k ) /= h_func(q);
           else
