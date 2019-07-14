@@ -84,7 +84,7 @@ namespace particle::scat {
     static T B_thr;
     static T mfp;
 
-    static constexpr std::optional<T> test ( const Ptc_t<T,S>& photon, const Properties&, const apt::Vec<T,S<T>::Dim>& dp, T dt,
+    static constexpr std::optional<T> test ( const Ptc_t<T,S>& photon, const Properties&, const apt::Vec<T,S<T>::Dim>& , T dt,
                                          const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng ) noexcept {
       return ( apt::sqabs(B) > B_thr * B_thr ) && ( rng.uniform() < dt / mfp )  ? std::optional<T>(1.0) : std::nullopt; // NOTE return std::optional(1.0) so as to be treated true in boolean conversion
     }
@@ -99,9 +99,9 @@ namespace particle::scat {
     // }
     static T mfp;
 
-    static constexpr std::optional<T> test ( const Ptc_t<T,S>& photon, const Properties&, const apt::Vec<T,S<T>::Dim>& dp, T dt,
-                                                   const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng ) noexcept {
-      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(0.0) : std::nullopt;
+    static constexpr std::optional<T> test ( const Ptc_t<T,S>& , const Properties&, const apt::Vec<T,S<T>::Dim>& , T dt,
+                                                   const apt::Vec<T,S<T>::Dim>& , util::Rng<T>& rng ) noexcept {
+      return ( rng.uniform() < dt / mfp )  ? std::optional<T>(1.0) : std::nullopt;
     }
   };
 }

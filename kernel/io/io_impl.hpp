@@ -89,10 +89,9 @@ namespace io {
 }
 
 namespace io {
-  template < int B, int E >
-  constexpr int POW() {
-    if constexpr ( E == 0 ) return 1;
-    else return B * POW<B,E-1>();
+  constexpr int POW( int B, int E ) {
+    if ( E == 0 ) return 1;
+    else return B * POW(B,E-1);
   };
 
   constexpr char MeshExport[] = "PICMesh";
@@ -105,15 +104,15 @@ namespace io {
       return res;
     }();
 
-  template < int DSRatio, int DGrid >
-  constexpr apt::Index<DGrid> subext
-  ( []() {
-      apt::Index<DGrid> res;
-      for ( int i = 0; i < DGrid; ++i ) res[i] = DSRatio;
-      return res;}() );
+  template < int DGrid >
+  constexpr apt::Index<DGrid> subext ( int DSRatio ) {
+    apt::Index<DGrid> res;
+    for ( int i = 0; i < DGrid; ++i ) res[i] = DSRatio;
+    return res;
+  }
 
-  template < int DSRatio, int DGrid >
-  constexpr auto Ifull( const apt::Index<DGrid>& Iexport, const apt::Index<DGrid>& Isub ) noexcept {
+  template < int DGrid >
+  constexpr auto Ifull( int DSRatio, const apt::Index<DGrid>& Iexport, const apt::Index<DGrid>& Isub ) noexcept {
     apt::Index<DGrid> res;
     for ( int i = 0; i < DGrid; ++i ) res[i] = DSRatio * Iexport[i] + Isub[i];
     return res;
@@ -127,15 +126,17 @@ namespace io {
   }
 
   // TODO This doesn't interpolate to zone center yet. Also may need intermediate sync_guards when interpolating to center. NOTE downsampling interpolation has its own shape function
-  template < int DSRatio, typename RealExport, typename Real, int DGrid, int DField >
-  void downsample ( field::Field<RealExport,1,DGrid>& io_field,
-                    const field::Field<Real,DField,DGrid>& full_field, int comp ) {
+  template < typename RealExport, typename Real, int DGrid, int DField >
+  void downsample ( int DSRatio,
+                    field::Field<RealExport,1,DGrid>& io_field,
+                    const field::Field<Real,DField,DGrid>& full_field,
+                    int comp ) {
     const auto& full_field_comp = full_field[comp];
     for ( const auto& I : apt::Block( io_field.mesh().bulk_dims() ) ) {
       Real f = 0.0;
-      for ( const auto& Isub : apt::Block(subext<DSRatio, DGrid>) )
-        f += full_field_comp( Ifull<DSRatio>(I,Isub) );
-      io_field[0](I) = f / POW<DSRatio, DGrid>();
+      for ( const auto& Isub : apt::Block(subext<DGrid>(DSRatio)) )
+        f += full_field_comp( Ifull(DSRatio,I,Isub) );
+      io_field[0](I) = f / POW(DSRatio, DGrid);
     }
   }
 
@@ -145,8 +146,7 @@ namespace io {
     return;
   }
 
-  template < int DSRatio,
-             int DGrid,
+  template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
              typename ShapeF,
@@ -160,7 +160,7 @@ namespace io {
     const particle::map<particle::array<Real,PtcSpecs>>& particles;
 
     template < typename RealExport, typename F_put_to_master >
-    void operator() ( const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
+    void operator() ( int DSRatio, const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       if ( !cart_opt ) return;
 
       field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
@@ -171,7 +171,7 @@ namespace io {
       std::string varname;
       for ( int comp = 0; comp < 3; ++comp ) {
         {
-          downsample<DSRatio>( io_field, Efield, comp );
+          downsample( DSRatio, io_field, Efield, comp );
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "E" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -179,7 +179,7 @@ namespace io {
                 });
           put_to_master( varname, cart_opt->size());
 
-          downsample<DSRatio>( io_field, Bfield, comp );
+          downsample( DSRatio, io_field, Bfield, comp );
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "B" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -222,7 +222,12 @@ namespace io {
                 tmp[0](I) = 0.0;
             }
           }
-          downsample<DSRatio>( io_field, tmp, 0 );
+          // downsample( DSRatio, io_field, tmp, 0 );
+          for ( int j = 0; j < 256; ++j ) {
+            for ( int i = 0; i < 256; ++i ) {
+              io_field[0]({i,j}) = tmp[0]({i,j});
+            }
+          }
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -236,8 +241,7 @@ namespace io {
     }
   };
 
-  template < int DSRatio,
-             int DGrid,
+  template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
              typename ShapeF,
@@ -279,7 +283,7 @@ namespace io {
     const particle::map<particle::array<Real,PtcSpecs>>& particles;
 
     template < typename RealExport, typename F_put_to_master >
-    void operator() ( const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
+    void operator() ( int DSRatio, const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       // TODO dbfile.put charge mass of the species in
       // TODO save gamma P density, which is total gamma / physical cell volume. Later this divided by number density gives us gamma P per unit particle. Think this over.
       field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
@@ -302,7 +306,7 @@ namespace io {
           field::merge_sync_guard_cells( tmp, *cart_opt );
           fold_back_at_axis(tmp);
 
-          downsample<DSRatio>(io_field, tmp, 0);
+          downsample( DSRatio, io_field, tmp, 0);
           varname = std::string("n_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -325,7 +329,7 @@ namespace io {
           field::merge_sync_guard_cells( tmp, *cart_opt );
           fold_back_at_axis(tmp);
 
-          downsample<DSRatio>(io_field, tmp, 0);
+          downsample(DSRatio, io_field, tmp, 0);
           varname = std::string("energy_") + particle::properties[sp].name;
           pmpio([&](auto& dbfile){
                   dbfile.put_var( varname, MeshExport, io_field[0].data().data(), dims );
@@ -343,13 +347,12 @@ namespace io {
   template < typename RealExport,
              typename Metric,
              typename ShapeF,
-             int DownsampleRatio,
              int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
              typename RealJ
              >
-  void export_data( std::string prefix, int timestep, Real dt, int num_files,
+  void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid
@@ -414,7 +417,7 @@ namespace io {
       };
 
     auto bulk_dims_export = Efield.mesh().bulk_dims();
-    for ( int i = 0; i < DGrid; ++i ) bulk_dims_export[i] /= DownsampleRatio;
+    for ( int i = 0; i < DGrid; ++i ) bulk_dims_export[i] /= downsample_ratio;
 
     field::Field<RealExport,1,DGrid> field_export( { bulk_dims_export, silo_mesh_ghost } );
 
@@ -464,7 +467,7 @@ namespace io {
       //     c.resize(dim, {});
 
       //     for ( int j = 0; j < dim; ++j )
-      //       c[j] = grid[i].absc( DownsampleRatio * j, ofs_export<DGrid>[i] );
+      //       c[j] = grid[i].absc( downsample_ratio * j, ofs_export<DGrid>[i] );
       //   }
 
       //   dbfile.put_mesh(MeshExport, coords, silo_mesh_type, optlist);
@@ -486,8 +489,8 @@ namespace io {
 
         for ( int j = 0; j < quadmesh_dims[1]; ++j ) {
           for ( int i = 0; i < quadmesh_dims[0]; ++i ) {
-            auto r = std::exp( grid[0].absc( DownsampleRatio * ( i - lo_ofs[0]) ) );
-            auto theta = grid[1].absc( DownsampleRatio * (j - lo_ofs[1]) );
+            auto r = std::exp( grid[0].absc( downsample_ratio * ( i - lo_ofs[0]) ) );
+            auto theta = grid[1].absc( downsample_ratio * (j - lo_ofs[1]) );
             coords[0][i + j * quadmesh_dims[0]] = r * std::sin(theta);
             coords[1][i + j * quadmesh_dims[0]] = r * std::cos(theta);
           }
@@ -513,8 +516,8 @@ namespace io {
       //   dbfile.put_var( name, meshname, exfd );
       // }
 
-      ExportEBJ<DownsampleRatio, DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportEBJ{grid,Efield,Bfield,Jfield,particles};
-      exportEBJ(pmpio, field_export, cart_opt, ens, put_to_master );
+      ExportEBJ<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportEBJ{grid,Efield,Bfield,Jfield,particles};
+      exportEBJ(downsample_ratio, pmpio, field_export, cart_opt, ens, put_to_master );
     }
 
     {
@@ -533,8 +536,8 @@ namespace io {
       //   }
       // }
 
-      ExportParticles<DownsampleRatio, DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
-      exportPtcs(pmpio, field_export, cart_opt, ens, put_to_master );
+      ExportParticles<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
+      exportPtcs(downsample_ratio, pmpio, field_export, cart_opt, ens, put_to_master );
     }
 
   }

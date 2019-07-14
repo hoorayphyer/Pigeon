@@ -29,13 +29,12 @@ namespace io {
   template < typename RealExport,
              typename Metric,
              typename ShapeF,
-             int DownsampleRatio,
              int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
              typename RealJ
              >
-  void export_data( std::string prefix, int timestep, Real dt, int num_files,
+  void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid

@@ -1,5 +1,5 @@
 #include "ckpt/checkpoint_impl.hpp"
-#include "gen.hpp"
+#include "pic.hpp"
 
 namespace ckpt {
   using namespace pic;

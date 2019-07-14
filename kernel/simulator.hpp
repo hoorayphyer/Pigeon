@@ -294,7 +294,7 @@ namespace pic {
           lgr::file % "ExportData" << "==>>" << std::endl;
           stamp.emplace();
         }
-        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF, pic::downsample_ratio>( this_run_dir, timestep, dt, pic::pmpio_num_files, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }

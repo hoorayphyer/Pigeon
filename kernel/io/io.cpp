@@ -1,12 +1,12 @@
 #include "io/io_impl.hpp"
-#include "gen.hpp"
+#include "pic.hpp"
 
 namespace io {
   using namespace pic;
 
   template
-  void export_data<real_export_t, Metric, ShapeF, downsample_ratio, DGrid, real_t, particle::Specs, real_j_t>
-  ( std::string prefix, int timestep, real_t dt, int num_files,
+  void export_data<real_export_t, Metric, ShapeF, DGrid, real_t, particle::Specs, real_j_t>
+  ( std::string prefix, int timestep, real_t dt, int num_files, int downsample_ratio,
     const std::optional<mpi::CartComm>& cart_opt,
     const dye::Ensemble<DGrid>& ens,
     const mani::Grid<real_t,DGrid>& grid, // local grid
