@@ -1,5 +1,6 @@
 #include "field/updater.hpp"
 
+#include "field/params.hpp"
 #include "field/field.hpp"
 #include "field/sync.hpp"
 
@@ -12,40 +13,29 @@
 #include <cmath>
 #include <memory>
 
-#include "gen.hpp"
-#include "classical_electron_radius.hpp"
-
-inline auto FT_SpinUp (Scalar t) noexcept {
-  return std::min(t / pic::spinup_duration, 1.0);
-}
-
-void Rotating_Monopole_LogSph( FBC& bdry, Scalar mu0, Scalar final_omega ) {
-  bdry.B1 = [mu0] (Scalar r_log, Scalar , Scalar )
-            {return mu0 / std::exp(2*r_log); };
-  bdry.B2 = [] (Scalar, Scalar, Scalar) { return 0.0; };
-  bdry.B3 = [] (Scalar, Scalar, Scalar){ return 0.0; };
+// NOTE these are modulo mu0 and max_omega
+void Rotating_Monopole_LogSph( FBC& bdry ) {
+  bdry.B1 = [] (Scalar r_log, Scalar , Scalar )-> Scalar { return 1.0 / std::exp(2*r_log); };
+  bdry.B2 = [] (Scalar, Scalar, Scalar)-> Scalar { return 0.0; };
+  bdry.B3 = [] (Scalar, Scalar, Scalar)-> Scalar { return 0.0; };
 
   // find out E by E = -( Omega x r ) x B
-  bdry.E1 = [=, B2=bdry.B2]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return final_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
-  bdry.E2 = [=, B1=bdry.B1]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return - final_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
-  bdry.E3 = []( Scalar, Scalar, Scalar ) {return 0.0;};
+  bdry.E1 = []( Scalar, Scalar, Scalar)-> Scalar { return 0.0; };
+  bdry.E2 = []( Scalar r_log, Scalar theta, Scalar )-> Scalar { return - std::exp(-r_log) * std::sin( theta ); };
+  bdry.E3 = []( Scalar, Scalar, Scalar )-> Scalar { return 0.0; };
 }
 
-void Rotating_Dipole_LogSph( FBC& bdry, Scalar mu0, Scalar final_omega ) {
-  bdry.B1 = [mu0] (Scalar x, Scalar theta, Scalar)
-       { return mu0 * 2.0 * std::cos(theta) / std::exp(3*x); };
-  bdry.B2 = [mu0] (Scalar x, Scalar theta, Scalar)
-       { return mu0 * std::sin(theta) / std::exp(3*x); };
-  bdry.B3 = [] (Scalar, Scalar, Scalar) { return 0.0; };
+void Rotating_Dipole_LogSph( FBC& bdry ) {
+  bdry.B1 = [] (Scalar x, Scalar theta, Scalar)-> Scalar { return 2.0 * std::cos(theta) * std::exp(-3*x); };
+  bdry.B2 = [] (Scalar x, Scalar theta, Scalar)-> Scalar { return std::sin(theta) * std::exp(-3*x); };
+  bdry.B3 = [] (Scalar, Scalar, Scalar)-> Scalar { return 0.0; };
 
   // find out E by E = -( Omega x r ) x B
-  bdry.E1 = [=, B2=bdry.B2]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return final_omega * std::exp(r_log) * std::sin( theta ) * B2( r_log, theta, phi );};
-  bdry.E2 = [=, B1=bdry.B1]( Scalar r_log, Scalar theta, Scalar phi ) {
-              return - final_omega * std::exp(r_log) * std::sin( theta ) * B1( r_log, theta, phi );};
-  bdry.E3 = [=]( Scalar, Scalar, Scalar ) {return 0.0;};
+  bdry.E1 = []( Scalar r_log, Scalar theta, Scalar )-> Scalar {
+              return std::exp(- 2 * r_log) * std::sin( theta ) * std::sin(theta);};
+  bdry.E2 = []( Scalar r_log, Scalar theta, Scalar )-> Scalar {
+              return - std::exp(- 2 * r_log) * std::sin( 2*theta );};
+  bdry.E3 = []( Scalar, Scalar, Scalar )-> Scalar {return 0.0;};
 }
 
 void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
@@ -61,13 +51,13 @@ void RestoreJToRealSpace( VectorField<Scalar>& JField, const Grid& grid ) {
     stagJ = GetStagProperty(FieldType::ETYPE, comp);
     switch(comp) {
     case 0 : h_func =
-        [] ( std::array<Scalar,3> q ) {
+        [] ( std::array<Scalar,3> q )-> Scalar {
           return coord.h2( q[0], q[1], q[2] ) * coord.h3( q[0], q[1], q[2] ); }; break;
     case 1 : h_func =
-        [] ( std::array<Scalar,3> q ) {
+        [] ( std::array<Scalar,3> q )-> Scalar {
           return coord.h3( q[0], q[1], q[2] ) * coord.h1( q[0], q[1], q[2] ); }; break;
     case 2 : h_func =
-        [] ( std::array<Scalar,3> q ) {
+        [] ( std::array<Scalar,3> q )-> Scalar {
           return coord.h1( q[0], q[1], q[2] ) * coord.h2( q[0], q[1], q[2] ); }; break;
     }
 
@@ -104,29 +94,30 @@ namespace field {
 
   // Set field BCs for rotating conductor in 2D log spherical coordinates with a damping layer
   template < typename FBCs >
-  void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard ) {
+  void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard, int mu0, Scalar (*omega_t)(Scalar) ) {
     // field BC, specialized for pulsar
     { auto& fbc = fieldBC[LOWER_1];
       fbc.type = FieldBCType::ROTATING_CONDUCTOR;
-      fbc.indent = pic::ofs::indent[LOWER_1];
-      fbc.ft = FT_SpinUp;
-      if ( pic::ofs::magnetic_pole == 1 )
-        Rotating_Monopole_LogSph( fbc, pic::mu0, pic::Omega );
-      else if ( pic::ofs::magnetic_pole == 2 )
-        Rotating_Dipole_LogSph( fbc, pic::mu0, pic::Omega );
+      fbc.indent = ofs::indent[LOWER_1];
+      fbc.ft = omega_t;
+      fbc.mu0 = mu0;
+      if ( ofs::magnetic_pole == 1 )
+        Rotating_Monopole_LogSph( fbc );
+      else if ( ofs::magnetic_pole == 2 )
+        Rotating_Dipole_LogSph( fbc );
     }
     { auto& fbc = fieldBC[UPPER_1];
       fbc.type = FieldBCType::DAMPING;
-      fbc.damping_rate = pic::ofs::damping_rate;
-      fbc.indent = pic::ofs::indent[UPPER_1];
+      fbc.damping_rate = ofs::damping_rate;
+      fbc.indent = ofs::indent[UPPER_1];
     }
     { auto& fbc = fieldBC[LOWER_2];
       fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = pic::ofs::indent[LOWER_2];
+      fbc.indent = ofs::indent[LOWER_2];
     }
     { auto& fbc = fieldBC[UPPER_2];
       fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = pic::ofs::indent[UPPER_2];
+      fbc.indent = ofs::indent[UPPER_2];
     }
   }
 
@@ -134,7 +125,10 @@ namespace field {
   Updater<Real, DGrid, RealJ>::Updater( const mpi::CartComm& cart,
                                         const mani::Grid<Real,DGrid>& local_grid,
                                         apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                        int guard ) : _cart(cart) {
+                                        int guard, Real mu0,
+                                        Real (*omega_t) (Real),
+                                        Real re )
+    : _cart(cart), _4pi_x_re(  4.0 * std::acos(-1.0l) * re ) {
     static_assert( DGrid == 2 );
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
@@ -151,7 +145,7 @@ namespace field {
     }
 
     // set fieldBC
-    Set_FBC_RC_2DLogSph_Damp(fuparams.fieldBC, guard);
+    Set_FBC_RC_2DLogSph_Damp(fuparams.fieldBC, guard, mu0, omega_t);
 
     // grid
     { auto& grid = fuparams.grid;
@@ -188,11 +182,11 @@ namespace field {
           Scalar r = exp(grid.pos(0, i, 0));
           Scalar r_s = exp(grid.pos(0, i, 1));
 
-          if ( pic::ofs::magnetic_pole == 1 ) {
-            Bfield(0, i, j ) = pic::mu0 / (r * r);
-          } else if ( pic::ofs::magnetic_pole == 2 ) {
-            Bfield(0, i, j) = pic::mu0 * 2.0 * cos(theta_s) / (r * r * r);
-            Bfield(1, i, j) = pic::mu0 * sin(theta) / (r_s * r_s * r_s);
+          if ( ofs::magnetic_pole == 1 ) {
+            Bfield(0, i, j ) = mu0 / (r * r);
+          } else if ( ofs::magnetic_pole == 2 ) {
+            Bfield(0, i, j) = mu0 * 2.0 * cos(theta_s) / (r * r * r);
+            Bfield(1, i, j) = mu0 * sin(theta) / (r_s * r_s * r_s);
           }
         }
       }
@@ -277,7 +271,7 @@ namespace field {
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= (4 * pic::PI * pic::classic_electron_radius());
+          current.ptr(c)[i] *= _4pi_x_re;
 
       RestoreJToRealSpace(current, grid);
       fc->SendGuardCells(current);

@@ -2,13 +2,10 @@
 #define _FUPARAMS_H_
 
 #include "Predefs.h"
-#include <functional>
 
 struct FBC {
-  // typedef Scalar (*BCFunc_split_t) (Scalar t);
-  // typedef Scalar (*BCFunc_split_x) (Scalar x1, Scalar x2, Scalar x3);
-  typedef std::function<Scalar(Scalar)> BCFunc_split_t;
-  typedef std::function<Scalar(Scalar, Scalar, Scalar)> BCFunc_split_x;
+  typedef Scalar (*BCFunc_split_t) (Scalar t);
+  typedef Scalar (*BCFunc_split_x) (Scalar x1, Scalar x2, Scalar x3);
 
   FieldBCType type;
   int indent;
@@ -24,6 +21,7 @@ struct FBC {
   BCFunc_split_x E2;
   BCFunc_split_x E3;
 
+  Scalar mu0;
   // for damping
   Scalar damping_rate;
   // Scalar thickness; // physical value FIXME setting this requires coordinate system

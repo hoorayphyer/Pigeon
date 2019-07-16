@@ -8,6 +8,7 @@
 
 #define NEIGHBOR_NULL -1
 
-typedef double Scalar;
+#include "pic.hpp"
+typedef pic::real_t Scalar;
 
 #endif

@@ -27,6 +27,12 @@
 namespace pic {
   std::string this_run_dir;
 
+  constexpr real_t classic_electron_radius () noexcept {
+    real_t res = wdt_pic * wdt_pic / ( 4 * std::acos(-1.0l) * dt * dt);
+    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
+    return res;
+  }
+
 
   template < int DGrid,
              typename Real,
@@ -100,7 +106,11 @@ namespace pic {
 
       ens.is_at_boundary();
       if ( _cart_opt )
-        _field_update.reset(new field::Updater<Real,DGrid,RealJ>( *_cart_opt, _grid, ens.is_at_boundary(), _guard ) );
+        _field_update.reset(new field::Updater<Real,DGrid,RealJ>( *_cart_opt, _grid,
+                                                                  ens.is_at_boundary(), _guard,
+                                                                  field::mu0, field::omega_spinup,
+                                                                  pic::classic_electron_radius() ) );
+
       _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng,
                                                                                              particle::properties,
                                                                                              particle::force_gen<Real,PtcSpecs,particle::vParticle>,

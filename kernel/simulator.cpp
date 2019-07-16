@@ -82,6 +82,7 @@ int main(int argc, char** argv) {
                            } );
     lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
+    field::set_up<pic::real_t>();
     particle::set_up_properties();
     particle::set_up<pic::real_t>();
 

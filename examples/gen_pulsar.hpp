@@ -8,6 +8,7 @@
 #include "manifold/grid.hpp"
 
 #include "field/field.hpp"
+#include "field/params.hpp"
 
 #include "particle/properties.hpp"
 #include "particle/map.hpp"
@@ -32,7 +33,7 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 200000;
+  inline constexpr int total_timesteps = 20000;
   inline constexpr real_t dt = 0.003;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
@@ -40,24 +41,6 @@ namespace pic {
   inline constexpr int guard = 1;
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
-}
-
-namespace pic {
-  // TODOL these will become free parameters
-  inline constexpr real_t mu0 = 3750.0;
-  inline constexpr real_t Omega = 1.0 / 6.0;
-
-  inline constexpr int spinup_duration = 4.0;
-
-  constexpr real_t omega_spinup ( real_t time ) noexcept {
-    return std::min<real_t>( time / pic::spinup_duration, 1.0 ) * pic::Omega;
-  }
-  namespace ofs {
-    inline constexpr int magnetic_pole = 2; // 1 for mono-, 2 for di-
-    inline constexpr int indent[4] = { 5, 43, guard, guard };
-    inline constexpr real_t damping_rate = 10.0;
-  }
-
 }
 
 namespace pic {
@@ -78,6 +61,24 @@ namespace pic {
   inline constexpr std::optional<int> msperf_max_entries {};
   inline constexpr auto msperf_qualified =
     []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
+}
+
+namespace field {
+  using pic::real_t;
+  // TODOL these will become free parameters
+  inline constexpr real_t mu0 = 3750.0;
+  inline constexpr real_t Omega = 1.0 / 6.0;
+
+  constexpr real_t omega_spinup ( real_t time ) noexcept {
+    return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
+  }
+
+  template < typename Real >
+  void set_up() {
+    ofs::magnetic_pole = 2; // 1 for mono-, 2 for di-
+    ofs::indent = { 5, 43, pic::guard, pic::guard };
+    ofs::damping_rate = 10.0;
+  }
 }
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
@@ -135,7 +136,7 @@ namespace particle {
       using Force = force::Force<real_t,Specs,vParticle>;
       constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      real_t landau0_B_thr = 0.1 * pic::mu0;
+      real_t landau0_B_thr = 0.1 * field::mu0;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
 
       constexpr real_t gravity_strength = 0.5;
@@ -196,7 +197,7 @@ namespace particle {
       scat::Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc) { return true; });
-      scat::MagneticConvert<real_t,Specs>::B_thr = pic::mu0 / 10.0;
+      scat::MagneticConvert<real_t,Specs>::B_thr = field::mu0 / 10.0;
       scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
@@ -264,7 +265,7 @@ namespace pic {
     apt::Index<DGrid> _Ib;
     apt::Index<DGrid> _extent;
 
-    const Real _mu0 = pic::mu0;
+    const Real _mu0 = field::mu0;
 
     Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
       return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
@@ -319,7 +320,7 @@ namespace pic {
                const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
                particle::map<particle::array<Real,Specs>>& particles )
       : _grid(localgrid), _Efield(Efield), _Bfield(Bfield), _Jfield(Jfield), _particles(particles) {
-      apt::tie(_Ib[0], _extent[0]) = gtl( pic::ofs::indent[0] - 1, 1, supergrid[0], localgrid[0] );
+      apt::tie(_Ib[0], _extent[0]) = gtl( field::ofs::indent[0] - 1, 1, supergrid[0], localgrid[0] );
       apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
     }
 
@@ -333,7 +334,7 @@ namespace pic {
       constexpr auto posion = species::ion;
       constexpr auto negaon = species::electron;
 
-      Real omega = pic::omega_spinup( timestep * dt );
+      Real omega = field::omega_spinup( timestep * dt );
 
       int charge_x = particle::properties.at(posion).charge_x;
 
