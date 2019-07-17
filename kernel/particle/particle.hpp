@@ -57,6 +57,12 @@ namespace particle {
       : _q(std::move(ptc.q())), _p(std::move(ptc.p())), _state( ptc.state() ) {
       ptc.reset(flag::exist);
     }
+
+    constexpr void swap( Particle& other ) noexcept {
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, q(), other.q() );
+      apt::foreach<0,Specs<T>::Dim>([](auto& a, auto& b){ std::swap(a,b);}, p(), other.p() );
+      std::swap( state(), other.state() );
+    }
   };
 
 }

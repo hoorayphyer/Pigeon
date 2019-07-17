@@ -7,8 +7,8 @@ namespace particle :: impl {
   // NOTE Assume there is no empty particles.
   template < typename Buffer, typename F_LCR >
   auto lcr_sort( Buffer& buffer, const F_LCR& lcr ) noexcept {
-    constexpr int L = 0;
-    constexpr int C = 1;
+    constexpr int C = 0;
+    constexpr int L = 1;
     constexpr int R = 2;
 
     // RATIONALE sort buffer into [CCC...LLL...RRR...)
@@ -119,12 +119,12 @@ namespace particle {
   template < typename Real,
              template < typename > class PtcSpecs,
              int DGrid, int I = DGrid-1 >
-  void migrate ( std::vector<cParticle< Real, PtcSpecs >>& buffer,
+  void migrate ( std::vector<Particle< Real, PtcSpecs >>& buffer,
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  unsigned int pairing_shift ) {
 
     auto lcr = [](const auto& ptc) noexcept {
-                 return ( ptc.extra() % apt::pow3(I+1) ) / apt::pow3(I);
+                 return ( ptc.template get<migrate_code>() % apt::pow3(I+1) ) / apt::pow3(I);
                };
 
     impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );

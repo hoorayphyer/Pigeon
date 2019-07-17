@@ -34,23 +34,22 @@ namespace mpi {
   MPI_Datatype datatype<long double>(long double*) noexcept { return MPI_LONG_DOUBLE; }
 }
 
-#include "mpipp/mpi_cparticle.cpp"
+#include "mpipp/mpi_particle.hpp"
 #include <vector>
 namespace mpi {
-  MPI_Datatype MPI_CPARTICLE = MPI_DATATYPE_NULL;
+  MPI_Datatype MPI_PARTICLE = MPI_DATATYPE_NULL;
 
-  void create_MPI_CPARTICLE (MPI_Datatype& mdt_ptc) {
-    std::vector<cPtc_t> ptcs(2);
-    constexpr int numBlocks = 4;
+  void create_MPI_PARTICLE (MPI_Datatype& mdt_ptc) {
+    std::vector<Ptc_t> ptcs(2);
+    constexpr int numBlocks = 3;
     MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(),
-                                     datatype<typename particle::Specs<real_t>::state_type>(), datatype<char>() };
-    int blocklen[numBlocks] = { particle::Specs<real_t>::Dim, particle::Specs<real_t>::Dim, 1, 1 };
+                                     datatype<typename particle::Specs<real_t>::state_type>() };
+    int blocklen[numBlocks] = { particle::Specs<real_t>::Dim, particle::Specs<real_t>::Dim, 1 };
     MPI_Aint disp[numBlocks];
 
     MPI_Get_address( &(ptcs[0].q()), disp );
     MPI_Get_address( &(ptcs[0].p()), disp+1 );
     MPI_Get_address( &(ptcs[0].state()), disp+2 );
-    MPI_Get_address( &(ptcs[0].extra()), disp+3 );
 
     auto base = disp[0];
     for ( int i = 0; i < numBlocks; ++i )
@@ -70,5 +69,5 @@ namespace mpi {
   }
 
   template <>
-  MPI_Datatype datatype<cPtc_t>(cPtc_t*) noexcept { return MPI_CPARTICLE; }
+  MPI_Datatype datatype<Ptc_t>(Ptc_t*) noexcept { return MPI_PARTICLE; }
 }

@@ -2,13 +2,11 @@
 #include "particle/array_impl.hpp"
 #include "particle/particle.hpp"
 #include "particle/virtual_particle.hpp"
-#include "particle/c_particle.hpp"
 
 using namespace particle;
 using ptc_array = array<double,aio::Specs>;
 using Ptc = Particle<double,aio::Specs>;
 using vPtc = vParticle<double,aio::Specs>;
-using cPtc = cParticle<double,aio::Specs>;
 using Vec = apt::Vec<double,aio::Specs<double>::Dim>;
 
 SCENARIO("test Particle constructors and flag::exist", "[particle]") {
@@ -82,42 +80,6 @@ SCENARIO("array push_back and iterator", "[particle]") {
     REQUIRE( ptc.state() == 147 );
   }
 
-  WHEN("push back c particle") {
-    cPtc ptc0 ( Ptc(Vec(15,6,73), Vec(20,-3,-5), species::ion, flag::secondary) );
-    arr.push_back(ptc0);
-    REQUIRE( arr.size() == 1 );
-    AND_WHEN("by copy") {
-      auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
-      REQUIRE( ptc.q()[0] == 15 );
-      REQUIRE( ptc.q()[1] == 6 );
-      REQUIRE( ptc.q()[2] == 73 );
-
-      REQUIRE( ptc.p()[0] == 20 );
-      REQUIRE( ptc.p()[1] == -3 );
-      REQUIRE( ptc.p()[2] == -5 );
-
-      REQUIRE( ptc.is(species::ion) );
-      REQUIRE( ptc.is(flag::secondary) );
-    }
-
-    cPtc ptc1 ( Ptc(Vec(-45,10,-76), Vec(-13,-58,97), species::photon, flag::traced) );
-    arr.push_back(std::move(ptc1));
-    REQUIRE_FALSE( ptc1.is(flag::exist) );
-    REQUIRE( arr.size() == 2 );
-    AND_WHEN("by move") {
-      auto ptc = arr[1]; // NOTE ptc is a proxy hence no ref
-      REQUIRE( ptc.q()[0] == -45 );
-      REQUIRE( ptc.q()[1] == 10 );
-      REQUIRE( ptc.q()[2] == -76 );
-
-      REQUIRE( ptc.p()[0] == -13 );
-      REQUIRE( ptc.p()[1] == -58 );
-      REQUIRE( ptc.p()[2] == 97 );
-
-      REQUIRE( ptc.is(species::photon) );
-      REQUIRE( ptc.is(flag::traced) );
-    }
-  }
 }
 
 SCENARIO("array back inserter", "[particle]") {

@@ -1,6 +1,6 @@
 #include "dye/dynamic_balance.hpp"
 #include "mpipp/mpi++.hpp"
-#include "particle/c_particle.hpp"
+#include "particle/particle.hpp"
 #include "apt/priority_queue.hpp" // used in calc_new_nprocs
 
 // bifurcate
@@ -72,7 +72,7 @@ namespace dye::impl {
   template < typename T, template < typename > class PtcSpecs >
   void relinguish_data( particle::array<T, PtcSpecs>& ptc_array,
                         const mpi::InterComm& itc, int root ) {
-    std::vector<particle::cParticle<T,PtcSpecs>> buf;
+    std::vector<particle::Particle<T,PtcSpecs>> buf;
     int count = 0;
     if ( root == MPI_ROOT ) {
       const auto size = ptc_array.size();
@@ -249,7 +249,7 @@ namespace dye {
 
     std::vector<mpi::Request> reqs(num_comms);
 
-    std::vector<particle::cParticle<T,PtcSpecs>> buffer;
+    std::vector<particle::Particle<T,PtcSpecs>> buffer;
 
     for ( int i = 0; i < num_comms; ++i ) {
       int other_rank = instr[ 2 * i + 1 ];

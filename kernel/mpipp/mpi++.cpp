@@ -27,13 +27,13 @@ namespace mpi {
     if (!is_initialized)
       MPI_Init(NULL, NULL);
 
-    create_MPI_CPARTICLE(MPI_CPARTICLE);
+    create_MPI_PARTICLE(MPI_PARTICLE);
 
-    MPI_Type_commit(&MPI_CPARTICLE);
+    MPI_Type_commit(&MPI_PARTICLE);
   }
 
   void finalize() {
-    MPI_Type_free( &MPI_CPARTICLE );
+    MPI_Type_free( &MPI_PARTICLE );
 
     int is_finalized = 0;
     MPI_Finalized(&is_finalized);

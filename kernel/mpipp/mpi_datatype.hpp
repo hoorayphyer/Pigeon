@@ -17,8 +17,8 @@ namespace mpi {
     return datatype((T*)0);
   }
 
-  extern MPI_Datatype MPI_CPARTICLE;
-  void create_MPI_CPARTICLE (MPI_Datatype&);
+  extern MPI_Datatype MPI_PARTICLE;
+  void create_MPI_PARTICLE (MPI_Datatype&);
 }
 
 #endif

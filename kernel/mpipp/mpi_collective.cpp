@@ -187,7 +187,7 @@ namespace mpi {
   template void Collective_Comm<InterComm>::barrier(const char*) const;
 }
 
-#include "mpi_cparticle.cpp"
+#include "mpi_particle.hpp"
 namespace mpi {
-  INSTANTIATE_MPI_COLLECTIVE(cPtc_t);
+  INSTANTIATE_MPI_COLLECTIVE(Ptc_t);
 }

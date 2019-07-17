@@ -6,11 +6,10 @@
 
 using namespace particle;
 using Real = pic::real_t;
-using cPtc_t = cParticle<Real,Specs>;
 using Ptc_t = Particle<Real,Specs>;
 using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
-SCENARIO("Test sendrecv cparticle", "[particle][mpi][.]") {
+SCENARIO("Test sendrecv particle", "[particle][mpi][.]") {
   if ( mpi::world.size() > 1 && mpi::world.rank() < 2  ) {
     aio::unif_real<double> dist;
     std::vector<Ptc_t> ptc_arr;
@@ -19,7 +18,7 @@ SCENARIO("Test sendrecv cparticle", "[particle][mpi][.]") {
     for ( int i = 0; i < nptcs; ++i )
       ptc_arr.emplace_back( Vec_t(dist(),dist(),dist()), Vec_t{dist(),dist(),dist()}, flag::secondary, species::electron );
 
-    std::vector<cPtc_t> data;
+    std::vector<Ptc_t> data;
     data.reserve(nptcs);
     data.resize(nptcs);
     for ( auto& ptc : data ) ptc.set(flag::exist);
@@ -55,7 +54,7 @@ SCENARIO("Test lcr_sort", "[particle][.]") {
       if ( mpi::world.rank() == 0 ) {
 
         auto lcr = []( const auto& ptc ) { return ptc.extra() % 3; };
-        std::vector<cPtc_t> ptcs;
+        std::vector<Ptc_t> ptcs;
 
         apt::array<int,3> count{};
 
@@ -135,7 +134,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
   auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
   if ( ens_opt ) {
     // first every node initialize some particles out of borders. Then they share this information with neighbors for test purpose.
-    std::vector<cPtc_t> mgr_buf;
+    std::vector<Ptc_t> mgr_buf;
 
     aio::unif_int<int> unif( 0, apt::pow3(DGrid) - 1 );
     unif.seed( aio::now() + mpi::world.rank() );
@@ -218,7 +217,7 @@ SCENARIO("Stress Test" , "[particle][mpi]") {
     load_gen.seed( rwld_opt->rank() );
     aio::unif_int<int> mig_dir_gen( 0, apt::pow3(DGrid) - 1 );
 
-    std::vector<cPtc_t> ptcs;
+    std::vector<Ptc_t> ptcs;
     while ( M-- ) {
       int color = 0;
       if ( rwld_opt->rank() < num_ens ) color = rwld_opt->rank();

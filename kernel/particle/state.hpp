@@ -7,20 +7,39 @@
 #include <tuple>
 
 namespace particle {
-  struct birthplace {
-  private:
-    unsigned int _value;
+  struct migrate_code {
   public:
-    birthplace( unsigned int a) noexcept : _value(a) {}
-    operator unsigned int() const noexcept { return _value; }
+    using type = int;
+    migrate_code( type a) noexcept : _value(a) {}
+    operator type() const noexcept { return _value; }
+
+    constexpr migrate_code& operator+= ( type a ) noexcept {
+      _value += a;
+      return *this;
+    }
+
+    constexpr operator bool() const noexcept { return {_value}; }
+
+  private:
+    type _value;
+  };
+
+  struct birthplace {
+  public:
+    using type = unsigned int;
+    birthplace( type a) noexcept : _value(a) {}
+    operator type() const noexcept { return _value; }
+  private:
+    type _value;
   };
 
   struct serial_number {
-  private:
-    unsigned int _value;
   public:
-    serial_number( unsigned int a) noexcept : _value(a) {}
-    operator unsigned int() const noexcept { return _value; }
+    using type = unsigned int;
+    serial_number( type a) noexcept : _value(a) {}
+    operator type() const noexcept { return _value; }
+  private:
+    type _value;
   };
 }
 
@@ -40,8 +59,8 @@ namespace particle {
 
   struct layout {
   private:
-    using ordering = std::tuple<species, flag, birthplace, serial_number>;
-    static constexpr auto sizing = std::make_tuple(3, 16, 16, 29); // TODO remove the hard coded sum to 64
+    using ordering = std::tuple<species, flag, migrate_code, birthplace, serial_number>;
+    static constexpr auto sizing = std::make_tuple(3, 16, 5, 16, 24); // TODO remove the hard coded sum to 64
 
   public:
     template < typename Attr, std::size_t I = 0 >
@@ -72,8 +91,9 @@ namespace particle {
       setbits< layout::begin<species>(), layout::size<species>() >( state(), static_cast<std::underlying_type_t<species>>(attr) );
     }
 
-    inline void set_impl( const birthplace& attr ) noexcept {
-      setbits< layout::begin<birthplace>(), layout::size<birthplace>() >( state(), static_cast<unsigned int>(attr) );
+    template < typename Attr >
+    inline void set_impl( const Attr& attr ) noexcept {
+      setbits< layout::begin<Attr>(), layout::size<Attr>() >( state(), static_cast<typename Attr::type>(attr) );
     }
 
   public:

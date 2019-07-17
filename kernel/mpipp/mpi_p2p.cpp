@@ -93,7 +93,7 @@ namespace mpi {
   INSTANTIATE_MPI_P2P(long double);
 }
 
-#include "mpi_cparticle.cpp"
+#include "mpi_particle.hpp"
 namespace mpi {
-  INSTANTIATE_MPI_P2P(cPtc_t);
+  INSTANTIATE_MPI_P2P(Ptc_t);
 }

@@ -59,7 +59,7 @@ namespace pic {
     std::unique_ptr<field::Updater<Real,DGrid,RealJ>> _field_update;
     std::unique_ptr<particle::Updater<DGrid,Real,PtcSpecs,ShapeF,RealJ,Metric>> _ptc_update;
 
-    std::vector<particle::cParticle<Real, PtcSpecs>> _migrators;
+    std::vector<particle::Particle<Real, PtcSpecs>> _migrators;
 
     std::unique_ptr<bc::Axissymmetric<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
     std::unique_ptr<bc::FoldBackJ<DGrid, Real, PtcSpecs, RealJ>> _fbj;
@@ -119,22 +119,23 @@ namespace pic {
     }
 
     void migrate_particles( int timestep ) {
-      constexpr auto migrate_dir =
+      // C = 0, L = 1, R = 2; bulk range = [lb, ub)
+      constexpr auto migrate_code =
         []( auto q, auto lb, auto ub ) noexcept {
-          return ( q >= lb ) + ( q >= ub );
+          return ( q < lb ) + 2 * ( q >= ub );
         };
 
       for ( auto&[ sp, ptcs ] : _particles ) {
         for ( auto ptc : ptcs ) { // TODOL semantics
           if ( !ptc.is(particle::flag::exist) ) continue;
-          char mig_dir = 0;
+          particle::migrate_code mig_dir = 0;
           for ( int i = 0; i < DGrid; ++i ) {
-            mig_dir += migrate_dir( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
+            mig_dir += migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
           }
+          ptc.set( mig_dir );
 
-          if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
+          if ( mig_dir ) {
             _migrators.emplace_back(std::move(ptc));
-            _migrators.back().extra() = mig_dir;
           }
         }
       }
