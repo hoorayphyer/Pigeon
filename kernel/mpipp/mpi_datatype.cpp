@@ -39,7 +39,7 @@ namespace mpi {
 namespace mpi {
   MPI_Datatype MPI_CPARTICLE = MPI_DATATYPE_NULL;
 
-  MPI_Datatype create_MPI_CPARTICLE () {
+  void create_MPI_CPARTICLE (MPI_Datatype& mdt_ptc) {
     std::vector<cPtc_t> ptcs(2);
     constexpr int numBlocks = 4;
     MPI_Datatype type[numBlocks] = { datatype<real_t>(), datatype<real_t>(),
@@ -64,9 +64,9 @@ namespace mpi {
     MPI_Get_address( ptcs.data() + 1, &sizeofentry );
     sizeofentry = MPI_Aint_diff(sizeofentry, base);
 
-    MPI_Datatype mdt_ptc;
     MPI_Type_create_resized(mdt_tmp, 0, sizeofentry, &mdt_ptc);
-    return mdt_ptc;
+
+    MPI_Type_free(&mdt_tmp);
   }
 
   template <>

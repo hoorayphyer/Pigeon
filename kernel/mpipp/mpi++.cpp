@@ -27,7 +27,7 @@ namespace mpi {
     if (!is_initialized)
       MPI_Init(NULL, NULL);
 
-    MPI_CPARTICLE = create_MPI_CPARTICLE();
+    create_MPI_CPARTICLE(MPI_CPARTICLE);
 
     MPI_Type_commit(&MPI_CPARTICLE);
   }
