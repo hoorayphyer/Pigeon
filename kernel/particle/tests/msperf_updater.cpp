@@ -34,8 +34,6 @@ SCENARIO("Time particle updater", "[particle]") {
   properties[species::electron] = {1,-1,"electron"};
   // properties[species::positron] = {1,1,"positron"};
 
-  using Force = force::Force<Real,PtcSpecs,vParticle>;
-  ForceGen<Real,PtcSpecs,vParticle> fgen;
   constexpr auto* lorentz = force::template lorentz<Real,PtcSpecs,vParticle>;
   // constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
 
@@ -43,14 +41,14 @@ SCENARIO("Time particle updater", "[particle]") {
   // constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
   {
     auto sp = species::electron;
-    Force force;
+    Force<Real,PtcSpecs> force;
     const auto& prop = properties.at(sp);
 
     force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
     // force.add( gravity, gravity_strength );
     // force.add( landau0, landau0_B_thr );
 
-    fgen.Register( sp, force );
+    force.Register( sp );
   }
   // {
   //   auto sp = species::positron;
@@ -72,7 +70,7 @@ SCENARIO("Time particle updater", "[particle]") {
     = {{ { 0.0, 1.0, bulk_dims[0] }, { 0.0, 1.0, bulk_dims[1] } }};
   constexpr int guard = 1;
 
-  PU_t pu( grid, rng, properties, fgen, {} );
+  PU_t pu( grid, rng, properties );
 
   field::Field<Real, 3, DGrid> E;
   field::Field<Real, 3, DGrid> B;

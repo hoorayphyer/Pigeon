@@ -10,9 +10,9 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
                    , (aio::IndexType<-2,-2>)
                    , (aio::IndexType<-4,-4>)
                    ) {
-  using Real = double;
+  using Real = float;
   constexpr int DGrid = 2;
-  using RealJ = double;
+  using RealJ = float;
 
   constexpr auto Cartesian_Partition = TestType::get();
   CAPTURE(Cartesian_Partition);
@@ -37,7 +37,17 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
       grid[i] = supergrid[i].divide( std::abs(Cartesian_Partition[i]), coords[i] );
 
     constexpr int guard = 1;
-    field::Updater<Real,DGrid,RealJ> fu(*cart_opt, grid, is_at_boundary, guard);
+    constexpr Real mu0 = 10000.0;
+    constexpr auto omega_t = [] ( Real t ) -> Real { return 0.2 * ( std::min<Real>( t / 4.0, 1.0) ); };
+    constexpr Real re = 1.0;
+    {
+      using namespace field::ofs;
+      magnetic_pole = 2; // 1 for mono-, 2 for di-
+      indent = { 5, 43, guard, guard };
+      damping_rate = 10.0;
+    }
+
+    field::Updater<Real,DGrid,RealJ> fu(*cart_opt, grid, is_at_boundary, guard, mu0, omega_t, re);
 
     field::Field<Real, 3, DGrid> E {{ bulk_dims, guard }};
     field::Field<Real, 3, DGrid> B {{ bulk_dims, guard }};
