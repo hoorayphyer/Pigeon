@@ -106,15 +106,16 @@ namespace pic {
 
       ens.is_at_boundary();
       if ( _cart_opt )
-        _field_update.reset(new field::Updater<Real,DGrid,RealJ>( *_cart_opt, _grid,
-                                                                  ens.is_at_boundary(), _guard,
-                                                                  field::mu0, field::omega_spinup,
-                                                                  pic::classic_electron_radius() ) );
+        _field_update.reset(new field::Updater<Real,DGrid,RealJ>
+                            ( *_cart_opt, _grid,
+                              ens.is_at_boundary(), _guard,
+                              field::mu0, field::omega_spinup,
+                              pic::classic_electron_radius() )
+                            );
 
-      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>( _grid, _rng,
-                                                                                             particle::properties,
-                                                                                             particle::force_gen<Real,PtcSpecs,particle::vParticle>,
-                                                                                             particle::scat_gen<Real,PtcSpecs>) );
+      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>
+                        ( _grid, _rng, particle::properties)
+                        );
     }
 
     void migrate_particles( int timestep ) {

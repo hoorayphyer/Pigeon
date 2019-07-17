@@ -3,73 +3,37 @@
 
 #include "apt/vec.hpp"
 #include "particle/map.hpp"
-#include "particle/virtual_particle.hpp"
+#include "particle/array.hpp"
 #include <vector>
 
-namespace particle::force {
+namespace particle {
   // NOTE currently we assume all forces have at most one free param
-  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  using force_t = void (*) ( Ptc_t<T,PtcSpecs>& ptc,
+  template < typename T, template < typename > class S >
+  using force_t = void (*) ( typename array<T,S>::particle_type& ptc,
                              T dt,
-                             const apt::Vec<T, PtcSpecs<T>::Dim>& E,
-                             const apt::Vec<T, PtcSpecs<T>::Dim>& B,
+                             const apt::Vec<T, S<T>::Dim>& E,
+                             const apt::Vec<T, S<T>::Dim>& B,
                              T param0 );
 }
 
 namespace particle {
-  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  struct ForceGen;
+  template < typename T, template < typename > class S >
+  struct Force {
+    std::vector<force_t<T,S>> forces;
+    std::vector<T> params;
 
-  namespace force {
-    template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-    struct Force {
-    private:
+    void add ( force_t<T,S> force, T param );
 
-      std::vector<force_t<T,PtcSpecs,Ptc_t>> _forces;
-      std::vector<T> _params;
-
-    public:
-      friend class ForceGen<T,PtcSpecs, Ptc_t>;
-      // TODO turn these into unique_ptr and use deepcopy
-      void add ( force::force_t<T,PtcSpecs,Ptc_t> force, T param ) {
-        _forces.push_back(force);
-        _params.push_back(param);
-      }
-    };
-  }
-
-
-  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  struct ForceGen {
-  private:
-    map<force::Force<T,PtcSpecs,Ptc_t>> _force_map;
-
-  public:
-    void Register( species sp, force::Force<T,PtcSpecs,Ptc_t> force ) {
-      _force_map[sp] = std::move(force);
-    }
-
-    void Unregister( species sp ) {
-      _force_map.erase(sp);
-    }
-
-    inline auto operator() ( species sp ) noexcept {
-      // if sp doesn't exist, newly created item in the maps will automatically have zero elements
-      return [&forces = _force_map[sp]._forces,
-              &params = _force_map[sp]._params]
-        ( auto& ptc, auto&&... args ) {
-          for ( int i = 0; i < forces.size(); ++i ) {
-            (forces[i])( ptc, std::forward<decltype(args)>(args)..., params[i] );
-          }
-        };
-    }
+    void Register( species sp ) const;
+    static void Unregister( species sp );
+    static Force<T,S> Get( species sp ) noexcept;
 
   };
 }
 
 namespace particle::force {
-  template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-  void lorentz( Ptc_t<T,PtcSpecs>& ptc, T dt, const apt::Vec<T, PtcSpecs<T>::Dim>& E, const apt::Vec<T, PtcSpecs<T>::Dim>& B, T q_over_m  );
+  template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
+  void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_over_m  );
 }
 
 

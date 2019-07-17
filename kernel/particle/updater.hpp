@@ -27,11 +27,7 @@ namespace particle {
   private:
     const mani::Grid< Real, DGrid >& _localgrid;
     util::Rng<Real> _rng;
-    using ForceGen_t = ForceGen<Real, PtcSpecs, vParticle>;
-    using ScatGen_t = ScatGen<Real, PtcSpecs>;
     const map<Properties>& _properties;
-    ForceGen_t _force_gen;
-    ScatGen_t _scat_gen;
 
     array<Real,PtcSpecs> _buf;
 
@@ -44,9 +40,7 @@ namespace particle {
                          );
 
   public:
-    Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng,
-             const map<Properties>& properties,
-             const ForceGen_t& force_gen, const ScatGen_t& scat_gen );
+    Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const map<Properties>& properties );
 
     void operator() ( map<array<Real,PtcSpecs>>& particles,
                       field::Field<RealJ,3,DGrid>& J,

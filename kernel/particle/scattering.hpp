@@ -9,22 +9,27 @@
 #include <memory>
 #include "random/rng.hpp"
 
-namespace particle::scat {
+namespace particle {
   template < typename T, template < typename > class S >
   using Ptc_t = typename array<T,S>::particle_type;
 
-  template < typename T, template < typename > class S >
-  using Eligible_t = bool (*) ( const Ptc_t<T,S>& );
+  namespace scat {
+    template < typename T, template < typename > class S >
+    using Eligible_t = bool (*) ( const Ptc_t<T,S>& );
 
-  template < typename T, template < typename > class S >
-  using Channel_t = std::optional<T> (*)( const Ptc_t<T,S>& ptc, const Properties& props, const apt::Vec<T,S<T>::Dim>& dp, T dt, const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng );
+    template < typename T, template < typename > class S >
+    using Channel_t = std::optional<T> (*)( const Ptc_t<T,S>& ptc, const Properties& props, const apt::Vec<T,S<T>::Dim>& dp, T dt, const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng );
+  }
 
   template < typename T, template < typename > class S >
   struct Scat {
-    std::vector<Eligible_t<T,S>> eligs;
-    std::vector<Channel_t<T,S>> channels;
-
+    std::vector<scat::Eligible_t<T,S>> eligs;
+    std::vector<scat::Channel_t<T,S>> channels;
     void (*impl) ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T ) = nullptr;
+
+    void Register( species sp ) const;
+    static void Unregister( species sp );
+    static Scat<T,S> Get ( species sp );
   };
 }
 
@@ -113,15 +118,6 @@ namespace particle::scat {
 
   template < typename T, template < typename > class S >
   void PhotonPairProduction ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& photon, T );
-}
-
-namespace particle {
-  template < typename T, template < typename > class S >
-  struct ScatGen {
-    void Register( species sp, const scat::Scat<T,S>& scat );
-    void Unregister( species sp );
-    scat::Scat<T,S>* operator() ( species sp );
-  };
 }
 
 #endif

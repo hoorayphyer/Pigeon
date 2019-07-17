@@ -54,20 +54,21 @@ namespace particle::scat {
 
 namespace particle {
   template < typename T, template < typename > class S >
-  map<scat::Scat<T,S>> scat_map;
+  map<Scat<T,S>> scat_map;
 
   template < typename T, template < typename > class S >
-  void ScatGen<T,S>::Register( species sp, const scat::Scat<T,S>& scat ) {
-    scat_map<T,S>[sp] = scat;
+  void Scat<T,S>::Register( species sp ) const {
+    scat_map<T,S>[sp] = *this;
   }
 
   template < typename T, template < typename > class S >
-  void ScatGen<T,S>::Unregister( species sp ) {
+  void Scat<T,S>::Unregister( species sp ) {
     scat_map<T,S>.erase(sp);
   }
 
   template < typename T, template < typename > class S >
-  scat::Scat<T,S>* ScatGen<T,S>::operator() ( species sp ) {
-    return scat_map<T,S>.has(sp) ? &(scat_map<T,S>.at(sp)) : nullptr;
+  Scat<T,S> Scat<T,S>::Get ( species sp ) {
+    if ( scat_map<T,S>.has(sp) ) return scat_map<T,S>.at(sp);
+    else return {};
   }
 }

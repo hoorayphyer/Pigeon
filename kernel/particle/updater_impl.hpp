@@ -17,10 +17,8 @@ namespace particle {
              typename Metric
              >
   Updater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
-  ::Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng,
-             const map<Properties>& properties,
-             const ForceGen_t& force_gen, const ScatGen_t& scat_gen )
-    : _localgrid(localgrid), _rng(rng), _properties(properties), _force_gen(force_gen), _scat_gen(scat_gen) {}
+  ::Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const map<Properties>& properties )
+    : _localgrid(localgrid), _rng(rng), _properties(properties) {}
 }
 
 namespace particle {
@@ -45,9 +43,32 @@ namespace particle {
 
     using Ptc = typename array<Real,PtcSpecs>::particle_type;
 
-    auto update_p = _force_gen(sp);
+    auto update_p =
+      [forces=Force<Real, PtcSpecs>::Get(sp)]
+      ( auto& ptc, auto&&... args ) {
+        for ( int i = 0; i < forces.forces.size(); ++i ) {
+          (forces.forces[i])( ptc, std::forward<decltype(args)>(args)..., forces.params[i] );
+        }
+      };
 
-    auto* scat = _scat_gen(sp);
+    auto scatter =
+      [scat = Scat<Real, PtcSpecs>::Get(sp) ] (auto& ptc, auto& buf, auto&&... args) {
+          bool is_eligible = true;
+          for ( const auto& elig : scat.eligs ) {
+            if ( !(*elig)(ptc) ) {
+              is_eligible = false;
+              break;
+            }
+          }
+          if ( is_eligible ) {
+            for ( const auto& chnl : scat.channels ) {
+              if ( auto param = (*chnl)(ptc, std::forward<decltype(args)>(args)...) ) {
+                scat.impl( std::back_inserter(buf), ptc, *param );
+                break;
+              }
+            }
+          }
+      };
 
     constexpr auto shapef = ShapeF();
     auto charge_over_dt = static_cast<Real>(prop.charge_x) / dt;
@@ -104,33 +125,16 @@ namespace particle {
       }
 #endif
 
-      if ( scat ) {
-        dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
-
-        bool is_eligible = true;
-        for ( const auto& elig : scat->eligs ) {
-          if ( !(*elig)(ptc) ) {
-            is_eligible = false;
-            break;
-          }
-        }
-        if ( is_eligible ) {
-          for ( const auto& chnl : scat->channels ) {
-            if ( auto param = (*chnl)(ptc, prop, dp, dt, B_itpl, _rng) ) {
-              scat->impl( std::back_inserter(_buf), ptc, *param );
-              break;
-            }
-          }
-        }
+      dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
+      scatter( ptc, _buf, prop, dp, dt, B_itpl, _rng );
 #ifdef PIC_DEBUG
-        if(debug::has_nan(ptc)) {
-          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-          lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
-          show_ptc(ptc);
-          throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
-        }
-#endif
+      if(debug::has_nan(ptc)) {
+        lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
+        show_ptc(ptc);
+        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
+#endif
 
       // NOTE q is updated, starting from here, particles may be in the guard cells.
       auto dq = update_q( ptc, dt );

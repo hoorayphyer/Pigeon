@@ -3,7 +3,11 @@
 
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
+
 #include "pic/module_range.hpp"
+#include "pic/range_conversion.hpp"
+#include "pic/forces/gravity.hpp"
+#include "pic/forces/landau0.hpp"
 
 #include "manifold/grid.hpp"
 
@@ -13,8 +17,6 @@
 #include "particle/properties.hpp"
 #include "particle/map.hpp"
 #include "particle/array.hpp"
-#include "particle/forces.hpp"
-#include "particle/scattering.hpp"
 #include "particle/particle.hpp"
 
 #include "bc/fold_back_J.hpp"
@@ -81,37 +83,6 @@ namespace field {
   }
 }
 
-// TODOL all the stuff under this {} are meant to be user-specified. Here the pulsar in LogSpherical is used
-namespace particle {
-
-  // LogSpherical
-  namespace force {
-    template < typename T, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
-    void gravity( Ptc_t<T,Specs>& ptc, T dt, const apt::Vec<T,Specs<T>::Dim>& , const apt::Vec<T,Specs<T>::Dim>&, T g  ) noexcept {
-      ptc.p()[0] -= g * std::exp( - 2 * ptc.q()[0] ) * dt;
-    };
-
-    // when B is strong enough, damp the perpendicular component of momentum
-    template < typename T, template < typename > class PtcSpecs, template < typename, template < typename > class > class Ptc_t >
-    void landau0( Ptc_t<T,PtcSpecs>& ptc, T dt, const apt::Vec<T,PtcSpecs<T>::Dim>& E, const apt::Vec<T,PtcSpecs<T>::Dim>& B, T B2_thr  ) {
-      using Vec = apt::Vec<T,PtcSpecs<T>::Dim>;
-      if ( apt::sqabs(B) < B2_thr ) return;
-
-      auto EB2 = apt::dot(E,B);
-      EB2 = EB2 * EB2;
-      auto B2_E2 = apt::sqabs(B) - apt::sqabs(E);
-      // calculate E'^2
-      auto Ep2 = 2 * EB2 / ( std::sqrt(B2_E2 * B2_E2 + 4 * EB2) + B2_E2 );
-      Vec beta_ExB = apt::cross(E,B) / ( apt::sqabs(B) + Ep2);
-      // find B' modulo gamma_ExB
-      Vec Bp = B - apt::cross( beta_ExB, E);
-      // obtain the momentum with perpendicular components damped
-      ptc.p() = Bp * ( apt::dot( ptc.p(), Bp ) / apt::sqabs(Bp) );
-      ptc.p() += beta_ExB * std::sqrt( ( 1.0 + apt::sqabs(ptc.p()) ) / ( 1.0 - apt::sqabs(beta_ExB) ) );
-    };
-  }
-}
-
 namespace particle {
   // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
   template < typename Real = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
@@ -122,64 +93,57 @@ namespace particle {
     properties[species::photon] = { 0, 0, "photon" };
   }
 
-  template < typename Real, template < typename > class Specs, template < typename, template < typename > class > class Ptc_t >
-  ForceGen<Real, Specs,Ptc_t> force_gen;
-
-  template < typename Real, template < typename > class Specs >
-  ScatGen<Real, Specs> scat_gen;
-
   // NOTE called in particle updater
   template < typename Real >
   void set_up() {
     using namespace pic;
     {
-      using Force = force::Force<real_t,Specs,vParticle>;
-      constexpr auto& fgen = force_gen<real_t,Specs,vParticle>;
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      real_t landau0_B_thr = 0.1 * field::mu0;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
-
-      constexpr real_t gravity_strength = 0.5;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
+      real_t landau0_B_thr = 0.1 * field::mu0;
+      real_t gravity_strength = 0.5;
+
       {
         auto sp = species::electron;
-        Force force;
+        Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
   //      force.add( landau0, landau0_B_thr );
 
-        fgen.Register( sp, force );
+        force.Register(sp);
       }
       {
         auto sp = species::positron;
-        Force force;
+        Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
     //    force.add( landau0, landau0_B_thr );
 
-        fgen.Register( sp, force );
+        force.Register(sp);
       }
       {
         auto sp = species::ion;
-        Force force;
+        Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
         force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
         force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
-        fgen.Register( sp, force );
+        force.Register(sp);
       }
     }
 
+    using Ptc_t = typename array<real_t,Specs>::particle_type;
     {
-      scat::Scat<real_t,Specs> ep_scat;
+      Scat<real_t,Specs> ep_scat;
 
-      ep_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc){ return ptc.q()[0] < std::log(9.0); });
+      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q()[0] < std::log(9.0); });
 
       scat::CurvatureRadiation<real_t,Specs>::K_thr = 10.0;
       scat::CurvatureRadiation<real_t,Specs>::gamma_off = 5.0;
@@ -189,14 +153,14 @@ namespace particle {
 
       ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
 
-      scat_gen<real_t,Specs>.Register( species::electron, ep_scat );
-      scat_gen<real_t,Specs>.Register( species::positron, ep_scat );
+      ep_scat.Register( species::electron );
+      ep_scat.Register( species::positron );
     }
 
     {
-      scat::Scat<real_t,Specs> photon_scat;
+      Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
-      photon_scat.eligs.push_back([](const scat::Ptc_t<real_t,Specs>& ptc) { return true; });
+      photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
       scat::MagneticConvert<real_t,Specs>::B_thr = field::mu0 / 10.0;
       scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
@@ -206,53 +170,13 @@ namespace particle {
 
       photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
 
-      scat_gen<real_t,Specs>.Register( species::photon, photon_scat );
+      photon_scat.Register( species::photon );
     }
   }
 
 }
 
 namespace pic {
-  // TODOL check gtl boundary on extent.
-  // NOTE range is assumed to be [,), and range[1] >= range[0]
-  template < typename Real >
-  apt::pair< int > gtl ( const apt::pair<Real>& range,
-                          const mani::Grid1D<Real>& localgrid ) noexcept {
-    auto to_grid_index =
-      [&localgrid] ( auto absc ) noexcept {
-        return ( absc - localgrid.lower() ) / localgrid.delta();
-      };
-    int lb = to_grid_index( range[LFT] );
-    int ub = to_grid_index( range[RGT] );
-
-    if ( ub <= 0 || lb >= localgrid.dim() ) {
-      // range not applicable on current local patch
-      return {0,0};
-    } else {
-      lb = std::max<int>( 0, lb );
-      ub = std::min<int>( ub, localgrid.dim() );
-      return { lb, ub - lb };
-    }
-  }
-
-  template < typename Real >
-  apt::pair< int > gtl ( int Ib_global, int extent_global,
-                         const mani::Grid1D<Real>& supergrid,
-                         const mani::Grid1D<Real>& localgrid ) noexcept {
-    // lb is the Ib_global with respect to the localgrid
-    int lb = Ib_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
-    int ub = lb + extent_global;
-
-    if ( ub <= 0 || lb >= localgrid.dim() ) {
-      // range not applicable on current local patch
-      return {0,0};
-    } else {
-      lb = std::max<int>( 0, lb );
-      ub = std::min<int>( ub, localgrid.dim() );
-      return { lb, ub - lb };
-    }
-  }
-
   template < int DGrid,
              typename Real,
              template < typename > class Specs,

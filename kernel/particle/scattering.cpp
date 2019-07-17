@@ -28,5 +28,5 @@ namespace particle {
     template void RadiationFromCharges<false>(std::back_insert_iterator<array<real_t,Specs>>, Ptc_t<real_t,Specs>&, real_t);
     template void PhotonPairProduction(std::back_insert_iterator<array<real_t,Specs>>, Ptc_t<real_t,Specs>&, real_t);
   }
-  template class ScatGen<real_t, Specs>;
+  template class Scat<real_t, Specs>;
 }

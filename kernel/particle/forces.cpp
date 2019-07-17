@@ -2,6 +2,9 @@
 #include "pic.hpp"
 
 using namespace pic;
+namespace particle {
+  template struct Force< real_t, Specs>;
+}
 
 namespace particle::force {
   template
