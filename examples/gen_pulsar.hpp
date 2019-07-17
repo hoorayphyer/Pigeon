@@ -3,7 +3,7 @@
 
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
-#include "module_range.hpp"
+#include "pic/module_range.hpp"
 
 #include "manifold/grid.hpp"
 
