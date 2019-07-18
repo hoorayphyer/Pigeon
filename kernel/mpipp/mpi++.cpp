@@ -5,6 +5,7 @@ namespace mpi {
   void group_free( MPI_Group* p ) {
     if ( p && *p != MPI_GROUP_NULL )
       MPI_Group_free(p);
+    delete p;
   }
 
   MPI_Group group_empty() {
@@ -14,6 +15,7 @@ namespace mpi {
   void comm_free ( MPI_Comm* p ) {
     if ( p && *p != MPI_COMM_NULL )
       MPI_Comm_free(p);
+    delete p; // NOTE p is by design created through new and stored in shared_ptr, so we delete it here to avoid memory leak
   }
 
   MPI_Comm comm_null() {
@@ -47,39 +49,39 @@ namespace mpi {
   Group::Group ( const std::vector<int>& ranks, const Group& source ) {
     if ( 0 == ranks.size() ) return;
     // TODO remove duplicates
-    auto* grp = new MPI_Group;
-    MPI_Group_incl(source, ranks.size(), ranks.data(), grp);
-    reset(grp);
+    MPI_Group grp;
+    MPI_Group_incl(source, ranks.size(), ranks.data(), &grp);
+    reset( new MPI_Group(grp) );
   }
 
   Group::Group ( const std::vector<int>& ranks ) {
     if ( 0 == ranks.size() ) return;
     MPI_Group grp_world;
     MPI_Comm_group( MPI_COMM_WORLD, &grp_world);
-    auto* grp = new MPI_Group;
-    MPI_Group_incl(grp_world, ranks.size(), ranks.data(), grp);
-    reset(grp);
+    MPI_Group grp;
+    MPI_Group_incl(grp_world, ranks.size(), ranks.data(), &grp);
+    reset( new MPI_Group(grp) );
     MPI_Group_free(&grp_world);
   }
 
   Group& Group::operator^= ( const Group& a ) {
-    auto* grp = new MPI_Group;
-    MPI_Group_intersection(*this, a, grp);
-    reset(grp);
+    MPI_Group grp;
+    MPI_Group_intersection(*this, a, &grp);
+    reset(new MPI_Group(grp));
     return *this;
   }
 
   Group& Group::operator+= ( const Group& a ) {
-    auto* grp = new MPI_Group;
-    MPI_Group_union(*this, a, grp);
-    reset(grp);
+    MPI_Group grp;
+    MPI_Group_union(*this, a, &grp);
+    reset(new MPI_Group(grp));
     return *this;
   }
 
   Group& Group::operator-= ( const Group& a ) {
-    auto* grp = new MPI_Group;
-    MPI_Group_difference(*this, a, grp);
-    reset(grp);
+    MPI_Group grp;
+    MPI_Group_difference(*this, a, &grp);
+    reset(new MPI_Group(grp));
     return *this;
   }
 
@@ -115,25 +117,25 @@ namespace mpi {
 
   Group operator^ ( const Group& a, const Group& b ) {
     Group result;
-    auto* grp = new MPI_Group;
-    MPI_Group_intersection(a, b, grp);
-    result.reset(grp);
+    MPI_Group grp;
+    MPI_Group_intersection(a, b, &grp);
+    result.reset( new MPI_Group(grp) );
     return result;
   }
 
   Group operator+ ( const Group& a, const Group& b ) {
     Group result;
-    auto* grp = new MPI_Group;
-    MPI_Group_union(a, b, grp);
-    result.reset(grp);
+    MPI_Group grp;
+    MPI_Group_union(a, b, &grp);
+    result.reset( new MPI_Group(grp) );
     return result;
   }
 
   Group operator- ( const Group& a, const Group& b ) {
     Group result;
-    auto* grp = new MPI_Group;
-    MPI_Group_difference(a, b, grp);
-    result.reset(grp);
+    MPI_Group grp;
+    MPI_Group_difference(a, b, &grp);
+    result.reset( new MPI_Group(grp) );
     return result;
   }
 
@@ -157,9 +159,9 @@ namespace mpi {
   template < typename E >
   Group CommAccessor<E>::group() const {
     Group result;
-    auto* grp = new MPI_Group;
-    MPI_Comm_group( _comm(), grp);
-    result.reset(grp);
+    MPI_Group grp;
+    MPI_Comm_group( _comm(), &grp);
+    result.reset(new MPI_Group(grp));
     return result;
   }
 
@@ -190,13 +192,11 @@ namespace mpi {
 
   std::optional<Comm> Comm::split ( std::optional<unsigned int> color, int key ) const {
     std::optional<Comm> res;
-    auto* comm = new MPI_Comm;
-    MPI_Comm_split(*this, color ? *color : MPI_UNDEFINED, key, comm );
-    if ( *comm != MPI_COMM_NULL ) {
+    MPI_Comm comm;
+    MPI_Comm_split(*this, color ? *color : MPI_UNDEFINED, key, &comm );
+    if ( comm != MPI_COMM_NULL ) {
       res.emplace();
-      res->reset(comm);
-    } else {
-      delete comm;
+      res->reset( new MPI_Comm(comm) );
     }
     return res;
   }
@@ -289,10 +289,11 @@ namespace mpi {
 // intercommunicator
 namespace mpi {
   InterComm::InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag ) {
-    auto* comm = new MPI_Comm;
-    auto pc = ( local_comm.rank() == local_leader ) ? static_cast<MPI_Comm>(*peer_comm) : MPI_COMM_NULL;
-    MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, comm );
-    reset( comm );
+    MPI_Comm pc = ( local_comm.rank() == local_leader ) ? *peer_comm : MPI_COMM_NULL;
+
+    MPI_Comm comm;
+    MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, &comm );
+    reset( new MPI_Comm(comm) );
   }
 
   int InterComm::remote_size() const {
@@ -304,9 +305,9 @@ namespace mpi {
   Group InterComm::remote_group() const {
     Group result;
 
-    auto* grp_remote = new MPI_Group;
-    MPI_Comm_remote_group(*this, grp_remote);
-    result.reset(grp_remote);
+    MPI_Group grp_remote;
+    MPI_Comm_remote_group(*this, &grp_remote);
+    result.reset( new MPI_Group(grp_remote) );
 
     return result;
   }
