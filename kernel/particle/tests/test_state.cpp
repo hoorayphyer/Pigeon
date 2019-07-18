@@ -1,9 +1,10 @@
 #include "testfw/testfw.hpp"
 #include "particle/state.hpp"
+#include <limits>
 
 using namespace particle;
 
-using T = unsigned long long;
+using T = long long;
 
 struct State : public StateExpression<State,T> {
 private:
@@ -13,8 +14,28 @@ public:
   constexpr T state() const noexcept { return _state; }
 };
 
+TEMPLATE_TEST_CASE("Test setbits and getbits", "[particle]"
+                   , char
+                   , short, unsigned short
+                   , int, unsigned int
+                   , long, unsigned long
+                   , long long, unsigned long long
+                   ) {
+  constexpr int Pos = sizeof(T) * 8 - 16;
+  constexpr int Nbits = 16;
+  TestType y = std::numeric_limits<TestType>::max();
+  y &= ~( ~0uLL << Nbits );
+  T s = 0;
+  setbits<Pos,Nbits>( s, y );
+  REQUIRE( s == ( static_cast<T>(y) << Pos ) );
+
+  auto yy = getbits<Pos,Nbits,TestType>(s);
+  REQUIRE( yy == y );
+}
+
 SCENARIO("setting species", "[particle]") {
   State s;
+  REQUIRE( s.get<species>() == species::unknown );
 
   s.set(species::electron);
   REQUIRE( s.get<species>() == species::electron );
@@ -27,24 +48,37 @@ SCENARIO("setting species", "[particle]") {
 }
 
 SCENARIO("setting flags", "[particle]") {
-  State s;
-  s.set(flag::exist);
-  REQUIRE( s.is(flag::exist));
-  s.reset(flag::exist);
-  REQUIRE_FALSE( s.is(flag::exist));
+  {
+    State s;
+    REQUIRE_FALSE( s.is(flag::exist));
+  }
 
-  s.set(flag::traced);
-  REQUIRE( s.is(flag::traced));
+  auto f =
+    []( flag X ) {
+      State s;
+      REQUIRE_FALSE(s.is(X));
+      s.set(X);
+      REQUIRE( s.is(X));
+      s.reset(X);
+      REQUIRE_FALSE( s.is(X));
+    };
+
+  for ( std::underlying_type_t<flag> i = 0; i < 8; ++i ) {
+    f(static_cast<flag>(i));
+  }
 }
 
-// TODO fix tracing, interface too bad
-SCENARIO("setting tracing", "[particle]") {
+SCENARIO("setting birthplace", "[particle]") {
   State s;
-  birthplace bp(265);
-  // serial_number sn(5654654);
-  s.set(bp);
-  // s.set(sn);
-  REQUIRE(s.get<birthplace>() == 265);
-  // REQUIRE(s.get<serial_number>() == 5654654);
+  using bp_t = std::underlying_type_t<birthplace>;
+  bp_t max = ( static_cast<bp_t>(1) << layout::size<birthplace>() );
+
+  for ( bp_t i = 0; i < max; ++i ) {
+    birthplace bp(i);
+    s.set(bp);
+    CAPTURE(i);
+    CHECK(s.get<birthplace>() == i);
+  }
 }
 
+// setting destination is in test_migration
