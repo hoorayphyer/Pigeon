@@ -2,6 +2,8 @@
 #define _FUPARAMS_H_
 
 #include "Predefs.h"
+#include <array>
+#include <unordered_map>
 
 struct FBC {
   typedef Scalar (*BCFunc_split_t) (Scalar t);

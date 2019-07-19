@@ -282,7 +282,8 @@ namespace mpi {
 // intercommunicator
 namespace mpi {
   InterComm::InterComm( const Comm& local_comm, int local_leader, const std::optional<Comm>& peer_comm, int remote_leader, int tag ) {
-    MPI_Comm pc = ( local_comm.rank() == local_leader ) ? *peer_comm : MPI_COMM_NULL;
+    MPI_Comm pc = MPI_COMM_NULL;
+    if ( local_comm.rank() == local_leader ) pc = static_cast<MPI_Comm>(*peer_comm);
 
     MPI_Comm comm;
     MPI_Intercomm_create( local_comm, local_leader, pc, remote_leader, tag, &comm );
