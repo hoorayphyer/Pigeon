@@ -3,7 +3,7 @@
 #include "mpipp/mpi++.hpp"
 
 int main( int argc, char* argv[] ) {
-  mpi::initialize();
+  mpi::initialize(argc, argv);
 
   int result = Catch::Session().run( argc, argv );
 

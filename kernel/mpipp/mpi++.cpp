@@ -22,12 +22,8 @@ namespace mpi {
     return MPI_COMM_NULL;
   }
 
-  void initialize() {
-    int is_initialized = 0;
-    MPI_Initialized(&is_initialized);
-
-    if (!is_initialized)
-      MPI_Init(NULL, NULL);
+  void initialize(int argc, char** argv) {
+    MPI_Init(&argc, &argv );
 
     create_MPI_PARTICLE(MPI_PARTICLE);
 
@@ -37,10 +33,7 @@ namespace mpi {
   void finalize() {
     MPI_Type_free( &MPI_PARTICLE );
 
-    int is_finalized = 0;
-    MPI_Finalized(&is_finalized);
-
-    if (!is_finalized) MPI_Finalize();
+    MPI_Finalize();
   }
 }
 
@@ -236,9 +229,9 @@ namespace mpi {
     for ( int i = 0; i < ndims; ++i )
       periods[i] = static_cast<int>( periodic[i] );
 
-    auto* comm_cart = new MPI_Comm;
-    MPI_Cart_create( comm, ndims, dims.data(), periods.data(), true, comm_cart );
-    reset( comm_cart );
+    MPI_Comm comm_cart;;
+    MPI_Cart_create( comm, ndims, dims.data(), periods.data(), true, &comm_cart );
+    reset( new MPI_Comm(comm_cart) );
   }
 
   std::vector<int> CartComm::rank2coords ( int rank ) const {

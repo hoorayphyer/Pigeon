@@ -98,6 +98,8 @@ public:
 
   }
 
+  ~FieldBC_damping() override = default;
+
   virtual void Apply(Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
     int dir = _bpos / 2;
     bool isupper = _bpos % 2;

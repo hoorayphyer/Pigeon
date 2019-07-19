@@ -94,6 +94,8 @@ public:
     SetFieldCache( FieldType::BTYPE, 2, fieldBC.B3 );
   }
 
+  ~FieldBC_rotating_conductor() override = default;
+
   virtual void Apply(Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
     // At lower boundary, discontious ( continuous ) components will be applied boundary conditions up to the indent-2-th ( indent-1-th ) cell.
     // At upper boundary, discontious and continuous components will both be applied boundary conditions starting from 0-th cell; stagger doesn't affect in this case.

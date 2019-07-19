@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
 
   auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
-  mpi::initialize();
+  mpi::initialize(argc, argv);
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
     pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );

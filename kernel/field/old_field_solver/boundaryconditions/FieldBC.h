@@ -7,6 +7,7 @@
 class FieldBC {
 public:
   virtual void Apply ( Scalar dt, VectorField<Scalar>& E, VectorField<Scalar>& B, Scalar time ) = 0;
+  virtual ~FieldBC() {};
 };
 
 #include "FieldBC_coordinate.h"

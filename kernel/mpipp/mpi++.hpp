@@ -104,7 +104,7 @@ namespace mpi {
 }
 
 namespace mpi {
-  void initialize();
+  void initialize(int argc, char** argv);
   void finalize();
   extern const Comm world;
   extern const Comm self;
