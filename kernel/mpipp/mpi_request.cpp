@@ -8,6 +8,7 @@ namespace mpi {
   void request_free ( MPI_Request* p ) {
     if ( p && *p != MPI_REQUEST_NULL )
       MPI_Request_free(p);
+    delete p;
   }
 
   MPI_Request request_null() {
@@ -16,13 +17,7 @@ namespace mpi {
 
   void wait( Request& request ) {
     if ( !request ) return;
-    MPI_Request raw = request;
     MPI_Wait( request, MPI_STATUS_IGNORE );
-    if ( MPI_REQUEST_NULL == raw ) {
-      MPI_Request* p = request;
-      (*p) = MPI_REQUEST_NULL;
-      request.reset();
-    }
   }
 
   void waitall( std::vector<Request>& reqs ) {
@@ -35,9 +30,8 @@ namespace mpi {
     MPI_Waitall( raw_reqs.size(), raw_reqs.data(), MPI_STATUSES_IGNORE );
     for ( int i = 0; i < reqs.size(); ++i ) {
       if ( raw_reqs[i] == MPI_REQUEST_NULL && reqs[i] ) {
-        MPI_Request* p = reqs[i];
+        auto* p = static_cast<MPI_Request*>(reqs[i]);
         (*p) = MPI_REQUEST_NULL;
-        reqs[i].reset();
       }
     }
   }

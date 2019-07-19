@@ -107,6 +107,7 @@ namespace mpi {
   template < typename T >
   Request Collective_Comm<Comm>::Ibroadcast( int root, T* buffer, int count ) const {
     Request req;
+    req.reset(new MPI_Request);
     MPI_Ibcast( buffer, count, datatype<T>(), root, _comm(), req );
     return req;
   }

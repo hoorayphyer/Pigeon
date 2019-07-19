@@ -119,22 +119,22 @@ namespace pic {
     }
 
     void migrate_particles( int timestep ) {
-      // C = 0, L = 1, R = 2; bulk range = [lb, ub)
+      // bulk range = [lb, ub)
       constexpr auto migrate_code =
         []( auto q, auto lb, auto ub ) noexcept {
-          return ( q < lb ) + 2 * ( q >= ub );
+          return ( q >= lb ) + ( q >= ub );
         };
 
       for ( auto&[ sp, ptcs ] : _particles ) {
         for ( auto ptc : ptcs ) { // TODOL semantics
           if ( !ptc.is(particle::flag::exist) ) continue;
-          particle::migrate_code mig_dir = 0;
+          particle::migrInt<DGrid> mig_dir{};
           for ( int i = 0; i < DGrid; ++i ) {
             mig_dir += migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
           }
-          ptc.set( mig_dir );
 
-          if ( mig_dir ) {
+          if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
+            mig_dir.imprint(ptc);
             _migrators.emplace_back(std::move(ptc));
           }
         }
@@ -143,6 +143,7 @@ namespace pic {
       particle::migrate( _migrators, _ens_opt->inter, timestep );
       for ( auto&& ptc : _migrators ) {
         auto sp = ptc.template get<particle::species>();
+        ptc.template reset<particle::destination>();
         _particles[sp].push_back( std::move(ptc) );
       }
       _migrators.resize(0);

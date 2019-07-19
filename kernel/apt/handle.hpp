@@ -16,6 +16,12 @@ namespace apt {
 
   public:
     Handle() = default;
+    Handle( const Handle& ) = default;
+    Handle( Handle&& other ) noexcept = default;
+    ~Handle() = default;
+
+    Handle& operator=( const Handle& ) noexcept = default;
+    Handle& operator=( Handle&& other ) noexcept = default;
 
     inline void reset() {
       _ptr.reset();

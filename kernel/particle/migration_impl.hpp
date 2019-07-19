@@ -1,5 +1,6 @@
 #include "particle/migration.hpp"
 #include "apt/type_traits.hpp"
+#include "apt/ternary.hpp"
 #include "mpipp/mpi++.hpp"
 #include <memory>
 
@@ -7,10 +8,6 @@ namespace particle :: impl {
   // NOTE Assume there is no empty particles.
   template < typename Buffer, typename F_LCR >
   auto lcr_sort( Buffer& buffer, const F_LCR& lcr ) noexcept {
-    constexpr int C = 0;
-    constexpr int L = 1;
-    constexpr int R = 2;
-
     // RATIONALE sort buffer into [CCC...LLL...RRR...)
     // Let ec points to end of CCC.., or equivalently beginning of LLL...;
     // Let el points to end of LLL...;
@@ -18,17 +15,17 @@ namespace particle :: impl {
     // the upshot: ccc.. will be [0, ec), lll... will be [ec, el), rrr... will be [el, buffer.size()), edge case safe
     int ec = 0, el = 0, rer = buffer.size() - 1;
     // REQUIRE rer always points to a value different from R
-    while( rer > -1 && lcr( buffer[rer] ) == R ) --rer;
+    while( rer > -1 && lcr( buffer[rer] ) == apt::R ) --rer;
 
     while ( el <= rer ) {
       switch ( lcr( buffer[el] ) ) {
-      case L : ++el; break;
-      case C :
+      case apt::L : ++el; break;
+      case apt::C :
         if ( ec != el ) buffer[el].swap( buffer[ec] );
         ++ec; ++el; break;
-      case R :
+      case apt::R :
         buffer[el].swap( buffer[rer--] );
-        while ( el <= rer && lcr( buffer[rer] ) == R ) --rer;
+        while ( el <= rer && lcr( buffer[rer] ) == apt::R ) --rer;
         break;
       }
     }
@@ -50,7 +47,7 @@ namespace particle :: impl {
       std::vector<mpi::Request> reqs;
       // sending
       if ( intercomms[lr] ) {
-        const auto& send_comm = *intercomms[lr];
+        const auto& send_comm = *(intercomms[lr]);
         int local_rank = send_comm.rank();
         int remote_dest = ( local_rank + shift ) % send_comm.remote_size();
         reqs.push_back( send_comm.Isend( remote_dest, tag, buffer.data() + begs[lr], begs[lr+1] - begs[lr] ) );
@@ -60,7 +57,7 @@ namespace particle :: impl {
       std::unique_ptr<Ptc[]> p_tmp(nullptr);
       int tot_num_recv = 0;
       if ( intercomms[1-lr] ) {
-        const auto& recv_comm = *intercomms[1-lr];
+        const auto& recv_comm = *(intercomms[1-lr]);
         int local_rank = recv_comm.rank();
         int local_size = recv_comm.size();
         int remote_size = recv_comm.remote_size();
@@ -123,9 +120,10 @@ namespace particle {
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  unsigned int pairing_shift ) {
 
-    auto lcr = [](const auto& ptc) noexcept {
-                 return ( ptc.template get<migrate_code>() % apt::pow3(I+1) ) / apt::pow3(I);
-               };
+    auto lcr =
+      [](const auto& ptc) noexcept {
+        return ( migrInt<DGrid>(ptc) % apt::pow3(I+1) ) / apt::pow3(I);
+      };
 
     impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
     if constexpr ( I > 0 )

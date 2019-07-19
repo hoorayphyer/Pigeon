@@ -9,14 +9,126 @@ using Real = pic::real_t;
 using Ptc_t = Particle<Real,Specs>;
 using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
+SCENARIO("Test swapping particles", "[particle][.]") {
+  if ( mpi::world.rank() == 0 ) {
+    Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, flag::secondary, birthplace{3} );
+    migrInt<2>(6).imprint(a);
+
+    Ptc_t b( {-4.7, -4.7, -4.7, }, {-2.8, -2.8, -2.8}, birthplace{98} );
+    migrInt<2>(1).imprint(b);
+    b.reset(flag::exist);
+
+    a.swap(b);
+
+    {
+      REQUIRE( a.q()[0] == static_cast<Real>(-4.7) );
+      REQUIRE( a.q()[1] == static_cast<Real>(-4.7) );
+      REQUIRE( a.q()[2] == static_cast<Real>(-4.7) );
+
+      REQUIRE( a.p()[0] == static_cast<Real>(-2.8) );
+      REQUIRE( a.p()[1] == static_cast<Real>(-2.8) );
+      REQUIRE( a.p()[2] == static_cast<Real>(-2.8) );
+
+      REQUIRE_FALSE( a.is(flag::exist) );
+      REQUIRE_FALSE( a.is(flag::secondary) );
+      REQUIRE( a.get<birthplace>() == 98 );
+      REQUIRE( migrInt<2>(a) == 1 );
+    }
+
+    {
+      REQUIRE( b.q()[0] == static_cast<Real>(3.5) );
+      REQUIRE( b.q()[1] == static_cast<Real>(3.5) );
+      REQUIRE( b.q()[2] == static_cast<Real>(3.5) );
+
+      REQUIRE( b.p()[0] == static_cast<Real>(5.9) );
+      REQUIRE( b.p()[1] == static_cast<Real>(5.9) );
+      REQUIRE( b.p()[2] == static_cast<Real>(5.9) );
+
+      REQUIRE( b.is(flag::exist) );
+      REQUIRE( b.is(flag::secondary) );
+      REQUIRE( b.get<birthplace>() == 3 );
+      REQUIRE( migrInt<2>(b) == 6 );
+    }
+
+  }
+}
+
+SCENARIO("Test sending particles", "[particle][mpi][.]") {
+  SECTION("Intra communicator") {
+    if ( mpi::world.size() >= 2 ) {
+      int myrank = mpi::world.rank();
+      if ( 0 == myrank ) {
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, birthplace{18} );
+        mpi::world.send( 1, 22, &ptc );
+      } else if ( 1 == myrank) {
+        Ptc_t ptc;
+        mpi::world.recv( 0, 22, &ptc, 1 );
+
+        REQUIRE( ptc.q()[0] == static_cast<Real>(1.1) );
+        REQUIRE( ptc.q()[1] == static_cast<Real>(2.2) );
+        REQUIRE( ptc.q()[2] == static_cast<Real>(3.3) );
+
+        REQUIRE( ptc.p()[0] == static_cast<Real>(4.4) );
+        REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
+        REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
+
+        REQUIRE( ptc.is(flag::exist) );
+        REQUIRE( ptc.get<birthplace>() == 18 );
+      }
+    }
+  }
+
+  SECTION("Inter communicator") {
+    if ( mpi::world.size() >= 2 && mpi::world.rank() < 2 ) {
+      int myrank = mpi::world.rank();
+      mpi::InterComm inter( mpi::self, 0, {mpi::world}, 1-myrank, 147 );
+      if ( 0 == myrank ) {
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, birthplace{18} );
+        inter.send( 0, 22, &ptc );
+      } else if ( 1 == myrank) {
+        Ptc_t ptc;
+        inter.recv( 0, 22, &ptc, 1 );
+
+        REQUIRE( ptc.q()[0] == static_cast<Real>(1.1) );
+        REQUIRE( ptc.q()[1] == static_cast<Real>(2.2) );
+        REQUIRE( ptc.q()[2] == static_cast<Real>(3.3) );
+
+        REQUIRE( ptc.p()[0] == static_cast<Real>(4.4) );
+        REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
+        REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
+
+        REQUIRE( ptc.is(flag::exist) );
+        REQUIRE( ptc.get<birthplace>() == 18 );
+      }
+    }
+  }
+}
+
+TEMPLATE_TEST_CASE("Test setting destination", "[particle][.]"
+                   , (std::integral_constant<int,2>)
+                   , (std::integral_constant<int,3>)
+                   ) {
+  constexpr int DGrid = TestType::value;
+  Ptc_t ptc;
+  REQUIRE( migrInt<DGrid>(ptc) == ( apt::pow3(DGrid) - 1 ) / 2 );
+
+  for ( int i = 0; i < apt::pow3(DGrid); ++i ) {
+    migrInt<DGrid> mint(i);
+    mint.imprint(ptc);
+    REQUIRE( migrInt<DGrid>(ptc) == i );
+  }
+}
+
 SCENARIO("Test sendrecv particle", "[particle][mpi][.]") {
   if ( mpi::world.size() > 1 && mpi::world.rank() < 2  ) {
     aio::unif_real<double> dist;
     std::vector<Ptc_t> ptc_arr;
     const int nptcs = 1000;
     ptc_arr.reserve(nptcs);
-    for ( int i = 0; i < nptcs; ++i )
+    for ( int i = 0; i < nptcs; ++i ) {
       ptc_arr.emplace_back( Vec_t(dist(),dist(),dist()), Vec_t{dist(),dist(),dist()}, flag::secondary, species::electron );
+      migrInt<3>(14).imprint(ptc_arr.back());
+    }
 
     std::vector<Ptc_t> data;
     data.reserve(nptcs);
@@ -26,7 +138,7 @@ SCENARIO("Test sendrecv particle", "[particle][mpi][.]") {
     if ( mpi::world.rank() == 0 ) {
       for ( int i = 0; i < nptcs; ++i ) {
         data[i] = ptc_arr[i];
-        data[i].set( migrate_code{14} );
+        migrInt<3>(14).imprint(data[i]);
       }
 
       mpi::world.send(1,147,data.data(),data.size());
@@ -52,7 +164,7 @@ SCENARIO("Test lcr_sort", "[particle][.]") {
     []( const std::vector<int>& lcr_vals ) {
       if ( mpi::world.rank() == 0 ) {
 
-        auto lcr = []( const auto& ptc ) { return ptc.template get<migrate_code>() % 3; };
+        auto lcr = []( const auto& ptc ) -> int { return migrInt<1>(ptc) % 3; };
         std::vector<Ptc_t> ptcs;
 
         apt::array<int,3> count{};
@@ -60,7 +172,7 @@ SCENARIO("Test lcr_sort", "[particle][.]") {
         for ( int i = 0; i < lcr_vals.size(); ++i ) {
           ++count[ lcr_vals[i] % 3 ];
           ptcs.emplace_back(Ptc_t());
-          ptcs.back().set(migrate_code{lcr_vals[i] % 3});
+          migrInt<1>(lcr_vals[i] % 3).imprint(ptcs.back());
         }
 
         auto begs = impl::lcr_sort( ptcs, lcr );
@@ -74,9 +186,9 @@ SCENARIO("Test lcr_sort", "[particle][.]") {
         REQUIRE( begs[2] == begE_exp );
 
         int n = 0;
-        for ( ; n < begs[0]; ++n ) REQUIRE( ptcs[n].template get<migrate_code>() == 0 );
-        for ( ; n < begs[1]; ++n ) REQUIRE( ptcs[n].template get<migrate_code>() == 1 );
-        for ( ; n < begs[2]; ++n ) REQUIRE( ptcs[n].template get<migrate_code>() == 2 );
+        for ( ; n < begs[0]; ++n ) REQUIRE( migrInt<1>(ptcs[n]) == apt::C );
+        for ( ; n < begs[1]; ++n ) REQUIRE( migrInt<1>(ptcs[n]) == apt::L );
+        for ( ; n < begs[2]; ++n ) REQUIRE( migrInt<1>(ptcs[n]) == apt::R );
 
       }
       mpi::world.barrier();
@@ -122,14 +234,8 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
                    // , (aio::IndexType<-8,-8>)
                    ) {
   constexpr int DGrid = 2;
-  std::vector<int> cart_dims;
-  std::vector<bool> periodic;
-  for ( auto i : TestType::get() ) {
-    cart_dims.push_back( i > 0 ? i : -i );
-    periodic.push_back( i < 0 );
-  }
 
-  auto cart_opt = aio::make_cart( cart_dims, periodic, mpi::world );
+  auto cart_opt = aio::make_cart( TestType::get(), mpi::world );
   auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
   if ( ens_opt ) {
     // first every node initialize some particles out of borders. Then they share this information with neighbors for test purpose.
@@ -140,19 +246,21 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
 
     int nptcs = 10000;
     constexpr int N = apt::pow3(DGrid);
+    constexpr int CENTER = ( N - 1 ) / 2;
     apt::array<int, N> sendcount{};
     while( nptcs ) {
-      int mig_dir = unif();
-      if (!migrate_code{mig_dir}) continue;
+      migrInt<DGrid> mig_dir = unif();
+      if (mig_dir == CENTER) continue;
       ++sendcount[mig_dir];
 
       Ptc_t ptc;
+      ptc.set(flag::exist);
       for ( int i = 0; i < DGrid; ++i ) {
         ptc.p()[i] = ens_opt -> cart_coords[i]; // use p for encoding
       }
 
+      mig_dir.imprint(ptc);
       mgr_buf.push_back( std::move(ptc) );
-      mgr_buf.back().set(migrate_code{mig_dir});
       -- nptcs;
     }
 
@@ -160,7 +268,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
     std::vector<mpi::Request> reqs;
     const auto[ my_coords, cart_dims, periodic ] = cart_opt -> coords_dims_periodic();
     for( int n = 0; n < N; ++n ) {
-      if ( !migrate_code{n} ) continue;
+      if ( CENTER == n ) continue;
       auto neigh_coords = my_coords;
       neigh_coords[1] += n / 3 - 1;
       neigh_coords[0] += n % 3 - 1;
@@ -195,7 +303,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
   mpi::world.barrier();
 }
 
-SCENARIO("Stress Test" , "[particle][mpi]") {
+SCENARIO("Stress Test" , "[particle][mpi][.]") {
   constexpr int DGrid = 2;
   const apt::array<int,DGrid> partition { 3, 3 };
   const int num_procs = mpi::world.size();
@@ -228,15 +336,18 @@ SCENARIO("Stress Test" , "[particle][mpi]") {
       int N = num_cycles_each_proc_map;
       while ( N-- ) {
         {
-          auto x = load_gen();
-          x = std::max<double>(x, 0.0);
-          x = std::min<double>(x, 100000.0);
-          ptcs.resize(static_cast<std::size_t>(x));
+          {
+            auto x = load_gen();
+            x = std::max<double>(x, 0.0);
+            x = std::min<double>(x, 100000.0);
+            ptcs.resize(static_cast<std::size_t>(x));
+          }
           for ( auto& ptc : ptcs ) {
-            do {
-              ptc.set(flag::exist);
-              ptc.set(migrate_code{mig_dir_gen()});
-            } while ( !ptc.template get<migrate_code>() );
+            ptc.set(flag::exist);
+            migrInt<DGrid> mi;
+            do mi = mig_dir_gen();
+            while ( mi == (apt::pow3(DGrid) - 1) / 2 );
+            mi.imprint(ptc);
           }
         }
         migrate( ptcs, ens_opt->inter, 0 ); // TODO shift
