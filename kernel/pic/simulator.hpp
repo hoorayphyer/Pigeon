@@ -62,7 +62,6 @@ namespace pic {
     std::vector<particle::Particle<Real, PtcSpecs>> _migrators;
 
     std::unique_ptr<bc::Axissymmetric<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
-    std::unique_ptr<bc::FoldBackJ<DGrid, Real, PtcSpecs, RealJ>> _fbj;
     std::unique_ptr<Injector< DGrid, Real, PtcSpecs, RealJ>> _injector;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
@@ -101,7 +100,6 @@ namespace pic {
       }
 
       _fbc_axis.reset( new typename decltype(_fbc_axis)::element_type {_grid, _E, _B, _J, _particles} );
-      _fbj.reset( new typename decltype(_fbj)::element_type {_grid, _E, _B, _J, _particles} );
       _injector.reset( new typename decltype(_injector)::element_type {_grid, _E, _B, _J, _particles} );
 
       ens.is_at_boundary();
@@ -283,10 +281,10 @@ namespace pic {
             lgr::file % "FieldUpdate" << "==>>" << std::endl;
             stamp.emplace();
           }
-          (*_fbj)();
+          _fbc_axis->setJ();
           field::merge_sync_guard_cells( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
-          (*_fbc_axis)();
+          _fbc_axis->setEB();
           if (stamp) {
             lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
           }

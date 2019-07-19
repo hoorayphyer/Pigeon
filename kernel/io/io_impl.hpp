@@ -11,6 +11,8 @@
 #include "apt/numeric.hpp"
 #include "manifold/curvilinear_impl.hpp"
 
+#include "bc/axissymmetric.hpp"
+
 #include <silo.h> // for an ad hoc DBPutQuadmesh
 
 namespace io {
@@ -148,22 +150,22 @@ namespace io {
 
   template < int DGrid,
              typename Real,
-             template < typename > class PtcSpecs,
+             template < typename > class S,
              typename ShapeF,
              typename RealJ,
              typename Metric >
   struct ExportEBJ {
     const mani::Grid<Real,DGrid>& grid; // local grid
-    const field::Field<Real, 3, DGrid>& Efield;
-    const field::Field<Real, 3, DGrid>& Bfield;
-    const field::Field<RealJ, 3, DGrid>& Jfield;// J is Jmesh on a replica
-    const particle::map<particle::array<Real,PtcSpecs>>& particles;
+    const field::Field<Real, 3, DGrid>& E;
+    const field::Field<Real, 3, DGrid>& B;
+    const field::Field<RealJ, 3, DGrid>& J;// J is Jmesh on a replica
+    const particle::map<particle::array<Real,S>>& particles;
 
     template < typename RealExport, typename F_put_to_master >
     void operator() ( int DSRatio, const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       if ( !cart_opt ) return;
 
-      field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
+      field::Field<Real, 1, DGrid> tmp( E.mesh() );
 
       std::vector<int> dims(DGrid);
       for ( int i = 0; i < DGrid; ++i ) dims[i] = io_field.mesh().extent()[i];
@@ -171,7 +173,7 @@ namespace io {
       std::string varname;
       for ( int comp = 0; comp < 3; ++comp ) {
         {
-          downsample( DSRatio, io_field, Efield, comp );
+          downsample( DSRatio, io_field, E, comp );
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "E" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -179,7 +181,7 @@ namespace io {
                 });
           put_to_master( varname, cart_opt->size());
 
-          downsample( DSRatio, io_field, Bfield, comp );
+          downsample( DSRatio, io_field, B, comp );
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "B" + std::to_string(comp+1);
           pmpio([&](auto& dbfile){
@@ -190,9 +192,9 @@ namespace io {
 
         {
           for ( const auto& I : apt::Block(tmp.mesh().bulk_dims()) ) {
-            tmp[0](I) = Jfield[comp](I);
+            tmp[0](I) = J[comp](I);
           }
-          tmp.set_offset( 0, Jfield[comp].offset() );
+          tmp.set_offset( 0, J[comp].offset() );
           { // normalize J to orthonormal basis
             // define a function pointer.
             auto* h_func =
@@ -243,50 +245,36 @@ namespace io {
 
   template < int DGrid,
              typename Real,
-             template < typename > class PtcSpecs,
+             template < typename > class S,
              typename ShapeF,
              typename RealJ,
              typename Metric >
   struct ExportParticles {
   private:
     void fold_back_at_axis ( field::Field<Real,1,DGrid>& field ) const {
+      // TODO these are duplicate
       constexpr int axis_dir = 1;
       constexpr auto PI = std::acos(-1.0l);
-      bool is_at_axis_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
-      bool is_at_axis_upper = std::abs( grid[axis_dir].upper() - PI ) < grid[axis_dir].delta();
+      bool is_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
+      bool is_upper = std::abs( grid[axis_dir].upper() - PI ) < grid[axis_dir].delta();
 
-      const auto& mesh = field.mesh();
-      const int guard = mesh.guard();
-
-      // NOTE field is assumed to have all-MIDWAY offset
-      if ( is_at_axis_lower ) {
-        for ( const auto& trI : mesh.project(axis_dir, {}, mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n )
-            field[0][ trI | n ] += field[0][ trI | -1 - n ];
-        }
-      }
-
-      if ( is_at_axis_upper ) {
-        const int dim = mesh.bulk_dim(axis_dir);
-        for ( const auto& trI : mesh.project(axis_dir, {}, mesh.extent() ) ) {
-          for ( int n = 0; n < guard; ++n )
-            field[0][ trI | dim - 1 - n ] += field[0][ trI | dim + n ];
-        }
-      }
+      // NOTE field is assumed to have all-MIDWAY offset // TODO check this
+      auto add_assign = []( Real& a, Real& b ) noexcept -> void {a += b; b = a;};
+      bc::Axissymmetric<DGrid,Real,S,RealJ>::symmetrize( is_lower, is_upper, field[0], add_assign );
     }
 
   public:
     const mani::Grid<Real,DGrid>& grid; // local grid
-    const field::Field<Real, 3, DGrid>& Efield;
-    const field::Field<Real, 3, DGrid>& Bfield;
-    const field::Field<RealJ, 3, DGrid>& Jfield;// J is Jmesh on a replica
-    const particle::map<particle::array<Real,PtcSpecs>>& particles;
+    const field::Field<Real, 3, DGrid>& E;
+    const field::Field<Real, 3, DGrid>& B;
+    const field::Field<RealJ, 3, DGrid>& J;// J is Jmesh on a replica
+    const particle::map<particle::array<Real,S>>& particles;
 
     template < typename RealExport, typename F_put_to_master >
     void operator() ( int DSRatio, const silo::Pmpio& pmpio, field::Field<RealExport,1,DGrid>& io_field, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens, const F_put_to_master& put_to_master ) const {
       // TODO dbfile.put charge mass of the species in
       // TODO save gamma P density, which is total gamma / physical cell volume. Later this divided by number density gives us gamma P per unit particle. Think this over.
-      field::Field<Real, 1, DGrid> tmp( Efield.mesh() );
+      field::Field<Real, 1, DGrid> tmp( E.mesh() );
 
       std::vector<int> dims(DGrid);
       for ( int i = 0; i < DGrid; ++i ) dims[i] = io_field.mesh().extent()[i];
@@ -349,7 +337,7 @@ namespace io {
              typename ShapeF,
              int DGrid,
              typename Real,
-             template < typename > class PtcSpecs,
+             template < typename > class S,
              typename RealJ
              >
   void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
@@ -359,7 +347,7 @@ namespace io {
                     const field::Field<Real, 3, DGrid>& Efield,
                     const field::Field<Real, 3, DGrid>& Bfield,
                     const field::Field<RealJ, 3, DGrid>& Jfield,// J is Jmesh on a replica
-                    const particle::map<particle::array<Real,PtcSpecs>>& particles
+                    const particle::map<particle::array<Real,S>>& particles
                     ) {
     constexpr int silo_mesh_ghost = 1;
     constexpr auto silo_mesh_type = silo::MeshType::Curv;
@@ -516,7 +504,7 @@ namespace io {
       //   dbfile.put_var( name, meshname, exfd );
       // }
 
-      ExportEBJ<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportEBJ{grid,Efield,Bfield,Jfield,particles};
+      ExportEBJ<DGrid, Real, S, ShapeF, RealJ, Metric> exportEBJ{grid,Efield,Bfield,Jfield,particles};
       exportEBJ(downsample_ratio, pmpio, field_export, cart_opt, ens, put_to_master );
     }
 
@@ -536,7 +524,7 @@ namespace io {
       //   }
       // }
 
-      ExportParticles<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
+      ExportParticles<DGrid, Real, S, ShapeF, RealJ, Metric> exportPtcs{grid,Efield,Bfield,Jfield,particles};
       exportPtcs(downsample_ratio, pmpio, field_export, cart_opt, ens, put_to_master );
     }
 

@@ -15,6 +15,7 @@ namespace silo :: traits {
 namespace silo {
   void dbfile_free ( DBfileHandle* p ) {
     if (p && *p) DBClose(*p);
+    delete p;
   }
 
   file_t open(  std::string filename, Mode mode ) {

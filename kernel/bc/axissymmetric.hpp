@@ -8,67 +8,86 @@ namespace bc {
              typename RealJ >
   struct Axissymmetric {
   private:
+    static_assert(DGrid==2);
     const mani::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _Efield;
-    field::Field<Real, 3, DGrid>& _Bfield;
+    field::Field<Real, 3, DGrid>& _E;
+    field::Field<Real, 3, DGrid>& _B;
+    field::Field<RealJ, 3, DGrid>& _J;
 
-    const int axis_dir = 1;
-    bool _is_at_axis_lower = false;
-    bool _is_at_axis_upper = false;
+    static constexpr int AxisDir = 1;
+    bool _is_lower = false;
+    bool _is_upper = false;
 
   public:
+    static void symmetrize( bool is_at_axis_lower, bool is_at_axis_upper,
+                            field::Component<Real,DGrid,false> comp, // TODOL semantics on comp
+                            void (*f)( Real& val_guard, Real& val_bulk ) ) {
+      const auto& mesh = comp.mesh();
+      int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
+
+      if ( is_at_axis_lower ) {
+        for ( const auto& trI : mesh.project(AxisDir, mesh.origin(), mesh.extent() ) ) {
+          for ( int n = mesh.origin()[AxisDir]; n < mirror_sum + 1; ++n ) { // n < 0 if MIDWAY, n < 1 is INSITU
+            f( comp[ trI | n ], comp[ trI | (mirror_sum - n) ] );
+          }
+        }
+      }
+      if ( is_at_axis_upper ) {
+        const int bulk = mesh.bulk_dim(AxisDir);
+        for ( const auto& trI : mesh.project(AxisDir, mesh.origin(), mesh.extent() ) ) {
+          for ( int n = bulk; n < bulk + mesh.guard(); ++n ) {
+            f( comp[ trI | n ], comp[ trI | 2*bulk + mirror_sum - n ] );
+          }
+        }
+      }
+    }
+
+
     Axissymmetric ( const mani::Grid<Real,DGrid>& localgrid,
                     field::Field<Real, 3, DGrid>& Efield,
                     field::Field<Real, 3, DGrid>& Bfield,
-                    const field::Field<RealJ, 3, DGrid>& Jfield,
+                    field::Field<RealJ, 3, DGrid>& Jfield,
                     const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield) {
-      _is_at_axis_lower = std::abs( localgrid[axis_dir].lower() - 0.0 ) < localgrid[axis_dir].delta();
-      _is_at_axis_upper = std::abs( localgrid[axis_dir].upper() - std::acos(-1.0) ) < localgrid[axis_dir].delta();
+      : _grid(localgrid), _E(Efield), _B(Bfield), _J(Jfield) {
+      _is_lower = std::abs( localgrid[AxisDir].lower() - 0.0 ) < localgrid[AxisDir].delta();
+      _is_upper = std::abs( localgrid[AxisDir].upper() - std::acos(-1.0) ) < localgrid[AxisDir].delta();
     }
 
-    void operator() () {
+    void setEB () {
       // NOTE Guard cells values are needed when interpolating E and B
       // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
-      const auto& mesh = _Efield.mesh();
-      if ( _is_at_axis_lower ) {
-        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = mesh.origin()[axis_dir]; n < 0; ++n ) {
-            // MIDWAY in axis_dir
-            _Efield[0][trI | n] = _Efield[0][ trI | ( -n - 1 ) ];
-            _Efield[2][trI | n] = - _Efield[2][ trI | ( -n - 1 ) ];
-            _Bfield[1][trI | n] = - _Bfield[1][ trI | ( -n - 1 ) ];
+      auto assign = []( Real& v_g, Real& v_b ) noexcept { v_g = v_b; };
+      auto neg_assign = []( Real& v_g, Real& v_b ) noexcept {
+                          v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
+                        };
+      // MIDWAY in AxisDir
+      symmetrize(_is_lower, _is_upper, _E[0], assign );
+      symmetrize(_is_lower, _is_upper, _E[2], neg_assign );
+      symmetrize(_is_lower, _is_upper, _B[1], neg_assign );
 
-            // INSITU in axis_dir
-            _Efield[1][trI | n] = - _Efield[1][ trI | -n ];
-            _Bfield[0][trI | n] = _Bfield[0][ trI | -n ];
-            _Bfield[2][trI | n] = - _Bfield[2][ trI | -n ];
-          }
+      // INSITU in AxisDir
+      symmetrize(_is_lower, _is_upper, _E[1], neg_assign );
+      symmetrize(_is_lower, _is_upper, _B[0], assign );
+      symmetrize(_is_lower, _is_upper, _B[2], neg_assign );
+    }
 
-          _Efield[1][trI | 0] = 0.0;
-          _Bfield[2][trI | 0] = 0.0;
-        }
-      }
+    void setJ() {
+      auto add_assign =
+        []( Real& a, Real& b ) noexcept {
+          a += b;
+          b = a;
+        };
 
-      if ( _is_at_axis_upper ) {
-        const int bulk = mesh.bulk_dim(axis_dir);
-        for ( const auto& trI : mesh.project(axis_dir, mesh.origin(), mesh.extent() ) ) {
-          for ( int n = bulk; n < bulk + mesh.guard(); ++n ) {
-            // MIDWAY in axis_dir
-            _Efield[0][trI | n] = _Efield[0][ trI | ( 2*bulk - 1 - n ) ];
-            _Efield[2][trI | n] = - _Efield[2][ trI | ( 2*bulk - 1 - n ) ];
-            _Bfield[1][trI | n] = - _Bfield[1][ trI | ( 2*bulk - 1 - n ) ];
-
-            // INSITU in axis_dir
-            _Efield[1][trI | n] = - _Efield[1][ trI | ( 2*bulk -n ) ];
-            _Bfield[0][trI | n] = _Bfield[0][ trI | ( 2*bulk -n ) ];
-            _Bfield[2][trI | n] = - _Bfield[2][ trI | ( 2*bulk -n ) ];
-          }
-
-          _Efield[1][trI | bulk] = 0.0;
-          _Bfield[2][trI | bulk] = 0.0;
-        }
-      }
+      auto sub_assign =
+        []( Real& a, Real& b ) noexcept {
+          a -= b;
+          b = -a;
+        };
+      // MIDWAY in AxisDir
+      symmetrize(_is_lower, _is_upper, _J[0], add_assign );
+      symmetrize(_is_lower, _is_upper, _J[2], sub_assign );
+      // INSITU in AxisDir
+      symmetrize(_is_lower, _is_upper, _J[1], sub_assign );
     }
   };
 }

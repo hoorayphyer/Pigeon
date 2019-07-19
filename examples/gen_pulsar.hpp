@@ -19,7 +19,6 @@
 #include "particle/array.hpp"
 #include "particle/particle.hpp"
 
-#include "bc/fold_back_J.hpp"
 #include "bc/axissymmetric.hpp"
 
 #include "dye/ensemble.hpp"
@@ -52,11 +51,11 @@ namespace pic {
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
-  inline constexpr ModuleRange checkpoint_mr { false, 0, 10000 };
+  inline constexpr ModuleRange checkpoint_mr { false, 1, 10000 };
   inline constexpr int num_checkpoint_parts = 4;
   inline constexpr std::optional<float> checkpoint_hourly;
 
-  inline constexpr ModuleRange dlb_mr { false, 0, 1000 };
+  inline constexpr ModuleRange dlb_mr { false, 1, 1000 };
   inline constexpr std::size_t dlb_target_load = 100000;
 
   inline constexpr ModuleRange msperf_mr { true, 0, 100 };
