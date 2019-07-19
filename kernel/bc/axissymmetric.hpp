@@ -19,9 +19,11 @@ namespace bc {
     bool _is_upper = false;
 
   public:
+    // NOTE f is a function pointer to void (*)( T&, T& ). The complicated expression is just to make template deduction work.
+    template < typename T >
     static void symmetrize( bool is_at_axis_lower, bool is_at_axis_upper,
-                            field::Component<Real,DGrid,false> comp, // TODOL semantics on comp
-                            void (*f)( Real& val_guard, Real& val_bulk ) ) {
+                            field::Component<T,DGrid,false> comp, // TODOL semantics on comp
+                            void (*f)( decltype(comp[0])& val_guard, decltype(comp[0])& val_bulk ) ) {
       const auto& mesh = comp.mesh();
       int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
 
@@ -73,13 +75,13 @@ namespace bc {
 
     void setJ() {
       auto add_assign =
-        []( Real& a, Real& b ) noexcept {
+        []( RealJ& a, RealJ& b ) noexcept {
           a += b;
           b = a;
         };
 
       auto sub_assign =
-        []( Real& a, Real& b ) noexcept {
+        []( RealJ& a, RealJ& b ) noexcept {
           a -= b;
           b = -a;
         };
