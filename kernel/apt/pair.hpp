@@ -14,8 +14,8 @@ namespace apt {
       return *this;
     }
 
-    constexpr T operator[] ( bool lr ) const noexcept { return lr ? rgt : lft;}
-    constexpr T& operator[] ( bool lr ) noexcept { return lr ? rgt : lft;}
+    constexpr const T& operator[] ( bool lr ) const noexcept { return lr ? rgt : lft; }
+    constexpr T& operator[] ( bool lr ) noexcept { return lr ? rgt : lft; }
   };
 
   template < typename T >

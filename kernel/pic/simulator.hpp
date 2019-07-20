@@ -102,7 +102,6 @@ namespace pic {
       _fbc_axis.reset( new typename decltype(_fbc_axis)::element_type {_grid, _E, _B, _J, _particles} );
       _injector.reset( new typename decltype(_injector)::element_type {_grid, _E, _B, _J, _particles} );
 
-      ens.is_at_boundary();
       if ( _cart_opt )
         _field_update.reset(new field::Updater<Real,DGrid,RealJ>
                             ( *_cart_opt, _grid,
@@ -326,6 +325,10 @@ namespace pic {
 
         std::optional<int> new_label;
         if ( _ens_opt ) new_label.emplace(_ens_opt->label());
+        if (stamp) {
+          lgr::file % "  refresh simulator..." << std::endl;
+          stamp.emplace();
+        }
         if ( old_label != new_label ) refresh(*_ens_opt);
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;

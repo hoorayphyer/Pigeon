@@ -130,13 +130,10 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
 // SCENARIO("intra collective communications", "[parallel][mpi]") {}
 
 SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
-  if ( world.size() >= 2 ) {
-    SECTION("each comm has one member") {
+  SECTION("each comm has one member") {
+    if ( world.size() >= 2 && world.rank() < 2 ) {
       int myrank = world.rank();
-      auto local_opt = world.split( {myrank} );
-      REQUIRE(local_opt);
-      auto& local = *local_opt;
-      InterComm inter( local, 0, {world}, 1-myrank, 147 );
+      InterComm inter( self, 0, {world}, 1-myrank, 147 );
       if ( 0 == myrank ) {
         int msg = 147;
         inter.send( 0, 22, &msg, 1 );
@@ -146,6 +143,7 @@ SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
         REQUIRE(msg == 147);
       }
     }
+    world.barrier();
   }
 
 }

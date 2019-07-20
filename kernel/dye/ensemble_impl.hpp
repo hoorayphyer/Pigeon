@@ -8,10 +8,10 @@ namespace dye::impl {
                   int ith_dim, int chief,
                   int cart_coord, int cart_dim, bool is_periodic ) {
     // NOTE InterComm constructor is blocking.
-    // Edge case: cart_dim == 1. If nonperiodic, nothing needs to be created. If periodic, since MPI intercommunicator doesn't allow overlapping of local and remote groups, just return no neighbors for now and make applications check for this case in practise. // TODOL periodicity
-    if ( cart_dim == 1 ) return {};
-
     apt::pair< std::optional<mpi::InterComm> > inter_comms;
+
+    // Edge case: cart_dim == 1. If nonperiodic, nothing needs to be created. If periodic, since MPI intercommunicator doesn't allow overlapping of local and remote groups, just return no neighbors for now and make applications check for this case in practise. // TODO periodicity
+    if ( cart_dim == 1 ) return inter_comms;
 
     auto remote_leader =
       [&cart, ith_dim]( bool to_right ) {

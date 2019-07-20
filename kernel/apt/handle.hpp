@@ -18,7 +18,7 @@ namespace apt {
     Handle() = default;
     Handle( const Handle& ) = default;
     Handle( Handle&& other ) noexcept = default;
-    ~Handle() = default;
+    virtual ~Handle() = default;
 
     Handle& operator=( const Handle& ) noexcept = default;
     Handle& operator=( Handle&& other ) noexcept = default;

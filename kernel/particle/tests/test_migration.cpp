@@ -9,7 +9,7 @@ using Real = pic::real_t;
 using Ptc_t = Particle<Real,Specs>;
 using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
-SCENARIO("Test swapping particles", "[particle][.]") {
+SCENARIO("Test swapping particles", "[particle]") {
   if ( mpi::world.rank() == 0 ) {
     Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, flag::secondary, birthplace{3} );
     migrInt<2>(6).imprint(a);
@@ -53,7 +53,7 @@ SCENARIO("Test swapping particles", "[particle][.]") {
   }
 }
 
-SCENARIO("Test sending particles", "[particle][mpi][.]") {
+SCENARIO("Test sending particles", "[particle][mpi]") {
   SECTION("Intra communicator") {
     if ( mpi::world.size() >= 2 ) {
       int myrank = mpi::world.rank();
@@ -104,7 +104,7 @@ SCENARIO("Test sending particles", "[particle][mpi][.]") {
   }
 }
 
-TEMPLATE_TEST_CASE("Test setting destination", "[particle][.]"
+TEMPLATE_TEST_CASE("Test setting destination", "[particle]"
                    , (std::integral_constant<int,2>)
                    , (std::integral_constant<int,3>)
                    ) {
@@ -119,7 +119,7 @@ TEMPLATE_TEST_CASE("Test setting destination", "[particle][.]"
   }
 }
 
-SCENARIO("Test sendrecv particle", "[particle][mpi][.]") {
+SCENARIO("Test sendrecv particle", "[particle][mpi]") {
   if ( mpi::world.size() > 1 && mpi::world.rank() < 2  ) {
     aio::unif_real<double> dist;
     std::vector<Ptc_t> ptc_arr;
@@ -159,7 +159,7 @@ SCENARIO("Test sendrecv particle", "[particle][mpi][.]") {
   mpi::world.barrier();
 }
 
-SCENARIO("Test lcr_sort", "[particle][.]") {
+SCENARIO("Test lcr_sort", "[particle]") {
   auto test =
     []( const std::vector<int>& lcr_vals ) {
       if ( mpi::world.rank() == 0 ) {
@@ -220,7 +220,7 @@ SCENARIO("Test lcr_sort", "[particle][.]") {
   }
 }
 
-TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][mpi][.]"
+TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][mpi]"
                    // NOTE Notation: XxYxZ is the cartesian partition. The cartesian topology is periodic in all directions
                    , (aio::IndexType<1,1>)
                    , (aio::IndexType<2,1>)
@@ -303,7 +303,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
   mpi::world.barrier();
 }
 
-SCENARIO("Stress Test" , "[particle][mpi][.]") {
+SCENARIO("Stress Test" , "[particle][mpi]") {
   constexpr int DGrid = 2;
   const apt::array<int,DGrid> partition { 3, 3 };
   const int num_procs = mpi::world.size();
