@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
 
     // journaling
     fs::mpido( mpi::world, [&](){
+                             if ( !fs::exists("journal.txt") ) return;
                              std::ofstream out;
                              out.open("journal.txt", std::ios_base::app);
                              out << "DataDir := " << pic::this_run_dir << std::endl;
