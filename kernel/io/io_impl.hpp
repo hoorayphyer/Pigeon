@@ -218,7 +218,7 @@ namespace io {
                 tmp[0](I) = 0.0;
             }
           }
-          downsample( DSRatio, io_field, tmp, comp );
+          downsample( DSRatio, io_field, tmp, 0 ); // 0 is to tmp
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
           pmpio([&](auto& dbfile){
