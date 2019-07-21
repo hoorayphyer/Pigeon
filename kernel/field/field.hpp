@@ -23,13 +23,13 @@ namespace field {
       return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
-    inline T operator() ( const apt::Index<DGrid>& i_bulk ) const {
+    inline const T& operator() ( const apt::Index<DGrid>& i_bulk ) const {
       return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
     }
 
     inline T& operator[] ( int i ) { return _data[i]; }
 
-    inline T operator[] ( int i ) const { return _data[i]; }
+    inline const T& operator[] ( int i ) const { return _data[i]; }
 
     inline const auto& data() const noexcept { return _data; }
     inline auto& data() noexcept { return _data; }

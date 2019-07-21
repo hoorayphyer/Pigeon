@@ -197,18 +197,12 @@ namespace io {
           tmp.set_offset( 0, J[comp].offset() );
           { // normalize J to orthonormal basis
             // define a function pointer.
-            auto* h_func =
-              [comp]() -> Real(*)(Real,Real,Real) {
-                if ( comp < DGrid ) {
-                  switch(comp) {
-                  case 0: return Metric::template hh<0,Real>;
-                  case 1: return Metric::template hh<1,Real>;
-                  case 2: return Metric::template hh<2,Real>;
-                  }
-                } else {
-                  return Metric::template hhh<Real>;
-                }
-              }();
+            Real(*h_func)(Real,Real,Real) = nullptr;
+            switch(comp) {
+            case 0: h_func = Metric::template hh<0,Real>; break;
+            case 1: h_func = Metric::template hh<1,Real>; break;
+            case 2: h_func = Metric::template hh<2,Real>; break;
+            }
 
             static_assert( DGrid == 2 );
             const auto& ofs = tmp[0].offset();
@@ -224,12 +218,7 @@ namespace io {
                 tmp[0](I) = 0.0;
             }
           }
-          // downsample( DSRatio, io_field, tmp, 0 );
-          for ( int j = 0; j < 256; ++j ) {
-            for ( int i = 0; i < 256; ++i ) {
-              io_field[0]({i,j}) = tmp[0]({i,j});
-            }
-          }
+          downsample( DSRatio, io_field, tmp, comp );
           field::copy_sync_guard_cells( io_field, *cart_opt );
           varname = "J"+std::to_string(comp+1);
           pmpio([&](auto& dbfile){
