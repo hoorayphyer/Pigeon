@@ -17,7 +17,9 @@ if [[ ! -d $oe_dir ]]; then
 fi
 
 mkdir $stage_dir/$tnow
-cp bin/pic CMakeLists.txt pic.hpp gen.hpp $stage_dir/$tnow/
+mkdir $stage_dir/$tnow/bin
+cp CMakeLists.txt pic.hpp gen.hpp $stage_dir/$tnow/
+cp bin/pic $stage_dir/$tnow/bin/
 
 if [[ -f job.sh ]]; then
     cp job.sh $stage_dir/$tnow/

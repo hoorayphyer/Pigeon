@@ -12,37 +12,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+top_dir=$(pwd)
+
 cd $name
 
-# create delrun
-printf "%s\n" \
-    "#!/bin/bash"\
-    "# This script works only under the current directory."\
-    "# It deletes symlinks and their associated data directories."\
-    "# To avoid any catastrophical event, deletable symlinks must begin with Data/, followed by some project name, followed by 6 digits, followed by -, followed by 4 digits."\
-    "regex='^Data/.+\-20[0-9]{6}-[0-9]{4}(-[0-9])?$'"\
-    "for i in \"\$@\""\
-    "do"\
-    "    if [[ \$i =~ \$regex && -L \$i ]]; then # -L checks symlink"\
-    "        rm -rf \$( cd \$i && pwd -P )"\
-    "        rm \$i"\
-    "    else"\
-    "        echo \"Ignored deleteion of \$i\""\
-    "    fi"\
-    "done"\
-    > delrun && chmod u+x delrun
-
+# create default stuff
+ln -s $top_dir/stage $(pwd)/stage
+ln -s $top_dir/delrun $(pwd)/delrun
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1
 fi
-
-# # create default stuff
-# mkdir build include lib src
-# if [ $? -ne 0 ]; then
-#     echo "Lab $name incomplete. Code 0003"
-#     exit 1
-# fi
 
 # printf "%s\n" \
 #        "set(LAB_SHADOWS \"\")"\

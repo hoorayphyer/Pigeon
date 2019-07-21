@@ -2,6 +2,7 @@
 
 !.gitignore
 !newlab
+!delrun
 !stage
 !README.md
 !LICENSE
