@@ -24,6 +24,7 @@ namespace mpi {
   constexpr auto mpi_op( by op ) {
     if ( by::SUM == op ) return MPI_SUM;
     if ( by::MAX == op ) return MPI_MAX;
+    if ( by::MIN == op ) return MPI_MIN;
     if ( by::MAXLOC == op ) return MPI_MAXLOC;
   }
 
@@ -112,7 +113,6 @@ namespace mpi {
     return req;
   }
 
-
   template < typename Comm >
   template < typename T >
   std::vector<T> Collective_Comm<Comm>::allgather( const T* send_buf, int send_count ) const {
@@ -124,6 +124,27 @@ namespace mpi {
     // NOTE recvcount is from one process so it's equal to send_count
     MPI_Allgather( send_buf, send_count, datatype<T>(), recv.data(), send_count, datatype<T>(), _comm() );
     return recv;
+  }
+
+  template < typename Comm >
+  template < typename T >
+  std::optional<std::vector<T>> Collective_Comm<Comm>::gather( const int root, const T* send_buf, int send_count ) const {
+    std::optional<std::vector<T>> res;
+    int size{};
+    MPI_Comm_size(_comm(), &size);
+    int rank{};
+    MPI_Comm_rank(_comm(), &rank);
+
+    T* recv_buf = nullptr;
+    if ( root == rank ) {
+      res.emplace();
+      (*res).reserve(send_count * size);
+      (*res).resize(send_count * size);
+      recv_buf = (*res).data();
+    }
+    // NOTE recvcount is from one process so it's equal to send_count
+    MPI_Gather( send_buf, send_count, datatype<T>(), recv_buf, send_count, datatype<T>(), root, _comm() );
+    return res;
   }
 
   template < typename Comm >
@@ -170,6 +191,8 @@ namespace mpi {
   template void Collective_Comm<_COMM_>::broadcast( int, _TYPE_ *, int ) const; \
   template Request Collective_Comm<_COMM_>::Ibroadcast( int, _TYPE_ *, int ) const; \
   template std::vector<_TYPE_> Collective_Comm<_COMM_>::allgather( const _TYPE_*, int ) const; \
+  template std::optional<std::vector<_TYPE_>>                           \
+  Collective_Comm<_COMM_>::gather( const int, const _TYPE_ *, int ) const; \
   template void Collective_Comm<_COMM_>::scatter( int, _TYPE_*, int ) const
 
 #define INSTANTIATE_MPI_COLLECTIVE(_TYPE_)                \

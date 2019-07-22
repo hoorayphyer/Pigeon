@@ -62,6 +62,8 @@ namespace pic {
   inline constexpr std::optional<int> msperf_max_entries {};
   inline constexpr auto msperf_qualified =
     []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
+
+  inline constexpr ModuleRange stats_mr { true, 0, 100 };
 }
 
 namespace field {

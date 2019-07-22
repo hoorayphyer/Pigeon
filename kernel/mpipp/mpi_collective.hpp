@@ -6,7 +6,7 @@
 #include <optional>
 
 namespace mpi {
-  enum class by : char { SUM = 0, MAX, MAXLOC};
+  enum class by : char { SUM = 0, MAX, MIN, MAXLOC};
 
   constexpr bool IN_PLACE = true;
 
@@ -37,6 +37,9 @@ namespace mpi {
 
     template < typename T >
     std::vector<T> allgather( const T* send_buf, int send_count ) const;
+
+    template < typename T >
+    std::optional<std::vector<T>> gather( const int root, const T* send_buf, int send_count ) const;
 
     // scatter for intra_comm is assumed to be in_place. This means in any case, root will not send anything to itself
     template < typename T >

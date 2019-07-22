@@ -20,6 +20,8 @@
 #include "logger/logger.hpp"
 #include "timer/timer.hpp"
 
+#include "pic/stats.hpp"
+
 #ifdef PIC_DEBUG
 #include "debug/debugger.hpp"
 #endif
@@ -344,6 +346,10 @@ namespace pic {
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
+      }
+
+      if (_ens_opt && is_do(pic::stats_mr, timestep) ) {
+        particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles );
       }
 
       // TODOL
