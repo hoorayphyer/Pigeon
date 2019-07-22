@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
                              fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp" );
                              fs::copy_file("gen.hpp", pic::this_run_dir + "/pigeon/gen.hpp" );
                            } );
-    lgr::file.open( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
+    lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
     field::set_up<pic::real_t>();
     particle::set_up_properties();

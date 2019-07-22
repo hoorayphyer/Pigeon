@@ -13,18 +13,32 @@ namespace lgr {
     std::string _filename{};
     std::string _indent_old{};
     std::string _indent{};
-    bool _is_on = true;
+    bool _is_on = false;
 
   public:
+    inline void set_filename( std::string filename ) noexcept {
+      _filename = std::move(filename);
+    }
+
     template < typename... Args >
     inline void open( std::string filename, Args&&... args ) {
+      if ( _fout.is_open() ) _fout.close();
       _filename = std::move(filename);
       _fout.open( _filename.c_str(), std::forward<Args>(args)... );
+      if ( _fout.is_open() ) _is_on = true;
+    }
+
+    template < typename... Args >
+    inline void open( Args&&... args ) noexcept {
+      if ( _fout.is_open() ) _fout.close();
+      _fout.open( _filename.c_str(), std::forward<Args>(args)... );
+      if ( _fout.is_open() ) _is_on = true;
     }
 
     inline void close() {
       _filename = {};
-      _fout.close();
+      if ( _fout.is_open() ) _fout.close();
+      _is_on = false;
     }
 
     void clear() {

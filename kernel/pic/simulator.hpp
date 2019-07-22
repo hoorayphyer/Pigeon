@@ -115,6 +115,7 @@ namespace pic {
       _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>
                         ( _grid, _rng, particle::properties)
                         );
+      if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open();
     }
 
     void migrate_particles( int timestep ) {
