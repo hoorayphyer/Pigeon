@@ -1,29 +1,25 @@
 #ifndef _IO_EXPORTEE_HPP_
 #define _IO_EXPORTEE_HPP_
 
-#include "apt/index.hpp"
-#include "particle/load_type.hpp"
-
-namespace field { template < typename, int > struct Mesh; }
-
 namespace io {
-  template < typename T, int DGrid >
-  struct FieldBasedExportee {
-    virtual T operator() ( const apt::Index<DGrid>& I_export_mesh_bulk,
-                           const field::Mesh<T,DGrid>& export_mesh ) = 0;
-  };
-}
+  template < int DGrid,
+             typename Real,
+             template < typename > class S,
+             typename ShapeF,
+             typename RealJ,
+             typename Metric >
+  struct Exportee {
+    void (*action)( const mani::Grid<Real,DGrid>& grid; // local grid
+                    field::Field<Real, 3, DGrid>& E;
+                    field::Field<Real, 3, DGrid>& B;
+                    field::Field<RealJ, 3, DGrid>& J;// J is Jmesh on a replica
+                    particle::map<particle::array<Real,S>>& particles;
+                   ) = nullptr;
 
-namespace io {
-  template < typename T, int DGrid >
-  struct ParticleBasedExportee {
-    using particle::load_t;
-    virtual load_t begin() const = 0;
-    virtual load_t end() const = 0;
-    load_t& next( load_t& index ) const = 0; // used for skipping empty particles for example, or iterate from back
-    virtual T val() ( load_t index ) const = 0;
-    virtual apt::array<T, DGrid> loc() ( load_t index ) const = 0;
+    template < typename Texp >
+    static void save_to( dbfile*);
   };
+
 }
 
 #endif

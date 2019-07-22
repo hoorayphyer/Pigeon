@@ -76,6 +76,11 @@ namespace field {
       return *this;
     }
 
+    inline Field& set_offset( int component, int ith_dim, offset_t ofs_v ) noexcept {
+      _offset[component][ith_dim] = ofs_v;
+      return *this;
+    }
+
     inline const auto& mesh() const noexcept { return _mesh;}
 
     inline const auto operator[] ( int i ) const noexcept {
