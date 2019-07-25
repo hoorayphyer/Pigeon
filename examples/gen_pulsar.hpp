@@ -105,7 +105,7 @@ namespace particle {
       real_t landau0_B_thr = 0.1 * field::mu0;
       real_t gravity_strength = 0.5;
 
-      {
+      if ( properties.has(species::electron) ) {
         auto sp = species::electron;
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
@@ -116,7 +116,7 @@ namespace particle {
 
         force.Register(sp);
       }
-      {
+      if ( properties.has(species::positron) ) {
         auto sp = species::positron;
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
@@ -127,7 +127,7 @@ namespace particle {
 
         force.Register(sp);
       }
-      {
+      if ( properties.has(species::ion) ) {
         auto sp = species::ion;
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
@@ -154,11 +154,13 @@ namespace particle {
 
       ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
 
-      ep_scat.Register( species::electron );
-      ep_scat.Register( species::positron );
+      if ( properties.has(species::electron) && properties.has(species::positron) ) {
+        ep_scat.Register( species::electron );
+        ep_scat.Register( species::positron );
+      }
     }
 
-    {
+    if ( properties.has(species::photon) ) {
       Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });

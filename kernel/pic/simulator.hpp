@@ -251,6 +251,7 @@ namespace pic {
           stamp.emplace();
         }
         (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
+        _fbc_axis->setJ();
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
@@ -283,7 +284,6 @@ namespace pic {
             lgr::file % "FieldUpdate" << "==>>" << std::endl;
             stamp.emplace();
           }
-          _fbc_axis->setJ();
           field::merge_sync_guard_cells( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
           _fbc_axis->setEB();

@@ -243,34 +243,51 @@ namespace dye {
 
     if ( impl::balance_code::none == instr[0] ) return;
 
-    // Start from the back of the particle array for both send and recv actions
-    int position = ptcs.size();
     const int num_comms = ( instr.size() - 1 ) / 2; // number of communications to make
 
-    std::vector<mpi::Request> reqs(num_comms);
-
-    std::vector<particle::Particle<T,PtcSpecs>> buffer;
+    std::vector<int> target_rank(num_comms);
+    std::vector<int> scan_count(num_comms+1);
+    target_rank.shrink_to_fit();
+    scan_count.shrink_to_fit();
+    scan_count[0] = 0;
 
     for ( int i = 0; i < num_comms; ++i ) {
-      int other_rank = instr[ 2 * i + 1 ];
-      int num = instr[ 2 * i + 2 ];
-      buffer.resize( num );
-      int tag = 147;
-      if ( impl::balance_code::send == instr[0] ) {
-        position -= num;
-        for ( int j = 0; j < num; ++j ) buffer[j] = std::move(ptcs[position + j]);
-        reqs[i] = intra.Isend( other_rank, tag, buffer.data(), num );
-      } else {
-        // TODOL double check if using Irecv/Isend would cause race condition?
-        // NOTE: using Irecv here causes hanging behavior on some platforms. So we use recv.
-        intra.recv( other_rank, tag, buffer.data(), num );
-        ptcs.resize(ptcs.size() + num);
-        for ( int j = 0; j < num; ++j ) ptcs[position + j] = std::move(buffer[j]);
-        position += num;
+      target_rank[i] = instr[ 2 * i + 1 ];
+      scan_count[i+1] = scan_count[i] + instr[ 2 * i + 2 ];
+    }
+
+    std::vector<particle::Particle<T,PtcSpecs>> buffer(scan_count.back());
+    buffer.shrink_to_fit();
+
+    if ( impl::balance_code::send == instr[0] ) {
+      auto beg = ptcs.size() - scan_count.back();
+      for ( int i = 0; i < scan_count.back(); ++i )
+        buffer[i] = std::move(ptcs[beg + i]);
+      ptcs.resize(scan_count.back());
+    }
+
+    std::vector<mpi::Request> reqs(num_comms);
+    reqs.shrink_to_fit();
+
+    if ( impl::balance_code::send == instr[0] ) {
+      for ( int i = 0; i < num_comms; ++i ) {
+        int tag = 147 + target_rank[i] + intra.rank() * 2;
+        reqs[i] = intra.Isend( target_rank[i], tag, buffer.data() + scan_count[i], scan_count[i+1] - scan_count[i] );
+      }
+    } else {
+      for ( int i = 0; i < num_comms; ++i ) {
+        int tag = 147 + intra.rank() + target_rank[i] * 2;
+        reqs[i] = intra.Irecv( target_rank[i], tag, buffer.data() + scan_count[i], scan_count[i+1] - scan_count[i] );
       }
     }
     mpi::waitall(reqs);
-    if ( impl::balance_code::send == instr[0] ) ptcs.resize( position );
+
+    if ( impl::balance_code::recv == instr[0] ) {
+      auto beg = ptcs.size(); // NOTE old size
+      ptcs.resize(ptcs.size() + scan_count.back());
+      for ( int i = 0; i < scan_count.back(); ++i )
+        ptcs[beg + i] = std::move(buffer[i]);
+    }
   }
 }
 
