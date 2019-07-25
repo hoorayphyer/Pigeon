@@ -119,8 +119,8 @@ namespace io {
     }
   }
 
-  template < int DGrid, typename Real, template < typename > class S, typename RealJ >
-  void fold_back_at_axis ( field::Field<Real,3,DGrid>& field, const mani::Grid<Real,DGrid>& grid, int num_comps ) {
+  template < int DGrid, typename RealDS, template < typename > class S, typename RealJ >
+  void fold_back_at_axis ( field::Field<RealDS,3,DGrid>& field, const mani::Grid<RealDS,DGrid>& grid, int num_comps ) {
     // NOTE field is assumed to have all-MIDWAY offset
     for ( int i = 0; i < num_comps; ++i ) {
       for ( int dim = 0; dim < DGrid; ++dim )
@@ -133,9 +133,9 @@ namespace io {
     bool is_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
     bool is_upper = std::abs( grid[axis_dir].upper() - PI ) < grid[axis_dir].delta();
 
-    auto add_assign = []( Real& a, Real& b ) noexcept -> void {a += b; b = a;}; // TODO only add_assign
+    auto add_assign = []( RealDS& a, RealDS& b ) noexcept -> void {a += b; b = a;}; // TODO only add_assign
     for ( int i = 0; i < num_comps; ++i )
-      bc::Axissymmetric<DGrid,Real,S,RealJ>::symmetrize( is_lower, is_upper, field[i], add_assign );
+      bc::Axissymmetric<DGrid,RealDS,S,RealJ>::symmetrize( is_lower, is_upper, field[i], add_assign );
   }
 }
 
@@ -305,17 +305,17 @@ namespace io {
       using PA = PtcAction<RealDS,DGrid,Real,S,ShapeF>;
       pexps.push_back( new PA ("Num", 1,
                                ptc_num<Real,S>,
-                               fold_back_at_axis< DGrid, Real, S, RealJ >
+                               fold_back_at_axis< DGrid, RealDS, S, RealJ >
                                ) );
 
       pexps.push_back( new PA ("E", 1,
                                ptc_energy<Real,S>,
-                               fold_back_at_axis< DGrid, Real, S, RealJ >
+                               fold_back_at_axis< DGrid, RealDS, S, RealJ >
                                ) );
 
       pexps.push_back( new PA ("P", 3,
                                ptc_energy<Real,S>,
-                               fold_back_at_axis< DGrid, Real, S, RealJ >
+                               fold_back_at_axis< DGrid, RealDS, S, RealJ >
                                ) );
     }
 
