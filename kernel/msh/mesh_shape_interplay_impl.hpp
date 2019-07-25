@@ -97,16 +97,13 @@ namespace msh {
                  apt::array<T, DField> variable,
                  const apt::array<T, Dq>& q_std,
                  const ShapeF& shapef ) noexcept {
+    apt::Index<DGrid> ext;
+    for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
     apt::foreach<0,DField>
       ( [&] ( const auto& var, auto comp ) { // TODOL comp is proxy, it breaks semantics
           auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
 
-          for ( const auto& I : apt::Block( []()
-                                            { // create extent filled with ShapeF::support
-                                              apt::Index<DGrid> res;
-                                              for ( int i = 0; i < DGrid; ++i ) res[i] = ShapeF::support();
-                                              return res;
-                                            }() ) )
+          for ( const auto& I : apt::Block(ext) )
             comp( wf.I_b() + I ) += var * wf.weight(I);
 
         }, variable, field );

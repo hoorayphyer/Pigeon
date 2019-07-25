@@ -26,7 +26,7 @@ namespace io {
   // template < typename T, int DGrid >
   // void register_exportee( std::string name, ParticleBasedExportee<T,DGrid>* );
 
-  template < typename RealExport,
+  template < typename RealDS,
              typename Metric,
              typename ShapeF,
              int DGrid,

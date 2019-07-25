@@ -94,10 +94,7 @@ int main(int argc, char** argv) {
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
-      if ( ts % 100 == 0 && mpi::world.rank() == 0 )
-        std::cout << "==== Timestep " << ts << " ====" << std::endl;
       sim.evolve( ts, pic::dt );
-
     }
     lgr::file.close();
     // barrier everyone to avoid idles calling mpi::finalize() prematurely

@@ -64,6 +64,8 @@ namespace pic {
     []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
 
   inline constexpr ModuleRange stats_mr { true, 0, 100 };
+
+  inline constexpr int cout_ts_interval = 100;
 }
 
 namespace field {

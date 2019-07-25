@@ -193,6 +193,9 @@ namespace pic {
 
     // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
     void evolve( int timestep, Real dt ) {
+      if ( timestep % pic::cout_ts_interval == 0 && mpi::world.rank() == 0 )
+        std::cout << "==== Timestep " << timestep << " ====" << std::endl;
+
 #ifdef PIC_DEBUG
       debug::timestep = timestep;
       debug::world_rank = mpi::world.rank();

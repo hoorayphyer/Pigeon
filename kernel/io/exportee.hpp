@@ -2,24 +2,42 @@
 #define _IO_EXPORTEE_HPP_
 
 namespace io {
-  template < int DGrid,
+  template < typename RealDS,
+             int DGrid,
              typename Real,
-             template < typename > class S,
-             typename ShapeF,
              typename RealJ,
              typename Metric >
-  struct Exportee {
-    void (*action)( const mani::Grid<Real,DGrid>& grid; // local grid
-                    field::Field<Real, 3, DGrid>& E;
-                    field::Field<Real, 3, DGrid>& B;
-                    field::Field<RealJ, 3, DGrid>& J;// J is Jmesh on a replica
-                    particle::map<particle::array<Real,S>>& particles;
-                   ) = nullptr;
-
-    template < typename Texp >
-    static void save_to( dbfile*);
+  struct FieldExportee {
+    virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
+    action ( const int ds_ratio,
+             const mani::Grid<Real,DGrid>& grid, // local grid
+             const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
+             const int guard_ds,
+             const field::Field<Real, 3, DGrid>& E,
+             const field::Field<Real, 3, DGrid>& B,
+             const field::Field<RealJ, 3, DGrid>& J// J is Jmesh on a primary after reduction
+             ) { return {}; }
   };
-
 }
+
+namespace io {
+  template < typename RealDS,
+             int DGrid,
+             typename Real,
+             template < typename > class S,
+             typename ShapeF
+             >
+  struct PtcExportee {
+    virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
+    action ( const int ds_ratio,
+             const mani::Grid<Real,DGrid>& grid, // local grid
+             const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
+             const int guard_ds,
+             particle::species sp,
+             const particle::array<Real,S>& ptcs
+             ) { return {}; }
+  };
+}
+
 
 #endif
