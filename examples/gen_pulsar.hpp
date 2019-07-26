@@ -42,6 +42,7 @@ namespace pic {
   inline constexpr int guard = 1;
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
+  inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 }
 
 namespace pic {
@@ -71,7 +72,6 @@ namespace pic {
 namespace field {
   using pic::real_t;
   // TODOL these will become free parameters
-  inline constexpr real_t mu0 = 3750.0;
   inline constexpr real_t Omega = 1.0 / 6.0;
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
@@ -104,7 +104,7 @@ namespace particle {
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
-      real_t landau0_B_thr = 0.1 * field::mu0;
+      real_t landau0_B_thr = 0.1;
       real_t gravity_strength = 0.5;
 
       if ( properties.has(species::electron) ) {
@@ -112,7 +112,7 @@ namespace particle {
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
   //      force.add( landau0, landau0_B_thr );
 
@@ -123,7 +123,7 @@ namespace particle {
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
     //    force.add( landau0, landau0_B_thr );
 
@@ -134,7 +134,7 @@ namespace particle {
         Force<real_t,Specs> force;
         const auto& prop = properties.at(sp);
 
-        force.add( lorentz, static_cast<real_t>(prop.charge_x) / prop.mass_x );
+        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
@@ -166,7 +166,7 @@ namespace particle {
       Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
-      scat::MagneticConvert<real_t,Specs>::B_thr = field::mu0 / 10.0;
+      scat::MagneticConvert<real_t,Specs>::B_thr = 0.1;
       scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
@@ -194,13 +194,11 @@ namespace pic {
     apt::Index<DGrid> _Ib;
     apt::Index<DGrid> _extent;
 
-    const Real _mu0 = field::mu0;
-
-    Real B_r_over_mu0 ( Real logr, Real theta ) noexcept {
+    Real B_r ( Real logr, Real theta ) noexcept {
       return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
     };
 
-    Real B_th_over_mu0 ( Real logr, Real theta ) noexcept {
+    Real B_th ( Real logr, Real theta ) noexcept {
       return std::sin(theta) * std::exp(-3.0 * logr);
     };
 
@@ -218,8 +216,8 @@ namespace pic {
     void operator() () {
       for ( auto I : apt::Block(_extent) ) {
         I += _Ib;
-        _Bfield[0](I) = _mu0 * B_r_over_mu0( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
-        _Bfield[1](I) = _mu0 * B_th_over_mu0( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
+        _Bfield[0](I) = B_r( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
+        _Bfield[1](I) = B_th( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
       }
     }
 

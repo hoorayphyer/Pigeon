@@ -73,6 +73,9 @@ namespace io {
 }
 
 namespace io {
+  template < typename Real >
+  Real the_4pi_times_re_over_w_gyro_unitB = 0;
+
   template < typename Real, int DGrid >
   constexpr apt::array<Real, DGrid> I2std ( const apt::Index<DGrid>& I ) {
     apt::array<Real, DGrid> res;
@@ -119,7 +122,7 @@ namespace io {
 
         auto h = h_func(q[0], q[1], q[2]);
         if ( std::abs(h) > 1e-12 )
-          fds[comp](I) /= h;
+          fds[comp](I) *= ( the_4pi_times_re_over_w_gyro_unitB<RealDS> / h );
         else
           fds[comp](I) = 0.0;
       }
@@ -245,6 +248,7 @@ namespace io {
              >
   void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
+                    const RealDS factor_before_J,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid
                     const field::Field<Real, 3, DGrid>& E,
@@ -254,6 +258,7 @@ namespace io {
                     ) {
     using Exporter_t = DataExporter<RealDS, DGrid, Real, S, ShapeF, RealJ, Metric>;
 
+    the_4pi_times_re_over_w_gyro_unitB<RealDS> = factor_before_J;
     constexpr int silo_mesh_ghost = 1;
     constexpr auto silo_mesh_type = silo::MeshType::Curv;
 
@@ -373,7 +378,7 @@ namespace io {
                                 field_self<1,Real, DGrid, ShapeF, RealJ>,
                                 nullptr
                                 ) );
-      fexps.push_back( new FA ( "J", 3,
+      fexps.push_back( new FA ( "J4X", 3,
                                 field_self<2,Real, DGrid, ShapeF, RealJ>,
                                 divide_flux_by_area<RealDS, DGrid, Metric>
                                 ) );

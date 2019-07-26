@@ -8,6 +8,7 @@ namespace io {
   void export_data<real_export_t, Metric, ShapeF, DGrid, real_t, particle::Specs, real_j_t>
   ( std::string prefix, int timestep, real_t dt, int num_files, int downsample_ratio,
     const std::optional<mpi::CartComm>& cart_opt,
+    const real_export_t,
     const dye::Ensemble<DGrid>& ens,
     const mani::Grid<real_t,DGrid>& grid, // local grid
     const field::Field<real_t, 3, DGrid>& Efield,

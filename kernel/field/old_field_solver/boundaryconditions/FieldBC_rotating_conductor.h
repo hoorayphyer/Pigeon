@@ -12,7 +12,6 @@ private:
   FBC::BCFunc_split_t _f_t; // time dependence of omega
   VectorField<Scalar> _E_cond;
   VectorField<Scalar> _B_cond;
-  Scalar _mu0;
 
   // for each field component, enforce the boundary condition in the boundary direction
   // from dir_start to dir_end
@@ -52,7 +51,7 @@ private:
         for ( int i = 0; i < _grid_cond.dims[0]; ++i ) {
           Scalar q1 = _grid_cond.pos( 0, i, stagger[0] );
 
-          field(i,j,k) = _mu0 * fx(q1, q2, q3);
+          field(i,j,k) = fx(q1, q2, q3);
         }
       }
     }
@@ -61,7 +60,7 @@ private:
 
 public:
   FieldBC_rotating_conductor( BoundaryPosition bpos, const Grid& grid, const FBC& fieldBC )
-    : _bpos(bpos), _grid_cond(grid), _f_t(fieldBC.ft), _mu0(fieldBC.mu0)  {
+    : _bpos(bpos), _grid_cond(grid), _f_t(fieldBC.ft)  {
     int dir = bpos / 2;
     bool islower = ( bpos % 2 == 0 );
 

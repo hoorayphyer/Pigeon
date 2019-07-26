@@ -12,7 +12,7 @@ namespace field {
   struct Updater {
   private:
     const mpi::CartComm& _cart;
-    Real _4pi_x_re {}; // 4 \pi times classical electron radius
+    Real _4pi_times_re_over_w_gyro_unitB {};
 
   public:
     using field_type = field::Field<Real,3,DGrid>;
@@ -22,7 +22,9 @@ namespace field {
     Updater( const mpi::CartComm& cart,
              const mani::Grid<Real,DGrid>& local_grid,
              apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-             int guard, Real mu0, Real (*omega_t) (Real), Real re );
+             int guard,
+             Real (*omega_t) (Real),
+             Real re_over_w_gyro_unitB );
 
     void operator() ( field_type& E,
                       field_type& B,

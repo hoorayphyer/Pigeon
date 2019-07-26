@@ -13,7 +13,7 @@
 #include <cmath>
 #include <memory>
 
-// NOTE these are modulo mu0 and max_omega
+// NOTE these are modulo max_omega
 void Rotating_Monopole_LogSph( FBC& bdry ) {
   bdry.B1 = [] (Scalar r_log, Scalar , Scalar )-> Scalar { return 1.0 / std::exp(2*r_log); };
   bdry.B2 = [] (Scalar, Scalar, Scalar)-> Scalar { return 0.0; };
@@ -94,13 +94,12 @@ namespace field {
 
   // Set field BCs for rotating conductor in 2D log spherical coordinates with a damping layer
   template < typename FBCs >
-  void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard, int mu0, Scalar (*omega_t)(Scalar) ) {
+  void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard, Scalar (*omega_t)(Scalar) ) {
     // field BC, specialized for pulsar
     { auto& fbc = fieldBC[LOWER_1];
       fbc.type = FieldBCType::ROTATING_CONDUCTOR;
       fbc.indent = ofs::indent[LOWER_1];
       fbc.ft = omega_t;
-      fbc.mu0 = mu0;
       if ( ofs::magnetic_pole == 1 )
         Rotating_Monopole_LogSph( fbc );
       else if ( ofs::magnetic_pole == 2 )
@@ -125,10 +124,11 @@ namespace field {
   Updater<Real, DGrid, RealJ>::Updater( const mpi::CartComm& cart,
                                         const mani::Grid<Real,DGrid>& local_grid,
                                         apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                        int guard, Real mu0,
+                                        int guard,
                                         Real (*omega_t) (Real),
-                                        Real re )
-    : _cart(cart), _4pi_x_re(  4.0 * std::acos(-1.0l) * re ) {
+                                        Real re_over_w_gyro_unitB )
+    : _cart(cart),
+      _4pi_times_re_over_w_gyro_unitB( 4.0 * std::acos(-1.0l) * re_over_w_gyro_unitB ) {
     static_assert( DGrid == 2 );
     for ( int i = 0; i < DGrid; ++i ) {
       fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
@@ -145,7 +145,7 @@ namespace field {
     }
 
     // set fieldBC
-    Set_FBC_RC_2DLogSph_Damp(fuparams.fieldBC, guard, mu0, omega_t);
+    Set_FBC_RC_2DLogSph_Damp(fuparams.fieldBC, guard, omega_t);
 
     // grid
     { auto& grid = fuparams.grid;
@@ -183,10 +183,10 @@ namespace field {
           Scalar r_s = exp(grid.pos(0, i, 1));
 
           if ( ofs::magnetic_pole == 1 ) {
-            Bfield(0, i, j ) = mu0 / (r * r);
+            Bfield(0, i, j ) = 1.0 / (r * r);
           } else if ( ofs::magnetic_pole == 2 ) {
-            Bfield(0, i, j) = mu0 * 2.0 * cos(theta_s) / (r * r * r);
-            Bfield(1, i, j) = mu0 * sin(theta) / (r_s * r_s * r_s);
+            Bfield(0, i, j) = 2.0 * cos(theta_s) / (r * r * r);
+            Bfield(1, i, j) = sin(theta) / (r_s * r_s * r_s);
           }
         }
       }
@@ -267,11 +267,11 @@ namespace field {
 
 
       // NOTE differences of new code
-      // 1. The new code will evolve Maxwell's equations with 4\pi r_e.
+      // 1. The new code will evolve Maxwell's equations with 4\pi r_e / w_gyro.
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= _4pi_x_re;
+          current.ptr(c)[i] *= _4pi_times_re_over_w_gyro_unitB;
 
       RestoreJToRealSpace(current, grid);
       fc->SendGuardCells(current);

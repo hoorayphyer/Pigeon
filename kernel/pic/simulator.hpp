@@ -30,7 +30,7 @@ namespace pic {
   std::string this_run_dir;
 
   constexpr real_t classic_electron_radius () noexcept {
-    real_t res = wdt_pic * wdt_pic / ( 4 * std::acos(-1.0l) * dt * dt);
+    real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
     apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
     return res;
   }
@@ -108,8 +108,8 @@ namespace pic {
         _field_update.reset(new field::Updater<Real,DGrid,RealJ>
                             ( *_cart_opt, _grid,
                               ens.is_at_boundary(), _guard,
-                              field::mu0, field::omega_spinup,
-                              pic::classic_electron_radius() )
+                              field::omega_spinup,
+                              pic::classic_electron_radius() / pic::w_gyro_unitB )
                             );
 
       _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>
@@ -310,7 +310,7 @@ namespace pic {
           lgr::file % "ExportData" << "==>>" << std::endl;
           stamp.emplace();
         }
-        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles  );
+        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, 4.0 * std::acos(-1.0l) * classic_electron_radius() / pic::w_gyro_unitB ,  *_ens_opt, _grid, _E, _B, _J, _particles  );
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }

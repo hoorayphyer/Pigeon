@@ -36,6 +36,7 @@ namespace io {
              >
   void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
+                    const RealDS factor_before_J,
                     const dye::Ensemble<DGrid>& ens,
                     const mani::Grid<Real,DGrid>& grid, // local grid
                     const field::Field<Real, 3, DGrid>& Efield,

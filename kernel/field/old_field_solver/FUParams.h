@@ -23,7 +23,6 @@ struct FBC {
   BCFunc_split_x E2;
   BCFunc_split_x E3;
 
-  Scalar mu0;
   // for damping
   Scalar damping_rate;
   // Scalar thickness; // physical value FIXME setting this requires coordinate system

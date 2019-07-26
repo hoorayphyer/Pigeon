@@ -33,10 +33,10 @@ namespace particle {
 // TODO optimize use of intermediate variables
 namespace particle::force {
   template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
-  void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T,S<T>::Dim>& E, const apt::Vec<T,S<T>::Dim>& B, T q_over_m  ) {
+  void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T,S<T>::Dim>& E, const apt::Vec<T,S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
     using Vec = apt::Vec<T,S<T>::Dim>;
-    // lambda = 0.5 * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
-    dt *= 0.5 * q_over_m; // repurpose dt for lambda
+    // lambda = 0.5 * w_gyro_unitB * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
+    dt *= 0.5 * q_times_w_gyro_unitB_over_m; // repurpose dt for lambda
 
     const auto& p = ptc.p();
     Vec u_halfstep = p + E * dt + apt::cross(p, B) * ( dt / std::sqrt( 1.0 + apt::sqabs(p) ) );
