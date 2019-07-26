@@ -92,7 +92,8 @@ namespace io {
       } else if ( F == 1 ) {
       return msh::interpolate( B, I2std<Real>(I), ShapeF() );
     } else if ( F == 2 ) {
-      return msh::interpolate( J, I2std<Real>(I), ShapeF() );
+      auto x = msh::interpolate( J, I2std<RealJ>(I), ShapeF() );
+      return { x[0], x[1], x[2] };
     } else {
       static_assert(F < 3);
     }
@@ -144,7 +145,7 @@ namespace io {
                              const field::Field<Real, 3, DGrid>& B,
                              const field::Field<RealJ, 3, DGrid>& J ) {
     return {apt::dot( msh::interpolate( E, I2std<Real>(I), ShapeF() ),
-                      msh::interpolate( J, I2std<Real>(I), ShapeF() ) ),
+                      msh::interpolate( J, I2std<RealJ>(I), ShapeF() ) ),
             0.0, 0.0};
   }
 
