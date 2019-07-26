@@ -20,7 +20,7 @@ namespace io {
     const dye::Ensemble<DGrid>& _ens;
 
   public:
-    using FexpT= FieldExportee<RealDS, DGrid, Real, RealJ, Metric>;
+    using FexpT= FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ, Metric>;
     using PexpT = PtcExportee<RealDS, DGrid, Real, S, ShapeF>;
 
     DataExporter( int ratio, int guard, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens )

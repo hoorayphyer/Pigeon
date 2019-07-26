@@ -17,16 +17,17 @@ namespace io {
   template < typename RealDS,
              int DGrid,
              typename Real,
+             typename ShapeF,
              typename RealJ,
              typename Metric >
-  struct FieldAction : public FieldExportee<RealDS, DGrid, Real, RealJ, Metric> {
+  struct FieldAction : public FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ, Metric> {
     // NOTE we use Real here so RealJ may be downcast. But it is fine since RealJ is mainly to avoid losing precision in current deposition. Here Real is sufficient.
     using F = apt::array<Real,3> (*) ( apt::Index<DGrid> I,
-                                         const mani::Grid<Real,DGrid>& grid,
-                                         const field::Field<Real, 3, DGrid>& E,
-                                         const field::Field<Real, 3, DGrid>& B,
-                                         const field::Field<RealJ, 3, DGrid>& J);
-    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps );
+                                       const mani::Grid<Real,DGrid>& grid,
+                                       const field::Field<Real, 3, DGrid>& E,
+                                       const field::Field<Real, 3, DGrid>& B,
+                                       const field::Field<RealJ, 3, DGrid>& J);
+    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
 
     FieldAction( std::string a, int b, F c, H d )
       : varname(a), num_comps(b), impl(c), post_hook(d) {}
@@ -38,6 +39,7 @@ namespace io {
 
     virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
     action( const int ds_ratio,
+            const std::optional<mpi::CartComm>& cart_opt,
             const mani::Grid<Real,DGrid>& grid, // local grid
             const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
             const int guard_ds,
@@ -76,7 +78,7 @@ namespace io {
         }
       }
 
-      if ( post_hook != nullptr ) post_hook( fds, grid_ds, num_comps );
+      if ( post_hook != nullptr && cart_opt ) post_hook( fds, grid_ds, num_comps, *cart_opt );
 
       return std::make_tuple( varname, num_comps, fds );
     }

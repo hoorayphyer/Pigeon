@@ -73,27 +73,33 @@ namespace io {
 }
 
 namespace io {
-  template < int F, typename Real, int DGrid, typename RealJ >
+  template < typename Real, int DGrid >
+  constexpr apt::array<Real, DGrid> I2std ( const apt::Index<DGrid>& I ) {
+    apt::array<Real, DGrid> res;
+    for ( int i = 0; i < DGrid; ++i )
+      res[i] = I[i] + 0.5; // interpolate to MIDWAY
+    return res;
+  }
+
+  template < int F, typename Real, int DGrid, typename ShapeF, typename RealJ >
   apt::array<Real,3> field_self ( apt::Index<DGrid> I,
                                   const mani::Grid<Real,DGrid>& grid,
                                   const field::Field<Real, 3, DGrid>& E,
                                   const field::Field<Real, 3, DGrid>& B,
-                                  const field::Field<RealJ, 3, DGrid>& J) {
+                                  const field::Field<RealJ, 3, DGrid>& J ) {
     if constexpr ( F == 0 ) {
-        return { E[0](I), E[1](I), E[2](I) };
+        return msh::interpolate( E, I2std<Real>(I), ShapeF() );
       } else if ( F == 1 ) {
-      return { B[0](I), B[1](I), B[2](I) };
+      return msh::interpolate( B, I2std<Real>(I), ShapeF() );
     } else if ( F == 2 ) {
-      return { J[0](I), J[1](I), J[2](I) };
+      return msh::interpolate( J, I2std<Real>(I), ShapeF() );
     } else {
       static_assert(F < 3);
     }
   }
 
-  // TODO add interpolate to center for E, B, J
-
   template < typename RealDS, int DGrid, typename Metric >
-  void divide_flux_by_area ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid, int num_comps = 3  ) {
+  void divide_flux_by_area ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid, int num_comps, const mpi::CartComm& ) {
     // define a function pointer.
     RealDS(*h_func)(RealDS,RealDS,RealDS) = nullptr;
     apt::array<RealDS,3> q {}; // TODO 3 is hard coded
@@ -119,6 +125,94 @@ namespace io {
     }
   }
 
+  template < typename Real, int DGrid, typename ShapeF, typename RealJ >
+  apt::array<Real,3> EparaB ( apt::Index<DGrid> I,
+                              const mani::Grid<Real,DGrid>& grid,
+                              const field::Field<Real, 3, DGrid>& E,
+                              const field::Field<Real, 3, DGrid>& B,
+                              const field::Field<RealJ, 3, DGrid>& J ) {
+    auto B_itpl = msh::interpolate( B, I2std<Real>(I), ShapeF() );
+    B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
+    return {apt::dot( msh::interpolate( E, I2std<Real>(I), ShapeF() ), B_itpl ),
+            0.0, 0.0};
+  }
+
+  template < typename Real, int DGrid, typename ShapeF, typename RealJ >
+  apt::array<Real,3> EdotJ ( apt::Index<DGrid> I,
+                             const mani::Grid<Real,DGrid>& grid,
+                             const field::Field<Real, 3, DGrid>& E,
+                             const field::Field<Real, 3, DGrid>& B,
+                             const field::Field<RealJ, 3, DGrid>& J ) {
+    return {apt::dot( msh::interpolate( E, I2std<Real>(I), ShapeF() ),
+                      msh::interpolate( J, I2std<Real>(I), ShapeF() ) ),
+            0.0, 0.0};
+  }
+
+  // Poloidal flux function, LogSpherical
+  template < typename Real, int DGrid, typename ShapeF, typename RealJ >
+  apt::array<Real,3> dFlux_pol ( apt::Index<DGrid> I,
+                                 const mani::Grid<Real,DGrid>& grid,
+                                 const field::Field<Real, 3, DGrid>& E,
+                                 const field::Field<Real, 3, DGrid>& B,
+                                 const field::Field<RealJ, 3, DGrid>& J ) {
+    // F = \int_Br_d\theta, we want F to be all MIDWAY. Since Br is (MIDWAY, INSITU), it is automatically the natural choice
+    const auto& Br = B[0];
+    return { Br(I) * std::exp( 2.0 * grid[0].absc( I[0], 0.5 ) ) * std::sin( grid[1].absc( I[1], 0.0 ) ), 0.0, 0.0 };
+  }
+
+  template < typename RealDS, int DGrid, typename Metric >
+  void integrate_dFlux ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid, int num_comps, const mpi::CartComm& cart ) {
+    // Flux_t - Flux_{t-1} = dFlux_t, can be in-placed
+    // integrate in theta direction
+    assert(num_comps == 1);
+    auto dFlux = fds[0]; // TODOL semantics
+    const auto& mesh = fds.mesh();
+    apt::Index<DGrid> ext = mesh.bulk_dims();
+    std::vector<RealDS> buf;
+    { // one value from each theta row
+      std::size_t size = 1;
+      for ( int i = 0; i < DGrid; ++i ) size *= ext[i];
+      size /= ext[1];
+      buf.reserve(size);
+    }
+    for ( auto trI : mesh.project( 1, {}, ext ) ) {
+      dFlux[trI | -1] = 0.0;
+      for ( int n = 0; n < ext[1]; ++n ) {
+        dFlux[ trI | n ] += dFlux[ trI | (n-1) ];
+      }
+      buf.push_back(dFlux[ trI | (ext[1]-1) ]);
+    }
+    // do an exclusive scan then add the scanned value back
+    cart.exscan_inplace(buf.data(), buf.size());
+    int idx = 0;
+    for ( auto trI : mesh.project( 1, {}, ext ) ) {
+      auto val = buf[idx++];
+      for ( int n = 0; n < ext[1]; ++n ) dFlux[ trI | n ] += val;
+    }
+  }
+
+  // void delE_v_J();
+
+  // void delB();
+
+}
+
+namespace io {
+  template < typename Real, template < typename > class S >
+  apt::array<Real,3> ptc_num ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
+    return { 1.0, 0.0, 0.0 };
+  }
+
+  template < typename Real, template < typename > class S >
+  apt::array<Real,3> ptc_energy ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
+    return { std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
+  }
+
+  template < typename Real, template < typename > class S >
+  apt::array<Real,3> ptc_momentum ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
+    return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
+  }
+
   template < int DGrid, typename RealDS, template < typename > class S, typename RealJ >
   void fold_back_at_axis ( field::Field<RealDS,3,DGrid>& field, const mani::Grid<RealDS,DGrid>& grid, int num_comps ) {
     // NOTE field is assumed to have all-MIDWAY offset
@@ -136,23 +230,6 @@ namespace io {
     auto add_assign = []( RealDS& a, RealDS& b ) noexcept -> void {a += b; b = a;}; // TODO only add_assign
     for ( int i = 0; i < num_comps; ++i )
       bc::Axissymmetric<DGrid,RealDS,S,RealJ>::symmetrize( is_lower, is_upper, field[i], add_assign );
-  }
-}
-
-namespace io {
-  template < typename Real, template < typename > class S >
-  apt::array<Real,3> ptc_num ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
-    return { 1.0, 0.0, 0.0 };
-  }
-
-  template < typename Real, template < typename > class S >
-  apt::array<Real,3> ptc_energy ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
-    return { std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
-  }
-
-  template < typename Real, template < typename > class S >
-  apt::array<Real,3> ptc_momentum ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc ) {
-    return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
   }
 }
 
@@ -285,19 +362,31 @@ namespace io {
     std::vector<typename Exporter_t::PexpT*> pexps;
 
     {
-      using FA = FieldAction<RealDS,DGrid,Real,RealJ,Metric>;
+      using FA = FieldAction<RealDS,DGrid,Real,ShapeF,RealJ,Metric>;
 
       fexps.push_back( new FA ( "E", 3,
-                                field_self<0,Real, DGrid, RealJ>,
+                                field_self<0,Real, DGrid, ShapeF, RealJ>,
                                 nullptr
                                 ) );
       fexps.push_back( new FA ( "B", 3,
-                                field_self<1,Real, DGrid, RealJ>,
+                                field_self<1,Real, DGrid, ShapeF, RealJ>,
                                 nullptr
                                 ) );
       fexps.push_back( new FA ( "J", 3,
-                                field_self<2,Real, DGrid, RealJ>,
+                                field_self<2,Real, DGrid, ShapeF, RealJ>,
                                 divide_flux_by_area<RealDS, DGrid, Metric>
+                                ) );
+      fexps.push_back( new FA ( "EparaB", 1,
+                                EparaB<Real, DGrid, ShapeF, RealJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "EdotJ", 1,
+                                EdotJ<Real, DGrid, ShapeF, RealJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "Flux", 1,
+                                dFlux_pol<Real, DGrid, ShapeF, RealJ>,
+                                integrate_dFlux<RealDS, DGrid, Metric>
                                 ) );
     }
 
@@ -318,7 +407,6 @@ namespace io {
                                fold_back_at_axis< DGrid, RealDS, S, RealJ >
                                ) );
     }
-
 
     exporter.execute( saver, grid, E, B, J, particles, fexps, pexps );
 

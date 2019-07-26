@@ -32,8 +32,8 @@ namespace msh {
   // NOTE q_std refers to the same "standard" as above
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   apt::Vec<T, DField> interpolate ( const field::Field<T,DField,DGrid>& field,
-                                      const apt::array<T,Dq>& q_std,
-                                      const ShapeF& shapef ) noexcept;
+                                    const apt::array<T,Dq>& q_std,
+                                    const ShapeF& shapef ) noexcept;
 
   // the opposite of interpolate. `var` is +=ed to field // NOTE, this is not same as depositing current
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >

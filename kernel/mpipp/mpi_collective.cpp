@@ -179,6 +179,12 @@ namespace mpi {
 
     MPI_Scatter(sendbuf, sendcount, datatype<T>(), recvbuf, recvcount, datatype<T>(), root, _comm() );
   }
+
+  template < typename Comm >
+  template < typename T >
+  void Collective_Comm<Comm>::exscan_inplace( T* send_buf, int count ) const {
+    MPI_Exscan( MPI_IN_PLACE, send_buf, count, datatype<T>(), MPI_SUM, _comm() );
+  }
 }
 
 // instantiation
@@ -193,7 +199,8 @@ namespace mpi {
   template std::vector<_TYPE_> Collective_Comm<_COMM_>::allgather( const _TYPE_*, int ) const; \
   template std::optional<std::vector<_TYPE_>>                           \
   Collective_Comm<_COMM_>::gather( const int, const _TYPE_ *, int ) const; \
-  template void Collective_Comm<_COMM_>::scatter( int, _TYPE_*, int ) const
+  template void Collective_Comm<_COMM_>::scatter( int, _TYPE_*, int ) const; \
+  template void Collective_Comm<_COMM_>::exscan_inplace( _TYPE_*, int ) const
 
 #define INSTANTIATE_MPI_COLLECTIVE(_TYPE_)                \
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(Comm, _TYPE_);      \

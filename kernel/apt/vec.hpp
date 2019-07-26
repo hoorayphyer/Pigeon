@@ -15,6 +15,8 @@ namespace apt {
     static constexpr auto NDim = N;
     using element_type = T;
 
+    constexpr operator array<T,N>() noexcept { return _v; }
+
     constexpr Vec() noexcept = default;
 
     template < typename... U, class = std::enable_if_t<sizeof...(U) == N> >

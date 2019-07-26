@@ -5,11 +5,13 @@ namespace io {
   template < typename RealDS,
              int DGrid,
              typename Real,
+             typename ShapeF,
              typename RealJ,
              typename Metric >
   struct FieldExportee {
     virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
     action ( const int ds_ratio,
+             const std::optional<mpi::CartComm>& cart_opt, // in case some global operation is needed
              const mani::Grid<Real,DGrid>& grid, // local grid
              const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
              const int guard_ds,

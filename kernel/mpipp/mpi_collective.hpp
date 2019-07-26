@@ -44,6 +44,10 @@ namespace mpi {
     // scatter for intra_comm is assumed to be in_place. This means in any case, root will not send anything to itself
     template < typename T >
     void scatter( int root, T* buffer, int count ) const;
+
+    // TODO finish this
+    template < typename T >
+    void exscan_inplace( T* send_buf, int count ) const;
   };
 
 }

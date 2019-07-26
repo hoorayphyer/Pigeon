@@ -51,7 +51,7 @@ namespace io {
 
     if ( _cart_opt ) {
       for ( auto* fe : fexps ) {
-        std::tie(varname,dim,fds) = fe->action(_ratio, grid, grid_ds, _guard, E, B, J );
+        std::tie(varname,dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
         if ( dim > 1 ) varname += "#";
 
         field::copy_sync_guard_cells( fds, *_cart_opt );
