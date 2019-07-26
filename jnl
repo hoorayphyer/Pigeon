@@ -1,0 +1,2 @@
+#! /bin/bash
+grep -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | awk '{print $0; if( substr($1,41) == "DataDir" ) print "\n";}'
