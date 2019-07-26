@@ -19,6 +19,7 @@ cd $name
 # create default stuff
 ln -s $top_dir/stage $(pwd)/stage
 ln -s $top_dir/delrun $(pwd)/delrun
+ln -s $top_dir/jnl $(pwd)/jnl
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1
