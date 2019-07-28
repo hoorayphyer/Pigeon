@@ -90,6 +90,7 @@ namespace mani {
       }
       { // rebase velocity to the new position
         // first rotate in r-theta plane to equator. Location is rotated by PI/2 - theta, so velocity components are rotated by theta - PI/2.
+        T pmg = apt::abs(p); // explicitly conserve energy
         cos = std::cos( x[1] - PI<T> / 2.0 );
         sin = std::sin( x[1] - PI<T> / 2.0 );
         dx[0] = p[0];
@@ -109,6 +110,7 @@ namespace mani {
         dx[0] = p[0];
         p[0] = dx[0] * cos - p[1] * sin;
         p[1] = dx[0] * sin + p[1] * cos;
+        p *= ( pmg / apt::abs(p) );
       }
 
       { // in this block we update x
