@@ -158,7 +158,31 @@ namespace pic {
     Simulator( const mani::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
       : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
       _grid = supergrid;
-      _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
+      if ( pic::dlb_init_replica_deploy ) {
+        std::optional<int> label{};
+        if ( _cart_opt )
+          label.emplace( _cart_opt->rank() );
+        else {
+          int num_ens = 1;
+          for ( int i = 0; i < DGrid; ++i ) num_ens *= pic::dims[i];
+
+          int my_rank = mpi::world.rank();
+          int count = num_ens;
+          for ( int i = 0; i < num_ens; ++i ) {
+            int num_replicas = (*pic::dlb_init_replica_deploy)(i);
+            if ( my_rank >= count && my_rank < count + num_replicas ) {
+              label.emplace(i);
+              break;
+            } else
+              count += num_replicas;
+          }
+        }
+
+        auto intra_opt = mpi::world.split(label);
+        _ens_opt = dye::create_ensemble<DGrid>(cart_opt, intra_opt);
+      } else {
+        _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
+      }
 
       // NOTE all species in the game should be created regardless of whether they appear on certain processes. This is to make the following work
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.

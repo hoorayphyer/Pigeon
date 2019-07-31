@@ -57,6 +57,7 @@ namespace pic {
   inline constexpr std::optional<float> checkpoint_hourly;
 
   inline constexpr ModuleRange dlb_mr { false, 1, 1000 };
+  inline constexpr std::optional<int (*) ( int )> dlb_init_replica_deploy {}; // take in ensemble label and return the intended number of replicas in that ensemble
   inline constexpr std::size_t dlb_target_load = 100000;
 
   inline constexpr ModuleRange msperf_mr { true, 0, 100 };
