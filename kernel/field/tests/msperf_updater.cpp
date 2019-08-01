@@ -37,9 +37,8 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
       grid[i] = supergrid[i].divide( std::abs(Cartesian_Partition[i]), coords[i] );
 
     constexpr int guard = 1;
-    constexpr Real mu0 = 10000.0;
     constexpr auto omega_t = [] ( Real t ) -> Real { return 0.2 * ( std::min<Real>( t / 4.0, 1.0) ); };
-    constexpr Real re = 1.0;
+    constexpr Real re_over_w_gyro_unitB = 1.0;
     {
       using namespace field::ofs;
       magnetic_pole = 2; // 1 for mono-, 2 for di-
@@ -47,7 +46,7 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
       damping_rate = 10.0;
     }
 
-    field::Updater<Real,DGrid,RealJ> fu(*cart_opt, grid, is_at_boundary, guard, mu0, omega_t, re);
+    field::Updater<Real,DGrid,RealJ> fu(*cart_opt, grid, is_at_boundary, guard, omega_t, re_over_w_gyro_unitB);
 
     field::Field<Real, 3, DGrid> E {{ bulk_dims, guard }};
     field::Field<Real, 3, DGrid> B {{ bulk_dims, guard }};
@@ -57,7 +56,7 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
     aio::unif_real<RealJ> unif;
     for ( int i = 0; i < 3; ++i ) {
       for ( const auto& I : apt::Block(bulk_dims) ) {
-        J[i](I) = 1000.0 * ( 2.0 * unif() - 1.0 );
+        J[i](I) = ( 2.0 * unif() - 1.0 ) * 0.1;
       }
     }
 

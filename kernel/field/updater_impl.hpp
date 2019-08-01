@@ -217,7 +217,6 @@ namespace field {
           const auto& g = grid.guard;
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
-            // TODO double check the correction to j < .... and i < ...
             for ( int j = 0; j < grid.reducedDim(1) + (o[1] == INSITU); ++j ) {
               for ( int i = 0; i < grid.reducedDim(0) + (o[0] == INSITU); ++i ) {
                 old_f( c,
