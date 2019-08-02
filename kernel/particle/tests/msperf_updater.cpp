@@ -70,7 +70,7 @@ SCENARIO("Time particle updater", "[particle]") {
     = {{ { 0.0, 1.0, bulk_dims[0] }, { 0.0, 1.0, bulk_dims[1] } }};
   constexpr int guard = 1;
 
-  PU_t pu( grid, rng, properties );
+  PU_t pu( properties );
 
   field::Field<Real, 3, DGrid> E;
   field::Field<Real, 3, DGrid> B;
@@ -126,7 +126,7 @@ SCENARIO("Time particle updater", "[particle]") {
 
     tmr::Timestamp t1;
     for ( int i = 0; i < N; ++i ) {
-      pu( particles, J, E, B, dt, i );
+      pu( particles, J, E, B, grid, dt, i, rng );
     }
     auto dur = t1.lapse();
     dur.in_units_of("ms");

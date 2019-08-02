@@ -16,26 +16,15 @@ namespace particle {
              typename RealJ,
              typename Metric
              >
-  Updater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
-  ::Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const map<Properties>& properties )
-    : _localgrid(localgrid), _rng(rng), _properties(properties) {}
-}
-
-namespace particle {
-  template < int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs,
-             typename ShapeF,
-             typename RealJ,
-             typename Metric
-             >
   void Updater< DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric >
   ::update_species( species sp,
                     array<Real,PtcSpecs>& sp_ptcs,
                     field::Field<RealJ,3,DGrid>& J,
                     Real dt,
                     const field::Field<Real,3,DGrid>& E,
-                    const field::Field<Real,3,DGrid>& B
+                    const field::Field<Real,3,DGrid>& B,
+                    const mani::Grid< Real, DGrid >& grid,
+                    util::Rng<Real>& rng
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
@@ -110,7 +99,7 @@ namespace particle {
       }
 #endif
 
-      auto q0_std = msh::to_standard( _localgrid, ptc.q() );
+      auto q0_std = msh::to_standard( grid, ptc.q() );
       auto E_itpl = msh::interpolate( E, q0_std, shapef );
       auto B_itpl = msh::interpolate( B, q0_std, shapef );
 
@@ -126,7 +115,7 @@ namespace particle {
 #endif
 
       dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
-      scatter( ptc, _buf, prop, dp, dt, B_itpl, _rng );
+      scatter( ptc, _buf, prop, dp, dt, B_itpl, rng );
 #ifdef PIC_DEBUG
       if(debug::has_nan(ptc)) {
         lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
@@ -150,7 +139,7 @@ namespace particle {
       if ( prop.charge_x != 0 ) {
         // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()
         for ( int i = 0; i < DGrid; ++i ) {
-          dq[i] /= _localgrid[i].delta();
+          dq[i] /= grid[i].delta();
           dq[i] += q0_std[i];
         }
         for ( int i = DGrid; i < PtcSpecs<Real>::Dim; ++i )
@@ -174,10 +163,12 @@ namespace particle {
                  field::Field<RealJ,3,DGrid>& J,
                  const field::Field<Real,3,DGrid>& E,
                  const field::Field<Real,3,DGrid>& B,
-                 Real dt, int timestep ) {
+                 const mani::Grid< Real, DGrid >& grid,
+                 Real dt, int timestep, util::Rng<Real>& rng
+                 ) {
 
     for ( auto&[ sp, ptcs ] : particles ) {
-      update_species( sp, ptcs, J, dt, E, B );
+      update_species( sp, ptcs, J, dt, E, B, grid, rng );
     }
 
     { // Put particles where they belong after scattering
@@ -190,10 +181,10 @@ namespace particle {
 
     { // NOTE rescale Jmesh back to real grid delta
       Real dV = 1.0;
-      for ( int i = 0; i < DGrid; ++i ) dV *= _localgrid[i].delta();
+      for ( int i = 0; i < DGrid; ++i ) dV *= grid[i].delta();
 
       for ( int i = 0; i < DGrid; ++i ) {
-        Real tmp = _localgrid[i].delta() / dV;
+        Real tmp = grid[i].delta() / dV;
         for ( auto& elm : J[i].data() ) elm *= tmp;
       }
 

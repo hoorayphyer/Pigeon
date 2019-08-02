@@ -112,9 +112,7 @@ namespace pic {
                               pic::classic_electron_radius() / pic::w_gyro_unitB )
                             );
 
-      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric>
-                        ( _grid, _rng, particle::properties)
-                        );
+      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> (particle::properties));
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open();
     }
 
@@ -277,7 +275,7 @@ namespace pic {
           lgr::file % "ParticleUpdate" << "==>>" << std::endl;
           stamp.emplace();
         }
-        (*_ptc_update) ( _particles, _J, _E, _B, dt, timestep );
+        (*_ptc_update) ( _particles, _J, _E, _B, _grid, dt, timestep, _rng );
         _fbc_axis->setJ();
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;

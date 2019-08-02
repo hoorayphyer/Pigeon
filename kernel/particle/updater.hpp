@@ -25,8 +25,6 @@ namespace particle {
              typename Metric >
   class Updater {
   private:
-    const mani::Grid< Real, DGrid >& _localgrid;
-    util::Rng<Real> _rng;
     const map<Properties>& _properties;
 
     array<Real,PtcSpecs> _buf;
@@ -36,17 +34,22 @@ namespace particle {
                          field::Field<RealJ,3,DGrid>& J,
                          Real dt,
                          const field::Field<Real,3,DGrid>& E,
-                         const field::Field<Real,3,DGrid>& B
+                         const field::Field<Real,3,DGrid>& B,
+                         const mani::Grid< Real, DGrid >& grid,
+                         util::Rng<Real>& rng
                          );
 
   public:
-    Updater( const mani::Grid< Real, DGrid >& localgrid, const util::Rng<Real>& rng, const map<Properties>& properties );
+    Updater( const map<Properties>& properties )
+      : _properties(properties) {}
 
     void operator() ( map<array<Real,PtcSpecs>>& particles,
                       field::Field<RealJ,3,DGrid>& J,
                       const field::Field<Real,3,DGrid>& E,
                       const field::Field<Real,3,DGrid>& B,
-                      Real dt, int timestep );
+                      const mani::Grid< Real, DGrid >& grid,
+                      Real dt, int timestep, util::Rng<Real>& rng
+                      );
   };
 
 }
