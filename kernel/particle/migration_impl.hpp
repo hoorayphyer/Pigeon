@@ -90,16 +90,16 @@ namespace particle :: impl {
       mpi::waitall(reqs);
 
       // merge into buffer if needed.
-      if ( intercomms[1-lr] && ( begE_run + tot_num_recv > buffer.capacity() ) ) {
+      if ( p_tmp ) {
         buffer.resize( begE_run + tot_num_recv );
         for ( int i = 0; i < tot_num_recv; ++i )
-          buffer[begE_run + i] = p_tmp[i];
+          buffer[begE_run + i] = std::move(p_tmp[i]);
         p_tmp.reset(nullptr);
       }
       begE_run += tot_num_recv;
     }
 
-    { // erase sent particles
+    { // overwrite sent particles with recved ones
       int itr = begs[0]; // forward iterator
       int ritr = begE_run - 1; // reverse iterator
       while( itr != begs[2] && ritr != begs[2] - 1 ) {

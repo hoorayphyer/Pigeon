@@ -257,7 +257,7 @@ namespace pic {
 
       constexpr Real v_th = 0.3;
       constexpr Real j_reg_x = 0.0;
-      constexpr Real Ninj = 1.0;
+      constexpr Real N_dot = 500.0;
 
       constexpr auto posion = species::ion;
       constexpr auto negaon = species::electron;
@@ -269,13 +269,13 @@ namespace pic {
       // the idea is that (timestep + 1) * N_inj * profile represents the accummulated number of injected pairs through the specified timestep. NOTE the timestep is shifted by one to reflect the actual times the inject is called, including this time.
       // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
       auto profile_inj =
-        [&Ninj,&timestep] ( Real theta ) noexcept {
-          Real inj_num_base = Ninj * 0.5 * std::abs( std::sin( 2 * theta ) );
+        [N_inj=N_dot*dt,timestep] ( Real theta ) noexcept {
+          Real inj_num_base = N_inj * 0.5 * std::abs( std::sin( 2 * theta ) );
           return static_cast<int>( (timestep + 1) * inj_num_base ) - static_cast<int>( timestep * inj_num_base );
         };
 
       auto j_reg_inj =
-        [&grid=_grid, charge_x, &j_reg_x]( Real J ) noexcept {
+        [&grid=_grid, charge_x, j_reg_x]( Real J ) noexcept {
           static auto factor = j_reg_x * grid[0].delta() * grid[1].delta() / charge_x;
           return J * factor;
         };
