@@ -1,7 +1,7 @@
 #include "dye/dynamic_balance.hpp"
 #include "mpipp/mpi++.hpp"
 #include "particle/particle.hpp"
-#include "apt/priority_queue.hpp" // used in calc_new_nprocs
+#include "apt/priority_queue.hpp"
 
 // bifurcate
 namespace dye::impl {
@@ -168,66 +168,65 @@ namespace dye::impl {
     static constexpr int recv = -1;
   };
 
-  std::vector<int> get_ptc_num_surplus ( const std::vector<particle::load_t>& nums_ptc ) {
+  std::vector<particle::load_t> get_ptc_num_surplus ( const std::vector<particle::load_t>& nums_ptc ) {
+    using particle::load_t;
     // NOTE: surplus = actual number - expected number
-    std::vector<int> spls( nums_ptc.size() );
-    particle::load_t num_tot = 0;
+    std::vector<load_t> spls( nums_ptc.size() );
+    load_t num_tot = 0;
     for ( auto x : nums_ptc ) num_tot += x;
 
-    particle::load_t average = num_tot / nums_ptc.size();
+    load_t average = num_tot / nums_ptc.size();
     int remain = num_tot % nums_ptc.size();
     for ( unsigned int rank = 0; rank < nums_ptc.size(); ++rank ) {
-      particle::load_t num_exp = average + ( rank < remain );
+      load_t num_exp = average + ( rank < remain );
       spls[rank] = nums_ptc[rank] - num_exp;
     }
 
     return spls;
   }
 
-  // The ith element of nums_adjust, which should be ordered by ensemble ranks, specifies the number of particles ( could be positive, zero, or negative ) to be adjusted for the process i. Postive indicates sending. The constraint is that the sum of nums_adjust elements must be zero in order to conserve total particle number. The return value contains the actual sendrecv scheme for the corresponding process. Each scheme is of the format, action, member1, number1, member2, number2, etc, where numbers here are all positive.
-  std::vector<int> get_instr( const std::vector<int>& nums_surplus, int my_rank ) {
-    std::vector<std::vector<int>> instructions ( nums_surplus.size() );
-    // split the input array into positive(send), zero, and negative(recv)
-    std::vector<int> procs_send;
-    std::vector<int> procs_recv;
-    for ( unsigned int i = 0; i < nums_surplus.size(); ++i ) {
-      if ( 0 == nums_surplus[i] )
-        instructions[i] = { balance_code::none };
-      else if ( nums_surplus[i] > 0 ) {
-        instructions[i] = { balance_code::send };
-        procs_send.push_back(i);
-      }
-      else {
-        instructions[i] = { balance_code::recv };
-        procs_recv.push_back(i);
-      }
+  // The ith element of nums_surplus, which should be ordered by ensemble ranks, specifies the number of particles ( could be positive, zero, or negative ) to be adjusted for the process i. Postive indicates sending. The constraint is that the sum of nums_surplus elements must be zero in order to conserve total particle number. The return value contains the actual sendrecv scheme for the corresponding process. Each scheme is of the format, action, member1, number1, member2, number2, etc, where numbers here are all positive.
+  std::vector<particle::load_t> get_instr( const std::vector<particle::load_t>& nums_surplus, const int my_rank ) {
+    using particle::load_t;
+    std::vector<load_t> instr;
+    if ( nums_surplus[my_rank] == 0 ) {
+      instr = { balance_code::none };
+      return instr;
+    } else if ( nums_surplus[my_rank] > 0 ) instr = {balance_code::send};
+    else instr = {balance_code::recv};
+
+    apt::priority_queue<load_t> pq_send;
+    apt::priority_queue<load_t> pq_recv;
+
+    for ( int i = 0; i < nums_surplus.size(); ++i ) {
+      if ( 0 == nums_surplus[i] ) continue;
+
+      if ( nums_surplus[i] > 0 ) pq_send.push(i, nums_surplus[i]);
+      else pq_recv.push(i, -nums_surplus[i]);
     }
 
-    // match postives with negatives
-    auto it_s = procs_send.begin();
-    auto it_r = procs_recv.begin();
-    int num_s = it_s != procs_send.end() ? std::abs( nums_surplus[*it_s] ) : 0;
-    int num_r = it_r != procs_recv.end() ? std::abs( nums_surplus[*it_r] ) : 0;
+    while( !pq_send.empty() && !pq_recv.empty() ) {
+      auto[r_s, num_s] = pq_send.top();
+      auto[r_r, num_r] = pq_recv.top();
 
-    while ( it_s != procs_send.end() && it_r != procs_recv.end() ) {
-      auto& instr_s = instructions[ *it_s ];
-      auto& instr_r = instructions[ *it_r ];
-      int num_transfer = std::min( num_s, num_r );
-      instr_s.push_back( *it_r );
-      instr_s.push_back(num_transfer);
-      instr_r.push_back( *it_s );
-      instr_r.push_back(num_transfer);
+      if ( my_rank == r_s ) {
+        instr.push_back( r_r );
+        instr.push_back( std::min(num_s, num_r) );
+      }
+      else if ( my_rank == r_r ) {
+        instr.push_back( r_s );
+        instr.push_back( std::min(num_s, num_r) );
+      }
 
-      num_s -= num_transfer;
-      num_r -= num_transfer;
-      if ( 0 == num_s && (++it_s) != procs_send.end() )
-        num_s = std::abs( nums_surplus[*it_s] );
-      if ( 0 == num_r && (++it_r) != procs_recv.end() )
-        num_r = std::abs( nums_surplus[*it_r] );
+      pq_send.pop();
+      pq_recv.pop();
+
+      if ( num_s < num_r ) pq_recv.push( r_r, num_r - num_s );
+      else if ( num_r < num_s ) pq_send.push( r_s, num_s - num_r );
+
     }
 
-    return instructions[my_rank];
-
+    return instr;
   }
 
 }
@@ -237,7 +236,8 @@ namespace dye {
   template < typename T, template < typename > class PtcSpecs >
   void detailed_balance ( particle::array<T, PtcSpecs>& ptcs,
                           const mpi::Comm& intra ) {
-    particle::load_t my_load = ptcs.size();
+    using particle::load_t;
+    load_t my_load = ptcs.size();
     auto loads = intra.allgather(&my_load, 1);
     auto instr = impl::get_instr( impl::get_ptc_num_surplus( loads ), intra.rank() );
 
@@ -246,7 +246,7 @@ namespace dye {
     const int num_comms = ( instr.size() - 1 ) / 2; // number of communications to make
 
     std::vector<int> target_rank(num_comms);
-    std::vector<int> scan_count(num_comms+1);
+    std::vector<load_t> scan_count(num_comms+1);
     target_rank.shrink_to_fit();
     scan_count.shrink_to_fit();
     scan_count[0] = 0;
@@ -356,7 +356,7 @@ namespace dye {
     { // Deploy
       particle::load_t my_tot_load = 0;
       if ( ens_opt ) {
-        for ( auto&[sp,ptcs] : particles ) {
+        for ( const auto&[sp,ptcs] : particles ) {
           if ( sp == particle::species::photon )
             my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
           else
@@ -387,6 +387,7 @@ namespace dye {
         }
       }
     }
+
     { // clear ens_opt properly, which needs 1. we do the following outside the above scope so as to make sure [comm, itc_opt] are deallocated, 2. freeing communicator is collective though implemented as local operation, so everyone needs to call.
       ens_opt.reset();
       ens_opt.swap(ens_opt_new);
