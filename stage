@@ -2,17 +2,24 @@
 tnow=`date +%F-%H-%M-%S`
 project_name=${PWD##*/} # the current direcoty name. copied from https://stackoverflow.com/questions/1371261/get-current-directory-name-without-full-path-in-a-bash-script
 
-
 skeleton_file=".skeleton$tnow"
-printf "%s\n" "## Write message below." > $skeleton_file
+printf "%s" "# Please enter the message for the current run. To abort, simply exit and don't save this file." > $skeleton_file
 
-vim_src=".vim_rc$tnow"
-printf "%s" "autocmd BufNewFile * 0read ${skeleton_file}" > $vim_src
+vim_before=".vim_before$tnow"
+printf "%s" "autocmd BufNewFile * 0read ${skeleton_file}" > $vim_before
+
+vim_after=".vim_after$tnow"
+printf "%s\n" \
+       "set number" \
+       "normal 2G" \
+       "startinsert" \
+       > $vim_after
 
 message_file=".message$tnow"
-vim $message_file --cmd "source ${vim_src}"
+vim $message_file --cmd "source ${vim_before}" -c "source ${vim_after}"
 rm $skeleton_file
-rm $vim_src
+rm $vim_before
+rm $vim_after
 
 if [[ -f $message_file ]]; then
     message=`tail -n "+2" $message_file`
