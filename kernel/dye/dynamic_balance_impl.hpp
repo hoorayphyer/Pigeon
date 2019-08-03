@@ -263,7 +263,7 @@ namespace dye {
       auto beg = ptcs.size() - scan_count.back();
       for ( int i = 0; i < scan_count.back(); ++i )
         buffer[i] = std::move(ptcs[beg + i]);
-      ptcs.resize(scan_count.back());
+      ptcs.resize(beg);
     }
 
     std::vector<mpi::Request> reqs(num_comms);
