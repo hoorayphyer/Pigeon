@@ -36,7 +36,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
-                       int target_load
+                       int target_load = 0
                        );
 }
 

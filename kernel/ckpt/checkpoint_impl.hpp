@@ -26,7 +26,7 @@ namespace ckpt {
     void load( silo::file_t& dbfile, const std::string& name, field::Field<T,DField,DGrid>& f ) {
       for ( int comp = 0; comp < DField; ++comp ) {
         auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
-        dbfile.read( n, f._comps[comp] );
+        dbfile.read( n, f._comps[comp].data() );
       }
     }
   };
@@ -62,10 +62,10 @@ namespace ckpt {
         apt::array<int, 3> slice { from, num, 1 };
         {
           for ( int i = 0; i < DPtc; ++i ) {
-            dbfile.readslice("q"+std::to_string(i+1), slice, ptcs._q[i].data() + size_old );
-            dbfile.readslice("p"+std::to_string(i+1), slice, ptcs._p[i].data() + size_old );
+            dbfile.readslice("q"+std::to_string(i+1), {slice}, ptcs._q[i].data() + size_old );
+            dbfile.readslice("p"+std::to_string(i+1), {slice}, ptcs._p[i].data() + size_old );
           }
-          dbfile.readslice("state", slice, ptcs._state.data() + size_old );
+          dbfile.readslice("state", {slice}, ptcs._state.data() + size_old );
         }
       }
       dbfile.cd("..");
@@ -266,8 +266,8 @@ namespace ckpt {
     if ( !ens_opt ) return resume_ts;
     {
       const int mylabel = ens_opt->label();
-      const int myrank = ens_opt->rank();
-      const auto ens_size = ens_opt->size();
+      const int myrank = ens_opt->intra.rank();
+      const auto ens_size = ens_opt->intra.size();
 
       FieldCkpt<Real,DGrid> f_ckpt;
       ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;

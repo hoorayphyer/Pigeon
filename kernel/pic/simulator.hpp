@@ -195,16 +195,20 @@ namespace pic {
     }
 
     template < template < int, typename, template < typename > class, typename > class IC >
-    int load_initial_condition() {
-      // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
+    int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = 0;
-      if (_cart_opt) {
-        IC ic( _grid, _E, _B, _J, _particles );
-        ic();
-        init_ts = ic.initial_timestep();
-        field::copy_sync_guard_cells(_E, *_cart_opt);
-        field::copy_sync_guard_cells(_B, *_cart_opt);
-        field::copy_sync_guard_cells(_J, *_cart_opt);
+      if ( checkpoint_dir ) {
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles );
+      } else {
+        // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
+        if (_cart_opt) {
+          IC ic( _grid, _E, _B, _J, _particles );
+          ic();
+          init_ts = ic.initial_timestep();
+          field::copy_sync_guard_cells(_E, *_cart_opt);
+          field::copy_sync_guard_cells(_B, *_cart_opt);
+          field::copy_sync_guard_cells(_J, *_cart_opt);
+        }
       }
       // broadcast to ensure uniformity
       mpi::world.broadcast( 0, &init_ts, 1 );

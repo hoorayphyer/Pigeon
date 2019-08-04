@@ -12,4 +12,14 @@ namespace ckpt {
                                const field::Field<real_t, 3, DGrid>& B,
                                const particle::map<particle::array<real_t,particle::Specs>>& particles
                                );
+
+  template
+  int load_checkpoint( std::string dir,
+                       std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                       const std::optional<mpi::CartComm>& cart_opt,
+                       field::Field<real_t, 3, DGrid>& E,
+                       field::Field<real_t, 3, DGrid>& B,
+                       particle::map<particle::array<real_t,particle::Specs>>& particles,
+                       int target_load
+                       );
 }

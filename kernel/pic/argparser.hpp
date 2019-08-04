@@ -2,10 +2,10 @@
 #define _ARGPARSER_HPP_
 
 namespace pic {
-
   struct CLIArgs {
     // std::string journal_file = "journal.txt";
-    std::string parameters_file{};
+    std::optional<std::string> parameters_file{};
+    std::optional<std::string> checkpoint_dir {};
   };
 
   auto parse_args( int argc, char** argv ) {
@@ -24,7 +24,11 @@ namespace pic {
       //   i += 2;
       // } else
       if ( "--params" == args[i] ) {
-        res.parameters_file = args[i + 1];
+        res.parameters_file.emplace( args[i + 1] );
+        i += 2;
+      }
+      else if ( "--checkpoint" == args[i] ) {
+        res.checkpoint_dir.emplace( args[i + 1] );
         i += 2;
       }
     }

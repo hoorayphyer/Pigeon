@@ -4,7 +4,7 @@
 #include <cstring>
 #include "filesys/filesys.hpp"
 #include "logger/logger.hpp"
-#include "argparser.hpp"
+#include "pic/argparser.hpp"
 
 std::string data_dirname() {
   char subDir[100] = {};
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
       sim( pic::supergrid, cart_opt, pic::guard );
 
-    int init_timestep = sim.load_initial_condition<pic::InitialCondition>();
+    int init_timestep = sim.load_initial_condition<pic::InitialCondition>( cli_args.checkpoint_dir );
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {

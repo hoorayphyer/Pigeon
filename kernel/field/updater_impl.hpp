@@ -170,7 +170,7 @@ namespace field {
       current.resize(grid);
     }
 
-    { // NOTE this is setting up IC, as well as setting up E_bg and B_bg for damping and store in Efield, Bfield
+    { // NOTE this is setting up E_bg and B_bg for damping and store in Efield, Bfield. IC for E and B are set up in operator(). This is to make resume work
       Efield.assign(0.0);
       Bfield.assign(0.0);
       const auto& grid = fuparams.grid;
@@ -204,6 +204,7 @@ namespace field {
                                                field_type& B,
                                                const J_type& Jmesh,
                                                Real dt, int timestep ) {
+    static bool is_EB_initialized = false; // A hotfix to apply
     // NOTE
     // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,
@@ -226,44 +227,15 @@ namespace field {
               }}}
           // TODOL there is no need to copy guard cell values to current right? Because field solver doesn't use those values, instead they have boundary conditions
         };
+      if ( !is_EB_initialized ) {
+        convert_from_new( Efield, E );
+        fc->SendGuardCells(Efield);
+        convert_from_new( Bfield, B );
+        fc->SendGuardCells(Bfield);
+        is_EB_initialized = true;
+      }
       convert_from_new( current, Jmesh );
       fc->SendGuardCells(current);
-      // { // deal with boundaries of current
-      //   if ( fuparams.is_at_boundary[LOWER_1] ) {
-      //     // excluding guard cells in theta
-      //     for ( int t = 0; t < grid.reducedDim(1); ++t ) {
-      //       current(1, 1-1, t + 1 ) = Jmesh[1]({-1, t});
-      //       current(2, 1-1, t + 1 ) = Jmesh[2]({-1, t});
-      //     }
-      //   }
-      //   if ( fuparams.is_at_boundary[UPPER_1] ) {
-      //     for ( int t = 0; t < grid.reducedDim(1); ++t ) {
-      //       current(0, 1 + grid.reducedDim(0), t + 1 ) = current(0, 1 + grid.reducedDim(0) - 1, t + 1 );
-
-      //       current(1, 1 + grid.reducedDim(0), t + 1 ) = Jmesh[1]({grid.reducedDim(0), t});
-      //       current(2, 1 + grid.reducedDim(0), t + 1 ) = Jmesh[2]({grid.reducedDim(0), t});
-      //     }
-      //   }
-      //   if ( fuparams.is_at_boundary[LOWER_2] ) {
-      //     // include guard cells in r
-      //     for ( int r = -1; r < grid.reducedDim(0) + 1; ++r ) {
-      //       current(1, r + 1, 1-1 ) = 0.0;
-
-      //       current(0, r + 1, 1-1 ) = Jmesh[0]({r, -1});
-      //       current(2, r + 1, 1-1 ) = Jmesh[2]({r, -1});
-      //     }
-      //   }
-      //   if ( fuparams.is_at_boundary[UPPER_2] ) {
-      //     for ( int r = -1; r < grid.reducedDim(0) + 1; ++r ) {
-      //       current(1, r + 1, 1 + grid.reducedDim(1) ) = - Jmesh[1]({ r,grid.reducedDim(1) - 1 });
-
-      //       current(0, r + 1, 1 + grid.reducedDim(1) ) = Jmesh[0]({r, grid.reducedDim(1) });
-      //       current(2, r + 1, 1 + grid.reducedDim(1) ) = Jmesh[2]({r, grid.reducedDim(1) });
-      //     }
-      //   }
-
-      // }
-
 
       // NOTE differences of new code
       // 1. The new code will evolve Maxwell's equations with 4\pi r_e / w_gyro.
