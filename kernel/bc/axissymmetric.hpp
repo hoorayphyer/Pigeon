@@ -2,23 +2,13 @@
 #define _BC_AXISSYMMETRIC_HPP_
 
 namespace bc {
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
+  template < int DGrid >
   struct Axissymmetric {
-  private:
     static_assert(DGrid==2);
-    const mani::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _E;
-    field::Field<Real, 3, DGrid>& _B;
-    field::Field<RealJ, 3, DGrid>& _J;
-
     static constexpr int AxisDir = 1;
-    bool _is_lower = false;
-    bool _is_upper = false;
+    bool is_lower = false;
+    bool is_upper = false;
 
-  public:
     // NOTE f is a function pointer to void (*)( T&, T& ). The complicated expression is just to make template deduction work.
     template < typename T >
     static void symmetrize( bool is_at_axis_lower, bool is_at_axis_upper,
@@ -44,18 +34,8 @@ namespace bc {
       }
     }
 
-
-    Axissymmetric ( const mani::Grid<Real,DGrid>& localgrid,
-                    field::Field<Real, 3, DGrid>& Efield,
-                    field::Field<Real, 3, DGrid>& Bfield,
-                    field::Field<RealJ, 3, DGrid>& Jfield,
-                    const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _E(Efield), _B(Bfield), _J(Jfield) {
-      _is_lower = std::abs( localgrid[AxisDir].lower() - 0.0 ) < localgrid[AxisDir].delta();
-      _is_upper = std::abs( localgrid[AxisDir].upper() - std::acos(-1.0) ) < localgrid[AxisDir].delta();
-    }
-
-    void setEB () {
+    template < typename Real >
+    void setEB ( field::Field<Real, 3, DGrid>& E, field::Field<Real, 3, DGrid>& B) {
       // NOTE Guard cells values are needed when interpolating E and B
       // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
       auto assign = []( Real& v_g, Real& v_b ) noexcept { v_g = v_b; };
@@ -63,17 +43,18 @@ namespace bc {
                           v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
                         };
       // MIDWAY in AxisDir
-      symmetrize(_is_lower, _is_upper, _E[0], assign );
-      symmetrize(_is_lower, _is_upper, _E[2], neg_assign );
-      symmetrize(_is_lower, _is_upper, _B[1], neg_assign );
+      symmetrize(is_lower, is_upper, E[0], assign );
+      symmetrize(is_lower, is_upper, E[2], neg_assign );
+      symmetrize(is_lower, is_upper, B[1], neg_assign );
 
       // INSITU in AxisDir
-      symmetrize(_is_lower, _is_upper, _E[1], neg_assign );
-      symmetrize(_is_lower, _is_upper, _B[0], assign );
-      symmetrize(_is_lower, _is_upper, _B[2], neg_assign );
+      symmetrize(is_lower, is_upper, E[1], neg_assign );
+      symmetrize(is_lower, is_upper, B[0], assign );
+      symmetrize(is_lower, is_upper, B[2], neg_assign );
     }
 
-    void setJ() {
+    template < typename RealJ >
+    void setJ( field::Field<RealJ, 3, DGrid>& J ) {
       auto add_assign =
         []( RealJ& a, RealJ& b ) noexcept {
           a += b;
@@ -86,10 +67,10 @@ namespace bc {
           b = -a;
         };
       // MIDWAY in AxisDir
-      symmetrize(_is_lower, _is_upper, _J[0], add_assign );
-      symmetrize(_is_lower, _is_upper, _J[2], sub_assign );
+      symmetrize(is_lower, is_upper, J[0], add_assign );
+      symmetrize(is_lower, is_upper, J[2], sub_assign );
       // INSITU in AxisDir
-      symmetrize(_is_lower, _is_upper, _J[1], sub_assign );
+      symmetrize(is_lower, is_upper, J[1], sub_assign );
     }
   };
 }

@@ -233,7 +233,7 @@ namespace io {
 
     auto add_assign = []( RealDS& a, RealDS& b ) noexcept -> void {a += b; b = a;}; // TODO only add_assign
     for ( int i = 0; i < num_comps; ++i )
-      bc::Axissymmetric<DGrid,RealDS,S,RealJ>::symmetrize( is_lower, is_upper, field[i], add_assign );
+      bc::Axissymmetric<DGrid>::symmetrize( is_lower, is_upper, field[i], add_assign );
   }
 }
 

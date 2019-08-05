@@ -20,6 +20,7 @@
 #include "particle/particle.hpp"
 
 #include "bc/axissymmetric.hpp"
+#include "bc/injection.hpp"
 
 #include "dye/ensemble.hpp"
 
@@ -84,6 +85,32 @@ namespace field {
     ofs::magnetic_pole = 2; // 1 for mono-, 2 for di-
     ofs::indent = { 5, 43, pic::guard, pic::guard };
     ofs::damping_rate = 10.0;
+  }
+}
+
+namespace pic {
+  template < int DGrid, typename Real >
+  auto set_up_boundary_conditions( const mani::Grid<Real,DGrid>& grid ) {
+    bc::Axissymmetric<DGrid> axis;
+    {
+      constexpr auto AxisDir = decltype(axis)::AxisDir;
+      axis.is_lower = std::abs( grid[AxisDir].lower() - 0.0 ) < grid[AxisDir].delta();
+      axis.is_upper = std::abs( grid[AxisDir].upper() - std::acos(-1.0) ) < grid[AxisDir].delta();
+    }
+
+    bc::Injector<DGrid,Real> inj;
+    {
+      apt::tie(inj.Ib[0], inj.extent[0]) = gtl( field::ofs::indent[0] - 1, 1, supergrid[0], grid[0] );
+      apt::tie(inj.Ib[1], inj.extent[1]) = gtl( {0.0, PI}, grid[1] );
+      inj.v_th = 0.3;
+      inj.j_reg_x = 2.0;
+      inj.N_dot = 500.0;
+      inj.posion = particle::species::ion;
+      inj.negaon = particle::species::electron;
+      inj.omega_t = field::omega_spinup;
+    }
+
+    return std::make_tuple(axis,inj);
   }
 }
 
@@ -223,95 +250,6 @@ namespace pic {
     }
 
     constexpr int initial_timestep() noexcept { return 0; }
-  };
-
-  // as a boundary condition for particles
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct Injector {
-  private:
-    const mani::Grid<Real,DGrid>& _grid;
-    const field::Field<Real, 3, DGrid>& _Efield;
-    const field::Field<Real, 3, DGrid>& _Bfield;
-    const field::Field<RealJ, 3, DGrid>& _Jfield; // J is Jmesh on a replica
-    particle::map<particle::array<Real,Specs>>& _particles;
-
-    apt::Index<DGrid> _Ib;
-    apt::Index<DGrid> _extent;
-
-  public:
-    Injector ( const mani::Grid<Real,DGrid>& localgrid,
-               const field::Field<Real, 3, DGrid>& Efield,
-               const field::Field<Real, 3, DGrid>& Bfield,
-               const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-               particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Efield(Efield), _Bfield(Bfield), _Jfield(Jfield), _particles(particles) {
-      apt::tie(_Ib[0], _extent[0]) = gtl( field::ofs::indent[0] - 1, 1, supergrid[0], localgrid[0] );
-      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
-    }
-
-    void operator() ( int timestep, Real dt, util::Rng<Real>& rng, particle::birthplace birth ) {
-      using namespace particle;
-
-      constexpr Real v_th = 0.3;
-      constexpr Real j_reg_x = 2.0;
-      constexpr Real N_dot = 500.0;
-
-      constexpr auto posion = species::ion;
-      constexpr auto negaon = species::electron;
-
-      Real omega = field::omega_spinup( timestep * dt );
-
-      // the idea is that (timestep + 1) * N_inj * profile represents the accummulated number of injected pairs through the specified timestep. NOTE the timestep is shifted by one to reflect the actual times the inject is called, including this time.
-      // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
-      auto profile_inj =
-        [N_inj=N_dot*dt,timestep] ( Real theta ) noexcept {
-          Real inj_num_base = N_inj * 0.5 * std::abs( std::sin( 2 * theta ) );
-          return static_cast<int>( (timestep + 1) * inj_num_base ) - static_cast<int>( timestep * inj_num_base );
-        };
-
-      auto j_reg_inj =
-        [factor = j_reg_x * mani::dV(grid) / (particle::properties.at(posion).charge_x) ]( Real J ) noexcept {
-          return J * factor;
-        };
-
-      auto itr_po = std::back_inserter(_particles[posion]);
-      auto itr_ne = std::back_inserter(_particles[negaon]);
-
-      for ( auto I : apt::Block(_extent) ) {
-        I += _Ib;
-        apt::Vec<Real, Specs<Real>::Dim> q{};
-        for ( int i = 0; i < DGrid; ++i )
-          q[i] = _grid[i].absc(I[i], 0.5);
-
-        apt::Vec<Real,3> nB, J;
-        // TODOL use interpolated value
-        for ( int i = 0; i < 3; ++i ) {
-          nB[i] = _Bfield[i](I);
-          J[i] = _Jfield[i](I);
-        }
-
-        int num = std::max<Real>( profile_inj(q[1]), j_reg_inj(apt::abs(J)) );
-
-        // find n_B
-        nB /= apt::abs(nB);
-
-        apt::Vec<Real, Specs<Real>::Dim> p{};
-        p[2] = omega * std::exp(q[0]) * std::sin(q[1]); // corotating
-
-        for ( int n = 0; n < num; ++n ) {
-          auto q_ptc = q;
-          for ( int i = 0; i < DGrid; ++i )
-            q_ptc[i] += _grid[i].delta() * rng.uniform(-0.5, 0.5);
-          auto p_ptc = p;
-          p_ptc += nB * rng.gaussian( 0.0, v_th );
-          *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon, birth );
-          *(itr_po++) = Particle<Real,Specs>( std::move(q_ptc), std::move(p_ptc), posion, birth );
-        }
-      }
-    }
   };
 }
 

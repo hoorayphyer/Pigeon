@@ -63,8 +63,8 @@ namespace pic {
 
     std::vector<particle::Particle<Real, PtcSpecs>> _migrators;
 
-    std::unique_ptr<bc::Axissymmetric<DGrid, Real, PtcSpecs, RealJ>> _fbc_axis;
-    std::unique_ptr<Injector< DGrid, Real, PtcSpecs, RealJ>> _injector;
+    bc::Axissymmetric<DGrid> _fbc_axis;
+    bc::Injector< DGrid, Real > _injector;
 
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
@@ -101,8 +101,7 @@ namespace pic {
         _J.reset();
       }
 
-      _fbc_axis.reset( new typename decltype(_fbc_axis)::element_type {_grid, _E, _B, _J, _particles} );
-      _injector.reset( new typename decltype(_injector)::element_type {_grid, _E, _B, _J, _particles} );
+      std::tie(_fbc_axis, _injector) = pic::set_up_boundary_conditions(_grid);
 
       if ( _cart_opt )
         _field_update.reset(new field::Updater<Real,DGrid,RealJ>
@@ -280,7 +279,7 @@ namespace pic {
           stamp.emplace();
         }
         (*_ptc_update) ( _particles, _J, _E, _B, _grid, dt, timestep, _rng );
-        _fbc_axis->setJ();
+        _fbc_axis.setJ(_J);
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
@@ -315,13 +314,13 @@ namespace pic {
           }
           field::merge_sync_guard_cells( _J, *_cart_opt );
           (*_field_update)(_E, _B, _J, dt, timestep);
-          _fbc_axis->setEB();
+          _fbc_axis.setEB(_E,_B);
           if (stamp) {
             lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
           }
 
           // TODO only primary does injection now
-          (*_injector)( timestep, dt, _rng, _ens_opt->label() );
+          _injector( timestep, dt, _rng, _ens_opt->label(), _grid, _E, _B, _J, _particles );
         }
       }
 

@@ -138,8 +138,8 @@ namespace field {
       fuparams.neighbor_right[i] = dest ? *(dest) : NEIGHBOR_NULL;
     }
     for ( int i = DGrid; i < 3; ++i ) {
-      fuparams.is_at_boundary[2*i] = true;
-      fuparams.is_at_boundary[2*i + 1] = true;
+      fuparams.is_at_boundary[2*i] = false;
+      fuparams.is_at_boundary[2*i + 1] = false;
       fuparams.neighbor_left[i] = NEIGHBOR_NULL;
       fuparams.neighbor_right[i] = NEIGHBOR_NULL;
     }
