@@ -19,6 +19,8 @@
 #include "particle/array.hpp"
 #include "particle/particle.hpp"
 
+#include "ic/multipole.hpp"
+
 #include "bc/axissymmetric.hpp"
 #include "bc/injection.hpp"
 
@@ -89,6 +91,17 @@ namespace field {
 }
 
 namespace pic {
+  template < int DGrid, typename Real >
+  auto set_up_initial_conditions( const mani::Grid<Real,DGrid>& grid ) {
+    ic::MagneticDipole<DGrid> dipole;
+    {
+      apt::tie(dipole.Ib[0], dipole.extent[0]) = gtl( {0.0, std::log(30.0)}, grid[0] );
+      apt::tie(dipole.Ib[1], dipole.extent[1]) = gtl( {0.0, PI}, grid[1] );
+    }
+
+    return dipole;
+  }
+
   template < int DGrid, typename Real >
   auto set_up_boundary_conditions( const mani::Grid<Real,DGrid>& grid ) {
     bc::Axissymmetric<DGrid> axis;
@@ -207,50 +220,6 @@ namespace particle {
     }
   }
 
-}
-
-namespace pic {
-  template < int DGrid,
-             typename Real,
-             template < typename > class Specs,
-             typename RealJ >
-  struct InitialCondition {
-  private:
-    const mani::Grid<Real,DGrid>& _grid;
-    field::Field<Real, 3, DGrid>& _Bfield;
-
-    apt::Index<DGrid> _Ib;
-    apt::Index<DGrid> _extent;
-
-    Real B_r ( Real logr, Real theta ) noexcept {
-      return 2.0 * std::cos(theta) * std::exp(-3.0 * logr);
-    };
-
-    Real B_th ( Real logr, Real theta ) noexcept {
-      return std::sin(theta) * std::exp(-3.0 * logr);
-    };
-
-  public:
-    InitialCondition ( const mani::Grid<Real,DGrid>& localgrid,
-                       const field::Field<Real, 3, DGrid>& Efield,
-                       field::Field<Real, 3, DGrid>& Bfield,
-                       const field::Field<RealJ, 3, DGrid>& Jfield, // J is Jmesh on a replica
-                       const particle::map<particle::array<Real,Specs>>& particles )
-      : _grid(localgrid), _Bfield(Bfield) {
-      apt::tie(_Ib[0], _extent[0]) = gtl( {0.0, std::log(30.0)}, localgrid[0] );
-      apt::tie(_Ib[1], _extent[1]) = gtl( {0.0, PI}, localgrid[1] );
-    }
-
-    void operator() () {
-      for ( auto I : apt::Block(_extent) ) {
-        I += _Ib;
-        _Bfield[0](I) = B_r( _grid[0].absc(I[0], _Bfield[0].offset()[0]), _grid[1].absc(I[1], _Bfield[0].offset()[1]) );
-        _Bfield[1](I) = B_th( _grid[0].absc(I[0], _Bfield[1].offset()[0]), _grid[1].absc(I[1], _Bfield[1].offset()[1]) );
-      }
-    }
-
-    constexpr int initial_timestep() noexcept { return 0; }
-  };
 }
 
 #endif

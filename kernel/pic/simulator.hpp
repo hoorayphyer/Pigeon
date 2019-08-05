@@ -193,7 +193,6 @@ namespace pic {
       refresh(ens);
     }
 
-    template < template < int, typename, template < typename > class, typename > class IC >
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = 0;
       if ( checkpoint_dir ) {
@@ -201,8 +200,8 @@ namespace pic {
       } else {
         // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
         if (_cart_opt) {
-          IC ic( _grid, _E, _B, _J, _particles );
-          ic();
+          auto ic = pic::set_up_initial_conditions(_grid);
+          ic(_grid, _E, _B, _J, _particles);
           init_ts = ic.initial_timestep();
           field::copy_sync_guard_cells(_E, *_cart_opt);
           field::copy_sync_guard_cells(_B, *_cart_opt);
