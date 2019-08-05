@@ -195,7 +195,10 @@ namespace particle {
       scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.0; };
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
-      ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
+      if ( properties.has(species::photon) )
+        ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
+      else
+        ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
       if ( properties.has(species::electron) && properties.has(species::positron) ) {
         ep_scat.Register( species::electron );
