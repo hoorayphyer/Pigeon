@@ -256,15 +256,13 @@ namespace pic {
       using namespace particle;
 
       constexpr Real v_th = 0.3;
-      constexpr Real j_reg_x = 0.0;
+      constexpr Real j_reg_x = 2.0;
       constexpr Real N_dot = 500.0;
 
       constexpr auto posion = species::ion;
       constexpr auto negaon = species::electron;
 
       Real omega = field::omega_spinup( timestep * dt );
-
-      int charge_x = particle::properties.at(posion).charge_x;
 
       // the idea is that (timestep + 1) * N_inj * profile represents the accummulated number of injected pairs through the specified timestep. NOTE the timestep is shifted by one to reflect the actual times the inject is called, including this time.
       // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
@@ -275,8 +273,7 @@ namespace pic {
         };
 
       auto j_reg_inj =
-        [&grid=_grid, charge_x, j_reg_x]( Real J ) noexcept {
-          static auto factor = j_reg_x * grid[0].delta() * grid[1].delta() / charge_x;
+        [factor = j_reg_x * mani::dV(grid) / (particle::properties.at(posion).charge_x) ]( Real J ) noexcept {
           return J * factor;
         };
 

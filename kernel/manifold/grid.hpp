@@ -111,6 +111,13 @@ namespace mani {
       ext[i] = grid[i].dim();
     return ext;
   }
+
+  template < typename T, int DGrid >
+  constexpr T dV(const Grid<T,DGrid>& grid) noexcept {
+    T res = 1.0;
+    for ( const auto& g : grid ) res *= g.delta();
+    return res;
+  }
 }
 
 #endif
