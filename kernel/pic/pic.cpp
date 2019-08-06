@@ -5,6 +5,7 @@
 #include "filesys/filesys.hpp"
 #include "logger/logger.hpp"
 #include "pic/argparser.hpp"
+#include "particle/mpi_particle.hpp"
 
 std::string data_dirname() {
   char subDir[100] = {};
@@ -53,10 +54,11 @@ namespace particle{
 }
 
 int main(int argc, char** argv) {
-
   auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
   mpi::initialize(argc, argv);
+
+  mpi::commit( mpi::Datatype<particle::Particle<pic::real_t, particle::Specs>>{} );
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
     pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );

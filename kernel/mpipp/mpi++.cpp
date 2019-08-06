@@ -22,16 +22,20 @@ namespace mpi {
     return MPI_COMM_NULL;
   }
 
+  std::vector<MPI_Datatype*> custom_datatypes;
+
+  void commit_impl(MPI_Datatype& x) {
+    custom_datatypes.push_back(&x);
+    MPI_Type_commit(&x);
+  }
+
   void initialize(int argc, char** argv) {
     MPI_Init(&argc, &argv );
-
-    create_MPI_PARTICLE(MPI_PARTICLE);
-
-    MPI_Type_commit(&MPI_PARTICLE);
   }
 
   void finalize() {
-    MPI_Type_free( &MPI_PARTICLE );
+    for ( auto x : custom_datatypes )
+      MPI_Type_free( x );
 
     MPI_Finalize();
   }

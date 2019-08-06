@@ -3,7 +3,6 @@ add_library(mpipp SHARED "mpi++.cpp" "mpi_request.cpp" "mpi_datatype.cpp" "mpi_p
 target_include_directories(mpipp PRIVATE ${MPI_CXX_INCLUDE_DIRS} ${KERNEL_DIR} )
 target_compile_options(mpipp PUBLIC "${MPI_CXX_COMPILE_OPTIONS}")
 target_link_libraries(mpipp PUBLIC ${MPI_CXX_LIBRARIES})
-target_link_libraries(mpipp PRIVATE picgen) # TODO
 separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # a workaround since findMPI doesn't provide this yet
 target_link_options(mpipp PUBLIC ${MPI_CXX_LINK_OPTIONS})
 

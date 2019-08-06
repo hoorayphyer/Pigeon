@@ -4,8 +4,19 @@
 #include <mpi.h>
 
 namespace mpi {
-  template <typename Type>
-  MPI_Datatype datatype(Type* = nullptr) noexcept;
+  template < typename T >
+  struct Datatype {
+    static MPI_Datatype type;
+    // NOTE for custom datatypes, specialization of Datatype should have the following function
+    static void define(MPI_Datatype&);
+  };
+}
+
+namespace mpi {
+  template < typename T >
+  constexpr MPI_Datatype datatype(T* = nullptr) noexcept {
+    return Datatype<T>::type;
+  }
 
   template <typename T>
   constexpr MPI_Datatype datatype(const T&) noexcept {
@@ -16,9 +27,6 @@ namespace mpi {
   constexpr MPI_Datatype datatype(const T*) noexcept {
     return datatype((T*)0);
   }
-
-  extern MPI_Datatype MPI_PARTICLE;
-  void create_MPI_PARTICLE (MPI_Datatype&);
 }
 
 #endif
