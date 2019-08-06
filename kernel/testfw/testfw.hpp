@@ -46,7 +46,7 @@ namespace aio {
   struct Specs {
     using value_type = T;
     static constexpr int Dim = 3;
-    using state_type = apt::copy_cvref_t<T,unsigned long long>;
+    using state_type = apt::copy_cvref_t<T,long long>;
 
     static_assert( 8 * sizeof( state_type ) >= 64 );
   };

@@ -19,6 +19,11 @@ namespace mpi {
     int probe( int source_rank, int tag, const T* ) const; // returns the send count
 
     template < typename T >
+    inline int probe( int source_rank, int tag, T* ) const {
+      return probe( source_rank, tag, (const T*)0 );
+    }
+
+    template < typename T >
     inline int probe( int source_rank, int tag, const T& ) const {
       return probe( source_rank, tag, (const T*)0 );
     }

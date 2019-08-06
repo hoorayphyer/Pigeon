@@ -4,10 +4,11 @@
 #include "particle/virtual_particle.hpp"
 
 using namespace particle;
-using ptc_array = array<double,aio::Specs>;
-using Ptc = Particle<double,aio::Specs>;
-using vPtc = vParticle<double,aio::Specs>;
-using Vec = apt::Vec<double,aio::Specs<double>::Dim>;
+using Real = double;
+using ptc_array = array<Real,aio::Specs>;
+using Ptc = Particle<Real,aio::Specs>;
+using vPtc = vParticle<Real,aio::Specs>;
+using Vec = apt::Vec<Real,aio::Specs<Real>::Dim>;
 
 SCENARIO("test Particle constructors and flag::exist", "[particle]") {
   WHEN("constructed with parameters, particle exists") {
@@ -61,9 +62,9 @@ SCENARIO("array push_back and iterator", "[particle]") {
   }
 
   WHEN("push back virtual particle only by move") {
-    apt::array<double,3> q { 15,6,73 };
-    apt::array<double,3> p { 20,-3,-5 };
-    unsigned long long state = 147;
+    apt::array<Real,3> q { 15,6,73 };
+    apt::array<Real,3> p { 20,-3,-5 };
+    typename aio::Specs<Real>::state_type state = 147;
     vPtc ptc0 ( q, p, state );
     arr.push_back(std::move(ptc0)); // NOTE no push_back by copy for virtual particle in order to preserve semantics
     REQUIRE_FALSE( ptc0.is(flag::exist) );

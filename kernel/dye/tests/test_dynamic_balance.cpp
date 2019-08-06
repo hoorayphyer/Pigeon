@@ -4,12 +4,15 @@
 #include "mpipp/mpi++.hpp"
 #include "dye/ensemble_impl.hpp"
 #include "dye/dynamic_balance_impl.hpp"
-#include "pic.hpp"
+#include "mpipp/mpi_p2p_impl.hpp"
+#include "mpipp/mpi_collective_impl.hpp"
+#include "particle/mpi_particle.hpp"
 #include <unordered_set>
 #include "logger/ofstream.hpp"
 
 using namespace particle;
-using Real = pic::real_t;
+using Real = double;
+using aio::Specs;
 
 SCENARIO("Test calc_new_nprocs", "[dye][.]") {
   if ( mpi::world.rank() == 0 ) {
@@ -132,6 +135,7 @@ TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
                     ) {
   // the sending side of an intercommunicator consists of MPI_ROOT and one MPI_PROC_NULL
   // the receiving side consists of number of processes specified by the template parameter
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   constexpr auto nremotes = TestType::value;
   static_assert(nremotes > 0);
   if ( mpi::world.size() >= nremotes + 2 ) {
@@ -163,6 +167,7 @@ TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
       }
     }
   }
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }
 
 TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi][.]"
@@ -233,6 +238,7 @@ TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
                     , (std::integral_constant<int,4>)
                     , (std::integral_constant<int,16>)
                     ) {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   constexpr auto ens_size = TestType::value;
   if ( mpi::world.size() >= ens_size ) {
     auto intra = mpi::world.split( mpi::world.rank() < ens_size );
@@ -264,11 +270,13 @@ TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
     }
     mpi::world.barrier();
   }
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }
 
 TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi][.]"
                     , (aio::IndexType<2,1>)
                     ) {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   // TODO test a shrinking ensemble
   constexpr int DGrid = 2;
   int nens = 1;
@@ -310,10 +318,12 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     dye::dynamic_load_balance(ptcs, ens_opt, cart_opt, target_load );
 
   }
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 
 }
 
 SCENARIO("Stress test", "[dye][mpi][.]") {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   const int num_ens = 1;
   const int num_procs = mpi::world.size();
   const int num_cycles = 1000;
@@ -365,5 +375,6 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
     out.close();
   }
   mpi::world.barrier();
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 
 }

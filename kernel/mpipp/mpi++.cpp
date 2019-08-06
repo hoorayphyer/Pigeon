@@ -24,9 +24,13 @@ namespace mpi {
 
   std::vector<MPI_Datatype*> custom_datatypes;
 
-  void commit_impl(MPI_Datatype& x) {
+  void commit(MPI_Datatype& x) {
     custom_datatypes.push_back(&x);
     MPI_Type_commit(&x);
+  }
+
+  void uncommit(MPI_Datatype& x) {
+    if ( x != MPI_DATATYPE_NULL ) MPI_Type_free( &x );
   }
 
   void initialize(int argc, char** argv) {
@@ -34,8 +38,7 @@ namespace mpi {
   }
 
   void finalize() {
-    for ( auto x : custom_datatypes )
-      MPI_Type_free( x );
+    for ( auto x : custom_datatypes ) uncommit(*x);
 
     MPI_Finalize();
   }

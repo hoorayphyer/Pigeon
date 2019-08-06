@@ -1,11 +1,14 @@
 #include "testfw/testfw.hpp"
-#include "pic.hpp"
 #include "particle/migration_impl.hpp"
 #include "particle/particle.hpp"
 #include "dye/ensemble_impl.hpp"
 
+#include "mpipp/mpi_p2p_impl.hpp"
+#include "particle/mpi_particle.hpp"
+
 using namespace particle;
-using Real = pic::real_t;
+using Real = double;
+using aio::Specs;
 using Ptc_t = Particle<Real,Specs>;
 using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
@@ -54,6 +57,7 @@ SCENARIO("Test swapping particles", "[particle]") {
 }
 
 SCENARIO("Test sending particles", "[particle][mpi]") {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   SECTION("Intra communicator") {
     if ( mpi::world.size() >= 2 ) {
       int myrank = mpi::world.rank();
@@ -102,6 +106,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
       }
     }
   }
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }
 
 TEMPLATE_TEST_CASE("Test setting destination", "[particle]"
@@ -120,6 +125,7 @@ TEMPLATE_TEST_CASE("Test setting destination", "[particle]"
 }
 
 SCENARIO("Test sendrecv particle", "[particle][mpi]") {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   if ( mpi::world.size() > 1 && mpi::world.rank() < 2  ) {
     aio::unif_real<double> dist;
     std::vector<Ptc_t> ptc_arr;
@@ -157,6 +163,7 @@ SCENARIO("Test sendrecv particle", "[particle][mpi]") {
     }
   }
   mpi::world.barrier();
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }
 
 SCENARIO("Test lcr_sort", "[particle]") {
@@ -220,7 +227,7 @@ SCENARIO("Test lcr_sort", "[particle]") {
   }
 }
 
-TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][mpi]"
+TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[particle][mpi]"
                    // NOTE Notation: XxYxZ is the cartesian partition. The cartesian topology is periodic in all directions
                    , (aio::IndexType<1,1>)
                    , (aio::IndexType<2,1>)
@@ -233,6 +240,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
                    // , (aio::IndexType<-4,-4>)
                    // , (aio::IndexType<-8,-8>)
                    ) {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   constexpr int DGrid = 2;
 
   auto cart_opt = aio::make_cart( TestType::get(), mpi::world );
@@ -301,9 +309,11 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[field][
 
   }
   mpi::world.barrier();
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }
 
 SCENARIO("Stress Test" , "[particle][mpi]") {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
   constexpr int DGrid = 2;
   const apt::array<int,DGrid> partition { 3, 3 };
   const int num_procs = mpi::world.size();
@@ -356,4 +366,5 @@ SCENARIO("Stress Test" , "[particle][mpi]") {
 
   }
   mpi::world.barrier();
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }

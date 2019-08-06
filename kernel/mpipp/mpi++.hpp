@@ -114,15 +114,20 @@ namespace mpi {
   void initialize(int argc, char** argv);
   void finalize();
 
-  void commit_impl(MPI_Datatype& x);
+  void commit(MPI_Datatype& x);
+  void uncommit( MPI_Datatype& x );
 
   template < typename T >
   void commit( Datatype<T> ) {
     auto&x = Datatype<T>::type;
     Datatype<T>::define(x);
-    commit_impl(x);
+    commit(x);
   }
-
+  template < typename T >
+  void uncommit( Datatype<T> ) {
+    auto&x = Datatype<T>::type;
+    uncommit(x);
+  }
 
   extern const Comm world;
   extern const Comm self;
