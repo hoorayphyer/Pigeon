@@ -12,6 +12,7 @@
 #include "io/io.hpp"
 #include "dye/dynamic_balance.hpp"
 #include "ckpt/checkpoint.hpp"
+#include "ckpt/autosave.hpp"
 
 #include <memory>
 
@@ -19,6 +20,7 @@
 
 #include "logger/logger.hpp"
 #include "timer/timer.hpp"
+#include "filesys/filesys.hpp"
 
 #include "pic/stats.hpp"
 
@@ -197,6 +199,7 @@ namespace pic {
       int init_ts = 0;
       if ( checkpoint_dir ) {
         init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles );
+        ++init_ts; // checkpoint is saved at the end of a timestep
       } else {
         // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
         if (_cart_opt) {
@@ -365,19 +368,25 @@ namespace pic {
         }
       }
 
-      if ( is_do(pic::checkpoint_mr, timestep) ) {
+      if (_ens_opt && is_do(pic::stats_mr, timestep) ) {
+        particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles );
+      }
+
+      static ckpt::Autosave autosave;
+      if ( is_do(pic::checkpoint_mr, timestep)
+           || ( pic::checkpoint_autosave_hourly &&
+                autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
         if (stamp) {
           lgr::file % "SaveCheckpoint" << "==>>" << std::endl;
           stamp.emplace();
         }
-        ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
+        auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
+        auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
+        if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
+
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
-      }
-
-      if (_ens_opt && is_do(pic::stats_mr, timestep) ) {
-        particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles );
       }
 
       // TODOL

@@ -10,10 +10,11 @@ namespace tmr {
     std::string _unit{"ms"}; // possible values are s, ms, us, ns
     const TDur _val{};
 
+  public:
     Duration( TDur val ) noexcept : _val(std::move(val)) {}
 
-  public:
-    friend struct Timestamp;
+    Duration( TDur val, std::string unit ) noexcept
+      : _val(std::move(val)), _unit(std::move(unit)) {}
 
     inline Duration& in_units_of(std::string unit) noexcept {
       _unit = std::move(unit);
@@ -24,6 +25,14 @@ namespace tmr {
     inline const std::string& unit() const noexcept { return _unit; }
     TDur val(std::string unit) const noexcept;
     inline TDur val() const noexcept { return val(_unit); }
+
+    inline bool operator< ( const Duration& other ) noexcept {
+      return _val < other.val(_unit);
+    }
+
+    inline bool operator> ( const Duration& other ) noexcept {
+      return _val > other.val(_unit);
+    }
   };
 
   template < typename OStream >

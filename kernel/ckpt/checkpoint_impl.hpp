@@ -186,7 +186,7 @@ namespace ckpt {
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
                        int target_load
                        ) {
-    int resume_ts = 0;
+    int checkpoint_ts = 0;
     using T = std::underlying_type_t<particle::species>;
     int num_sps = 0;
     std::vector<T> sps;
@@ -196,13 +196,12 @@ namespace ckpt {
     // rank0 read data
     if ( mpi::world.rank() == 0 ) {
       auto dir_itr = fs::directory_iterator(dir);
-      // TODO what if there is no file?
       auto dbfile = silo::open(*dir_itr, silo::Mode::Read);
       assert( dbfile.var_exists("/timestep") );
       assert( dbfile.var_exists("/cartesian_partition") );
       assert( dbfile.var_exists("/species") );
 
-      dbfile.read("/timestep", &resume_ts);
+      dbfile.read("/timestep", &checkpoint_ts);
       {
         int ndims = dbfile.var_length("/cartesian_partition");
         std::vector<int> parts(ndims);
@@ -218,10 +217,10 @@ namespace ckpt {
     }
     // rank0 broadcast data
     {
-      int buf[3] = {resume_ts, num_sps, num_ens };
+      int buf[3] = {checkpoint_ts, num_sps, num_ens };
       mpi::world.broadcast( 0, buf, 3 );
       if ( mpi::world.rank() != 0 ) {
-        resume_ts = buf[0];
+        checkpoint_ts = buf[0];
         num_sps = buf[1];
         num_ens = buf[2];
         sps.resize(num_sps);
@@ -263,7 +262,7 @@ namespace ckpt {
     }
 
     // by this step, all processes should have ens_opt set properly. The real loading begins now
-    if ( !ens_opt ) return resume_ts;
+    if ( !ens_opt ) return checkpoint_ts;
     {
       const int mylabel = ens_opt->label();
       const int myrank = ens_opt->intra.rank();
@@ -278,14 +277,14 @@ namespace ckpt {
           int l = sf.read1<int>(dname+"/label");
           if ( l != mylabel ) continue;
           sf.cd(dname);
+          if ( 0 == myrank ) {
+            f_ckpt.load( sf, "E", E );
+            f_ckpt.load( sf, "B", B );
+          }
           for ( const auto& rdir : sf.toc_dir() ) {
             if ( rdir.find("rank") != 0 ) continue;
             sf.cd(rdir);
             int r = sf.read1<int>("r");
-            if ( 0 == r && 0 == myrank ) {
-              f_ckpt.load( sf, "E", E );
-              f_ckpt.load( sf, "B", B );
-            }
             for ( auto i : sps ) {
               auto sp = static_cast<particle::species>(i);
               p_ckpt.load( sf, sp, particles.at(sp), myrank + r, ens_size );
@@ -297,5 +296,6 @@ namespace ckpt {
       }
     }
 
+    return checkpoint_ts;
   }
 }

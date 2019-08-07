@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include <time.h>
 #include <cstring>
-#include "filesys/filesys.hpp"
 #include "logger/logger.hpp"
 #include "pic/argparser.hpp"
 #include "particle/mpi_particle.hpp"
