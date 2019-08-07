@@ -128,8 +128,8 @@ namespace ckpt {
 
               using T = std::underlying_type_t<particle::species>;
               std::vector<T> sps;
-              for ( const auto& [sp, ptcs] : particles )
-                sps.push_back( static_cast<T>(sp) );
+              for ( const auto& elm : particles )
+                sps.push_back( static_cast<T>(elm.first) );
               dbfile.write( "/species", sps  );
 
               dbfile.write( "/timestep", timestep );
@@ -144,8 +144,8 @@ namespace ckpt {
               FieldCkpt<Real,DGrid> ckpt;
               if ( ens.intra.rank() == ens.chief ) {
                 int idx = 0;
-                for ( const auto& [sp, ptcs] : particles )
-                  dbfile.write( particle::properties[sp].name + "_load", loads[idx++] );
+                for ( const auto& elm : particles )
+                  dbfile.write( particle::properties[elm.first].name + "_load", loads[idx++] );
 
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
@@ -157,8 +157,8 @@ namespace ckpt {
               int r = ens.intra.rank();
               dbfile.write( "r", r );
               ParticleArrayCkpt<Real, PtcSpecs> ckpt;
-              for ( const auto& [sp, ptcs] : particles ) {
-                ckpt.save( dbfile, sp, ptcs );
+              for ( const auto& elm : particles ) {
+                ckpt.save( dbfile, elm.first, elm.second );
               }
             }
             dbfile.cd("..");
