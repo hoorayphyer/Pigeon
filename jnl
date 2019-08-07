@@ -1,2 +1,14 @@
 #! /bin/bash
-grep -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | awk '{print $0; if( substr($1,41) == "DataDir" ) print "\n";}'
+grep -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | \
+    awk '\
+BEGIN{ journal = ""; }\
+ { \
+size = index($1,"journal.txt") + length("journal.txt");
+this_journal = substr($1,1,size); \
+if( this_journal != journal ) { \
+if ( journal != "" ) print ""; \
+printf "-----  %s  -----\n" , this_journal; \
+}\
+journal = this_journal; \
+printf "\t%s\n",  substr($0, size+1 ); \
+ }'
