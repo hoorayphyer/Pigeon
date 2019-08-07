@@ -372,7 +372,7 @@ namespace pic {
         particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles );
       }
 
-      static ckpt::Autosave autosave;
+      static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0
       if ( is_do(pic::checkpoint_mr, timestep)
            || ( pic::checkpoint_autosave_hourly &&
                 autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
@@ -381,8 +381,10 @@ namespace pic {
           stamp.emplace();
         }
         auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
-        auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
-        if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
+        if ( mpi::world.rank() == 0 ) {
+          auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
+          if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
+        }
 
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;

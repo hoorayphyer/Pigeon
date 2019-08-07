@@ -89,7 +89,7 @@ namespace ckpt {
     bool is_idle = !ens_opt;
     int key = 0;
     if ( !is_idle ) key = ens_opt -> label();
-    // use ensemble label to put same ensemble processes together
+    // use ensemble label to put processes from same ensemble together
     auto active = mpi::world.split( {is_idle}, key );
     if ( is_idle ) return "";
     const auto& ens = *ens_opt;
@@ -113,39 +113,33 @@ namespace ckpt {
 
     active->barrier();
 
+    std::vector<particle::load_t> loads;
+    loads.reserve(particles.size());
+    for ( const auto& [sp, ptcs] : particles )
+      loads.push_back(ptcs.size());
+
+    ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
+
     pmpio([&]( auto& dbfile )
           {
-            { // write global data
-              if ( !dbfile.exists("/timestep") ) {
-                dbfile.write( "/timestep", timestep );
-              }
-              if ( !dbfile.exists("/cartesian_partition") ) {
-                dbfile.write( "/cartesian_partition", ens.cart_dims.begin(), {DGrid} );
-              }
-              if ( !dbfile.exists("/species") ) {
-                using T = std::underlying_type_t<particle::species>;
-                std::vector<T> sps;
-                for ( const auto& [sp, ptcs] : particles )
-                  sps.push_back( static_cast<T>(sp) );
-                dbfile.write( "/species", sps  );
-              }
+            // write global data
+            if ( !dbfile.exists("/timestep") ) {
+              dbfile.write( "/cartesian_partition", ens.cart_dims.begin(), {DGrid} );
+
+              using T = std::underlying_type_t<particle::species>;
+              std::vector<T> sps;
+              for ( const auto& [sp, ptcs] : particles )
+                sps.push_back( static_cast<T>(sp) );
+              dbfile.write( "/species", sps  );
+
+              dbfile.write( "/timestep", timestep );
             }
 
             { // write ensemble-wise data
               if ( !dbfile.exists("label") ) {
+                dbfile.write( "cartesian_coordinates", ens.cart_coords.begin(), {DGrid} );
                 dbfile.write( "label", ens.label() );
               }
-
-              if ( !dbfile.exists("cartesian_coordinates") ) {
-                dbfile.write( "cartesian_coordinates", ens.cart_coords.begin(), {DGrid} );
-              }
-
-              std::vector<particle::load_t> loads;
-              loads.reserve(particles.size());
-              for ( const auto& [sp, ptcs] : particles )
-                loads.push_back(ptcs.size());
-
-              ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
 
               FieldCkpt<Real,DGrid> ckpt;
               if ( ens.intra.rank() == ens.chief ) {
