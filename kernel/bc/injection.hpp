@@ -4,6 +4,11 @@
 namespace bc {
   template < int DGrid, typename Real >
   struct Injector {
+  private:
+    field::Field<int,1,DGrid> _count_n;
+    field::Field<int,1,DGrid> _count_p;
+
+  public:
     apt::Index<DGrid> Ib;
     apt::Index<DGrid> extent;
 
@@ -26,8 +31,8 @@ namespace bc {
                       ) {
       using namespace particle;
 
-      static field::Field<int,1,DGrid> count_n({extent,0});
-      static field::Field<int,1,DGrid> count_p({extent,0});
+      _count_n.resize( {extent,0} );
+      _count_p.resize( {extent,0} );
 
       apt::array<Real,DGrid> lb;
       apt::array<Real,DGrid> ub;
@@ -51,8 +56,8 @@ namespace bc {
             }
           };
 
-      f_count( count_n, particles.at(negaon) );
-      f_count( count_p, particles.at(posion) );
+      f_count( _count_n, particles.at(negaon) );
+      f_count( _count_p, particles.at(posion) );
 
       // the idea is that (timestep + 1) * N_inj * profile represents the accummulated number of injected pairs through the specified timestep. NOTE the timestep is shifted by one to reflect the actual times the inject is called, including this time.
       // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
@@ -71,7 +76,7 @@ namespace bc {
       auto itr_ne = std::back_inserter(particles[negaon]);
 
       for ( auto I : apt::Block(extent) ) {
-        int N_pairs = std::min( count_n[0](I), count_p[0](I) );
+        int N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
         I += Ib;
         apt::Vec<Real, Specs<Real>::Dim> q{};
         for ( int i = 0; i < DGrid; ++i )

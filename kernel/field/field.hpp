@@ -60,15 +60,8 @@ namespace field {
 
     Field() = default;
 
-    Field( const Mesh<DGrid>& mesh ) : _mesh(mesh) {
-      int size = 1;
-      for ( int i = 0; i < DGrid; ++i ) size *= _mesh.extent()[i];
-      apt::foreach<0,DField>
-        ( [size] ( auto& comp ) {
-            comp.reserve( size );
-            comp.resize( size );
-            for ( auto& elm : comp ) elm = static_cast<T>(0);
-          }, _comps );
+    Field( const Mesh<DGrid>& mesh ) {
+      resize(mesh);
     }
 
     inline Field& set_offset( int component, const apt::array< offset_t, DGrid >& offset ) noexcept {
@@ -96,6 +89,18 @@ namespace field {
         ( []( auto& comp ) {
             for ( auto& elm : comp ) elm = 0.0;
           }, _comps );
+    }
+
+    inline void resize( const Mesh<DGrid>& mesh ) noexcept {
+      int size = 1;
+      for ( int i = 0; i < DGrid; ++i ) size *= mesh.extent()[i];
+      apt::foreach<0,DField>
+        ( [size] ( auto& comp ) {
+            comp.reserve( size );
+            comp.resize( size );
+          }, _comps );
+      _mesh = mesh;
+      reset();
     }
 
 
