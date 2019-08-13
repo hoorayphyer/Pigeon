@@ -297,7 +297,9 @@ namespace pic {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
 
-        // ----- after this line, particles are all within borders. particles before this line _J is local on each cpu --- //
+        // NOTE injector is implemented as a local operation
+        _injector( timestep, dt, _rng, _ens_opt->label(), _ens_opt->size(), _grid, _E, _B, _J, _particles );
+        // ----- After this line, particles are all within borders. Before this line _J is local on each cpu --- //
         if ( stamp ) {
           lgr::file % "ReduceJmesh" << "==>>" << std::endl;
           stamp.emplace();
@@ -321,8 +323,6 @@ namespace pic {
             lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
           }
 
-          // TODO only primary does injection now
-          _injector( timestep, dt, _rng, _ens_opt->label(), _grid, _E, _B, _J, _particles );
         }
       }
 

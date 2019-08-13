@@ -21,6 +21,7 @@ namespace dye {
     apt::array< bool, DGrid > is_periodic;
 
     int label() const noexcept;
+    inline auto size() const noexcept { return intra.size(); }
     inline bool is_chief() const noexcept { return intra.rank() == chief; }
     apt::pair<bool> is_at_boundary( int ith_dim ) const noexcept;
     apt::array< apt::pair<bool>, DGrid > is_at_boundary() const noexcept;
