@@ -139,25 +139,24 @@ namespace old_vay {
   }
 }
 
-SCENARIO("Test against old Vay Pusher") {
+SCENARIO("Test against old Vay Pusher", "[particle]") {
   aio::unif_real<double> unif(-1.0 , 1.0);
   const int N = 1000000;
   for ( int i = 0; i < N; ++i ) {
     apt::Vec<double, 3> E( unif(), unif(), unif() );
     apt::Vec<double, 3> B( unif(), unif(), unif() );
     apt::Vec<double, 3> p( unif(), unif(), unif() );
-    E *= 1000.0;
-    B *= 1000.0;
     p *= 10.0;
 
     double dt = 0.01;
+    double w_gyro_unitB = 10000.0;
     double q_over_m = 1.0;
 
-    auto p_old = old_vay::lorentz( q_over_m * dt, p, E, B );
+    auto p_old = old_vay::lorentz( q_over_m * dt * w_gyro_unitB, p, E, B );
 
     Particle<double,aio::Specs> ptc;
     ptc.p() = p;
-    force::lorentz( ptc, dt, E, B, q_over_m );
+    force::lorentz( ptc, dt, E, B, q_over_m * w_gyro_unitB );
     for ( int i = 0; i < 3; ++i ) {
       REQUIRE( p_old[i] == Approx(ptc.p()[i]) );
     }
@@ -165,3 +164,98 @@ SCENARIO("Test against old Vay Pusher") {
 
 }
 
+SCENARIO("Test gyration resolved Lorentz force", "[particle]") {
+  SECTION("E = 0, uniform B in the z direction") {
+    aio::unif_real<double> unif(-1.0 , 1.0);
+    const int N = 1;
+    apt::Vec<double, 3> E;
+    for ( int i = 0; i < N; ++i ) {
+      apt::Vec<double, 3> B( 0.0, 0.0, unif() );
+      apt::Vec<double, 3> p( unif(), unif(), unif() );
+
+      B = {0.0,0.0,1.0};
+      p = {1.0,0.0,0.0};
+
+      const double gamma = 10.0;
+      B /= apt::abs(B);
+      p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
+
+      double dt = 0.0001;
+      double w_B = 1000000.0; // qB / m_q c
+
+      double angle = w_B * dt / gamma;
+      double p_thy_0 = p[0] * std::cos(angle) - p[1] * std::sin(angle);
+      double p_thy_1 = p[0] * std::sin(angle) + p[1] * std::cos(angle);
+      double p_thy_2 = p[2];
+
+      Particle<double,aio::Specs> ptc;
+      ptc.p() = p;
+      force::lorentz_exact( ptc, dt, E, B, w_B );
+      REQUIRE( ptc.p()[0] == Approx(p_thy_0) );
+      REQUIRE( ptc.p()[1] == Approx(p_thy_1) );
+      REQUIRE( ptc.p()[2] == Approx(p_thy_2) );
+    }
+  }
+
+  SECTION("Test energy conservation when E // B") {
+    aio::unif_real<double> unif(-1.0 , 1.0);
+    unif.seed(0);
+    const int N = 100;
+    for ( int i = 0; i < N; ++i ) {
+      apt::Vec<double, 3> B( unif(), unif(), unif() );
+      apt::Vec<double, 3> p( unif(), unif(), unif() );
+
+      B /= apt::abs(B);
+
+      apt::Vec<double, 3> E = 0.001 * B;
+
+      const double gamma = 10.0;
+      p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
+
+      double dt = 0.0002;
+      double w_B = 720000.0;
+
+      // NOTE this formula works only when E // B
+      const double gamma_new = sqrt( gamma * gamma + 2.0 * apt::dot(p,E) * dt * w_B + apt::sqabs(E) * dt * dt * w_B * w_B );
+
+      auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
+
+      Particle<double,aio::Specs> ptc;
+      ptc.p() = p;
+      force::lorentz_exact( ptc, dt, E, B, w_B );
+
+      CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma_new * gamma_new ) );
+      REQUIRE( 1.0 + apt::sqabs(ptc.p()) == Approx(gamma_new * gamma_new) );
+    }
+  }
+
+  SECTION("Test energy conservation when E \perp B and E < B") {
+    aio::unif_real<double> unif(-1.0 , 1.0);
+    unif.seed(0);
+    const int N = 100;
+    for ( int i = 0; i < N; ++i ) {
+      apt::Vec<double, 3> E( unif(), unif(), unif() );
+      apt::Vec<double, 3> B( unif(), unif(), unif() );
+      apt::Vec<double, 3> p( unif(), unif(), unif() );
+
+      B /= apt::abs(B);
+      E = E - B * apt::dot(E,B);
+      E *= 0.001 / apt::abs(E);
+
+      const double gamma = 10.0;
+      p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
+
+      double dt = 0.0002;
+      double w_B = 720000.0;
+
+      auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
+
+      Particle<double,aio::Specs> ptc;
+      ptc.p() = p;
+      force::lorentz_exact( ptc, dt, E, B, w_B );
+
+      CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma * gamma ) );
+      REQUIRE( 1.0 + apt::sqabs(ptc.p()) == Approx(gamma * gamma) );
+    }
+  }
+}

@@ -51,4 +51,66 @@ namespace particle::force {
     auto s = 1.0 / ( 1.0 + inv_gamma2 * tt );
     ptc.p() = ( upr + tau * ( ut * inv_gamma2 ) + apt::cross(upr, tau) * std::sqrt(inv_gamma2) ) * s;
   }
+
+  template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
+  void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
+    using Vec = apt::Vec<T,S<T>::Dim>;
+    using vVec = apt::vVec<T,S<T>::Dim>;
+
+    // get drift velocity
+    T xp = apt::dot(E,B);
+    T xE = apt::sqabs(B) - apt::sqabs(E); // calculate B^2 - E^2
+    T xB = ( std::sqrt(xE * xE + 4 * xp * xp) + xE ) / 2.0; // calculate B'^2
+
+    Vec beta_d = apt::cross(E,B) / ( apt::sqabs(E) + xB );
+    T gamma_d = 1.0 / std::sqrt( 1 - apt::sqabs(beta_d) );
+
+    T gamma {}, gamma_co{};
+    { /// ------- boost particle momentum to comoving frame
+      gamma = sqrt( 1 + apt::sqabs(ptc.p()) );
+      gamma_co = gamma_d * ( gamma - apt::dot(beta_d, ptc.p()) );
+      ptc.p() -= beta_d * ( gamma_d * ( gamma + gamma_co ) / ( 1.0 + gamma_d ) );
+    }
+
+    { /// ------- update in comoving frame
+      Vec z = B - apt::cross(beta_d,E);
+      z /= apt::abs(z);
+      xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
+      xB = std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+      xp = apt::dot(z,ptc.p());
+
+      gamma_co = std::sqrt( gamma_co * gamma_co + 2 * xp * 0.5 * xE + 0.25 * xE * xE );
+      xp += 0.5 * xE; // 1st half update
+      // update p_z
+      ptc.p() += xE * z;
+
+      xB = ( xE == 0 ) ? 0.0 : xB / xE;
+      xE *= 0.5 / gamma_co;
+      xp /= gamma_co;
+      xB *= std::log( 1 + (xE - 1 + std::sqrt(1 + (2 * xp + xE) * xE)) / ( 1 + xp ) );
+
+      xp = ( xp + 0.5 * 2.0 * xE ) * gamma_co; // 2nd half update
+
+      { // rotate p around B in the comoving frame
+        ptc.p() = xp * z + std::cos(xB) * ( ptc.p() - xp * z);
+        // by now, xp and xE are free
+        xp = z[1] * ptc.p()[2] - z[2] * ptc.p()[1]; // ( z x p )_0
+        xE = z[2] * ptc.p()[0] - z[0] * ptc.p()[2]; // ( z x p )_1
+        z[2] = z[0] * ptc.p()[1] - z[1] * ptc.p()[0]; // ( z x p )_2
+        z[0] = std::tan(xB);
+        ptc.p()[0] += z[0] * xp;
+        ptc.p()[1] += z[0] * xE;
+        ptc.p()[2] += z[0] * z[2];
+      }
+
+      // TODO udate delta q
+    }
+
+    { /// ------- boost particle momentum back to lab
+      gamma_co = sqrt( 1 + apt::sqabs(ptc.p()) );
+      gamma = gamma_d * ( gamma_co + apt::dot(beta_d, ptc.p()) );
+      ptc.p() += beta_d * ( gamma_d * ( gamma + gamma_co ) / ( 1.0 + gamma_d ) );
+    }
+
+  }
 }

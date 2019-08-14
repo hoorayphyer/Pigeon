@@ -34,13 +34,9 @@ namespace particle {
         _p(std::forward<P>(p)),
         _state(state) {}
 
-    vParticle( vParticle&& ptc ) noexcept
-      : _q( std::move(ptc._q)), _p( std::move(ptc._p) ), _state( ptc._state ) {
-      ptc.reset(flag::exist);
-    }
-
     vParticle() = delete;
     vParticle( const vParticle& ) = delete;
+    vParticle( vParticle&& ptc ) noexcept = default;
 
     template < typename E >
     constexpr vParticle& operator= ( const PtcExpression<E>& ptc ) noexcept {
@@ -50,6 +46,16 @@ namespace particle {
       return *this;
     }
 
+    template < typename E >
+    constexpr vParticle& operator= ( PtcExpression<E>&& ptc ) noexcept {
+      for ( int i = 0; i < NDim; ++i ) {
+        std::swap( _q[i], ptc.q()[i] );
+        std::swap( _p[i], ptc.p()[i] );
+      }
+      std::swap( _state, ptc.state() );
+      ptc.reset(flag::exist);
+      return *this;
+    }
   };
 
 }

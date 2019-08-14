@@ -75,6 +75,16 @@ namespace {
     noexcept {                                                          \
     return { static_cast<const E&>(e), t };                             \
   }                                                                     \
+                                                                        \
+  template <typename E, typename Real>                                  \
+  constexpr std::enable_if_t< std::is_arithmetic_v<Real>,               \
+                              apt::FCompWise_Vec_Sca                    \
+                              <apt::BinaryOps::_OP_NAME_,               \
+                               E, Real > >                              \
+  operator _OP_ (const Real& t, const apt::VecExpression<E>& e)         \
+    noexcept {                                                          \
+    return { static_cast<const E&>(e), t };                             \
+  }                                                                     \
 
   vec_def_op(+, ADD);
   vec_def_op(-, SUB);

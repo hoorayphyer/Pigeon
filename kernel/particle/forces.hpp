@@ -34,6 +34,9 @@ namespace particle {
 namespace particle::force {
   template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
   void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  );
+
+  template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
+  void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  );
 }
 
 

@@ -7,7 +7,6 @@
 #include "pic/module_range.hpp"
 #include "pic/range_conversion.hpp"
 #include "pic/forces/gravity.hpp"
-#include "pic/forces/landau0.hpp"
 
 #include "manifold/grid.hpp"
 
@@ -143,10 +142,8 @@ namespace particle {
   void set_up() {
     using namespace pic;
     {
-      constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
+      constexpr auto* lorentz = force::template lorentz_exact<real_t,Specs,vParticle>;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
-      real_t landau0_B_thr = 0.1;
       real_t gravity_strength = 0.5;
 
       if ( properties.has(species::electron) ) {
@@ -156,7 +153,6 @@ namespace particle {
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
-  //      force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -167,7 +163,6 @@ namespace particle {
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
-    //    force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -178,7 +173,6 @@ namespace particle {
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
-        // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
