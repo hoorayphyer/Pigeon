@@ -144,6 +144,12 @@ namespace field {
       else return _extent[ith_dim - 1] * stride( ith_dim - 1 );
     }
 
+    constexpr apt::array<int,D> strides() const noexcept {
+      apt::array<int,D> res;
+      for ( int i = 0; i < D; ++i )
+        res[i] = stride(i);
+      return res;
+    }
     // // TODOL this potentially will introduce subtle bugs when using trI from the full mesh. Naturally the goal here is to have a mesh that is 1 dim short. But such a mesh doesn't work well with trI from the full mesh. One solution is to provide trI to int by subtracting g * stride_normal
     // auto squeeze( int ith_dim ) const noexcept {
     //   // TODOL check bounds

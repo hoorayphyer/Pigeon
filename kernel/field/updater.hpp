@@ -3,7 +3,6 @@
 
 #include "field/field.hpp"
 #include "manifold/grid.hpp"
-#include <optional>
 
 namespace mpi { struct CartComm; }
 
