@@ -110,6 +110,7 @@ namespace particle {
         lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
         lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
+        lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
 #endif
@@ -121,6 +122,7 @@ namespace particle {
         lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
         lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
+        lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
 #endif
