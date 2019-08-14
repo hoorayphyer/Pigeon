@@ -41,15 +41,18 @@ namespace bc {
         lb[i] = grid[i].absc( Ib[i], 0.0 );
         ub[i] = grid[i].absc( Ib[i] + extent[i], 0.0 );
       }
+      auto is_in = [&lb,&ub]( const auto& q ) {
+                     for ( int i = 0; i < DGrid; ++i ) {
+                       if ( q[i] < lb[i] || q[i] >= ub[i] ) return false;
+                     }
+                     return true;
+                   };
 
       auto f_count
-        = [&lb,&ub,&grid]( auto& count, const auto& ptcs) {
+        = [&lb,&ub,&grid,is_in]( auto& count, const auto& ptcs) {
             count.reset();
             for ( const auto& x : ptcs ) {
-              if ( !x.is(flag::exist) ) continue;
-              for ( int i = 0; i < DGrid; ++i ) {
-                if ( x.q()[i] < lb[i] || x.q()[i] >= ub[i] ) continue;
-              }
+              if ( !x.is(flag::exist) || !is_in(x.q()) ) continue;
               apt::Index<DGrid> idx;
               for ( int i = 0; i < DGrid; ++i )
                 idx[i] = ( x.q()[i] - lb[i] ) / grid[i].delta();
