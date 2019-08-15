@@ -73,10 +73,18 @@ namespace particle::force {
     }
 
     { /// ------- update in comoving frame
-      Vec z = B - apt::cross(beta_d,E);
-      z /= apt::abs(z);
-      xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
-      xB = std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+      Vec z;
+      if ( xE > 0 ) { // test if B' > E'
+        z = B - apt::cross(beta_d,E);
+        z /= apt::abs(z);
+        xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
+        xB = std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+      } else {
+        z = E + apt::cross(beta_d,B);
+        z /= apt::abs(z);
+        xE = sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
+        xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+      }
       xp = apt::dot(z,ptc.p());
 
       gamma_co = std::sqrt( gamma_co * gamma_co + 2 * xp * 0.5 * xE + 0.25 * xE * xE );
