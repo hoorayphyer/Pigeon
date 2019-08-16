@@ -53,19 +53,27 @@ namespace field {
   template < int DGrid, typename Real, typename RealJ >
   struct RHS {
     const Mesh<DGrid>& mesh;
-    const Field<Real,3,DGrid>& E;
-    const Field<Real,3,DGrid>& B;
     const Field<RealJ,3,DGrid>& J;
     const Derivative<DGrid,Real>& d;
 
-    template < int I_, typename Res >
-    inline void find( Res& res, Real dt, Real alpha, Real preJ ) const {
+    template < int I_ >
+    inline void ofB( Field<Real,3,DGrid>& B_new, Real dt, Real alpha, Real preJ, const Field<Real,3,DGrid>& E, const Field<Real,3,DGrid>& B ) const {
       constexpr int J_ = (I_+1)%3;
       constexpr int K_ = (I_+2)%3;
       for ( const auto& I : apt::Block(mesh.bulk_dims()) ) {
         int idx = mesh.linearized_index_of_whole_mesh(I);
-        res[I_][idx] = B[I_][idx] + dt*dt*alpha*(1.0-alpha) * d.Lapl(B[I_][idx])
+        B_new[I_][idx] = B[I_][idx] + dt*dt*alpha*(1.0-alpha) * d.Lapl(B[I_][idx])
           - dt * ( d.template Curl<I_>(E[K_][idx - d.s[J_]], E[J_][idx - d.s[K_]] ) + alpha*dt*preJ* d.template Curl<I_>(J[K_][idx - d.s[J_]], J[J_][idx - d.s[K_]] ));
+      }
+    }
+
+    template < int I_ >
+    inline void ofE( Field<Real,3,DGrid>& E, Real dt, Real alpha, Real preJ, const Field<Real,3,DGrid>& B_old, const Field<Real,3,DGrid>& B_new ) const {
+      constexpr int J_ = (I_+1)%3;
+      constexpr int K_ = (I_+2)%3;
+      for ( const auto& I : apt::Block(mesh.bulk_dims()) ) {
+        int idx = mesh.linearized_index_of_whole_mesh(I);
+        E[I_][idx] += dt * ( alpha * d.template Curl<I_>( B_new[K_][idx], B_new[J_][idx] ) + ( 1.0 - alpha ) * d.template Curl<I_>( B_old[K_][idx], B_old[J_][idx] ) - preJ * J[I_][idx] );
       }
     }
 
@@ -90,10 +98,13 @@ namespace field {
     Derivative<DGrid,Real> d{strd,grid};
 
     Field<Real,3,DGrid> tmp(mesh);
-    RHS<DGrid,Real,RealJ> rhs{mesh,E,B,J,d};
-    rhs.template find<0>(tmp,dt,alpha,preJ);
-    rhs.template find<1>(tmp,dt,alpha,preJ);
-    rhs.template find<2>(tmp,dt,alpha,preJ);
+
+    RHS<DGrid,Real,RealJ> rhs{mesh,J,d};
+
+    // update B
+    rhs.template ofB<0>(tmp,dt,alpha,preJ,E,B);
+    rhs.template ofB<1>(tmp,dt,alpha,preJ,E,B);
+    rhs.template ofB<2>(tmp,dt,alpha,preJ,E,B);
 
     copy_sync_guard_cells(tmp, comm);
 
@@ -101,8 +112,17 @@ namespace field {
     int num_iteration = 5;
     for ( int n = 0; n < num_iteration; ++n ) {
       
+      // copy_sync_guard_cells(tmp, comm);
     }
 
+    std::swap(B,tmp);
+
+    // update E
+    rhs.template ofE<0>(E,dt,alpha,preJ,tmp,B);
+    rhs.template ofE<1>(E,dt,alpha,preJ,tmp,B);
+    rhs.template ofE<2>(E,dt,alpha,preJ,tmp,B);
+
+    copy_sync_guard_cells(E, comm);
   }
 }
 
