@@ -52,6 +52,13 @@ namespace particle::force {
     ptc.p() = ( upr + tau * ( ut * inv_gamma2 ) + apt::cross(upr, tau) * std::sqrt(inv_gamma2) ) * s;
   }
 
+  // NOTE this is the Taylor expansion of (1/x) * ln( ( x+b+sqrt(1+2bx+x^2) ) / ( 1+b ) )
+  // NOTE this requires e E dt /m c << 1
+  template < typename T >
+  constexpr T F( T x, T b ) noexcept {
+    return 1 - 0.5 * b * x + (1.0 / 6.0) * ( 3 * b * b - 1 ) * x * x;
+  }
+
   template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
   void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
     using Vec = apt::Vec<T,S<T>::Dim>;
@@ -85,6 +92,7 @@ namespace particle::force {
         xE = sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
         xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
       }
+
       xp = apt::dot(z,ptc.p());
 
       gamma_co = std::sqrt( gamma_co * gamma_co + 2 * xp * 0.5 * xE + 0.25 * xE * xE );
@@ -92,12 +100,10 @@ namespace particle::force {
       // update p_z
       ptc.p() += xE * z;
 
-      xB = ( xE == 0 ) ? 0.0 : xB / xE;
-      xE *= 0.5 / gamma_co;
-      xp /= gamma_co;
-      xB *= std::log( 1 + (xE - 1 + std::sqrt(1 + (2 * xp + xE) * xE)) / ( 1 + xp ) );
+      xE *= 0.5;
+      xB *= F(xE/gamma_co,xp/gamma_co) / gamma_co;
 
-      xp = ( xp + 0.5 * 2.0 * xE ) * gamma_co; // 2nd half update
+      xp += 0.5 * 2.0 * xE; // 2nd half update
 
       { // rotate p around B in the comoving frame
         ptc.p() = xp * z + std::cos(xB) * ( ptc.p() - xp * z);

@@ -167,23 +167,25 @@ SCENARIO("Test against old Vay Pusher", "[particle]") {
 SCENARIO("Test gyration resolved Lorentz force", "[particle]") {
   SECTION("E = 0, uniform B in the z direction") {
     aio::unif_real<double> unif(-1.0 , 1.0);
-    const int N = 1;
+    // unif.seed(0);
+    const int N = 100000;
     apt::Vec<double, 3> E;
     for ( int i = 0; i < N; ++i ) {
       apt::Vec<double, 3> B( 0.0, 0.0, unif() );
       apt::Vec<double, 3> p( unif(), unif(), unif() );
 
-      B = {0.0,0.0,1.0};
-      p = {1.0,0.0,0.0};
+      // B = {0.0,0.0,1.0};
+      // p = {1.0,0.0,0.0};
 
-      const double gamma = 10.0;
+      const double gamma = 10.0 * std::abs(unif()) + 1.0;
       B /= apt::abs(B);
       p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
 
       double dt = 0.0001;
-      double w_B = 1000000.0; // qB / m_q c
+      double w_B = 10000.0; // qB / m_q c
 
       double angle = w_B * dt / gamma;
+      if ( B[2] < 0 ) angle *= -1;
       double p_thy_0 = p[0] * std::cos(angle) - p[1] * std::sin(angle);
       double p_thy_1 = p[0] * std::sin(angle) + p[1] * std::cos(angle);
       double p_thy_2 = p[2];
@@ -199,17 +201,17 @@ SCENARIO("Test gyration resolved Lorentz force", "[particle]") {
 
   SECTION("Test energy conservation when E // B") {
     aio::unif_real<double> unif(-1.0 , 1.0);
-    unif.seed(0);
-    const int N = 100;
+    // unif.seed(0);
+    const int N = 100000;
     for ( int i = 0; i < N; ++i ) {
       apt::Vec<double, 3> B( unif(), unif(), unif() );
       apt::Vec<double, 3> p( unif(), unif(), unif() );
 
       B /= apt::abs(B);
 
-      apt::Vec<double, 3> E = 0.001 * B;
+      apt::Vec<double, 3> E = 2 * unif() * B; // E can be larger than B
 
-      const double gamma = 10.0;
+      const double gamma = 10.0 * std::abs(unif()) + 1;
       p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
 
       double dt = 0.0002;
@@ -218,21 +220,21 @@ SCENARIO("Test gyration resolved Lorentz force", "[particle]") {
       // NOTE this formula works only when E // B
       const double gamma_new = sqrt( gamma * gamma + 2.0 * apt::dot(p,E) * dt * w_B + apt::sqabs(E) * dt * dt * w_B * w_B );
 
-      auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
+      // auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
 
       Particle<double,aio::Specs> ptc;
       ptc.p() = p;
       force::lorentz_exact( ptc, dt, E, B, w_B );
 
-      CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma_new * gamma_new ) );
+      // CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma_new * gamma_new ) );
       REQUIRE( 1.0 + apt::sqabs(ptc.p()) == Approx(gamma_new * gamma_new) );
     }
   }
 
-  SECTION("Test energy conservation when E \perp B and E < B") {
+  SECTION("Test energy conservation when E \perp B and E < B, and p // ExB") {
     aio::unif_real<double> unif(-1.0 , 1.0);
     unif.seed(0);
-    const int N = 100;
+    const int N = 1;
     for ( int i = 0; i < N; ++i ) {
       apt::Vec<double, 3> E( unif(), unif(), unif() );
       apt::Vec<double, 3> B( unif(), unif(), unif() );
@@ -240,22 +242,52 @@ SCENARIO("Test gyration resolved Lorentz force", "[particle]") {
 
       B /= apt::abs(B);
       E = E - B * apt::dot(E,B);
-      E *= 0.001 / apt::abs(E);
+      E /= apt::abs(E);
+      p = p - E * apt::dot(E,p);
+      p = p - B * apt::dot(B,p);
+      E *= 0.5;
 
-      const double gamma = 10.0;
+      const double gamma = 2.0;
       p *= std::sqrt( (gamma * gamma - 1.0)  / apt::sqabs(p) );
 
       double dt = 0.0002;
-      double w_B = 720000.0;
+      double w_B = 7200.0;
 
-      auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
+      // auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
 
       Particle<double,aio::Specs> ptc;
       ptc.p() = p;
       force::lorentz_exact( ptc, dt, E, B, w_B );
 
-      CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma * gamma ) );
-      REQUIRE( 1.0 + apt::sqabs(ptc.p()) == Approx(gamma * gamma) );
+      // CHECK( 1.0 + p_old[0]*p_old[0] + p_old[1]*p_old[1] + p_old[2]*p_old[2] == Approx( gamma * gamma ) );
+      // TODO test wrong, there can still be a little acceleration
+      // REQUIRE( 1.0 + apt::sqabs(ptc.p()) == Approx(gamma * gamma) );
     }
   }
+
+  // SECTION("Random") {
+  //   aio::unif_real<double> unif(-1.0 , 1.0);
+  //   unif.seed(0);
+  //   const int N = 1;
+  //   for ( int i = 0; i < N; ++i ) {
+  //     apt::Vec<double, 3> E( unif(), unif(), unif() );
+  //     apt::Vec<double, 3> B( unif(), unif(), unif() );
+  //     apt::Vec<double, 3> p( unif(), unif(), unif() );
+  //     E = { 0.00760478, 0.00280827, -0.00196783 };
+  //     B = { -0.00251577, 0.0078043, 0.00141511 };
+  //     p = { 2.35757, -3.76661, 5.40618 };
+
+  //     double dt = 0.003;
+  //     double w_B = 3750.0;
+
+  //     auto p_old = old_vay::lorentz( w_B * dt, p, E, B );
+
+  //     Particle<double,aio::Specs> ptc;
+  //     ptc.p() = p;
+  //     force::lorentz_exact( ptc, dt, E, B, w_B );
+  //     CHECK( ptc.p()[0] == 0 );
+  //     CHECK( ptc.p()[1] == 0 );
+  //     CHECK( ptc.p()[2] == 0 );
+  //   }
+  // }
 }
