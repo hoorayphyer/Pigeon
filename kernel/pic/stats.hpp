@@ -2,6 +2,7 @@
 #define _PARTICLE_STATS_HPP_
 
 #include "particle/load_type.hpp"
+#include "particle/properties.hpp"
 #include <fstream>
 #include <limits>
 
@@ -11,8 +12,8 @@ namespace particle {
              template < typename > class S
              >
   void statistics( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens, const std::optional<mpi::CartComm>& cart, const map<array<T,S>>& particles) {
-    // layout: ens_size, sum_sp1, sum_sp2, ..., max_sp1, max_sp2, ..., min_sp1, min_sp2,...
-    std::vector<load_t> buffer;
+    static bool first_time = true;
+    std::vector<load_t> buffer; // layout of buffer: ens_size, sum_sp1, max_sp1, min_sp1, sum_sp2, max_sp2, min_sp2...
     {
       if ( ens.is_chief() ) buffer.push_back(ens.intra.size());
       for ( const auto& [sp, ptcs] : particles ) {
@@ -36,8 +37,8 @@ namespace particle {
     map<load_t> ave;
     map<load_t> max;
     map<load_t> min;
+    int nprocs = 0;
     {
-      int nprocs = 0;
       map<int> sp2idx;
       {
         int idx = 0;
@@ -49,11 +50,11 @@ namespace particle {
         }
       }
       for( int i = 0; i < cart->size(); i += stride ) {
+        nprocs += stats[i * stride];
         for ( const auto& [sp, ignore ] : particles ) {
-          nprocs += stats[i * stride];
-          ave[sp] += stats[ i * stride + 1 + sp2idx[sp] ];
-          max[sp] = std::max<load_t>( max[sp], stats[ i * stride + 1 + particles.size() + sp2idx[sp] ] );
-          min[sp] = std::min<load_t>( min[sp], stats[ i * stride + 1 + 2 * particles.size() + sp2idx[sp] ] );
+          ave[sp] += stats[ i * stride + 1 + 3 * sp2idx[sp] ];
+          max[sp] = std::max<load_t>( max[sp], stats[ i * stride + 1 + 3 * sp2idx[sp] + 1 ] );
+          min[sp] = std::min<load_t>( min[sp], stats[ i * stride + 1 + 3 * sp2idx[sp] + 2 ] );
         }
       }
       for ( const auto& [sp, ignore ] : particles ) ave[sp] /= nprocs;
@@ -61,9 +62,17 @@ namespace particle {
 
     {
       std::ofstream out(filename, std::ios_base::app);
-      out << timestep;
+      if ( first_time ) {
+        out << "timestep|\tnprocs";
+        for ( const auto& [ sp, ignore ] : particles )
+          out << "|\t" << properties[sp].name;
+        out << std::endl;
+        out << "particle field : ave, max, min" << std::endl;
+        first_time = false;
+      }
+      out << timestep << "|\t" << nprocs;
       for ( const auto& [ sp, ignore ] : particles )
-        out << "\t" << ave[sp] << ", " << max[sp] << ", " << min[sp];
+        out << "|\t" << ave[sp] << ", " << max[sp] << ", " << min[sp];
       out << std::endl;
       out.close();
     }
