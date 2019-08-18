@@ -116,7 +116,7 @@ namespace particle {
         show_ptc(ptc);
         lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
 #ifdef LORENTZ
-        file << force::ostr.str() << std::endl;
+        lgr::file << force::ostr.str() << std::endl;
 #endif
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
