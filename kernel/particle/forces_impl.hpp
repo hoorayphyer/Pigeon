@@ -77,7 +77,7 @@ namespace particle::force {
 #endif
     // use Vay pusher when field is small. This is because somehow one gets NAN in these circumstances
     if ( std::abs(xE) * dt * dt < 0.001 * 0.001  ) {
-      lorentz(ptc,dt,E,B,1.0);
+      lorentz(ptc,dt,E,B,static_cast<T>(1.0));
       return;
     }
     T xp = apt::dot(E,B);
