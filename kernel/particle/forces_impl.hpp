@@ -68,15 +68,21 @@ namespace particle::force {
   void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
     using Vec = apt::Vec<T,S<T>::Dim>;
     using vVec = apt::vVec<T,S<T>::Dim>;
+    dt *= q_times_w_gyro_unitB_over_m;
 
     // get drift velocity
-    T xp = apt::dot(E,B);
-#ifdef LORENTZ
-    std::cout << "E dot B = " << xp << std::endl;
-#endif
     T xE = apt::sqabs(B) - apt::sqabs(E); // calculate B^2 - E^2
 #ifdef LORENTZ
     std::cout << "B^2 - E^2 = " << xE << std::endl;
+#endif
+    // use Vay pusher when field is small. This is because somehow one gets NAN in these circumstances
+    if ( std::abs(xE) * dt * dt < 0.001 * 0.001  ) {
+      lorentz(ptc,dt,E,B,1.0);
+      return;
+    }
+    T xp = apt::dot(E,B);
+#ifdef LORENTZ
+    std::cout << "E dot B = " << xp << std::endl;
 #endif
     T xB = ( std::sqrt(xE * xE + 4 * xp * xp) + xE ) / 2.0; // calculate B'^2
 
@@ -104,19 +110,18 @@ namespace particle::force {
         std::cout << "B' > E' branch" << std::endl;
         std::cout << "z_unnormalized = " << z << std::endl;
 #endif
-        z /= apt::abs(z);
-        xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
-        xB = std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+        xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * dt;
+        xB = std::sqrt(xB) *  dt;
       } else {
         z = E + apt::cross(beta_d,B);
 #ifdef LORENTZ
         std::cout << "B' <= E' branch" << std::endl;
         std::cout << "z_unnormalized = " << z << std::endl;
 #endif
-        z /= apt::abs(z);
-        xE = sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
-        xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
+        xE = sqrt( xB - xE ) * dt;
+        xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) *  dt;
       }
+      z /= apt::abs(z);
 #ifdef LORENTZ
       std::cout << "z = " << z << std::endl;
       std::cout << "eE'dt / mc = " << xE << std::endl;
@@ -142,19 +147,19 @@ namespace particle::force {
         xB = std::cos(xB);
         xp *= ( static_cast<T>(1.0) - xB );
 
-        T px = ptc.p()[0];
-        T py = ptc.p()[1];
+        dt = ptc.p()[0];
+        q_times_w_gyro_unitB_over_m = ptc.p()[1];
 
-        ptc.p()[0] = xp * z[0] + xB*px + xE*(z[1] * ptc.p()[2] - z[2] * py);
-        ptc.p()[1] = xp * z[1] + xB*py + xE*(z[2] * px - z[0] * ptc.p()[2]);
-        ptc.p()[2] = xp * z[2] + xB*ptc.p()[2] + xE*(z[0]*py - z[1]*px );
+        ptc.p()[0] = xp * z[0] + xB*dt + xE*(z[1] * ptc.p()[2] - z[2] * q_times_w_gyro_unitB_over_m);
+        ptc.p()[1] = xp * z[1] + xB*q_times_w_gyro_unitB_over_m + xE*(z[2] * dt - z[0] * ptc.p()[2]);
+        ptc.p()[2] = xp * z[2] + xB*ptc.p()[2] + xE*(z[0]*q_times_w_gyro_unitB_over_m - z[1]*dt );
       }
 
       // TODO udate delta q
     }
 
     { /// ------- boost particle momentum back to lab
-      gamma_co = sqrt( 1 + apt::sqabs(ptc.p()) );
+      gamma_co = sqrt( 1.0 + apt::sqabs(ptc.p()) );
       gamma = gamma_d * ( gamma_co + apt::dot(beta_d, ptc.p()) );
       ptc.p() += beta_d * ( gamma_d * ( gamma + gamma_co ) / ( 1.0 + gamma_d ) );
     }
