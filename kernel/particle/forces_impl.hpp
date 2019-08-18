@@ -1,11 +1,6 @@
 #include "particle/forces.hpp"
 #include "apt/numeric.hpp"
 
-#ifdef LORENTZ
-#include <iostream>
-#include "apt/print.hpp"
-#endif
-
 namespace particle {
   template < typename T, template < typename > class S >
   map<Force<T,S>> force_map;
@@ -34,6 +29,13 @@ namespace particle {
     else return {};
   }
 }
+
+#ifdef LORENTZ
+#include "apt/print.hpp"
+namespace particle::force {
+  std::ostringstream ostr;
+}
+#endif
 
 // TODO optimize use of intermediate variables
 namespace particle::force {
@@ -73,26 +75,30 @@ namespace particle::force {
     // get drift velocity
     T xE = apt::sqabs(B) - apt::sqabs(E); // calculate B^2 - E^2
 #ifdef LORENTZ
-    std::cout << "B^2 - E^2 = " << xE << std::endl;
+    ostr = {}; // clear all contents first
+    ostr << "B^2 - E^2 = " << xE << std::endl;
 #endif
     // use Vay pusher when field is small. This is because somehow one gets NAN in these circumstances
     if ( std::abs(xE) * dt * dt < 0.001 * 0.001  ) {
+#ifdef LORENTZ
+      ostr << "Use Vay" << std::endl;
+#endif
       lorentz(ptc,dt,E,B,static_cast<T>(1.0));
       return;
     }
     T xp = apt::dot(E,B);
 #ifdef LORENTZ
-    std::cout << "E dot B = " << xp << std::endl;
+    ostr << "E dot B = " << xp << std::endl;
 #endif
     T xB = ( std::sqrt(xE * xE + 4 * xp * xp) + xE ) / 2.0; // calculate B'^2
 
     Vec beta_d = apt::cross(E,B) / ( apt::sqabs(E) + xB );
 #ifdef LORENTZ
-    std::cout << "beta_d = " << beta_d << std::endl;
+    ostr << "beta_d = " << beta_d << std::endl;
 #endif
     T gamma_d = 1.0 / std::sqrt( 1 - apt::sqabs(beta_d) );
 #ifdef LORENTZ
-    std::cout << "gamma_d = " << gamma_d << std::endl;
+    ostr << "gamma_d = " << gamma_d << std::endl;
 #endif
 
     T gamma {}, gamma_co{};
@@ -107,25 +113,25 @@ namespace particle::force {
       if ( xE > 0 ) { // test if B' > E'
         z = B - apt::cross(beta_d,E);
 #ifdef LORENTZ
-        std::cout << "B' > E' branch" << std::endl;
-        std::cout << "z_unnormalized = " << z << std::endl;
+        ostr << "B' > E' branch" << std::endl;
+        ostr << "z_unnormalized = " << z << std::endl;
 #endif
         xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * dt;
         xB = std::sqrt(xB) *  dt;
       } else {
         z = E + apt::cross(beta_d,B);
 #ifdef LORENTZ
-        std::cout << "B' <= E' branch" << std::endl;
-        std::cout << "z_unnormalized = " << z << std::endl;
+        ostr << "B' <= E' branch" << std::endl;
+        ostr << "z_unnormalized = " << z << std::endl;
 #endif
         xE = sqrt( xB - xE ) * dt;
         xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) *  dt;
       }
       z /= apt::abs(z);
 #ifdef LORENTZ
-      std::cout << "z = " << z << std::endl;
-      std::cout << "eE'dt / mc = " << xE << std::endl;
-      std::cout << "eB'dt / mc = " << xB << std::endl;
+      ostr << "z = " << z << std::endl;
+      ostr  << "eE'dt / mc = " << xE << std::endl;
+      ostr  << "eB'dt / mc = " << xB << std::endl;
 #endif
       xp = apt::dot(z,ptc.p());
 
@@ -137,7 +143,7 @@ namespace particle::force {
       xE *= 0.5;
       xB *= F(xE/gamma_co,xp/gamma_co) / gamma_co;
 #ifdef LORENTZ
-      std::cout << "rotation angle = " << xB << std::endl;
+      ostr << "rotation angle = " << xB << std::endl;
 #endif
 
       xp += 0.5 * 2.0 * xE; // 2nd half update

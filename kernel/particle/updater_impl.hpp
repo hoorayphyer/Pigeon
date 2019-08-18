@@ -8,6 +8,10 @@
 #include "logger/logger.hpp"
 #endif
 
+#ifdef LORENTZ
+#include "logger/logger.hpp"
+#endif
+
 namespace particle {
   template < int DGrid,
              typename Real,
@@ -111,6 +115,9 @@ namespace particle {
         lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
         lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
+#ifdef LORENTZ
+        file << force::ostr.str() << std::endl;
+#endif
         throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
       }
 #endif
