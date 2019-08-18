@@ -1,6 +1,11 @@
 #include "particle/forces.hpp"
 #include "apt/numeric.hpp"
 
+#ifdef LORENTZ
+#include <iostream>
+#include "apt/print.hpp"
+#endif
+
 namespace particle {
   template < typename T, template < typename > class S >
   map<Force<T,S>> force_map;
@@ -66,11 +71,23 @@ namespace particle::force {
 
     // get drift velocity
     T xp = apt::dot(E,B);
+#ifdef LORENTZ
+    std::cout << "E dot B = " << xp << std::endl;
+#endif
     T xE = apt::sqabs(B) - apt::sqabs(E); // calculate B^2 - E^2
+#ifdef LORENTZ
+    std::cout << "B^2 - E^2 = " << xE << std::endl;
+#endif
     T xB = ( std::sqrt(xE * xE + 4 * xp * xp) + xE ) / 2.0; // calculate B'^2
 
     Vec beta_d = apt::cross(E,B) / ( apt::sqabs(E) + xB );
+#ifdef LORENTZ
+    std::cout << "beta_d = " << beta_d << std::endl;
+#endif
     T gamma_d = 1.0 / std::sqrt( 1 - apt::sqabs(beta_d) );
+#ifdef LORENTZ
+    std::cout << "gamma_d = " << gamma_d << std::endl;
+#endif
 
     T gamma {}, gamma_co{};
     { /// ------- boost particle momentum to comoving frame
@@ -83,16 +100,28 @@ namespace particle::force {
       Vec z;
       if ( xE > 0 ) { // test if B' > E'
         z = B - apt::cross(beta_d,E);
+#ifdef LORENTZ
+        std::cout << "B' > E' branch" << std::endl;
+        std::cout << "z_unnormalized = " << z << std::endl;
+#endif
         z /= apt::abs(z);
         xE = ( ( xp > 0 ) - ( xp < 0 ) ) * sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
         xB = std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
       } else {
         z = E + apt::cross(beta_d,B);
+#ifdef LORENTZ
+        std::cout << "B' <= E' branch" << std::endl;
+        std::cout << "z_unnormalized = " << z << std::endl;
+#endif
         z /= apt::abs(z);
         xE = sqrt( xB - xE ) * q_times_w_gyro_unitB_over_m * dt;
         xB = ( ( xp > 0 ) - ( xp < 0 ) ) * std::sqrt(xB) * q_times_w_gyro_unitB_over_m * dt;
       }
-
+#ifdef LORENTZ
+      std::cout << "z = " << z << std::endl;
+      std::cout << "eE'dt / mc = " << xE << std::endl;
+      std::cout << "eB'dt / mc = " << xB << std::endl;
+#endif
       xp = apt::dot(z,ptc.p());
 
       gamma_co = std::sqrt( gamma_co * gamma_co + 2 * xp * 0.5 * xE + 0.25 * xE * xE );
@@ -102,19 +131,23 @@ namespace particle::force {
 
       xE *= 0.5;
       xB *= F(xE/gamma_co,xp/gamma_co) / gamma_co;
+#ifdef LORENTZ
+      std::cout << "rotation angle = " << xB << std::endl;
+#endif
 
       xp += 0.5 * 2.0 * xE; // 2nd half update
 
       { // rotate p around B in the comoving frame
-        ptc.p() = xp * z + std::cos(xB) * ( ptc.p() - xp * z);
-        // by now, xp and xE are free
-        xp = z[1] * ptc.p()[2] - z[2] * ptc.p()[1]; // ( z x p )_0
-        xE = z[2] * ptc.p()[0] - z[0] * ptc.p()[2]; // ( z x p )_1
-        z[2] = z[0] * ptc.p()[1] - z[1] * ptc.p()[0]; // ( z x p )_2
-        z[0] = std::tan(xB);
-        ptc.p()[0] += z[0] * xp;
-        ptc.p()[1] += z[0] * xE;
-        ptc.p()[2] += z[0] * z[2];
+        xE = std::sin(xB);
+        xB = std::cos(xB);
+        xp *= ( static_cast<T>(1.0) - xB );
+
+        T px = ptc.p()[0];
+        T py = ptc.p()[1];
+
+        ptc.p()[0] = xp * z[0] + xB*px + xE*(z[1] * ptc.p()[2] - z[2] * py);
+        ptc.p()[1] = xp * z[1] + xB*py + xE*(z[2] * px - z[0] * ptc.p()[2]);
+        ptc.p()[2] = xp * z[2] + xB*ptc.p()[2] + xE*(z[0]*py - z[1]*px );
       }
 
       // TODO udate delta q
