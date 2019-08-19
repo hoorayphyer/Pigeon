@@ -31,7 +31,7 @@ namespace particle {
   };
 }
 
-#define LORENTZ
+// #define LORENTZ
 
 #ifdef LORENTZ
 #include <sstream>
