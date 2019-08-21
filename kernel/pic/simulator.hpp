@@ -350,6 +350,19 @@ namespace pic {
           lgr::file % "DynamicLoadBalance" << "==>>" << std::endl;
           stamp.emplace();
         }
+        if ( _ens_opt ) { // first reduce N_scat to avoid data loss
+          const auto& ens = *_ens_opt;
+          std::vector<particle::load_t> buffer;
+          for ( auto& [sp, l] : particle::N_scat ) {
+            buffer.push_back(l);
+            l = 0; // reset all the counters of all processes
+          }
+          ens.intra.template reduce<true>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
+          if ( ens.intra.rank() == ens.chief ) {
+            int idx = 0;
+            for ( auto& [sp, l] : particle::N_scat ) l = buffer[idx++];
+          }
+        }
         // TODO has a few hyper parameters
         // TODO touch create is not multinode safe even buffer is used
         std::optional<int> old_label;
@@ -371,7 +384,7 @@ namespace pic {
       }
 
       if (_ens_opt && is_do(pic::stats_mr, timestep) ) {
-        particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles );
+        particle::statistics( pic::this_run_dir + "/logs/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles, particle::N_scat );
       }
 
       static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0

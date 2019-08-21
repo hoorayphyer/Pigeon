@@ -68,9 +68,9 @@ namespace pic {
   inline constexpr auto msperf_qualified =
     []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
 
-  inline constexpr ModuleRange stats_mr { true, 0, 100 };
+  inline constexpr ModuleRange stats_mr { true, 0, 1 };
 
-  inline constexpr int cout_ts_interval = 100;
+  inline constexpr int cout_ts_interval = 10;
 }
 
 namespace field {
@@ -131,10 +131,10 @@ namespace particle {
   // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
   template < typename Real = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
   void set_up_properties() {
-    properties[species::electron] = {1,-1,"electron"};
-    properties[species::positron] = {1,1,"positron"};
-    properties[species::ion] = { 5, 1, "ion"};
-    properties[species::photon] = { 0, 0, "photon" };
+    properties[species::electron] = {1,-1,"electron","el"};
+    properties[species::positron] = {1,1,"positron","po"};
+    properties[species::ion] = { 5, 1, "ion","io"};
+    properties[species::photon] = { 0, 0, "photon","ph" };
   }
 
   // NOTE called in particle updater

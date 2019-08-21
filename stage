@@ -11,7 +11,7 @@ printf "%s" "autocmd BufNewFile * 0read ${skeleton_file}" > $vim_before
 vim_after=".vim_after$tnow"
 printf "%s\n" \
        "set number" \
-       "normal 2G" \
+       "normal! 2G" \
        "startinsert" \
        > $vim_after
 

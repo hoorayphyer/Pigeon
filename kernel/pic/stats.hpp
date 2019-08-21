@@ -11,10 +11,26 @@ namespace particle {
              typename T,
              template < typename > class S
              >
-  void statistics( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens, const std::optional<mpi::CartComm>& cart, const map<array<T,S>>& particles) {
+  void statistics( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens, const std::optional<mpi::CartComm>& cart, const map<array<T,S>>& particles, map<load_t>& N_scat ) {
     static bool first_time = true;
-    std::vector<load_t> buffer; // layout of buffer: ens_size, sum_sp1, max_sp1, min_sp1, sum_sp2, max_sp2, min_sp2...
-    {
+    std::vector<load_t> buffer;
+    { // use buffer to get N_scat
+      for ( auto& [sp, l] : N_scat ) {
+        buffer.push_back(l);
+        l = 0; // reset all the counters of all processes
+      }
+      ens.intra.template reduce<true>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
+      if ( cart ) {
+        cart->template reduce<true>( mpi::by::SUM, 0, buffer.data(), buffer.size() );
+        if ( cart->rank() == 0 ) {
+          int idx = 0;
+          for ( auto& [sp, l] : N_scat ) l = buffer[idx++]; // only world rank = 0 has the final result
+        }
+      }
+
+    }
+    buffer.resize(0);
+    { // layout of buffer: ens_size, sum_sp1, max_sp1, min_sp1, sum_sp2, max_sp2, min_sp2...
       if ( ens.is_chief() ) buffer.push_back(ens.intra.size());
       for ( const auto& [sp, ptcs] : particles ) {
         load_t load = ptcs.size();
@@ -66,13 +82,20 @@ namespace particle {
         out << "timestep|\tnprocs";
         for ( const auto& [ sp, ignore ] : particles )
           out << "|\t" << properties[sp].name;
-        out << std::endl;
+        out << "|\t" << "cumulative new ptcs from scattering" << std::endl;
         out << "particle field : ave, max, min" << std::endl;
+        out << "scattering : ";
+        for ( const auto& [ sp, ignore ] : N_scat )
+          out << properties[sp].nickname << " ";
+        out << std::endl;
         first_time = false;
       }
       out << timestep << "|\t" << nprocs;
       for ( const auto& [ sp, ignore ] : particles )
         out << "|\t" << ave[sp] << ", " << max[sp] << ", " << min[sp];
+      out << "|\t";
+      for ( const auto& [ sp, ignore ] : N_scat )
+        out << N_scat[sp] << ", ";
       out << std::endl;
       out.close();
     }

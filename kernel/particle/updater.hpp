@@ -7,6 +7,7 @@
 #include "particle/array.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
+#include "particle/load_type.hpp"
 
 #include "manifold/grid.hpp"
 
@@ -14,6 +15,10 @@
 
 namespace field {
   template < typename, int, int > struct Field;
+}
+
+namespace particle {
+  extern map<load_t> N_scat;
 }
 
 namespace particle {

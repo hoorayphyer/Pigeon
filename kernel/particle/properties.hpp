@@ -9,6 +9,7 @@ namespace particle {
     unsigned int mass_x = 0; // in terms of unit mass
     int charge_x = 0; // in terms of unit charge
     std::string name = "";
+    std::string nickname = "";
   };
 
   // defined at particle updater

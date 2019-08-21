@@ -13,6 +13,11 @@
 #endif
 
 namespace particle {
+  bool is_initiliazed = false;
+  map<load_t> N_scat;
+}
+
+namespace particle {
   template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
@@ -175,6 +180,12 @@ namespace particle {
                  const mani::Grid< Real, DGrid >& grid,
                  Real dt, int timestep, util::Rng<Real>& rng
                  ) {
+    if ( !is_initiliazed ) {
+      for ( auto&[ sp, ptcs ] : properties ) {
+        N_scat.emplace( sp, 0 );
+      }
+      is_initiliazed = true;
+    }
 
     for ( auto&[ sp, ptcs ] : particles ) {
       update_species( sp, ptcs, J, dt, E, B, grid, rng );
@@ -183,6 +194,7 @@ namespace particle {
     { // Put particles where they belong after scattering
       for ( int i = 0; i < _buf.size(); ++i ) {
         auto this_sp = _buf[i].template get<species>();
+        ++N_scat[this_sp];
         particles[this_sp].push_back(std::move(_buf[i]));
       }
       _buf.resize(0);
