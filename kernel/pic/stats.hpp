@@ -3,6 +3,7 @@
 
 #include "particle/load_type.hpp"
 #include "particle/properties.hpp"
+#include "apt/csi.hpp"
 #include <fstream>
 #include <limits>
 
@@ -65,12 +66,13 @@ namespace particle {
           sp2idx[sp] = idx++;
         }
       }
-      for( int i = 0; i < cart->size(); i += stride ) {
-        nprocs += stats[i * stride];
+      for( int i = 0; i < cart->size(); ++i ) {
+        nprocs += stats[i*stride];
+        auto* s = &(stats[i*stride+1]);
         for ( const auto& [sp, ignore ] : particles ) {
-          ave[sp] += stats[ i * stride + 1 + 3 * sp2idx[sp] ];
-          max[sp] = std::max<load_t>( max[sp], stats[ i * stride + 1 + 3 * sp2idx[sp] + 1 ] );
-          min[sp] = std::min<load_t>( min[sp], stats[ i * stride + 1 + 3 * sp2idx[sp] + 2 ] );
+          ave[sp] += s[ 3 * sp2idx[sp] ];
+          max[sp] = std::max<load_t>( max[sp], s[ 3 * sp2idx[sp] + 1 ] );
+          min[sp] = std::min<load_t>( min[sp], s[ 3 * sp2idx[sp] + 2 ] );
         }
       }
       for ( const auto& [sp, ignore ] : particles ) ave[sp] /= nprocs;
@@ -92,10 +94,10 @@ namespace particle {
       }
       out << timestep << "|\t" << nprocs;
       for ( const auto& [ sp, ignore ] : particles )
-        out << "|\t" << ave[sp] << ", " << max[sp] << ", " << min[sp];
+        out << "|\t" << apt::csi(ave[sp]) << ", " << apt::csi(max[sp]) << ", " << apt::csi(min[sp]);
       out << "|\t";
       for ( const auto& [ sp, ignore ] : N_scat )
-        out << N_scat[sp] << ", ";
+        out << apt::csi(N_scat[sp]) << ", ";
       out << std::endl;
       out.close();
     }
