@@ -1,23 +1,30 @@
 #include "testfw/testfw.hpp"
+#include "particle/array_impl.hpp"
 #include "ckpt/checkpoint_impl.hpp"
+#include "debug/compare_ptcs.hpp"
 #include <unordered_set>
+#include "mpipp/mpi_p2p_impl.hpp"
+#include "particle/mpi_particle.hpp"
 
 using Real = double;
-using State_t = long long;
+using aio::Specs;
+using State_t = typename Specs<Real>::state_type;
 constexpr int DGrid = 2;
-template < typename T >
-struct S {
-  using value_type = T;
-  static constexpr int Dim = 3;
-  using state_type = apt::copy_cvref_t<T, State_t>;
-};
 
 namespace particle {
   map<Properties> properties =
     [](){
       map<Properties> res;
-      res[species::electron] = {1,-1,"electron"};
-      res[species::positron] = {1,1,"positron"};
+      res.insert(species::electron, {1,-1,"electron"});
+      res.insert(species::positron, {1,1,"positron"});
+      return res;
+    }();
+
+  map<load_t> N_scat
+  = [](){
+      map<load_t> res;
+      for ( const auto& [sp, ignore ] : properties)
+        res.insert(sp,0);
       return res;
     }();
 }
@@ -50,7 +57,8 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
   apt::array<int, DGrid> bulk_dims { 128, 128 };
   const int guard = 1;
 
-  ens[0].rank[0] = {{ species::electron, 709 }, { species::positron, 64}};
+  ens[0].rank[0].insert(species::electron, 709);
+  ens[0].rank[0].insert(species::positron, 64);
   std::string prefix = "PUBG";
   const int num_parts = 2;
   const int timestep = 1234;
@@ -76,7 +84,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
       field::Field<Real, 3, DGrid> E( {bulk_dims, guard} );
       field::Field<Real, 3, DGrid> B( {bulk_dims, guard} );
 
-      map<array<Real,S>> particles;
+      map<array<Real,Specs>> particles;
 
       if ( ens_opt ) {
         int label = ens_opt->label();
@@ -89,6 +97,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
         }
 
         for ( auto[sp,load] : ens[label].rank[rank] ) {
+          particles.insert(sp);
           auto& ptcs = particles[sp];
           for ( int i = 0; i < load; ++i ) {
             ptcs.emplace_back({i * fq(0),i * fq(1),i * fq(2)},
@@ -98,7 +107,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
         }
       }
 
-      save_dir = ckpt::save_checkpoint(prefix, num_parts, ens_opt, timestep, E, B, particles);
+      save_dir = ckpt::save_checkpoint(prefix, num_parts, ens_opt, timestep, E, B, particles,particle::N_scat);
     }
 
     // test
@@ -145,7 +154,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                     std::string load_var = properties[sp].name + "_load";
                     REQUIRE( sf.var_exists(load_var) );
                     load_t total = 0;
-                    for ( const auto& r : ens[l].rank ) total += r.at(sp);
+                    for ( const auto& r : ens[l].rank ) total += r[sp];
                     REQUIRE( total == sf.read1<load_t>(load_var) );
                   }
                   int field_size = 1;
@@ -170,7 +179,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                   sf.cd(properties[sp].name);
                   auto load = sf.read1<load_t>("load");
                   REQUIRE( load == ens[l].rank[r][sp] );
-                  for ( int i = 0; i < S<Real>::Dim; ++i ) {
+                  for ( int i = 0; i < Specs<Real>::Dim; ++i ) {
                     {
                       std::string var = "q" + std::to_string(i+1);
                       REQUIRE( sf.var_exists(var) );
@@ -216,39 +225,73 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
     }
   }
 
-  // SCENARIO("Test load_checkpoint", "[ckpt]") {
+}
 
+SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
+  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
+  const int num_procs_before_resume = mpi::world.size();
+  const int num_procs_after_resume = mpi::world.size();
 
+  const apt::array<int,DGrid> partition { 1, 1 };
 
+  apt::array<int, DGrid> bulk_dims { 128, 128 };
+  const int guard = 1;
 
+  field::Field<Real, 3, DGrid> E( {bulk_dims, guard} );
+  field::Field<Real, 3, DGrid> B( {bulk_dims, guard} );
 
-  //   const apt::array<int,DGrid> partition { 1, 1 };
-  //   const int num_procs = mpi::world.size();
+  std::string prefix = "PUBG";
+  const int num_parts = 4;
+  const int timestep = 1234;
 
-  //   auto rwld_opt = aio::reduced_world(num_procs, mpi::world);
-  //   if ( rwld_opt ) {
-  //     auto cart_opt = aio::make_cart( partition, *rwld_opt );
-  //     auto ens_opt = dye::create_ensemble<DGrid>( cart_opt );
+  map<array<Real,Specs>> ptcs_bef;
 
-  //     apt::array<int, DGrid> bulk_dims { 128, 128 };
-  //     const int guard = 1;
+  std::string ckpt_dir{};
 
-  //     field::Field<Real, 3, DGrid> E( {bulk_dims, guard} );
-  //     field::Field<Real, 3, DGrid> B( {bulk_dims, guard} );
+  auto rwld_opt = aio::reduced_world(num_procs_before_resume, mpi::world);
+  if ( rwld_opt ) {
+    auto cart_opt = aio::make_cart( partition, *rwld_opt );
+    auto ens_opt = dye::create_ensemble<DGrid>( cart_opt );
 
-  //     const int num_ptcs = 709;
-  //     map<array<Real,S>> particles;
-  //     for ( const auto& [sp, ignore] : properties )
-  //       particles.emplace( sp, array<Real, S>() );
+    aio::unif_real<Real> unif;
 
+    const int num_ptcs = 10000;
+    for ( const auto& [sp, ignore] : properties ) {
+      ptcs_bef.insert( sp, array<Real, Specs>() );
+      for ( int i = 0; i < num_ptcs; ++i ) {
+        particle::Particle<Real,Specs> x;
+        x.q() = { unif(), unif(), unif() };
+        x.p() = { unif(), unif(), unif() };
+        x.state() = 123456 * unif();
+        x.set(particle::flag::exist);
+        ptcs_bef[sp].push_back( std::move(x) );
+      }
+    }
 
-  //     {
-  //     ens_opt = dye::create_ensemble<DGrid>( cart_opt );
+    ckpt_dir = ckpt::save_checkpoint( prefix, num_parts, ens_opt, timestep, E, B, ptcs_bef, particle::N_scat );
+  }
+  rwld_opt.reset();
 
+  mpi::world.barrier();
 
-  //     int ckpt::load_checkpoint(save_dir, )
-  //       }
-  //   }
-  // }
+  map<array<Real,Specs>> ptcs_aft;
+  for ( const auto& [sp, ignore] : properties ) {
+    ptcs_aft.insert( sp, array<Real, Specs>() );
+  }
 
+  rwld_opt = aio::reduced_world(num_procs_after_resume, mpi::world);
+  if ( rwld_opt ) {
+    auto cart_opt = aio::make_cart( partition, *rwld_opt );
+    auto ens_opt = dye::create_ensemble<DGrid>( cart_opt );
+    int ckpt_ts = ckpt::load_checkpoint( ckpt_dir, ens_opt, cart_opt, E, B, ptcs_aft, particle::N_scat, 0 );
+    REQUIRE( ckpt_ts == timestep );
+  }
+
+  for ( const auto& [sp, ignore] : properties ) {
+    auto [ Nptc_bef, Nptc_aft, count_matched, Nremain_bef, Nremain_aft ]
+      = debug::compare_particles( std::move(ptcs_bef[sp]), std::move(ptcs_aft[sp]), mpi::world );
+  }
+
+  mpi::world.barrier();
+  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
 }

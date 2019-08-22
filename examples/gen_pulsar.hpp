@@ -134,10 +134,10 @@ namespace particle {
   // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
   template < typename Real = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
   void set_up_properties() {
-    properties[species::electron] = {1,-1,"electron","el"};
-    properties[species::positron] = {1,1,"positron","po"};
-    properties[species::ion] = { 5, 1, "ion","io"};
-    properties[species::photon] = { 0, 0, "photon","ph" };
+    properties.insert(species::electron, {1,-1,"electron","el"});
+    properties.insert(species::positron, {1,1,"positron","po"});
+    properties.insert(species::ion, { 5, 1, "ion","io"});
+    properties.insert(species::photon, { 0, 0, "photon","ph" });
   }
 
   // NOTE called in particle updater
@@ -154,7 +154,7 @@ namespace particle {
       if ( properties.has(species::electron) ) {
         auto sp = species::electron;
         Force<real_t,Specs> force;
-        const auto& prop = properties.at(sp);
+        const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
@@ -165,7 +165,7 @@ namespace particle {
       if ( properties.has(species::positron) ) {
         auto sp = species::positron;
         Force<real_t,Specs> force;
-        const auto& prop = properties.at(sp);
+        const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
@@ -176,7 +176,7 @@ namespace particle {
       if ( properties.has(species::ion) ) {
         auto sp = species::ion;
         Force<real_t,Specs> force;
-        const auto& prop = properties.at(sp);
+        const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );

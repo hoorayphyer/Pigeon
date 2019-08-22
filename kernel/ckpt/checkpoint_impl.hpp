@@ -4,7 +4,6 @@
 #include "silopp/pmpio.hpp"
 #include "filesys/filesys.hpp"
 #include "particle/properties.hpp"
-#include "particle/load_type.hpp"
 #include "field/field.hpp"
 #include <cassert>
 #include "dye/dynamic_balance.hpp"
@@ -34,7 +33,7 @@ namespace ckpt {
   template < typename T, template < typename > class PtcSpecs >
   struct ParticleArrayCkpt {
     void save( silo::file_t& dbfile, const particle::species& sp, const particle::array<T,PtcSpecs>& ptcs ) {
-      dbfile.mkcd(particle::properties.at(sp).name);
+      dbfile.mkcd(particle::properties[sp].name);
       particle::load_t num = ptcs.size();
       // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
       dbfile.write("load", num);
@@ -50,7 +49,7 @@ namespace ckpt {
     }
 
     void load( silo::file_t& dbfile, const particle::species& sp, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
-      dbfile.cd( particle::properties.at(sp).name );
+      dbfile.cd( particle::properties[sp].name );
       auto N = dbfile.read1<particle::load_t>("load");
 
       if ( 0 != N ) {
@@ -84,7 +83,9 @@ namespace ckpt {
                                int timestep,
                                const field::Field<Real, 3, DGrid>& E,
                                const field::Field<Real, 3, DGrid>& B,
-                               const particle::map<particle::array<Real,PtcSpecs>>& particles
+                               const particle::map<particle::array<Real,PtcSpecs>>& particles,
+                               const particle::map<particle::load_t>& N_scat
+
                                ) {
     bool is_idle = !ens_opt;
     int key = 0;
@@ -149,6 +150,13 @@ namespace ckpt {
 
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
+
+                { // write N_scat
+                  std::vector<int> buffer;
+                  for ( const auto& [sp, l] : N_scat ) buffer.push_back(static_cast<int>(sp));
+                  dbfile.write( "N_scat_sp", buffer );
+                  dbfile.write( "N_scat_data", N_scat.data() );
+                }
               }
             }
 
@@ -178,6 +186,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       particle::map<particle::load_t>& N_scat,
                        int target_load
                        ) {
     int checkpoint_ts = 0;
@@ -274,6 +283,12 @@ namespace ckpt {
           if ( 0 == myrank ) {
             f_ckpt.load( sf, "E", E );
             f_ckpt.load( sf, "B", B );
+            {
+              const auto buf_sp = sf.read1d<int>("N_scat_sp");
+              const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
+              for ( int i = 0; i < buf_sp.size(); ++i )
+                N_scat[static_cast<particle::species>(buf_sp[i])] = buf_data[i];
+            }
           }
           for ( const auto& rdir : sf.toc_dir() ) {
             if ( rdir.find("rank") != 0 ) continue;
@@ -281,7 +296,7 @@ namespace ckpt {
             int r = sf.read1<int>("r");
             for ( auto i : sps ) {
               auto sp = static_cast<particle::species>(i);
-              p_ckpt.load( sf, sp, particles.at(sp), myrank + r, ens_size );
+              p_ckpt.load( sf, sp, particles[sp], myrank + r, ens_size );
             }
             sf.cd("..");
           }

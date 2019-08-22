@@ -4,6 +4,8 @@
 namespace particle {
   enum class species : char
     { unknown=0, electron, positron, ion, photon };
+
+  inline constexpr int NUM_SPECIES = 5;
 }
 
 #endif

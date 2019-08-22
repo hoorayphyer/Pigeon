@@ -188,7 +188,7 @@ namespace pic {
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
       // 2. data export. PutMultivar requires every patch to output every species
       for ( const auto& [sp, ignore] : particle::properties )
-        _particles.emplace( sp, particle::array<Real, PtcSpecs>() );
+        _particles.insert( sp, particle::array<Real, PtcSpecs>() );
 
       if ( _ens_opt ) update_parts(*_ens_opt);
     }
@@ -196,7 +196,7 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = 0;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, particle::N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
@@ -271,7 +271,7 @@ namespace pic {
         if ( stamp && _particles.size() != 0 ) {
           lgr::file % "ParticleCounts:" << std::endl;
           for ( const auto&[ sp, ptcs ] : _particles )
-            lgr::file % "\t" << particle::properties.at(sp).name << " = " << ptcs.size() << std::endl;
+            lgr::file % "\t" << particle::properties[sp].name << " = " << ptcs.size() << std::endl;
         }
 
         // ----- before this line particles are all within borders --- //
@@ -298,7 +298,7 @@ namespace pic {
 
         // ----- After this line, particles are all within borders.
         // NOTE injector is implemented as a local operation
-        _injector( timestep, dt, _rng, ens, _grid, _E, _B, _J, _particles );
+        _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
 
         // ----- Before this line _J is local on each cpu --- //
         if ( stamp ) {
@@ -393,7 +393,20 @@ namespace pic {
           lgr::file % "SaveCheckpoint" << "==>>" << std::endl;
           stamp.emplace();
         }
-        auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles );
+        if ( _ens_opt ) { // first reduce N_scat to avoid data loss
+          const auto& ens = *_ens_opt;
+          std::vector<particle::load_t> buffer;
+          for ( auto& [sp, l] : particle::N_scat ) {
+            buffer.push_back(l);
+            l = 0; // reset all the counters of all processes
+          }
+          ens.intra.template reduce<true>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
+          if ( ens.intra.rank() == ens.chief ) {
+            int idx = 0;
+            for ( auto& [sp, l] : particle::N_scat ) l = buffer[idx++];
+          }
+        }
+        auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, particle::N_scat );
         if ( mpi::world.rank() == 0 ) {
           auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
           if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);

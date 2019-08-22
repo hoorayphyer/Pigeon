@@ -13,7 +13,6 @@
 #endif
 
 namespace particle {
-  bool is_initiliazed = false;
   map<load_t> N_scat;
 }
 
@@ -37,7 +36,7 @@ namespace particle {
                     ) {
     if ( sp_ptcs.size() == 0 ) return;
 
-    const auto& prop = _properties.at(sp);
+    const auto& prop = _properties[sp];
 
     using Ptc = typename array<Real,PtcSpecs>::particle_type;
 
@@ -180,14 +179,7 @@ namespace particle {
                  const mani::Grid< Real, DGrid >& grid,
                  Real dt, int timestep, util::Rng<Real>& rng
                  ) {
-    if ( !is_initiliazed ) {
-      for ( auto&[ sp, ptcs ] : properties ) {
-        N_scat.emplace( sp, 0 );
-      }
-      is_initiliazed = true;
-    }
-
-    for ( auto&[ sp, ptcs ] : particles ) {
+    for ( const auto&[ sp, ptcs ] : particles ) {
       update_species( sp, ptcs, J, dt, E, B, grid, rng );
     }
 

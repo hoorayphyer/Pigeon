@@ -58,7 +58,7 @@ namespace particle {
 
   template < typename T, template < typename > class S >
   void Scat<T,S>::Register( species sp ) const {
-    scat_map<T,S>[sp] = *this;
+    scat_map<T,S>.insert(sp,*this);
   }
 
   template < typename T, template < typename > class S >
@@ -68,7 +68,7 @@ namespace particle {
 
   template < typename T, template < typename > class S >
   Scat<T,S> Scat<T,S>::Get ( species sp ) {
-    if ( scat_map<T,S>.has(sp) ) return scat_map<T,S>.at(sp);
+    if ( scat_map<T,S>.has(sp) ) return scat_map<T,S>[sp];
     else return {};
   }
 }

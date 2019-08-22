@@ -16,8 +16,8 @@ struct M {};
 
 SCENARIO("Test structured binding syntax", "[particle]") {
   map<array<float,S>> ptcs;
-  ptcs.emplace( species::electron, array<float,S>() );
-  ptcs.emplace( species::ion, array<float,S>() );
+  ptcs.insert( species::electron, array<float,S>() );
+  ptcs.insert( species::ion, array<float,S>() );
   std::unordered_map<int,int> aaa;
   aaa.emplace( 56, 23 );
   aaa.emplace( 98, 42 );

@@ -289,10 +289,10 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
   map<array<Real, Specs>> ptcs;
   map<std::vector<load_t>> loads;
   {
-    auto& x = ptcs[species::electron];
-    auto& y = ptcs[species::ion];
-    auto& xx = loads[species::electron];
-    auto& yy = loads[species::ion];
+    ptcs.insert(species::electron);
+    ptcs.insert(species::ion);
+    loads.insert(species::electron);
+    loads.insert(species::ion);
   }
 
 
@@ -330,9 +330,9 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
   // NOTE TODOL current implementation requires explicit touch-create before detailed balance
   map<array<Real, Specs>> particles;
   {
-    auto& x = particles[species::electron];
-    auto& y = particles[species::ion];
-    auto& z = particles[species::photon];
+    particles.insert(species::electron);
+    particles.insert(species::ion);
+    particles.insert(species::photon);
   }
 
   auto rwld_opt = aio::reduced_world(num_procs, mpi::world);

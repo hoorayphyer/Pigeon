@@ -75,7 +75,7 @@ namespace bc {
         };
 
       auto j_reg_inj =
-        [factor = j_reg_x * mani::dV(grid) / (particle::properties.at(posion).charge_x) ]( Real J ) noexcept {
+        [factor = j_reg_x * mani::dV(grid) / (particle::properties[posion].charge_x) ]( Real J ) noexcept {
           return J * factor;
         };
 

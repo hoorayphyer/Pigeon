@@ -2,6 +2,7 @@
 #define _CHECKPOINT_HPP_
 
 #include "dye/ensemble.hpp"
+#include "particle/load_type.hpp"
 #include <string>
 #include <optional>
 
@@ -24,7 +25,8 @@ namespace ckpt {
                                int timestep,
                                const field::Field<Real, 3, DGrid>& E,
                                const field::Field<Real, 3, DGrid>& B,
-                               const particle::map<particle::array<Real,PtcSpecs>>& particles
+                               const particle::map<particle::array<Real,PtcSpecs>>& particles,
+                               const particle::map<particle::load_t>& N_scat
                                );
 
   template < int DGrid,
@@ -36,6 +38,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       particle::map<particle::load_t>& N_scat,
                        int target_load = 0
                        );
 }

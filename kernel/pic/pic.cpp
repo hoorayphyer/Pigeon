@@ -86,6 +86,8 @@ int main(int argc, char** argv) {
 
     field::set_up<pic::real_t>();
     particle::set_up_properties();
+    for ( const auto&[ sp, ignore ] : particle::properties )
+      particle::N_scat.insert( sp, 0 );
     particle::set_up<pic::real_t>();
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >

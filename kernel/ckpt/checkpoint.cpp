@@ -10,7 +10,8 @@ namespace ckpt {
                                int timestep,
                                const field::Field<real_t, 3, DGrid>& E,
                                const field::Field<real_t, 3, DGrid>& B,
-                               const particle::map<particle::array<real_t,particle::Specs>>& particles
+                               const particle::map<particle::array<real_t,particle::Specs>>& particles,
+                               const particle::map<particle::load_t>& N_scat
                                );
 
   template
@@ -20,6 +21,7 @@ namespace ckpt {
                        field::Field<real_t, 3, DGrid>& E,
                        field::Field<real_t, 3, DGrid>& B,
                        particle::map<particle::array<real_t,particle::Specs>>& particles,
+                       particle::map<particle::load_t>& N_scat,
                        int target_load
                        );
 }

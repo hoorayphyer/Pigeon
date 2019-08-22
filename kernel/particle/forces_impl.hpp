@@ -14,7 +14,7 @@ namespace particle {
 
   template < typename T, template < typename > class S >
   void Force<T,S>::Register( species sp ) const {
-    force_map<T,S>[sp] = *this;
+    force_map<T,S>.insert(sp, *this);
   }
 
   template < typename T, template < typename > class S >
@@ -25,7 +25,7 @@ namespace particle {
   template < typename T, template < typename > class S >
   Force<T,S> Force<T,S>::Get( species sp ) noexcept {
     // if sp doesn't exist, newly created item in the maps will automatically have zero elements
-    if ( force_map<T,S>.has(sp) ) return force_map<T,S>.at(sp);
+    if ( force_map<T,S>.has(sp) ) return force_map<T,S>[sp];
     else return {};
   }
 }

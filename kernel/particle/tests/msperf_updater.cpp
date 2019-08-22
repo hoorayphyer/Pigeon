@@ -31,7 +31,7 @@ SCENARIO("Time particle updater", "[particle]") {
   using Metric = mani::LogSphericalCoordSys;
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
-  properties[species::electron] = {1,-1,"electron"};
+  properties.insert(species::electron, {1,-1,"electron"});
   // properties[species::positron] = {1,1,"positron"};
 
   constexpr auto* lorentz = force::template lorentz<Real,PtcSpecs,vParticle>;
@@ -42,7 +42,7 @@ SCENARIO("Time particle updater", "[particle]") {
   {
     auto sp = species::electron;
     Force<Real,PtcSpecs> force;
-    const auto& prop = properties.at(sp);
+    const auto& prop = properties[sp];
 
     force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
     // force.add( gravity, gravity_strength );
@@ -108,6 +108,7 @@ SCENARIO("Time particle updater", "[particle]") {
     const int Nptc = 1000000;
     aio::unif_real<Real> unif;
     {
+      particles.insert(species::electron);
       auto& ptcs = particles[species::electron];
       for ( int i = 0; i < Nptc; ++i ) {
         ptcs.emplace_back( {unif(), unif(), 0.0},

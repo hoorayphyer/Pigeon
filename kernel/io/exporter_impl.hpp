@@ -61,7 +61,7 @@ namespace io {
 
     for ( const auto& [sp, ptcs] : particles ) {
       fds.reset();
-      const auto& prop = particle::properties.at(sp);
+      const auto& prop = particle::properties[sp];
 
       for ( auto* pe : pexps ) {
         std::tie(varname,dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, sp, ptcs);
