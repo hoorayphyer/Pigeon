@@ -78,29 +78,11 @@ namespace pic {
       return res;
     }
 
-    void refresh( const dye::Ensemble<DGrid>& ens ) {
-      apt::Index<DGrid> bulk_dims;
+    void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
         _grid[i] = _supergrid[i].divide( ens.cart_dims[i], ens.cart_coords[i] );
-        // TODOL cart_dim = 1 and periodic
+        // TODO cart_dim = 1 and periodic
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
-        bulk_dims[i] = _grid[i].dim();
-      }
-
-      {
-        _E = {{ bulk_dims, _guard }};
-        _B = {{ bulk_dims, _guard }};
-        // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
-        _J = {{ bulk_dims, ( ShapeF::support() + 3 ) / 2 }};
-
-        for( int i = 0; i < 3; ++i ) {
-          _E.set_offset( i, all_but( MIDWAY, i ) );
-          _B.set_offset( i, all_but( INSITU, i ) );
-          _J.set_offset( i, all_but( MIDWAY, i ) );
-        }
-        _E.reset();
-        _B.reset();
-        _J.reset();
       }
 
       std::tie(_fbc_axis, _injector) = pic::set_up_boundary_conditions(_grid);
@@ -183,16 +165,32 @@ namespace pic {
         _ens_opt = dye::create_ensemble<DGrid>(cart_opt);
       }
 
+      { // initialize fields. Idles also do this for the sake of loading checkpoint, so pic::dims is used instead of _ens_opt or _cart_opt
+        apt::Index<DGrid> bulk_dims;
+        for ( int i = 0; i < DGrid; ++i ) {
+          bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
+        }
+        _E = {{ bulk_dims, _guard }};
+        _B = {{ bulk_dims, _guard }};
+        // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
+        _J = {{ bulk_dims, ( ShapeF::support() + 3 ) / 2 }};
+
+        for( int i = 0; i < 3; ++i ) {
+          _E.set_offset( i, all_but( MIDWAY, i ) );
+          _B.set_offset( i, all_but( INSITU, i ) );
+          _J.set_offset( i, all_but( MIDWAY, i ) );
+        }
+        _E.reset();
+        _B.reset();
+        _J.reset();
+      }
       // NOTE all species in the game should be created regardless of whether they appear on certain processes. This is to make the following work
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
       // 2. data export. PutMultivar requires every patch to output every species
       for ( const auto& [sp, ignore] : particle::properties )
         _particles.emplace( sp, particle::array<Real, PtcSpecs>() );
 
-      if ( !_ens_opt ) return;
-
-      const auto& ens = *_ens_opt;
-      refresh(ens);
+      if ( _ens_opt ) update_parts(*_ens_opt);
     }
 
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
@@ -200,6 +198,7 @@ namespace pic {
       if ( checkpoint_dir ) {
         init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles );
         ++init_ts; // checkpoint is saved at the end of a timestep
+        if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
         // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
         if (_cart_opt) {
@@ -368,16 +367,15 @@ namespace pic {
         std::optional<int> old_label;
         if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
-        // NOTE touch create is done in refresh()
         dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
 
         std::optional<int> new_label;
         if ( _ens_opt ) new_label.emplace(_ens_opt->label());
         if (stamp) {
-          lgr::file % "  refresh simulator..." << std::endl;
+          lgr::file % "  update parts of simulator..." << std::endl;
           stamp.emplace();
         }
-        if ( old_label != new_label ) refresh(*_ens_opt);
+        if ( old_label != new_label ) update_parts(*_ens_opt);
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
