@@ -46,6 +46,8 @@ namespace pic {
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
+
+  std::optional<std::string> resume_dir;
 }
 
 namespace pic {
