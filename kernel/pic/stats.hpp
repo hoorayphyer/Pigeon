@@ -57,10 +57,10 @@ namespace particle {
       {
         int idx = 0;
         for ( auto sp : particles ) {
-          ave[sp] = 0;
-          max[sp] = std::numeric_limits<load_t>::min();
-          min[sp] = std::numeric_limits<load_t>::max();
-          sp2idx[sp] = idx++;
+          ave.insert(sp,0);
+          max.insert(sp, std::numeric_limits<load_t>::min());
+          min.insert(sp, std::numeric_limits<load_t>::max());
+          sp2idx.insert(sp, idx++);
         }
       }
       for( int i = 0; i < cart->size(); ++i ) {
