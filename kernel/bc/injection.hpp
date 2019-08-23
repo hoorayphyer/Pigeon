@@ -23,6 +23,7 @@ namespace bc {
 
     template < template < typename > class Specs, typename RealJ >
     void operator() ( int timestep, Real dt, util::Rng<Real>& rng,
+                      Real wdt_pic,
                       const dye::Ensemble<DGrid>& ens,
                       const mani::Grid<Real,DGrid>& grid, // local grid
                       const field::Field<Real, 3, DGrid>& E,
