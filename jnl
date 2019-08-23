@@ -1,5 +1,6 @@
 #! /bin/bash
-grep -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | \
+# -H forces to output filename even there is only one match
+grep -H -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | \
     awk '\
 BEGIN{ journal = ""; }\
  { \
