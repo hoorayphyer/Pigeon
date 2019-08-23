@@ -302,7 +302,8 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     auto cart_opt = aio::make_cart( cart_dims, {false,false}, mpi::world );
     auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
 
-    for ( auto&[sp, load] : loads ) {
+    for ( auto sp : loads ) {
+      auto& load = loads[sp];
       load.resize(nens);
       for ( int label = 0; label < nens; ++label ) {
         auto x = load_gen();
@@ -351,20 +352,20 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
       if ( ens_opt ) {
         out << "--- Cycle = " << num_cycles - N << " ----" << std::endl;
         out << "old sizes:" << std::endl;;
-        for ( auto&[sp, ptcs] : particles ) {
-          out << "  sp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+        for ( auto sp : particles ) {
+          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size() << std::endl;
         }
 
-        for ( auto&[sp, ptcs] : particles ) {
+        for ( auto sp : particles ) {
             auto x = load_gen();
             x = std::max<double>(x, 0.0);
             x = std::min<double>(x, 100000.0);
-            ptcs.resize( static_cast<load_t>(x) );
+            particles[sp].resize( static_cast<load_t>(x) );
         }
 
         out << "new sizes:" << std::endl;;
-        for ( auto&[sp, ptcs] : particles ) {
-          out << "  sp " << static_cast<int>(sp) << ", " << ptcs.size() << std::endl;
+        for ( auto sp : particles ) {
+          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size() << std::endl;
         }
 
         if ( N % 5 == 0 && N != 0 ) out.clear();

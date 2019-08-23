@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
     field::set_up<pic::real_t>();
     particle::set_up_properties();
-    for ( const auto&[ sp, ignore ] : particle::properties )
+    for ( auto sp : particle::properties )
       particle::N_scat.insert( sp, 0 );
     particle::set_up<pic::real_t>();
 

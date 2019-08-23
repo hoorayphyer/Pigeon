@@ -356,11 +356,11 @@ namespace dye {
     { // Deploy
       particle::load_t my_tot_load = 0;
       if ( ens_opt ) {
-        for ( const auto&[sp,ptcs] : particles ) {
+        for ( auto sp : particles ) {
           if ( sp == particle::species::photon )
-            my_tot_load += ptcs.size() / 3; // empirically photon performance is about 3 times faster than that of a particle
+            my_tot_load += particles[sp].size() / 3; // empirically photon performance is about 3 times faster than that of a particle
           else
-            my_tot_load += ptcs.size();
+            my_tot_load += particles[sp].size();
         }
       }
       ens_opt_new = deploy( my_tot_load, ens_opt, cart_opt, target_load );
@@ -373,15 +373,15 @@ namespace dye {
         if ( itc_opt ) {
           const auto& itc = *itc_opt;
 
-          for ( auto&[sp, ptcs] : particles ) {
+          for ( auto sp : particles ) {
             if (is_leaving) {
               for ( int i = 0; i < itc.size(); ++i ) {
                 int root = (itc.rank() == i) ? MPI_ROOT : MPI_PROC_NULL;
-                impl::relinguish_data( ptcs, itc, root );
+                impl::relinguish_data( particles[sp], itc, root );
               }
             } else {
               for ( int i = 0; i < itc.remote_size(); ++i )
-                impl::relinguish_data( ptcs, itc, i );
+                impl::relinguish_data( particles[sp], itc, i );
             }
           }
         }
@@ -395,8 +395,8 @@ namespace dye {
 
     { // Perform a complete rebalance on all ensembles together. NOTE TODOL touchcreate is the preferred way to initialize particle array of a species. But in communication, touchcreate is not possible unless how others are sending you can be known a priori. While one could use a general buffer for all species, here we assume all species are touch created before dynamic_load_balance.
       if ( ens_opt ) {
-        for ( auto&[sp, ptcs] : particles ) {
-          detailed_balance(ptcs, ens_opt->intra);
+        for ( auto sp : particles ) {
+          detailed_balance(particles[sp], ens_opt->intra);
         }
       }
     }

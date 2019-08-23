@@ -7,5 +7,9 @@ namespace particle {
 
   inline constexpr int NUM_SPECIES = 5;
 }
+inline constexpr particle::species EL = particle::species::electron;
+inline constexpr particle::species PO = particle::species::positron;
+inline constexpr particle::species IO = particle::species::ion;
+inline constexpr particle::species PH = particle::species::photon;
 
 #endif

@@ -106,8 +106,8 @@ namespace pic {
           return ( q >= lb ) + ( q >= ub );
         };
 
-      for ( auto&[ sp, ptcs ] : _particles ) {
-        for ( auto ptc : ptcs ) { // TODOL semantics
+      for ( auto sp : _particles ) {
+        for ( auto ptc : _particles[sp] ) { // TODOL semantics
           if ( !ptc.is(particle::flag::exist) ) continue;
           particle::migrInt<DGrid> mig_dir{};
           for ( int i = 0; i < DGrid; ++i ) {
@@ -187,7 +187,7 @@ namespace pic {
       // NOTE all species in the game should be created regardless of whether they appear on certain processes. This is to make the following work
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
       // 2. data export. PutMultivar requires every patch to output every species
-      for ( const auto& [sp, ignore] : particle::properties )
+      for ( auto sp : particle::properties )
         _particles.insert( sp, particle::array<Real, PtcSpecs>() );
 
       if ( _ens_opt ) update_parts(*_ens_opt);
@@ -262,7 +262,7 @@ namespace pic {
             lgr::file % "SortParticles" << "==>>" << std::endl;
             stamp.emplace();
           }
-          for ( auto&[ sp, ptcs ] : _particles ) particle::sort( ptcs );
+          for ( auto sp : _particles ) particle::sort( _particles[sp] );
           if (stamp) {
             lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
           }
@@ -270,8 +270,8 @@ namespace pic {
 
         if ( stamp && _particles.size() != 0 ) {
           lgr::file % "ParticleCounts:" << std::endl;
-          for ( const auto&[ sp, ptcs ] : _particles )
-            lgr::file % "\t" << particle::properties[sp].name << " = " << ptcs.size() << std::endl;
+          for ( auto sp : _particles )
+            lgr::file % "\t" << particle::properties[sp].name << " = " << _particles[sp].size() << std::endl;
         }
 
         // ----- before this line particles are all within borders --- //
@@ -351,15 +351,9 @@ namespace pic {
         }
         if ( _ens_opt ) { // first reduce N_scat to avoid data loss
           const auto& ens = *_ens_opt;
-          std::vector<particle::load_t> buffer;
-          for ( auto& [sp, l] : particle::N_scat ) {
-            buffer.push_back(l);
-            l = 0; // reset all the counters of all processes
-          }
-          ens.intra.template reduce<true>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
-          if ( ens.intra.rank() == ens.chief ) {
-            int idx = 0;
-            for ( auto& [sp, l] : particle::N_scat ) l = buffer[idx++];
+          ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+          if ( !ens.is_chief() ) {
+            for ( auto& x : particle::N_scat.data() ) x = 0;
           }
         }
         // TODO has a few hyper parameters
@@ -395,15 +389,9 @@ namespace pic {
         }
         if ( _ens_opt ) { // first reduce N_scat to avoid data loss
           const auto& ens = *_ens_opt;
-          std::vector<particle::load_t> buffer;
-          for ( auto& [sp, l] : particle::N_scat ) {
-            buffer.push_back(l);
-            l = 0; // reset all the counters of all processes
-          }
-          ens.intra.template reduce<true>( mpi::by::SUM, ens.chief, buffer.data(), buffer.size() );
-          if ( ens.intra.rank() == ens.chief ) {
-            int idx = 0;
-            for ( auto& [sp, l] : particle::N_scat ) l = buffer[idx++];
+          ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+          if ( !ens.is_chief() ) {
+            for ( auto& x : particle::N_scat.data() ) x = 0;
           }
         }
         auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, particle::N_scat );

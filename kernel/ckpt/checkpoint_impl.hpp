@@ -116,8 +116,8 @@ namespace ckpt {
 
     std::vector<particle::load_t> loads;
     loads.reserve(particles.size());
-    for ( const auto& [sp, ptcs] : particles )
-      loads.push_back(ptcs.size());
+    for ( auto sp : particles )
+      loads.push_back(particles[sp].size());
 
     ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
 
@@ -129,8 +129,8 @@ namespace ckpt {
 
               using T = std::underlying_type_t<particle::species>;
               std::vector<T> sps;
-              for ( const auto& elm : particles )
-                sps.push_back( static_cast<T>(elm.first) );
+              for ( auto sp : particles )
+                sps.push_back( static_cast<T>(sp) );
               dbfile.write( "/species", sps  );
 
               dbfile.write( "/timestep", timestep );
@@ -145,15 +145,15 @@ namespace ckpt {
               FieldCkpt<Real,DGrid> ckpt;
               if ( ens.intra.rank() == ens.chief ) {
                 int idx = 0;
-                for ( const auto& elm : particles )
-                  dbfile.write( particle::properties[elm.first].name + "_load", loads[idx++] );
+                for ( auto sp : particles )
+                  dbfile.write( particle::properties[sp].name + "_load", loads[idx++] );
 
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
 
                 { // write N_scat
                   std::vector<int> buffer;
-                  for ( const auto& [sp, l] : N_scat ) buffer.push_back(static_cast<int>(sp));
+                  for ( auto sp : N_scat ) buffer.push_back(static_cast<int>(sp));
                   dbfile.write( "N_scat_sp", buffer );
                   dbfile.write( "N_scat_data", N_scat.data() );
                 }
@@ -165,8 +165,8 @@ namespace ckpt {
               int r = ens.intra.rank();
               dbfile.write( "r", r );
               ParticleArrayCkpt<Real, PtcSpecs> ckpt;
-              for ( const auto& elm : particles ) {
-                ckpt.save( dbfile, elm.first, elm.second );
+              for ( auto sp : particles ) {
+                ckpt.save( dbfile, sp, particles[sp] );
               }
             }
             dbfile.cd("..");

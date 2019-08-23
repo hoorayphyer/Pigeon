@@ -179,8 +179,8 @@ namespace particle {
                  const mani::Grid< Real, DGrid >& grid,
                  Real dt, int timestep, util::Rng<Real>& rng
                  ) {
-    for ( const auto&[ sp, ptcs ] : particles ) {
-      update_species( sp, ptcs, J, dt, E, B, grid, rng );
+    for ( auto sp : particles ) {
+      update_species( sp, particles[sp], J, dt, E, B, grid, rng );
     }
 
     { // Put particles where they belong after scattering

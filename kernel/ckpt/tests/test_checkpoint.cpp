@@ -23,8 +23,7 @@ namespace particle {
   map<load_t> N_scat
   = [](){
       map<load_t> res;
-      for ( const auto& [sp, ignore ] : properties)
-        res.insert(sp,0);
+      for ( auto sp : properties) res.insert(sp,0);
       return res;
     }();
 }
@@ -96,10 +95,10 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
           }
         }
 
-        for ( auto[sp,load] : ens[label].rank[rank] ) {
+        for ( auto sp : ens[label].rank[rank] ) {
           particles.insert(sp);
           auto& ptcs = particles[sp];
-          for ( int i = 0; i < load; ++i ) {
+          for ( int i = 0; i < ens[label].rank[rank][sp]; ++i ) {
             ptcs.emplace_back({i * fq(0),i * fq(1),i * fq(2)},
                               {-i * fp(0),-i * fp(1),-i * fp(2)},
                               sp);
@@ -256,7 +255,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
     aio::unif_real<Real> unif;
 
     const int num_ptcs = 10000;
-    for ( const auto& [sp, ignore] : properties ) {
+    for ( auto sp : properties ) {
       ptcs_bef.insert( sp, array<Real, Specs>() );
       for ( int i = 0; i < num_ptcs; ++i ) {
         particle::Particle<Real,Specs> x;
@@ -275,7 +274,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
   mpi::world.barrier();
 
   map<array<Real,Specs>> ptcs_aft;
-  for ( const auto& [sp, ignore] : properties ) {
+  for ( auto sp : properties ) {
     ptcs_aft.insert( sp, array<Real, Specs>() );
   }
 
@@ -287,7 +286,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
     REQUIRE( ckpt_ts == timestep );
   }
 
-  for ( const auto& [sp, ignore] : properties ) {
+  for ( auto sp : properties ) {
     auto [ Nptc_bef, Nptc_aft, count_matched, Nremain_bef, Nremain_aft ]
       = debug::compare_particles( std::move(ptcs_bef[sp]), std::move(ptcs_aft[sp]), mpi::world );
   }
