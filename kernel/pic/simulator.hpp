@@ -365,12 +365,10 @@ namespace pic {
 
         std::optional<int> new_label;
         if ( _ens_opt ) new_label.emplace(_ens_opt->label());
-        if (stamp) {
-          lgr::file % "  update parts of simulator..." << std::endl;
-          stamp.emplace();
-        }
+        if (stamp) lgr::file % "  update parts of simulator..." << std::endl;
         if ( old_label != new_label ) update_parts(*_ens_opt);
         if (stamp) {
+          lgr::file % "  Done." << std::endl;
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
       }
