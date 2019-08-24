@@ -1,5 +1,5 @@
-#ifndef _PARTICLE_STATS_HPP_
-#define _PARTICLE_STATS_HPP_
+#ifndef _PIC_VITALS_HPP_
+#define _PIC_VITALS_HPP_
 
 #include "particle/load_type.hpp"
 #include "particle/properties.hpp"
@@ -8,12 +8,16 @@
 #include <fstream>
 #include <limits>
 
-namespace particle {
+namespace pic {
   template < int DGrid,
              typename T,
              template < typename > class S
              >
-  void statistics( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens, const std::optional<mpi::CartComm>& cart, const map<array<T,S>>& particles, map<load_t>& N_scat ) {
+  void check_vitals( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens,
+                     const std::optional<mpi::CartComm>& cart,
+                     const particle::map<particle::array<T,S>>& particles,
+                     particle::map<particle::load_t>& N_scat ) {
+    using namespace particle;
     static bool first_time = true;
     static tmr::Timestamp stopwatch;
 

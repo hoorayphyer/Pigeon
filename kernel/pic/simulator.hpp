@@ -22,7 +22,7 @@
 #include "timer/timer.hpp"
 #include "filesys/filesys.hpp"
 
-#include "pic/stats.hpp"
+#include "pic/vitals.hpp"
 
 #ifdef PIC_DEBUG
 #include "debug/debugger.hpp"
@@ -373,12 +373,12 @@ namespace pic {
         }
       }
 
-      if (_ens_opt && is_do(pic::stats_mr, timestep) ) {
+      if (_ens_opt && is_do(pic::vitals_mr, timestep) ) {
         if (stamp) {
           lgr::file % "Statistics" << "==>>" << std::endl;
           stamp.emplace();
         }
-        particle::statistics( pic::this_run_dir + "/statistics.txt", timestep, *_ens_opt, _cart_opt, _particles, particle::N_scat );
+        pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep, *_ens_opt, _cart_opt, _particles, particle::N_scat );
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }
