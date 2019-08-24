@@ -4,6 +4,7 @@
 #include "particle/load_type.hpp"
 #include "particle/properties.hpp"
 #include "apt/csi.hpp"
+#include "timer/timer.hpp"
 #include <fstream>
 #include <limits>
 
@@ -14,6 +15,8 @@ namespace particle {
              >
   void statistics( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens, const std::optional<mpi::CartComm>& cart, const map<array<T,S>>& particles, map<load_t>& N_scat ) {
     static bool first_time = true;
+    static tmr::Timestamp stopwatch;
+
     std::vector<load_t> buffer;
     { // reduce N_scat to world rank 0
       ens.reduce_to_chief( mpi::by::SUM, N_scat.data().data(), N_scat.data().size() );
@@ -78,7 +81,7 @@ namespace particle {
     {
       std::ofstream out(filename, std::ios_base::app);
       if ( first_time ) {
-        out << "timestep|\tnprocs";
+        out << "timestep|\tnprocs|\tlapse/hr";
         for ( auto sp : particles )
           out << "|\t" << properties[sp].name;
         out << "|\t" << "cumulative new ptcs from scattering" << std::endl;
@@ -89,7 +92,8 @@ namespace particle {
         out << std::endl;
         first_time = false;
       }
-      out << timestep << "|\t" << nprocs;
+      float lps = stopwatch.lapse().in_units_of("s").val() / 3600.0;
+      out << timestep << "|\t" << nprocs << "|\t" << lps;
       for ( auto sp : particles )
         out << "|\t" << apt::csi(ave[sp]) << ", " << apt::csi(max[sp]) << ", " << apt::csi(min[sp]);
       out << "|\t";
