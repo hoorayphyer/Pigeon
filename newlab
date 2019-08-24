@@ -20,6 +20,7 @@ cd $name
 ln -s $top_dir/stage $(pwd)/stage
 ln -s $top_dir/delrun $(pwd)/delrun
 ln -s $top_dir/jnl $(pwd)/jnl
+ln -s $top_dir/comment $(pwd)/comment
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1

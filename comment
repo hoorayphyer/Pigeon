@@ -1,0 +1,34 @@
+#! /bin/bash
+# locate journal.txt. Proceed if and only if one match is found
+cmd='grep -l "$1" .stages/*/journal.txt -r'
+numf=$(eval $cmd | wc -l)
+if (( numf > 1)); then
+    echo "ERROR : matched more than 1 journal.txt"
+    eval $cmd
+    exit 0
+elif (( numf == 0 )); then
+    echo "ERROR : no matched journal.txt."
+    echo "NOTE filenames are not matched against."
+    exit 0
+fi
+journal=$(eval $cmd)
+
+# add comment to journal.txt. Open with vim, place cursor to last line. If no "Comment :", first create it
+vim_after=".vim_comment"
+printf "%s\n" \
+       'if !search("Comment := ")' \
+       '    execute "normal! GoComment := "' \
+       'endif' \
+       'execute "normal! $"' \
+       > $vim_after
+vim $journal -S $vim_after
+rm $vim_after
+
+# copy this journal file to DataDir if existed
+datadir=$(grep "DataDir" $journal -r)
+datadir=${datadir:$(expr length "DataDir")} # substring ${substr:position:length}
+if [[ $datadir == "" ]]; then
+    echo "DataDir not existed. Skip copying journal."
+else
+    cp $journal $datadir
+fi

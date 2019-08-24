@@ -69,6 +69,8 @@ int main(int argc, char** argv) {
                              std::ofstream out;
                              out.open("journal.txt", std::ios_base::app);
                              out << "DataDir := " << pic::this_run_dir << std::endl;
+                             if ( pic::resume_dir )
+                               out << "Resume := " << *pic::resume_dir << std::endl;
                              out.close();
                              // NOTE fs::rename doesn't work on some platforms because of cross-device link.
                              fs::copy_file( "journal.txt", pic::this_run_dir+"/journal.txt" );
