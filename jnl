@@ -1,6 +1,6 @@
 #! /bin/bash
 # -H forces to output filename even there is only one match
-grep -H -e "Message := " -e "JobID := " -e "DataDir := " .stages/*/journal.txt -r | \
+grep -H -e "Message := " -e "JobID := " -e "DataDir := " -e "Resume := " -e "Comment := " .stages/*/journal.txt -r | \
     awk '\
 BEGIN{ journal = ""; }\
  { \
