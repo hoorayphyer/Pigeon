@@ -18,7 +18,8 @@ namespace pic {
                      const particle::map<particle::array<T,S>>& particles,
                      particle::map<particle::load_t>& N_scat ) {
     using namespace particle;
-    static bool first_time = true;
+    static int counter = 0;
+    constexpr int interval = 40;
     static tmr::Timestamp stopwatch;
 
     std::vector<load_t> buffer;
@@ -84,7 +85,7 @@ namespace pic {
 
     {
       std::ofstream out(filename, std::ios_base::app);
-      if ( first_time ) {
+      if ( counter % interval == 0 ) {
         out << "timestep|\tnprocs|\tlapse/hr";
         for ( auto sp : particles )
           out << "|\t" << properties[sp].name;
@@ -94,8 +95,9 @@ namespace pic {
         for ( auto sp : N_scat )
           out << properties[sp].nickname << " ";
         out << std::endl;
-        first_time = false;
+        counter = 0;
       }
+      ++counter;
       float lps = stopwatch.lapse().in_units_of("s").val() / 3600.0;
       out << timestep << "|\t" << nprocs << "|\t" << lps;
       for ( auto sp : particles )
