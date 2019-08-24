@@ -25,8 +25,8 @@ vim $journal -S $vim_after
 rm $vim_after
 
 # copy this journal file to DataDir if existed
-datadir=$(grep "DataDir" $journal -r)
-datadir=${datadir:$(expr length "DataDir")} # substring ${substr:position:length}
+datadir=$(grep "DataDir := " $journal -r)
+datadir=${datadir:$(expr length "DataDir := ")} # substring ${substr:position:length}
 if [[ $datadir == "" ]]; then
     echo "DataDir not existed. Skip copying journal."
 else
