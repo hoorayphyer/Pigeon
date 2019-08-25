@@ -1,17 +1,9 @@
 #! /bin/bash
-# locate journal.txt. Proceed if and only if one match is found
-cmd='grep -l "$1" .stages/*/journal.txt -r'
-numf=$(eval $cmd | wc -l)
-if (( numf > 1)); then
-    echo "ERROR : matched more than 1 journal.txt"
-    eval $cmd
-    exit 0
-elif (( numf == 0 )); then
-    echo "ERROR : no matched journal.txt."
-    echo "NOTE filenames are not matched against."
-    exit 0
+journal=$(../pick $1)
+ret=$?
+if [[ $ret != 0 ]]; then # check return code
+    exit $ret
 fi
-journal=$(eval $cmd)
 
 # add comment to journal.txt. Open with vim, place cursor to last line. If no "Comment :", first create it
 vim_after=".vim_comment"
