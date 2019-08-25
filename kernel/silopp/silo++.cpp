@@ -41,3 +41,9 @@ namespace silo {
   }
 
 }
+
+namespace silo {
+  std::string errmsg() {
+    return std::string (DBErrFuncname()) + " : " + std::string (DBErrString());
+  }
+}

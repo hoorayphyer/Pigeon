@@ -27,4 +27,8 @@ namespace silo {
   inline void close( file_t& f ) { f.reset(); }
 }
 
+namespace silo {
+  std::string errmsg();
+}
+
 #endif

@@ -9,6 +9,11 @@
 #include "dye/dynamic_balance.hpp"
 #include "dye/scatter_load.hpp"
 
+#ifdef PIC_DEBUG
+#include "debug/debugger.hpp"
+#include "logger/logger.hpp"
+#endif
+
 // auxilliary
 namespace ckpt {
   template < typename T, int DGrid >
@@ -25,7 +30,13 @@ namespace ckpt {
     void load( silo::file_t& dbfile, const std::string& name, field::Field<T,DField,DGrid>& f ) {
       for ( int comp = 0; comp < DField; ++comp ) {
         auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
+#ifdef PIC_DEBUG
+        lgr::file << "LDCKPT Field " << n << ", length of ckpt data = " << dbfile.var_length(n) << ", length of container = " << f._comps[comp].size() << std::endl;
+#endif
         dbfile.read( n, f._comps[comp].data() );
+#ifdef PIC_DEBUG
+        lgr::file << silo::errmsg() << std::endl;
+#endif
       }
     }
   };
@@ -51,20 +62,38 @@ namespace ckpt {
     void load( silo::file_t& dbfile, const particle::species& sp, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
       dbfile.cd( particle::properties[sp].name );
       auto N = dbfile.read1<particle::load_t>("load");
+#ifdef PIC_DEBUG
+      lgr::file << "LDCKPT SPECIES " << particle::properties[sp].name << ", Load = " << N << std::endl;
+#endif
 
       if ( 0 != N ) {
         auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
+#ifdef PIC_DEBUG
+        lgr::file << "LDCKPT SPECIES " << particle::properties[sp].name << ", Load = " << N << std::endl;
+#endif
         auto size_old = ptcs.size();
         ptcs.resize(size_old + num);
 
         constexpr auto DPtc = PtcSpecs<T>::Dim;
         apt::array<int, 3> slice { from, num, 1 };
+#ifdef PIC_DEBUG
+        lgr::file << "LDCKPT Slice from = " << from << ", length = " << num << ", stride = " << 1 << std::endl;
+#endif
         {
           for ( int i = 0; i < DPtc; ++i ) {
             dbfile.readslice("q"+std::to_string(i+1), {slice}, ptcs._q[i].data() + size_old );
+#ifdef PIC_DEBUG
+            lgr::file << silo::errmsg() << std::endl;
+#endif
             dbfile.readslice("p"+std::to_string(i+1), {slice}, ptcs._p[i].data() + size_old );
+#ifdef PIC_DEBUG
+            lgr::file << silo::errmsg() << std::endl;
+#endif
           }
           dbfile.readslice("state", {slice}, ptcs._state.data() + size_old );
+#ifdef PIC_DEBUG
+          lgr::file << silo::errmsg() << std::endl;
+#endif
         }
       }
       dbfile.cd("..");
@@ -205,10 +234,20 @@ namespace ckpt {
       assert( dbfile.var_exists("/species") );
 
       dbfile.read("/timestep", &checkpoint_ts);
+#ifdef PIC_DEBUG
+      lgr::file << "LDCKPT timestep = " << checkpoint_ts << std::endl;
+      lgr::file << silo::errmsg() << std::endl;
+#endif
       {
         int ndims = dbfile.var_length("/cartesian_partition");
         std::vector<int> parts(ndims);
         dbfile.read("/cartesian_partition", parts.data());
+#ifdef PIC_DEBUG
+        lgr::file << "LDCKPT cartesian_partition = (";
+        for ( auto x : parts ) lgr::file << x << ",";
+        lgr::file << ")" << std::endl;
+        lgr::file << silo::errmsg() << std::endl;
+#endif
         num_ens = 1;
         for ( auto x : parts ) num_ens *= x;
       }
@@ -216,6 +255,12 @@ namespace ckpt {
         num_sps = dbfile.var_length("/species");
         sps.resize( num_sps );
         dbfile.read("/species", sps.data() );
+#ifdef PIC_DEBUG
+        lgr::file << "LDCKPT species = (";
+        for ( auto x : sps ) lgr::file << x << ",";
+        lgr::file << ")" << std::endl;
+        lgr::file << silo::errmsg() << std::endl;
+#endif
       }
     }
     // rank0 broadcast data
@@ -229,6 +274,19 @@ namespace ckpt {
         sps.resize(num_sps);
       }
       mpi::world.broadcast( 0, sps.data(), sps.size() );
+#ifdef PIC_DEBUG
+      if ( mpi::world.rank() != 0 ) {
+        lgr::file << "LDCKPT timestep = " << checkpoint_ts << std::endl;
+
+        lgr::file << "LDCKPT cartesian_partition = (";
+        for ( auto x : parts ) lgr::file << x << ",";
+        lgr::file << ")" << std::endl;
+
+        lgr::file << "LDCKPT species = (";
+        for ( auto x : sps ) lgr::file << x << ",";
+        lgr::file << ")" << std::endl;
+      }
+#endif
     }
     // each primary figure out its load
     if ( cart_opt ) {
@@ -248,6 +306,10 @@ namespace ckpt {
                 assert( sf.var_exists(entry) );
                 myload += sf.read1<particle::load_t>(entry);
               }
+#ifdef PIC_DEBUG
+              lgr::file << "LDCKPT Label = " << mylabel << ", Load = " << myload << std::endl;
+              lgr::file << silo::errmsg() << std::endl;
+#endif
               is_found = true;
               sf.cd("..");
               break;
@@ -284,8 +346,22 @@ namespace ckpt {
             f_ckpt.load( sf, "E", E );
             f_ckpt.load( sf, "B", B );
             {
+              assert( dbfile.var_exists("N_scat_sp") );
+              assert( dbfile.var_exists("N_scat_data") );
+
               const auto buf_sp = sf.read1d<int>("N_scat_sp");
+#ifdef PIC_DEBUG
+              lgr::file << "LDCKPT N_scat_sp, size = " << dbfile.var_length("N_scat_sp") << ", data = (";
+              for ( auto x : buf_sp ) lgr::file << x << ", ";
+              lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
+#endif
+
               const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
+#ifdef PIC_DEBUG
+              lgr::file << "LDCKPT N_scat_data, size = " << dbfile.var_length("N_scat_data") << ", data = (";
+              for ( auto x : buf_data ) lgr::file << x << ", ";
+              lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
+#endif
               for ( int i = 0; i < buf_sp.size(); ++i )
                 N_scat[static_cast<particle::species>(buf_sp[i])] = buf_data[i];
             }
@@ -294,6 +370,10 @@ namespace ckpt {
             if ( rdir.find("rank") != 0 ) continue;
             sf.cd(rdir);
             int r = sf.read1<int>("r");
+#ifdef PIC_DEBUG
+            lgr::file << "LDCKPT rank = " << r << std::endl;
+            lgr::file << silo::errmsg() << std::endl;
+#endif
             for ( auto i : sps ) {
               auto sp = static_cast<particle::species>(i);
               p_ckpt.load( sf, sp, particles[sp], myrank + r, ens_size );
