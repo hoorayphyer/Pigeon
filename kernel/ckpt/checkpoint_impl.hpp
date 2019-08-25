@@ -344,19 +344,19 @@ namespace ckpt {
             f_ckpt.load( sf, "E", E );
             f_ckpt.load( sf, "B", B );
             {
-              assert( dbfile.var_exists("N_scat_sp") );
-              assert( dbfile.var_exists("N_scat_data") );
+              assert( sf.var_exists("N_scat_sp") );
+              assert( sf.var_exists("N_scat_data") );
 
               const auto buf_sp = sf.read1d<int>("N_scat_sp");
 #ifdef PIC_DEBUG
-              lgr::file << "LDCKPT N_scat_sp, size = " << dbfile.var_length("N_scat_sp") << ", data = (";
+              lgr::file << "LDCKPT N_scat_sp, size = " << sf.var_length("N_scat_sp") << ", data = (";
               for ( auto x : buf_sp ) lgr::file << x << ", ";
               lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
 #endif
 
               const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
 #ifdef PIC_DEBUG
-              lgr::file << "LDCKPT N_scat_data, size = " << dbfile.var_length("N_scat_data") << ", data = (";
+              lgr::file << "LDCKPT N_scat_data, size = " << sf.var_length("N_scat_data") << ", data = (";
               for ( auto x : buf_data ) lgr::file << x << ", ";
               lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
 #endif
