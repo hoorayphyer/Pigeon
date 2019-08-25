@@ -278,9 +278,7 @@ namespace ckpt {
       if ( mpi::world.rank() != 0 ) {
         lgr::file << "LDCKPT timestep = " << checkpoint_ts << std::endl;
 
-        lgr::file << "LDCKPT cartesian_partition = (";
-        for ( auto x : parts ) lgr::file << x << ",";
-        lgr::file << ")" << std::endl;
+        lgr::file << "LDCKPT num_ens = " << num_ens << std::endl;
 
         lgr::file << "LDCKPT species = (";
         for ( auto x : sps ) lgr::file << x << ",";
