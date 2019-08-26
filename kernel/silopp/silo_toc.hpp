@@ -13,9 +13,11 @@ namespace silo {
   private:
     inline DBfile* _dbfile() noexcept { return static_cast<file_t&>(*this).operator DBfile* (); }
 
+    std::vector<std::string> toc_impl( int num, char** names );
+
   public:
     std::vector<std::string> toc_dir();
-
+    std::vector<std::string> toc_array();
 
   };
 

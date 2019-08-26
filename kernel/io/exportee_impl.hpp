@@ -125,12 +125,13 @@ namespace io {
       apt::Index<DGrid> ext;
       for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
 
+      apt::array< field::offset_t, DGrid > ofs;
+      for ( int i = 0; i < DGrid; ++i ) ofs[i] = MIDWAY;
+
       const auto& prop = particle::properties[sp];
 
       for ( const auto& ptc : ptcs ) {
         if ( !ptc.is(particle::flag::exist) ) continue;
-        apt::array< field::offset_t, DGrid > ofs;
-        for ( int i = 0; i < DGrid; ++i ) ofs[i] = MIDWAY;
         msh::impl::WeightFinder<Real, DGrid,S<Real>::Dim, ShapeF> wf(msh::to_standard(grid, ptc.q()), ofs, ShapeF() );
 
         auto var = impl( particle::properties[sp], ptc );

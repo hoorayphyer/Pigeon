@@ -68,9 +68,6 @@ namespace ckpt {
 
       if ( 0 != N ) {
         auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
-#ifdef PIC_DEBUG
-        lgr::file << "LDCKPT SPECIES " << particle::properties[sp].name << ", Load = " << N << std::endl;
-#endif
         auto size_old = ptcs.size();
         ptcs.resize(size_old + num);
 
