@@ -4,8 +4,8 @@
 using namespace silo;
 
 void show_dir(file_t& sf, std::string indent) {
-  for ( auto arr : sf.toc_array() ) {
-    std::cout << indent << arr << ", len = " << sf.var_length(arr) << std::endl;
+  for ( auto var : sf.toc_var() ) {
+    std::cout << indent << var << ", len = " << sf.var_length(var) << std::endl;
   }
   for ( auto dir : sf.toc_dir() ) {
     std::cout << indent << "(D)" << dir << std::endl;

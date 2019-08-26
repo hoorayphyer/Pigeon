@@ -17,7 +17,8 @@ namespace silo {
 
   public:
     std::vector<std::string> toc_dir();
-    std::vector<std::string> toc_array();
+    // std::vector<std::string> toc_array();
+    std::vector<std::string> toc_var();
 
   };
 

@@ -17,10 +17,16 @@ namespace silo {
     return toc_impl(toc->ndir, toc->dir_names);
   }
 
+  // template < typename file_t >
+  // std::vector<std::string> Toc<file_t>::toc_array() {
+  //   DBtoc* toc = DBGetToc( _dbfile() );
+  //   return toc_impl(toc->narray, toc->array_names);
+  // }
+
   template < typename file_t >
-  std::vector<std::string> Toc<file_t>::toc_array() {
+  std::vector<std::string> Toc<file_t>::toc_var() {
     DBtoc* toc = DBGetToc( _dbfile() );
-    return toc_impl(toc->narray, toc->array_names);
+    return toc_impl(toc->nvar, toc->var_names);
   }
 }
 
