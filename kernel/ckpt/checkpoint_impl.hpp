@@ -331,11 +331,17 @@ namespace ckpt {
       FieldCkpt<Real,DGrid> f_ckpt;
       ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;
       for ( auto f : fs::directory_iterator(dir) ) {
+#ifdef PIC_DEBUG
+        lgr::file << "Reading file " << f << std::endl;
+#endif
         auto sf = silo::open(f, silo::Mode::Read);
         for ( const auto& dname : sf.toc_dir() ) {
           if ( dname.find("ensemble") != 0 ) continue;
           int l = sf.read1<int>(dname+"/label");
           if ( l != mylabel ) continue;
+#ifdef PIC_DEBUG
+          lgr::file << "Reading EB from " << dname << std::endl;
+#endif
           sf.cd(dname);
           if ( 0 == myrank && sf.var_exists("rank0") ) { // NOTE: ranks of one ensemble may exist across files
             f_ckpt.load( sf, "E", E );
