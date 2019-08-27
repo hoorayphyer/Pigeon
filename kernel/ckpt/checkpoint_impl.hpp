@@ -337,7 +337,7 @@ namespace ckpt {
           int l = sf.read1<int>(dname+"/label");
           if ( l != mylabel ) continue;
           sf.cd(dname);
-          if ( 0 == myrank ) {
+          if ( 0 == myrank && sf.var_exists("rank0") ) { // NOTE: ranks of one ensemble may exist across files
             f_ckpt.load( sf, "E", E );
             f_ckpt.load( sf, "B", B );
             {
