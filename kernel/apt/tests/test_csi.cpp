@@ -7,6 +7,21 @@ using namespace apt;
 TEMPLATE_TEST_CASE("Test csi", "[apt]" , int, long, long long) {
   using T = TestType;
   T x {};
+  SECTION("beginning zeros") {
+    x = 1024;
+    CHECK(csi(x) == "1,024");
+    CHECK_FALSE(csi(x) == "1,24");
+
+    x = 1004;
+    CHECK(csi(x) == "1,004");
+    CHECK_FALSE(csi(x) == "1,4");
+
+    x = 1000;
+    CHECK(csi(x) == "1,000");
+    CHECK_FALSE(csi(x) == "1,0");
+    CHECK_FALSE(csi(x) == "1,");
+  }
+
   SECTION("positive number") {
     x = 7;
     CHECK(csi(x) == "7");
