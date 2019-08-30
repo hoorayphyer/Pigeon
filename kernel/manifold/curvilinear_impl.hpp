@@ -81,7 +81,7 @@ namespace mani {
         dx[0] = dx[0] * cos - dx[1] * sin;
         dx[1] = dt;
 
-        dt = std::atan( dx[2] / dt ) + PI<T> * is_massive;
+        dt = (dt == static_cast<T>(0)) ? 0.0 : std::atan( dx[2] / dt ) + PI<T> * is_massive;
         dx[2] = std::sqrt( dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]);
         dx[1] = std::acos( dx[0] / dx[2] );
         std::swap( dt, dx[2] );
