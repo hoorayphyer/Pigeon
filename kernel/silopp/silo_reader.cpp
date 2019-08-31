@@ -34,16 +34,21 @@ namespace silo {
 
   template < typename file_t >
   void Reader<file_t>::readslice( std::string varname, const std::vector<apt::array<int,3>>& slice, void* var ) {
+    // NOTE silo requires that length >= 1 and stride >= 1.
     int ndims = slice.size();
+    bool has_zero = false;
     std::vector<int> offset(ndims);
     std::vector<int> length(ndims);
     std::vector<int> stride(ndims);
     for ( int i = 0; i < ndims; ++i ) {
       offset[i] = slice[i][0];
       length[i] = slice[i][1];
-      stride[i] = slice[i][2];
+      if ( 0 == length[i] ) has_zero = true;
+      stride[i] = std::max(slice[i][2], 1);
     }
-    DBReadVarSlice(_dbfile(), varname.c_str(), offset.data(), length.data(), stride.data(), ndims, var );
+    if ( !has_zero ) {
+      DBReadVarSlice(_dbfile(), varname.c_str(), offset.data(), length.data(), stride.data(), ndims, var );
+    }
   }
 
 }

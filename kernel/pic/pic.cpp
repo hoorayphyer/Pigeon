@@ -63,14 +63,17 @@ int main(int argc, char** argv) {
     pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
+    std::optional<std::string> resume_dir;
+    pic::set_resume_dir(resume_dir);
+
     // journaling
     fs::mpido( mpi::world, [&](){
                              if ( !fs::exists("journal.txt") ) return;
                              std::ofstream out;
                              out.open("journal.txt", std::ios_base::app);
                              out << "DataDir := " << pic::this_run_dir << std::endl;
-                             if ( pic::resume_dir )
-                               out << "Resume := " << *pic::resume_dir << std::endl;
+                             if ( resume_dir )
+                               out << "Resume := " << *resume_dir << std::endl;
                              out.close();
                              // NOTE fs::rename doesn't work on some platforms because of cross-device link.
                              fs::copy_file( "journal.txt", pic::this_run_dir+"/journal.txt" );
@@ -95,7 +98,7 @@ int main(int argc, char** argv) {
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t, pic::Metric >
       sim( pic::supergrid, cart_opt, pic::guard );
 
-    int init_timestep = sim.load_initial_condition( pic::resume_dir );
+    int init_timestep = sim.load_initial_condition( resume_dir );
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {

@@ -124,7 +124,7 @@ namespace ckpt {
     char str_ts [10];
     sprintf(str_ts, "%06d\0", timestep);
 
-    prefix = prefix + "/checkpoints/checkpoint_timestep" + str_ts;
+    prefix = prefix + "/checkpoints/timestep" + str_ts;
 
     silo::Pmpio pmpio;
 
@@ -323,66 +323,65 @@ namespace ckpt {
 
     // by this step, all processes should have ens_opt set properly. The real loading begins now
     if ( !ens_opt ) return checkpoint_ts;
-    {
-      const int mylabel = ens_opt->label();
-      const int myrank = ens_opt->intra.rank();
-      const auto ens_size = ens_opt->intra.size();
 
-      FieldCkpt<Real,DGrid> f_ckpt;
-      ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;
-      for ( auto f : fs::directory_iterator(dir) ) {
-#ifdef PIC_DEBUG
-        lgr::file << "Reading file " << f << std::endl;
-#endif
-        auto sf = silo::open(f, silo::Mode::Read);
-        for ( const auto& dname : sf.toc_dir() ) {
-          if ( dname.find("ensemble") != 0 ) continue;
-          int l = sf.read1<int>(dname+"/label");
-          if ( l != mylabel ) continue;
-#ifdef PIC_DEBUG
-          lgr::file << "Reading EB from " << dname << std::endl;
-#endif
-          sf.cd(dname);
-          if ( 0 == myrank && sf.var_exists("rank0") ) { // NOTE: ranks of one ensemble may exist across files
-            f_ckpt.load( sf, "E", E );
-            f_ckpt.load( sf, "B", B );
-            {
-              assert( sf.var_exists("N_scat_sp") );
-              assert( sf.var_exists("N_scat_data") );
+    const int mylabel = ens_opt->label();
+    const int myrank = ens_opt->intra.rank();
+    const auto ens_size = ens_opt->intra.size();
 
-              const auto buf_sp = sf.read1d<int>("N_scat_sp");
+    FieldCkpt<Real,DGrid> f_ckpt;
+    ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;
+    for ( auto f : fs::directory_iterator(dir) ) {
 #ifdef PIC_DEBUG
-              lgr::file << "LDCKPT N_scat_sp, size = " << sf.var_length("N_scat_sp") << ", data = (";
-              for ( auto x : buf_sp ) lgr::file << x << ", ";
-              lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
+      lgr::file << "Reading file " << f << std::endl;
+#endif
+      auto sf = silo::open(f, silo::Mode::Read);
+      for ( const auto& dname : sf.toc_dir() ) {
+        if ( dname.find("ensemble") != 0 ) continue;
+        int l = sf.read1<int>(dname+"/label");
+        if ( l != mylabel ) continue;
+#ifdef PIC_DEBUG
+        lgr::file << "Reading EB from " << dname << std::endl;
+#endif
+        sf.cd(dname);
+        if ( 0 == myrank && sf.var_exists("rank0") ) { // NOTE: ranks of one ensemble may exist across files
+          f_ckpt.load( sf, "E", E );
+          f_ckpt.load( sf, "B", B );
+          {
+            assert( sf.var_exists("N_scat_sp") );
+            assert( sf.var_exists("N_scat_data") );
+
+            const auto buf_sp = sf.read1d<int>("N_scat_sp");
+#ifdef PIC_DEBUG
+            lgr::file << "LDCKPT N_scat_sp, size = " << sf.var_length("N_scat_sp") << ", data = (";
+            for ( auto x : buf_sp ) lgr::file << x << ", ";
+            lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
 #endif
 
-              const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
+            const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
 #ifdef PIC_DEBUG
-              lgr::file << "LDCKPT N_scat_data, size = " << sf.var_length("N_scat_data") << ", data = (";
-              for ( auto x : buf_data ) lgr::file << x << ", ";
-              lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
+            lgr::file << "LDCKPT N_scat_data, size = " << sf.var_length("N_scat_data") << ", data = (";
+            for ( auto x : buf_data ) lgr::file << x << ", ";
+            lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
 #endif
-              for ( int i = 0; i < buf_sp.size(); ++i )
-                N_scat[static_cast<particle::species>(buf_sp[i])] = buf_data[i];
-            }
+            for ( int i = 0; i < buf_sp.size(); ++i )
+              N_scat[static_cast<particle::species>(buf_sp[i])] = buf_data[i];
           }
-          for ( const auto& rdir : sf.toc_dir() ) {
-            if ( rdir.find("rank") != 0 ) continue;
-            sf.cd(rdir);
-            int r = sf.read1<int>("r");
+        }
+        for ( const auto& rdir : sf.toc_dir() ) {
+          if ( rdir.find("rank") != 0 ) continue;
+          sf.cd(rdir);
+          int r = sf.read1<int>("r");
 #ifdef PIC_DEBUG
-            lgr::file << "LDCKPT rank = " << r << std::endl;
-            lgr::file << silo::errmsg() << std::endl;
+          lgr::file << "LDCKPT rank = " << r << std::endl;
+          lgr::file << silo::errmsg() << std::endl;
 #endif
-            for ( auto i : sps ) {
-              auto sp = static_cast<particle::species>(i);
-              p_ckpt.load( sf, sp, particles[sp], myrank + r, ens_size );
-            }
-            sf.cd("..");
+          for ( auto i : sps ) {
+            auto sp = static_cast<particle::species>(i);
+            p_ckpt.load( sf, sp, particles[sp], myrank + r, ens_size );
           }
           sf.cd("..");
         }
+        sf.cd("..");
       }
     }
 

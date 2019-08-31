@@ -2,7 +2,7 @@
 #define  _SPECIES_PREDEF_HPP_
 
 namespace particle {
-  enum class species : char
+  enum class species : int
     { unknown=0, electron, positron, ion, photon };
 
   inline constexpr int NUM_SPECIES = 5;

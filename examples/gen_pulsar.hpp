@@ -37,7 +37,6 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr int total_timesteps = 20000;
   inline constexpr real_t dt = 0.003;
 
   constexpr mani::Grid<real_t,DGrid> supergrid
@@ -47,7 +46,8 @@ namespace pic {
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
-  std::optional<std::string> resume_dir;
+  inline void set_resume_dir( std::optional<std::string>& dir ) {}
+  inline constexpr int total_timesteps = 20000;
 }
 
 namespace pic {
