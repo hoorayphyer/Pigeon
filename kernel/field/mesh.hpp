@@ -108,7 +108,7 @@ namespace field {
 
     // NOTE I_bulk_begin[ith_dim] is not significant
     constexpr auto project( int ith_dim, apt::Index<D> I_bulk_begin, apt::Index<D> extent ) const noexcept {
-      return ProjBlock( *this, std::move(ith_dim), std::move(I_bulk_begin), std::move(extent) );;
+      return ProjBlock( *this, std::move(ith_dim), std::move(I_bulk_begin), std::move(extent) );
     }
 
 

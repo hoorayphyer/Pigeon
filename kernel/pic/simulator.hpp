@@ -6,6 +6,7 @@
 #include "field/updater.hpp"
 #include "particle/updater.hpp"
 #include "field/sync.hpp"
+#include "field/yee.hpp"
 
 #include "particle/migration.hpp"
 #include "particle/sorter.hpp"
@@ -71,13 +72,6 @@ namespace pic {
     // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
     // PairCreationTracker pairCreationTracker;
 
-    constexpr auto all_but( field::offset_t all, int but_comp ) noexcept {
-      apt::array<field::offset_t, DGrid> res;
-      apt::foreach<0,DGrid>( [&all]( auto& ofs ) { ofs = all; }, res );
-      if ( but_comp < DGrid ) res[but_comp] = !all;
-      return res;
-    }
-
     void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
         _grid[i] = _supergrid[i].divide( ens.cart_dims[i], ens.cart_coords[i] );
@@ -96,7 +90,7 @@ namespace pic {
                             );
 
       _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> (particle::properties));
-      if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open();
+      if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
     }
 
     void migrate_particles( int timestep ) {
@@ -176,9 +170,9 @@ namespace pic {
         _J = {{ bulk_dims, ( ShapeF::support() + 3 ) / 2 }};
 
         for( int i = 0; i < 3; ++i ) {
-          _E.set_offset( i, all_but( MIDWAY, i ) );
-          _B.set_offset( i, all_but( INSITU, i ) );
-          _J.set_offset( i, all_but( MIDWAY, i ) );
+          _E.set_offset( i, field::yee::ofs_gen<DGrid>( field::yee::Etype, i ) );
+          _B.set_offset( i, field::yee::ofs_gen<DGrid>( field::yee::Btype, i ) );
+          _J.set_offset( i, field::yee::ofs_gen<DGrid>( field::yee::Etype, i ) );
         }
         _E.reset();
         _B.reset();
