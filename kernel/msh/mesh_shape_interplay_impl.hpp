@@ -15,8 +15,8 @@ namespace msh::impl {
                             const apt::array< field::offset_t, DGrid >& offset,
                             const ShapeF& ) noexcept {
       apt::foreach<0,DGrid>
-        ( []( auto& i_b, auto& s_b, auto l, const auto& ofs ) {
-            l -= ofs; // now l is the native grid index
+        ( []( auto& i_b, auto& s_b, auto l, auto ofs ) {
+            l -= (0.5 * ofs); // now l is the native grid index
 
             static_assert( ShapeF::support() > 1); // TODOL
 

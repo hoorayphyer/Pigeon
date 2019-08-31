@@ -26,8 +26,8 @@ namespace ic {
                       ) {
       for ( auto I : apt::Block(extent) ) {
         I += Ib;
-        B[0](I) = B_r( grid[0].absc(I[0], B[0].offset()[0]), grid[1].absc(I[1], B[0].offset()[1]) );
-        B[1](I) = B_th( grid[0].absc(I[0], B[1].offset()[0]), grid[1].absc(I[1], B[1].offset()[1]) );
+        B[0](I) = B_r( grid[0].absc(I[0], 0.5 * B[0].offset()[0]), grid[1].absc(I[1], 0.5 * B[0].offset()[1]) );
+        B[1](I) = B_th( grid[0].absc(I[0], 0.5 * B[1].offset()[0]), grid[1].absc(I[1], 0.5 * B[1].offset()[1]) );
       }
     }
 

@@ -118,7 +118,7 @@ namespace io {
 
       for ( const auto& I : apt::Block(fds.mesh().bulk_dims()) ) {
 
-        for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], ofs[i]);
+        for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
 
         auto h = h_func(q[0], q[1], q[2]);
         if ( std::abs(h) > 1e-12 )
