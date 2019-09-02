@@ -14,6 +14,11 @@ namespace field::yee {
     if ( comp < DGrid ) res[comp] = {type};
     return res;
   }
+
+  template < offset_t Ftype >
+  constexpr offset_t ofs_get( int comp, int grid_dim ) noexcept { // NOTE: order doesn't matter
+    return ( comp == grid_dim ) ? Ftype : !Ftype;
+  }
 }
 
 #endif

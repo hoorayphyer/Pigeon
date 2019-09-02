@@ -18,37 +18,37 @@ namespace field {
       return  f - *(&f - stride);
     }
 
-    constexpr T diff2( const T& f, int stride ) const noexcept {
-      return *(&f + stride) + *(&f - stride) - 2.0 * f;
-    }
+    // constexpr T diff2( const T& f, int stride ) const noexcept {
+    //   return *(&f + stride) + *(&f - stride) - 2.0 * f;
+    // }
 
     template < int I, offset_t OFS_FIELD >
-    constexpr T D( const T& f, int stride ) const noexcept {
+    constexpr T D( const T& f ) const noexcept {
       static_assert( I >= 0 && I < 3 );
       if constexpr ( I >= DGrid ) return 0.0;
       else if ( offset_t(OFS_FIELD) == INSITU ) { // f being of Etype
-        return diff_plus(f,stride) / g[I].delta();
+        return diff_plus(f,s[I]) / g[I].delta();
       } else { // f being of Btype
-        return diff_minus(f,stride) / g[I].delta();
+        return diff_minus(f,s[I]) / g[I].delta();
       }
     }
 
-    template < int I >
-    constexpr T DD( const T& f, int stride ) const noexcept {
-      if constexpr ( I >= DGrid ) return 0.0;
-      else return diff2( f, stride ) / (g[I].delta() * g[I].delta());
-    }
+    // template < int I >
+    // constexpr T DD( const T& f ) const noexcept {
+    //   if constexpr ( I >= DGrid ) return 0.0;
+    //   else return diff2( f, s[I] ) / (g[I].delta() * g[I].delta());
+    // }
 
   public:
     const mani::Grid<T,DGrid>& g; // grid
+    const apt::Index<DGrid> s; // stride
 
-    template < int I >
-    constexpr T curlcurl( Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept {
-      const auto& m = f.mesh();
-      int li = m.linearized_index_of_whole_mesh(idx);
-      // used curlcurl == - laplacian for B field
-      return - ( DD<0>(f[I][li],m.stride(0)) + DD<1>(f[I][li],m.stride(1)) + DD<2>(f[I][li],m.stride(2)) );
-    }
+    // template < int I >
+    // constexpr T curlcurl( Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept {
+    //   int li = f.mesh().linearized_index_of_whole_mesh(idx);
+    //   // used curlcurl == - laplacian for B field
+    //   return - ( DD<0>(f[I][li]) + DD<1>(f[I][li]) + DD<2>(f[I][li]) );
+    // }
 
     template < int I, offset_t Ftype >
     constexpr T curl( Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept { // idx is with respect to f
@@ -58,7 +58,7 @@ namespace field {
       const auto& m = f.mesh();
       int li = m.linearized_index_of_whole_mesh(idx);
       // TODOL in c++20 there is templated lambda
-      return D<J,Ftype>( f[K][li], m.stride(J) ) - D<K,Ftype>( f[J][li], m.stride(K) );
+      return D<J,Ftype>( f[K][li] ) - D<K,Ftype>( f[J][li] );
     }
 
   };

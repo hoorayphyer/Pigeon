@@ -1,7 +1,8 @@
 #ifndef _FIELD_HAUGBOLLE_SOLVER_IMPL_HPP_
 #define _FIELD_HAUGBOLLE_SOLVER_IMPL_HPP_
 
-#include "field/haugbolle_solver/derivative_cartesian.hpp"
+// #include "field/haugbolle_solver/derivative_cartesian.hpp"
+#include "field/haugbolle_solver/derivative_logspherical.hpp"
 #include "field/haugbolle_solver/updater.hpp"
 #include "field/sync.hpp"
 
@@ -22,7 +23,17 @@ namespace field {
 
     const auto& mesh = E.mesh(); // TODO this implicitly requires J to have same grid as E
     const auto block = apt::Block(mesh.bulk_dims());
-    Derivative<DGrid,Real> d{grid};
+    Derivative<DGrid,Real> d{grid,mesh.strides()};
+
+    // NOTE the ranges are one cell into the guard
+    const auto [Ib_1st_curl, block_1st_curl ]
+      = [&mesh] () {
+          apt::Index<DGrid> Ib;
+          apt::Index<DGrid> ext = mesh.bulk_dims();
+          for ( auto& x : Ib ) x = -1;
+          for ( auto& x : ext ) x += 2;
+          return std::make_pair( Ib, apt::Block(ext));
+        } ();
 
     Field<Real,3,DGrid> tmp(E); // tmp holds old E values
 
@@ -35,22 +46,18 @@ namespace field {
         }
       }
       // add curl B to E
-      apt::Index<DGrid> Ib;
-      apt::Index<DGrid> ext = mesh.bulk_dims();
-      for ( auto& x : Ib ) x = -1; // NOTE the ranges are one cell into the guard
-      for ( auto& x : ext ) x += 2;
       Real prefactor = alpha*beta*dt;
       // TODO c++20 has templated lambda
-      for ( auto I : apt::Block(ext) ) {
-        I += Ib;
+      for ( auto I : block_1st_curl ) {
+        I += Ib_1st_curl;
         E[0](I) += prefactor * d.template curl<0,yee::Btype>(B,I);
       }
-      for ( auto I : apt::Block(ext) ) {
-        I += Ib;
+      for ( auto I : block_1st_curl ) {
+        I += Ib_1st_curl;
         E[1](I) += prefactor * d.template curl<1,yee::Btype>(B,I);
       }
-      for ( auto I : apt::Block(ext) ) {
-        I += Ib;
+      for ( auto I : block_1st_curl ) {
+        I += Ib_1st_curl;
         E[2](I) += prefactor * d.template curl<2,yee::Btype>(B,I);
       }
     }
@@ -72,20 +79,35 @@ namespace field {
         E[C][i] /= alpha;
       }
     }
-    { // 4. iteratively update B
-      constexpr int num_iteration = 5;
+    { // 4. iteratively update B. B_new = B_old - (alpha*dt)^2 * curl ( curl B_old ). Iterate as follows. Let X Y be two field objects, X stores B_old to start with
+      //   - curl X and stores into Y. NOTE curl X should be done from 1 cell into the guard
+      //   - X[i] -= (alpha * dt)^2 * (curl Y) [i]
+      //   - sync X
+      // now X has the updated B
+      constexpr int num_iteration = 4;
+      Real aatt = alpha * alpha * dt * dt;
       for ( int n = 0; n < num_iteration; ++n ) {
-        std::swap(B,tmp);
-        Real aatt = alpha * alpha * dt * dt;
+        for ( auto I : block_1st_curl ) {
+          I += Ib_1st_curl;
+          tmp[0](I) = d.template curl<0,yee::Btype>(B,I);
+        }
+        for ( auto I : block_1st_curl ) {
+          I += Ib_1st_curl;
+          tmp[1](I) = d.template curl<1,yee::Btype>(B,I);
+        }
+        for ( auto I : block_1st_curl ) {
+          I += Ib_1st_curl;
+          tmp[2](I) = d.template curl<2,yee::Btype>(B,I);
+        }
         // NOTE range is only in bulk
         for ( const auto& I : block ) {
-          B[0](I) = tmp[0](I) - aatt * d.template curlcurl<0>(tmp,I);
+          B[0](I) -= aatt * d.template curl<0,yee::Etype>(tmp,I);
         }
         for ( const auto& I : block ) {
-          B[1](I) = tmp[1](I) - aatt * d.template curlcurl<1>(tmp,I);
+          B[1](I) -= aatt * d.template curl<1,yee::Etype>(tmp,I);
         }
         for ( const auto& I : block ) {
-          B[2](I) = tmp[2](I) - aatt * d.template curlcurl<2>(tmp,I);
+          B[2](I) -= aatt * d.template curl<2,yee::Etype>(tmp,I);
         }
         copy_sync_guard_cells(B, comm);
       }
