@@ -116,11 +116,11 @@ namespace pic {
 
     bc::Injector<DGrid,Real> inj;
     {
+      constexpr Real N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( dt / wdt_pic, 2.0 );
       apt::tie(inj.Ib[0], inj.extent[0]) = gtl( field::ofs::indent[0] - 1, 1, supergrid[0], grid[0] );
       apt::tie(inj.Ib[1], inj.extent[1]) = gtl( {0.0, PI}, grid[1] );
       inj.v_th = 0.3;
-      inj.j_reg_x = 2.0;
-      inj.N_dot = 500.0;
+      inj.N_atm = 2.0 * N_atm_floor;
       inj.posion = particle::species::ion;
       inj.negaon = particle::species::electron;
       inj.omega_t = field::omega_spinup;

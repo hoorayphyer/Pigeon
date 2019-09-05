@@ -139,7 +139,7 @@ namespace io {
           for ( const auto& I : apt::Block(ext) ) {
             apt::Index<DGrid> Ids;
             for ( int i = 0; i < DGrid; ++i ) Ids[i] = ( wf.I_b()[i] + I[i] ) / ds_ratio;
-            fds[comp](Ids) += var[comp] * wf.weight(I);
+            fds[comp](Ids) += ptc.frac() * var[comp] * wf.weight(I);
           }
         }
 

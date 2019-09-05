@@ -38,6 +38,7 @@ namespace msh {
   // the opposite of interpolate. `var` is +=ed to field // NOTE, this is not same as depositing current
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   void deposit ( field::Field<T,DField,DGrid>& field,
+                 T frac,
                  apt::array<T, DField> var,
                  const apt::array<T,Dq>& q_std,
                  const ShapeF& shapef ) noexcept;

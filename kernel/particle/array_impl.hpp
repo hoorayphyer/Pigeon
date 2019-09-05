@@ -17,11 +17,11 @@ namespace particle {
 
   template < typename T, template < typename > class Specs >
   void array<T, Specs>::resize(std::size_t size) {
-    const auto old_size = _state.size();
     for ( int i = 0; i < DPtc; ++i ) {
       _q[i].resize( size, {} );
       _p[i].resize( size, {} );
     }
+    _frac.resize(size, {});
     _state.resize(size, {});
   }
 }

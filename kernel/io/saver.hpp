@@ -48,7 +48,7 @@ namespace io {
       }
     }
 
-    void PutMultimesh( auto mesh_type, silo::OptList oplst ) const {
+    void PutMultimesh( silo::MeshType mesh_type, silo::OptList oplst ) const {
       if ( master )
         master->put_multimesh( meshname, _cart_opt->size(), _file_ns,
                                _block_ns_prefix + meshname + _block_ns_postfix,

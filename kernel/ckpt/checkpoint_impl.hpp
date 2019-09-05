@@ -54,6 +54,7 @@ namespace ckpt {
           dbfile.write("q"+std::to_string(i+1), ptcs._q[i].data(), {ptcs._q[i].size()} );
           dbfile.write("p"+std::to_string(i+1), ptcs._p[i].data(), {ptcs._p[i].size()} );
         }
+        dbfile.write( "frac", ptcs._frac.data(), {ptcs._frac.size()} );
         dbfile.write( "state", ptcs._state.data(), {ptcs._state.size()} );
       }
       dbfile.cd("..");
@@ -87,6 +88,7 @@ namespace ckpt {
             lgr::file << silo::errmsg() << std::endl;
 #endif
           }
+          dbfile.readslice("frac", {slice}, ptcs._frac.data() + size_old );
           dbfile.readslice("state", {slice}, ptcs._state.data() + size_old );
 #ifdef PIC_DEBUG
           lgr::file << silo::errmsg() << std::endl;
@@ -110,7 +112,7 @@ namespace ckpt {
                                const field::Field<Real, 3, DGrid>& E,
                                const field::Field<Real, 3, DGrid>& B,
                                const particle::map<particle::array<Real,PtcSpecs>>& particles,
-                               const particle::map<particle::load_t>& N_scat
+                               const particle::map<double>& N_scat
 
                                ) {
     bool is_idle = !ens_opt;
@@ -212,7 +214,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
-                       particle::map<particle::load_t>& N_scat,
+                       particle::map<double>& N_scat,
                        int target_load
                        ) {
     int checkpoint_ts = 0;
@@ -357,7 +359,7 @@ namespace ckpt {
             lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
 #endif
 
-            const auto buf_data = sf.read1d<particle::load_t>("N_scat_data");
+            const auto buf_data = sf.read1d<double>("N_scat_data");
 #ifdef PIC_DEBUG
             lgr::file << "LDCKPT N_scat_data, size = " << sf.var_length("N_scat_data") << ", data = (";
             for ( auto x : buf_data ) lgr::file << x << ", ";

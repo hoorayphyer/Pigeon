@@ -5,16 +5,15 @@ namespace bc {
   template < int DGrid, typename Real >
   struct Injector {
   private:
-    field::Field<int,1,DGrid> _count_n;
-    field::Field<int,1,DGrid> _count_p;
+    field::Field<Real,1,DGrid> _count_n;
+    field::Field<Real,1,DGrid> _count_p;
 
   public:
     apt::Index<DGrid> Ib;
     apt::Index<DGrid> extent;
 
     Real v_th = 0.0;
-    Real j_reg_x = 0.0;
-    Real N_dot = 0.0;
+    Real N_atm = 0.0;
 
     particle::species posion = particle::species::ion;
     particle::species negaon = particle::species::electron;
@@ -57,61 +56,46 @@ namespace bc {
               apt::Index<DGrid> idx;
               for ( int i = 0; i < DGrid; ++i )
                 idx[i] = ( x.q()[i] - lb[i] ) / grid[i].delta();
-              ++count[0](idx);
+              count[0](idx) += x.frac(); // add by fraction
             }
           };
 
       f_count( _count_n, particles[negaon] );
       f_count( _count_p, particles[posion] );
 
-      // the idea is that (timestep + 1) * N_inj * profile represents the accummulated number of injected pairs through the specified timestep. NOTE the timestep is shifted by one to reflect the actual times the inject is called, including this time.
-      // NOTE _Jfield and Jmesh also differs in their underlying mesh guard cells
-      auto profile_inj =
-        [N_inj=N_dot*dt,timestep, &ens] ( Real theta ) noexcept {
-          Real inj_num_base = N_inj * 0.5 * std::abs( std::sin( 2 * theta ) );
-          auto N_tot = static_cast<int>( (timestep + 1) * inj_num_base ) - static_cast<int>( timestep * inj_num_base );
-          int r = ens.intra.rank();
-          int size = ens.size();
-          return N_tot / size + ( ((r + timestep) % size) < (N_tot % size) );
-        };
-
-      auto j_reg_inj =
-        [factor = j_reg_x * mani::dV(grid) / (particle::properties[posion].charge_x) ]( Real J ) noexcept {
-          return J * factor;
-        };
-
       auto itr_po = std::back_inserter(particles[posion]);
       auto itr_ne = std::back_inserter(particles[negaon]);
 
       for ( auto I : apt::Block(extent) ) {
-        int N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
+        auto N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
         I += Ib;
         apt::Vec<Real, Specs<Real>::Dim> q{};
         for ( int i = 0; i < DGrid; ++i )
           q[i] = grid[i].absc(I[i], 0.5);
 
-        apt::Vec<Real,3> nB, J_v;
+        apt::Vec<Real,3> nB;
         for ( int i = 0; i < 3; ++i ) {
           nB[i] = B[i](I);
-          J_v[i] = J[i](I);
         }
-
-        int num = std::max<Real>( profile_inj(q[1]), j_reg_inj(apt::abs(J_v)) - N_pairs );
-
-        // find n_B
-        nB /= apt::abs(nB);
+        if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
+        else nB /= apt::abs(nB);
 
         apt::Vec<Real, Specs<Real>::Dim> p{};
         p[2] = omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
 
-        for ( int n = 0; n < num; ++n ) {
+        // replenish
+        Real quota = ( N_atm * std::sin(q[1]) - N_pairs ) / ens.size(); // devide by ens_size() to parallelize
+        while ( quota > 0 ) {
           auto q_ptc = q;
+          Real frac = std::min( (Real)1.0, quota );
+          quota -= (Real)1.0;
+
           for ( int i = 0; i < DGrid; ++i )
             q_ptc[i] += grid[i].delta() * rng.uniform(-0.5, 0.5);
           auto p_ptc = p;
           p_ptc += nB * rng.gaussian( 0.0, v_th );
-          *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, negaon, birthplace(ens.label()) );
-          *(itr_po++) = Particle<Real,Specs>( std::move(q_ptc), std::move(p_ptc), posion, birthplace(ens.label()) );
+          *(itr_ne++) = Particle<Real,Specs>( q_ptc, p_ptc, frac, negaon, birthplace(ens.label()) );
+          *(itr_po++) = Particle<Real,Specs>( std::move(q_ptc), std::move(p_ptc), frac, posion, birthplace(ens.label()) );
         }
       }
     }

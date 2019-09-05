@@ -18,7 +18,7 @@ namespace field {
 }
 
 namespace particle {
-  extern map<load_t> N_scat;
+  extern map<double> N_scat;
 }
 
 namespace particle {

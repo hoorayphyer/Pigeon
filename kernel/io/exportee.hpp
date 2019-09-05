@@ -19,6 +19,7 @@ namespace io {
              const field::Field<Real, 3, DGrid>& B,
              const field::Field<RealJ, 3, DGrid>& J// J is Jmesh on a primary after reduction
              ) { return {}; }
+    virtual ~FieldExportee() = default;
   };
 }
 
@@ -38,6 +39,7 @@ namespace io {
              particle::species sp,
              const particle::array<Real,S>& ptcs
              ) { return {}; }
+    virtual ~PtcExportee() = default;
   };
 }
 

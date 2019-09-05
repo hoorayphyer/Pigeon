@@ -4,7 +4,7 @@
 #include "particle/state.hpp"
 
 namespace particle {
-  template < typename Ptc, typename Vec = typename Ptc::vec_type, typename State = typename Ptc::state_type >
+  template < typename Ptc, typename Vec = typename Ptc::vec_type, typename T = typename Vec::element_type, typename State = typename Ptc::state_type >
   struct PtcExpression : public particle::StateExpression<Ptc, State> {
     static constexpr int NDim = Ptc::NDim;
     using vec_type = Vec;
@@ -15,6 +15,9 @@ namespace particle {
 
     constexpr Vec& p() noexcept { return static_cast<Ptc&>(*this).p(); }
     constexpr const Vec& p() const noexcept { return static_cast<const Ptc&>(*this).p(); }
+
+    constexpr T& frac() noexcept { return static_cast<Ptc&>(*this).frac(); }
+    constexpr const T& frac() const noexcept { return static_cast<const Ptc&>(*this).frac(); }
 
     // NOTE state() are defined in StateExpression
   };

@@ -17,6 +17,7 @@ namespace particle {
   private:
     apt::array<std::vector<T>, Specs<T>::Dim> _q;
     apt::array<std::vector<T>, Specs<T>::Dim> _p;
+    std::vector<T> _frac;
     std::vector<typename Specs<T>::state_type> _state;
 
   public:
@@ -67,6 +68,7 @@ namespace particle {
       inline reference operator* () noexcept {
         return reference( build_ref_tuple(_array._q, _index),
                           build_ref_tuple(_array._p, _index),
+                          _array._frac[_index],
                           _array._state[_index] );
       }
 
@@ -97,6 +99,7 @@ namespace particle {
                  arr.push_back(x); };
       apt::foreach<0,DPtc> ( f, _q, ptc.q() );
       apt::foreach<0,DPtc> ( f, _p, ptc.p() );
+      f( _frac, ptc.frac() );
       f( _state, ptc.state() );
     }
 
@@ -106,14 +109,15 @@ namespace particle {
                  arr.push_back(x); };
       apt::foreach<0,DPtc> ( f, _q, ptc.q() );
       apt::foreach<0,DPtc> ( f, _p, ptc.p() );
+      f( _frac, ptc.frac() );
       f( _state, ptc.state() );
       ptc.reset(flag::exist);
     }
 
     // TODO emplace_back with braced-lists
     template < typename... Attrs >
-    inline void emplace_back( const apt::Vec<T,DPtc>& q, const apt::Vec<T,DPtc>& p, Attrs&&... attrs ) {
-      push_back( Particle<T,Specs>( q, p, std::forward<Attrs>(attrs)...) );
+    inline void emplace_back( const apt::Vec<T,DPtc>& q, const apt::Vec<T,DPtc>& p, T frac, Attrs&&... attrs ) {
+      push_back( Particle<T,Specs>( q, p, frac, std::forward<Attrs>(attrs)...) );
     }
 
     inline void emplace_back() {

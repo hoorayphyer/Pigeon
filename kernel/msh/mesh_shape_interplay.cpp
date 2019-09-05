@@ -28,12 +28,14 @@ namespace msh {
 
   template void
   deposit ( field::Field<real_t, 3, DGrid>& field,
+            real_t frac,
             apt::array<real_t, 3> var,
             const apt::array<real_t,Dq>& q_std,
             const ShapeF& shapef );
 
   template void
   deposit ( field::Field<real_t, 1, DGrid>& field,
+            real_t frac,
             apt::array<real_t, 1> var,
             const apt::array<real_t,Dq>& q_std,
             const ShapeF& shapef );

@@ -263,7 +263,7 @@ namespace io {
     constexpr auto silo_mesh_type = silo::MeshType::Curv;
 
     char str_ts [10];
-    sprintf(str_ts, "%06d\0", timestep);
+    snprintf(str_ts, 10, "%06d", timestep);
 
     DataSaver saver(cart_opt);
     { // set up saver

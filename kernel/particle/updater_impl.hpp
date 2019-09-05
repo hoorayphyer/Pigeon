@@ -13,7 +13,7 @@
 #endif
 
 namespace particle {
-  map<load_t> N_scat;
+  map<double> N_scat;
 }
 
 namespace particle {
@@ -93,6 +93,8 @@ namespace particle {
             lgr::file << ", " << ptc.p()[i];
           lgr::file << ")" << std::endl;
 
+          lgr::file << "frac = " << ptc.frac() << std::endl;
+
           lgr::file << "sp = " << static_cast<int>(ptc.template get<species>()) << ", bp = " << static_cast<int>(ptc.template get<birthplace>()) << ", is_sec = " << ptc.is(flag::secondary) << std::endl;
 
           lgr::file << "ptc q0 = " << q0 << std::endl;
@@ -157,7 +159,7 @@ namespace particle {
         }
         for ( int i = DGrid; i < PtcSpecs<Real>::Dim; ++i )
           dq[i] += q0_std[i];
-        msh::deposit( J, charge_over_dt, shapef, q0_std, std::move(dq) );
+        msh::deposit( J, ptc.frac() * charge_over_dt, shapef, q0_std, std::move(dq) );
       }
 
     }
@@ -186,7 +188,7 @@ namespace particle {
     { // Put particles where they belong after scattering
       for ( int i = 0; i < _buf.size(); ++i ) {
         auto this_sp = _buf[i].template get<species>();
-        ++N_scat[this_sp];
+        N_scat[this_sp] += _buf[i].frac();
         particles[this_sp].push_back(std::move(_buf[i]));
       }
       _buf.resize(0);

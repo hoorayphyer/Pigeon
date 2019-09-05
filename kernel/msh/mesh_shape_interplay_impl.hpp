@@ -94,6 +94,7 @@ namespace msh {
 namespace msh {
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   void deposit ( field::Field<T,DField,DGrid>& field,
+                 T frac,
                  apt::array<T, DField> variable,
                  const apt::array<T, Dq>& q_std,
                  const ShapeF& shapef ) noexcept {
@@ -104,7 +105,7 @@ namespace msh {
           auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
 
           for ( const auto& I : apt::Block(ext) )
-            comp( wf.I_b() + I ) += var * wf.weight(I);
+            comp( wf.I_b() + I ) += frac * var * wf.weight(I);
 
         }, variable, field );
 
