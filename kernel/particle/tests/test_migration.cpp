@@ -14,10 +14,10 @@ using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
 SCENARIO("Test swapping particles", "[particle]") {
   if ( mpi::world.rank() == 0 ) {
-    Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, flag::secondary, birthplace{3} );
+    Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, 1.0, flag::secondary, birthplace{3} );
     migrInt<2>(6).imprint(a);
 
-    Ptc_t b( {-4.7, -4.7, -4.7, }, {-2.8, -2.8, -2.8}, birthplace{98} );
+    Ptc_t b( {-4.7, -4.7, -4.7, }, {-2.8, -2.8, -2.8}, 0.67, birthplace{98} );
     migrInt<2>(1).imprint(b);
     b.reset(flag::exist);
 
@@ -31,6 +31,8 @@ SCENARIO("Test swapping particles", "[particle]") {
       REQUIRE( a.p()[0] == static_cast<Real>(-2.8) );
       REQUIRE( a.p()[1] == static_cast<Real>(-2.8) );
       REQUIRE( a.p()[2] == static_cast<Real>(-2.8) );
+
+      REQUIRE( a.frac() == 0.67 );
 
       REQUIRE_FALSE( a.is(flag::exist) );
       REQUIRE_FALSE( a.is(flag::secondary) );
@@ -47,6 +49,8 @@ SCENARIO("Test swapping particles", "[particle]") {
       REQUIRE( b.p()[1] == static_cast<Real>(5.9) );
       REQUIRE( b.p()[2] == static_cast<Real>(5.9) );
 
+      REQUIRE( b.frac() == 1.0 );
+
       REQUIRE( b.is(flag::exist) );
       REQUIRE( b.is(flag::secondary) );
       REQUIRE( b.get<birthplace>() == 3 );
@@ -62,7 +66,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
     if ( mpi::world.size() >= 2 ) {
       int myrank = mpi::world.rank();
       if ( 0 == myrank ) {
-        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, birthplace{18} );
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.37591, birthplace{18} );
         mpi::world.send( 1, 22, &ptc );
       } else if ( 1 == myrank) {
         Ptc_t ptc;
@@ -76,6 +80,8 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
         REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
 
+        REQUIRE( ptc.frac() == 0.37591 );
+
         REQUIRE( ptc.is(flag::exist) );
         REQUIRE( ptc.get<birthplace>() == 18 );
       }
@@ -87,7 +93,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
       int myrank = mpi::world.rank();
       mpi::InterComm inter( mpi::self, 0, {mpi::world}, 1-myrank, 147 );
       if ( 0 == myrank ) {
-        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, birthplace{18} );
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.2638, birthplace{18} );
         inter.send( 0, 22, &ptc );
       } else if ( 1 == myrank) {
         Ptc_t ptc;
@@ -100,6 +106,8 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         REQUIRE( ptc.p()[0] == static_cast<Real>(4.4) );
         REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
         REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
+
+        REQUIRE( ptc.frac() == 0.2638 );
 
         REQUIRE( ptc.is(flag::exist) );
         REQUIRE( ptc.get<birthplace>() == 18 );
@@ -132,7 +140,7 @@ SCENARIO("Test sendrecv particle", "[particle][mpi]") {
     const int nptcs = 1000;
     ptc_arr.reserve(nptcs);
     for ( int i = 0; i < nptcs; ++i ) {
-      ptc_arr.emplace_back( Vec_t(dist(),dist(),dist()), Vec_t{dist(),dist(),dist()}, flag::secondary, species::electron );
+      ptc_arr.emplace_back( Vec_t(dist(),dist(),dist()), Vec_t{dist(),dist(),dist()}, 0.56, flag::secondary, species::electron );
       migrInt<3>(14).imprint(ptc_arr.back());
     }
 
@@ -159,6 +167,7 @@ SCENARIO("Test sendrecv particle", "[particle][mpi]") {
         REQUIRE( cptc.q()[n] == ptc.q()[n] );
         REQUIRE( cptc.p()[n] == ptc.p()[n] );
       }
+      REQUIRE( cptc.frac() == ptc.frac() );
       REQUIRE( cptc.state() == ptc.state() );
     }
   }

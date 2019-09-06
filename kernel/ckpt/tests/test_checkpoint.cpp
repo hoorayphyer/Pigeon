@@ -20,9 +20,9 @@ namespace particle {
       return res;
     }();
 
-  map<load_t> N_scat
+  map<double> N_scat
   = [](){
-      map<load_t> res;
+      map<double> res;
       for ( auto sp : properties) res.insert(sp,0);
       return res;
     }();
@@ -101,7 +101,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
           for ( int i = 0; i < ens[label].rank[rank][sp]; ++i ) {
             ptcs.emplace_back({i * fq(0),i * fq(1),i * fq(2)},
                               {-i * fp(0),-i * fp(1),-i * fp(2)},
-                              sp);
+                              0.147, sp);
           }
         }
       }
@@ -197,6 +197,12 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
                     }
                   }
                   {
+                    REQUIRE( sf.var_exists("frac") );
+                    auto fs = sf.read1d<Real>("frac");
+                    REQUIRE( fs.size() == load );
+                    for ( auto f : fs ) REQUIRE( f == 0.147 );
+                  }
+                  {
                     REQUIRE( sf.var_exists("state") );
                     StateClass state;
                     state.set( sp, flag::exist );
@@ -261,6 +267,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
         particle::Particle<Real,Specs> x;
         x.q() = { unif(), unif(), unif() };
         x.p() = { unif(), unif(), unif() };
+        x.frac() = 0.147;
         x.state() = 123456 * unif();
         x.set(particle::flag::exist);
         ptcs_bef[sp].push_back( std::move(x) );

@@ -19,7 +19,7 @@ SCENARIO("Test particle sorter", "[particle]") {
     REQUIRE(ptcs.size() == 0);
   }
   WHEN("buffer has one ptc") {
-    ptcs.emplace_back({},{},species::electron);
+    ptcs.emplace_back({},{},1.0,species::electron);
     REQUIRE(ptcs.size() == 1);
     REQUIRE(ptcs[0].is(flag::exist));
     sort(ptcs);
@@ -34,7 +34,7 @@ SCENARIO("Test particle sorter", "[particle]") {
   }
   WHEN("buffer has only nonempty particles") {
     for ( int i = 0; i < 100; ++i )
-      ptcs.emplace_back({},{});
+      ptcs.emplace_back({},{},1.0);
     sort(ptcs);
     REQUIRE(ptcs.size() == 100 );
   }
@@ -51,7 +51,7 @@ SCENARIO("Test particle sorter", "[particle]") {
           ++num_empties;
           ptcs.emplace_back();
         } else {
-          ptcs.emplace_back({},{},species::electron);
+          ptcs.emplace_back({},{},1.0,species::electron);
         }
       }
 

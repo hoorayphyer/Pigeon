@@ -113,6 +113,7 @@ SCENARIO("Time particle updater", "[particle]") {
       for ( int i = 0; i < Nptc; ++i ) {
         ptcs.emplace_back( {unif(), unif(), 0.0},
                            {10.0*(2*unif()-1), 10.0*(2*unif()-1), 10.0*(2*unif()-1)},
+                           1.0,
                            species::electron );
       }
     }
