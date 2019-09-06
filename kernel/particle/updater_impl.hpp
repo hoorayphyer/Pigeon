@@ -105,7 +105,7 @@ namespace particle {
         lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
         lgr::file << "NANBEGINNING, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
-        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+        throw std::runtime_error("NANBEGINNING at rank" + std::to_string(debug::world_rank));
       }
 #endif
 
@@ -124,7 +124,7 @@ namespace particle {
 #ifdef LORENTZ
         lgr::file << force::ostr.str() << std::endl;
 #endif
-        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+        throw std::runtime_error("NANUPDATEP at rank" + std::to_string(debug::world_rank));
       }
 #endif
 
@@ -136,7 +136,7 @@ namespace particle {
         lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
         lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
-        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+        throw std::runtime_error("NANSCAT at rank" + std::to_string(debug::world_rank));
       }
 #endif
 
@@ -147,7 +147,7 @@ namespace particle {
         lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
         lgr::file << "NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;
         show_ptc(ptc);
-        throw std::runtime_error("NAN at rank" + std::to_string(debug::world_rank));
+        throw std::runtime_error("NANUPDATEQ at rank" + std::to_string(debug::world_rank));
       }
 #endif
       // TODO pusher handle boundary condition. Is it needed?

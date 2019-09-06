@@ -1,4 +1,12 @@
 #! /bin/bash
+# screening
+bin/pic --screen
+ret=$?
+if [[ $ret != 0 ]]; then
+    echo "Screening Failed. Run not staged."
+    exit $ret
+fi
+
 tnow=`date +%F-%H-%M-%S`
 project_name=${PWD##*/} # the current direcoty name. copied from https://stackoverflow.com/questions/1371261/get-current-directory-name-without-full-path-in-a-bash-script
 

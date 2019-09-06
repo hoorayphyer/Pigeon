@@ -55,6 +55,24 @@ namespace particle{
 int main(int argc, char** argv) {
   auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
+  std::optional<std::string> resume_dir;
+  pic::set_resume_dir(resume_dir);
+
+  if ( cli_args.is_screen ) {
+    int retcode = 0;
+#ifdef PIC_DEBUG
+    std::cout << "BuildType := Debug" << std::endl;
+#else
+    std::cout << "BuildType := Release" << std::endl;
+#endif
+    if ( resume_dir && !fs::exists(*resume_dir) ) {
+      retcode = 1;
+      std::cout << "Invalid checkpoint directory : " << *resume_dir << std::endl;
+    }
+
+    return retcode;
+  }
+
   mpi::initialize(argc, argv);
 
   mpi::commit( mpi::Datatype<particle::Particle<pic::real_t, particle::Specs>>{} );
@@ -63,14 +81,16 @@ int main(int argc, char** argv) {
     pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
-    std::optional<std::string> resume_dir;
-    pic::set_resume_dir(resume_dir);
-
     // journaling
     fs::mpido( mpi::world, [&](){
                              if ( !fs::exists("journal.txt") ) return;
                              std::ofstream out;
                              out.open("journal.txt", std::ios_base::app);
+#ifdef PIC_DEBUG
+                             out << "BuildType := Debug" << std::endl;
+#else
+                             out << "BuildType := Release" << std::endl;
+#endif
                              out << "DataDir := " << pic::this_run_dir << std::endl;
                              if ( resume_dir )
                                out << "Resume := " << *resume_dir << std::endl;
