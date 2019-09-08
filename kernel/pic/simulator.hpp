@@ -94,6 +94,7 @@ namespace pic {
     }
 
     void migrate_particles( int timestep ) {
+      using namespace particle;
       // bulk range = [lb, ub)
       constexpr auto migrate_code =
         []( auto q, auto lb, auto ub ) noexcept {
@@ -102,8 +103,8 @@ namespace pic {
 
       for ( auto sp : _particles ) {
         for ( auto ptc : _particles[sp] ) { // TODOL semantics
-          if ( !ptc.is(particle::flag::exist) ) continue;
-          particle::migrInt<DGrid> mig_dir{};
+          if ( !ptc.is(flag::exist) ) continue;
+          migrInt<DGrid> mig_dir{};
           for ( int i = 0; i < DGrid; ++i ) {
             mig_dir += migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
           }
@@ -115,10 +116,31 @@ namespace pic {
         }
       }
 
-      particle::migrate( _migrators, _ens_opt->inter, timestep );
+      migrate( _migrators, _ens_opt->inter, timestep );
       for ( auto&& ptc : _migrators ) {
-        auto sp = ptc.template get<particle::species>();
-        ptc.template reset<particle::destination>();
+        if ( !ptc.is(flag::exist) ) continue;
+        auto sp = ptc.template get<species>();
+#ifdef PIC_DEBUG
+        // check if the received ptc trully resides this ensemble
+        apt::array<int,DGrid> mig_co;
+        bool is_OK = true;
+        for ( int i = 0; i < DGrid; ++i ) {
+          mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
+          if ( mig_co[i] != 1 ) is_OK = false;
+        }
+        if ( !is_OK ) {
+          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+          lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << std::endl;
+          lgr::file << "  mig_dir on new ensemble  = " << mig_co;
+          // get old mig_co
+          for ( int i = 0; i < DGrid; ++i ) {
+            mig_co[i] = ( migrInt<DGrid>(ptc) % apt::pow3(i+1) ) / apt::pow3(i);
+          }
+          lgr::file << ", mig_dir on old ensemble = " << mig_co << std::endl;
+          debug::throw_error("Received across-ensemble particles!");
+        }
+#endif
+        ptc.template reset<destination>();
         _particles[sp].push_back( std::move(ptc) );
       }
       _migrators.resize(0);

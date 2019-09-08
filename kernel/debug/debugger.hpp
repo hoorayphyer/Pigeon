@@ -12,6 +12,10 @@ namespace debug {
   extern std::vector<int> ints;
   extern std::vector<float> flts;
   extern std::vector<std::string> strs;
+
+  inline void throw_error( std::string message ) {
+    throw std::runtime_error(message + " (rank " + std::to_string(world_rank) + ")" );
+  }
 }
 
 #endif

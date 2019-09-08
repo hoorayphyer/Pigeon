@@ -74,11 +74,21 @@ namespace bc {
           q[i] = grid[i].absc(I[i], 0.5);
 
         apt::Vec<Real,3> nB;
-        for ( int i = 0; i < 3; ++i ) {
-          nB[i] = B[i](I);
+        { // make nB centered in the cell
+          const auto& m = B.mesh();
+          auto li = m.linearized_index_of_whole_mesh(I);
+          if constexpr (DGrid == 2) {
+              nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride(1)] );
+              nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride(0)] );
+              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+                } else if (DGrid == 3){
+            nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
+            nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
+            nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+          }
+          if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
+          else nB /= apt::abs(nB);
         }
-        if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
-        else nB /= apt::abs(nB);
 
         apt::Vec<Real, Specs<Real>::Dim> p{};
         p[2] = omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
