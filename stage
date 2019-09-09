@@ -71,3 +71,5 @@ printf "%s\n" \
        "Message := $message"\
        "JobID := $jobID"\
        > $journal_file
+
+bin/pic --screen >> $journal_file

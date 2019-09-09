@@ -105,6 +105,11 @@ namespace pic {
     return dipole;
   }
 
+  constexpr real_t N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( dt / wdt_pic, 2.0 );
+  constexpr real_t N_atm_x = 2.0;
+  constexpr real_t v_th = 0.3;
+  constexpr real_t gravity_strength = 1.8;
+
   template < int DGrid, typename Real >
   auto set_up_boundary_conditions( const mani::Grid<Real,DGrid>& grid ) {
     bc::Axissymmetric<DGrid> axis;
@@ -116,11 +121,10 @@ namespace pic {
 
     bc::Injector<DGrid,Real> inj;
     {
-      constexpr Real N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( dt / wdt_pic, 2.0 );
       apt::tie(inj.Ib[0], inj.extent[0]) = gtl( field::ofs::indent[0] - 1, 1, supergrid[0], grid[0] );
       apt::tie(inj.Ib[1], inj.extent[1]) = gtl( {0.0, PI}, grid[1] );
-      inj.v_th = 0.3;
-      inj.N_atm = 2.0 * N_atm_floor;
+      inj.v_th = v_th;
+      inj.N_atm = N_atm_x * N_atm_floor;
       inj.posion = particle::species::ion;
       inj.negaon = particle::species::electron;
       inj.omega_t = field::omega_spinup;
@@ -131,6 +135,11 @@ namespace pic {
 }
 
 namespace particle {
+  constexpr pic::real_t gamma_thr = 20.0;
+  constexpr pic::real_t gamma_off = 15.0;
+  constexpr pic::real_t emission_rate = 0.25;
+  constexpr pic::real_t E_ph = 4.0;
+
   // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
   template < typename Real = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
   void set_up_properties() {
@@ -149,7 +158,6 @@ namespace particle {
       constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
       constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
       real_t landau0_B_thr = 0.1;
-      real_t gravity_strength = 0.5;
 
       if ( properties.has(species::electron) ) {
         auto sp = species::electron;
@@ -157,7 +165,7 @@ namespace particle {
         const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
-        force.add( gravity, gravity_strength );
+        force.add( gravity, pic::gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
@@ -168,7 +176,7 @@ namespace particle {
         const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
-        force.add( gravity, gravity_strength );
+        force.add( gravity, pic::gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
@@ -179,7 +187,7 @@ namespace particle {
         const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
-        force.add( gravity, gravity_strength );
+        force.add( gravity, pic::gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
@@ -192,10 +200,10 @@ namespace particle {
 
       ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q()[0] < std::log(9.0); });
 
-      scat::CurvatureRadiation<real_t,Specs>::K_thr = 10.0;
-      scat::CurvatureRadiation<real_t,Specs>::gamma_off = 5.0;
-      scat::CurvatureRadiation<real_t,Specs>::emission_rate = 0.25;
-      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return 3.0; };
+      scat::CurvatureRadiation<real_t,Specs>::K_thr = gamma_thr;
+      scat::CurvatureRadiation<real_t,Specs>::gamma_off = gamma_off;
+      scat::CurvatureRadiation<real_t,Specs>::emission_rate = emission_rate;
+      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return E_ph; };
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
       if ( properties.has(species::photon) )
@@ -226,6 +234,35 @@ namespace particle {
     }
   }
 
+}
+
+#include <sstream>
+#include "apt/print.hpp"
+
+namespace pic {
+  constexpr real_t classic_electron_radius () noexcept {
+    real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
+    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
+    return res;
+  }
+
+  std::string characteristics(std::string indent) {
+    std::ostringstream o;
+    auto gamma_0 = std::pow(field::Omega,2.0) * w_gyro_unitB;
+    o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
+    o << indent << "w_pic dt=" << apt::fmt("%.4f", wdt_pic ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / classic_electron_radius() ) << std::endl;
+
+    o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor);
+    o << ", multiplicity=" << apt::fmt("%.1f", N_atm_x);
+    o << ", v_th=" << apt::fmt("%.2f", v_th) << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
+
+    o << indent << "PC: gamma_thr=" << apt::fmt("%.0f", particle::gamma_thr);
+    o << ", gamma_off=" << apt::fmt("%.0f", particle::gamma_off);
+    o << ", gamma_ph=" << apt::fmt("%.0f", particle::E_ph);
+    o << ", emission_rate=" << apt::fmt("%.2f", particle::emission_rate);
+    return o.str();
+  }
 }
 
 #endif

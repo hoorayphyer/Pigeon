@@ -60,14 +60,16 @@ int main(int argc, char** argv) {
 
   if ( cli_args.is_screen ) {
     int retcode = 0;
+    std::cout << "Characteristics :=" << std::endl;
 #ifdef PIC_DEBUG
-    std::cout << "BuildType := Debug" << std::endl;
+    std::cout << "\tDebug" << std::endl;
 #else
-    std::cout << "BuildType := Release" << std::endl;
+    std::cout << "\tRelease" << std::endl;
 #endif
+    std::cout << pic::characteristics("\t") << std::endl;
     if ( resume_dir && !fs::exists(*resume_dir) ) {
       retcode = 1;
-      std::cout << "Invalid checkpoint directory : " << *resume_dir << std::endl;
+      std::cout << "\tInvalid checkpoint directory : " << *resume_dir << std::endl;
     }
 
     return retcode;

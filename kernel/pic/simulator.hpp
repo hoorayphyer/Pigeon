@@ -32,13 +32,6 @@
 namespace pic {
   std::string this_run_dir;
 
-  constexpr real_t classic_electron_radius () noexcept {
-    real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
-    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
-    return res;
-  }
-
-
   template < int DGrid,
              typename Real,
              template < typename > class PtcSpecs,
