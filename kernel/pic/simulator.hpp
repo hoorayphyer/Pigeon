@@ -228,6 +228,18 @@ namespace pic {
       }
       // broadcast to ensure uniformity
       mpi::world.broadcast( 0, &init_ts, 1 );
+      // set up vitals
+      if ( mpi::world.rank() == 0 ) {
+        vital::t_phys_prev = ( init_ts - 1 ) * pic::dt; // NOTE the -1
+        for ( auto sp : _particles ) {
+          double num = 0.0;
+          for ( const auto& ptc : _particles[sp] ) {
+            if ( ptc.is(particle::flag::exist) ) num += ptc.frac();
+          }
+          vital::num_ptcs_prev.push_back(num);
+          vital::num_scat_prev.push_back(particle::N_scat[sp]);
+        }
+      }
       return init_ts;
     }
 
@@ -394,7 +406,7 @@ namespace pic {
           lgr::file % "Statistics" << "==>>" << std::endl;
           stamp.emplace();
         }
-        pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep, *_ens_opt, _cart_opt, _particles, particle::N_scat );
+        pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _particles, particle::N_scat );
         if (stamp) {
           lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
         }

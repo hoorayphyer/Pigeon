@@ -5,6 +5,7 @@
 #include "apt/pair.hpp"
 #include "apt/vec_expression.hpp"
 #include <string>
+#include <cstdio>
 
 namespace std {
   template < typename T, int N >
@@ -53,6 +54,16 @@ OStream& operator<< ( OStream& os, const apt::VecExpression<E>& c ) {
     os << ", " << c[i];
   os << " )";
   return os;
+}
+
+namespace apt {
+  template < typename... T >
+  std::string fmt( std::string s, T&&... x ) {
+    constexpr int SIZE = 20;
+    char str[SIZE];
+    std::snprintf(str, SIZE, s.c_str(), std::forward<T>(x)...);
+    return {str};
+  }
 }
 
 #endif

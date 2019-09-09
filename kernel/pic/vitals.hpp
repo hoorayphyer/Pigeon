@@ -5,20 +5,20 @@
 #include "timer/timer.hpp"
 #include "msh/mesh_shape_interplay_impl.hpp" // WeightFinder
 #include <fstream>
-#include <cstdio>
 
 namespace pic {
-  std::string sci( double x ) {
-    char str[20];
-    std::snprintf(str, 20, "%.5e", x);
-    return {str};
+  namespace vital {
+    // significant only on world rank 0
+    std::vector<double> num_ptcs_prev;
+    std::vector<double> num_scat_prev;
+    double t_phys_prev = 0;
   }
 
   template < int DGrid,
              typename T,
              template < typename > class S
              >
-  void check_vitals( std::string filename, int timestep, const dye::Ensemble<DGrid>& ens,
+  void check_vitals( std::string filename, T t_phys, const dye::Ensemble<DGrid>& ens,
                      const std::optional<mpi::CartComm>& cart,
                      const particle::map<particle::array<T,S>>& particles,
                      const particle::map<double>& N_scat ) {
@@ -52,7 +52,7 @@ namespace pic {
     {
       std::ofstream out(filename, std::ios_base::app);
       if ( counter % interval == 0 ) {
-        out << "timestep|\tnprocs|\tlapse/hr|\tTotal load|\tcumulative new ptcs from scattering" << std::endl;
+        out << "t_phys|\tnprocs|\tlapse/hr|\tTotal load(rate)|\tcumulative new ptcs from scattering(rate)" << std::endl;
         out << "species ordering : ";
         for ( auto sp : N_scat )
           out << properties[sp].nickname << " ";
@@ -60,15 +60,20 @@ namespace pic {
         counter = 0;
       }
       ++counter;
-      float lps = stopwatch.lapse().in_units_of("s").val() / 3600.0;
-      out << timestep << "|\t" << buffer.back() << "|\t" << lps <<  "|\t";
-      for ( int i = 0; i < particles.size(); ++ i )
-        out << sci(p1[i]) << " ";
+      out << apt::fmt("%.2f",t_phys) << "|\t" << buffer.back() << "|\t" << apt::fmt("%8.2f", stopwatch.lapse().in_units_of("s").val() / 3600.0) <<  "|\t";
+      for ( int i = 0; i < particles.size(); ++ i ) {
+        out << apt::fmt("%.2e", p1[i]) << "(" << apt::fmt( "%.2e", (p1[i] - vital::num_ptcs_prev[i]) / (t_phys- vital::t_phys_prev) ) << ") ";
+        vital::num_ptcs_prev[i] = p1[i];
+      }
       out << "|\t";
-      for ( int i = 0; i < N_scat.size(); ++i )
-        out << sci(p2[i]) << " ";
+      for ( int i = 0; i < N_scat.size(); ++i ) {
+        out << apt::fmt("%.2e", p2[i]) << "(" << apt::fmt( "%.2e", (p2[i] - vital::num_scat_prev[i]) / (t_phys- vital::t_phys_prev) ) <<  ") ";
+        vital::num_scat_prev[i] = p2[i];
+      }
       out << std::endl;
       out.close();
+
+      vital::t_phys_prev = t_phys;
     }
 
     return;
