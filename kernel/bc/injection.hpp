@@ -63,6 +63,13 @@ namespace bc {
       f_count( _count_n, particles[negaon] );
       f_count( _count_p, particles[posion] );
 
+      { // parallelizae TODO optimize
+        int rank_inj = timestep % ens.size();
+        ens.intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_n[0].data().data(), _count_n[0].data().size() );
+        ens.intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_p[0].data().data(), _count_p[0].data().size() );
+        if ( ens.intra.rank() != rank_inj ) return;
+      }
+
       auto itr_po = std::back_inserter(particles[posion]);
       auto itr_ne = std::back_inserter(particles[negaon]);
 
@@ -94,7 +101,7 @@ namespace bc {
         p[2] = omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
 
         // replenish
-        Real quota = ( N_atm * std::sin(q[1]) - N_pairs ); // TODO parallelize
+        Real quota = N_atm * std::sin(q[1]) - N_pairs;
         while ( quota > 0 ) {
           auto q_ptc = q;
           Real frac = std::min( (Real)1.0, quota );
