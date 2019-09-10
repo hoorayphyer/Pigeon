@@ -318,8 +318,16 @@ namespace pic {
         }
 
         // ----- After this line, particles are all within borders.
-        // NOTE injector is implemented as a local operation
-        _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
+        if ( _cart_opt ) {// TODO currently injection is not parallelized, so only primaries inject
+          if (stamp) {
+            lgr::file % "Injection" << "==>>" << std::endl;
+            stamp.emplace();
+          }
+          _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
+          if (stamp) {
+            lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+          }
+        }
 
         // ----- Before this line _J is local on each cpu --- //
         if ( stamp ) {

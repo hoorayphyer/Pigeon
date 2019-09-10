@@ -94,7 +94,7 @@ namespace bc {
         p[2] = omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
 
         // replenish
-        Real quota = ( N_atm * std::sin(q[1]) - N_pairs ) / ens.size(); // devide by ens_size() to parallelize
+        Real quota = ( N_atm * std::sin(q[1]) - N_pairs ); // TODO parallelize
         while ( quota > 0 ) {
           auto q_ptc = q;
           Real frac = std::min( (Real)1.0, quota );
