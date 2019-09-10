@@ -110,16 +110,18 @@ namespace pic {
       }
 
       migrate( _migrators, _ens_opt->inter, timestep );
+
       for ( auto&& ptc : _migrators ) {
         if ( !ptc.is(flag::exist) ) continue;
         auto sp = ptc.template get<species>();
 #ifdef PIC_DEBUG
-        // check if the received ptc trully resides this ensemble
+        // check if the received ptc trully resides in this ensemble.
         apt::array<int,DGrid> mig_co;
         bool is_OK = true;
         for ( int i = 0; i < DGrid; ++i ) {
           mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
-          if ( mig_co[i] != 1 ) is_OK = false;
+          if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
+            is_OK = false;
         }
         if ( !is_OK ) {
           lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
