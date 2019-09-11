@@ -409,7 +409,7 @@ namespace io {
                                ) );
 
       pexps.push_back( new PA ("P", 3,
-                               ptc_energy<Real,S>,
+                               ptc_momentum<Real,S>,
                                fold_back_at_axis< DGrid, RealDS, S, RealJ >
                                ) );
     }
