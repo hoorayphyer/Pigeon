@@ -115,25 +115,25 @@ namespace pic {
         if ( !ptc.is(flag::exist) ) continue;
         auto sp = ptc.template get<species>();
 #ifdef PIC_DEBUG
-        // check if the received ptc trully resides in this ensemble.
-        apt::array<int,DGrid> mig_co;
-        bool is_OK = true;
-        for ( int i = 0; i < DGrid; ++i ) {
-          mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
-          if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
-            is_OK = false;
-        }
-        if ( !is_OK ) {
-          lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-          lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << std::endl;
-          lgr::file << "  mig_dir on new ensemble  = " << mig_co;
-          // get old mig_co
-          for ( int i = 0; i < DGrid; ++i ) {
-            mig_co[i] = ( migrInt<DGrid>(ptc) % apt::pow3(i+1) ) / apt::pow3(i);
-          }
-          lgr::file << ", mig_dir on old ensemble = " << mig_co << std::endl;
-          debug::throw_error("Received across-ensemble particles!");
-        }
+        // // check if the received ptc trully resides in this ensemble.
+        // apt::array<int,DGrid> mig_co;
+        // bool is_OK = true;
+        // for ( int i = 0; i < DGrid; ++i ) {
+        //   mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
+        //   if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
+        //     is_OK = false;
+        // }
+        // if ( !is_OK ) {
+        //   lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        //   lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << ", birth = " << static_cast<int>(ptc.template get<birthplace>()) << std::endl;
+        //   lgr::file << "  mig_dir on new ensemble  = " << mig_co;
+        //   // get old mig_co
+        //   for ( int i = 0; i < DGrid; ++i ) {
+        //     mig_co[i] = ( migrInt<DGrid>(ptc) % apt::pow3(i+1) ) / apt::pow3(i);
+        //   }
+        //   lgr::file << ", mig_dir on old ensemble = " << mig_co << std::endl;
+        //   debug::throw_error("Received across-ensemble particles!");
+        // }
 #endif
         ptc.template reset<destination>();
         _particles[sp].push_back( std::move(ptc) );
@@ -262,33 +262,35 @@ namespace pic {
         lgr::file.indent_append("\t");
       }
 
+      auto TIMING = [&stamp](std::string message, auto f) {
+                      if ( stamp ) {
+                        lgr::file % message << "==>>" << std::endl;
+                        stamp.emplace();
+                      }
+                      f();
+                      if ( stamp ) {
+                        lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
+                      }
+                    };
+#define START [&]()
+
       if ( _ens_opt ) {
         const auto& ens = *_ens_opt;
 
-        if ( stamp ) {
-          lgr::file % "BroadcastEB" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        // TODOL reduce number of communications?
-        for ( int i = 0; i < 3; ++i )
-          ens.intra.broadcast( ens.chief, _E[i].data().data(), _E[i].data().size() );
-        for ( int i = 0; i < 3; ++i )
-          ens.intra.broadcast( ens.chief, _B[i].data().data(), _B[i].data().size() );
-        if ( stamp ) {
-          lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("BroadcastEB", START {
+            // TODOL reduce number of communications?
+            for ( int i = 0; i < 3; ++i )
+              ens.intra.broadcast( ens.chief, _E[i].data().data(), _E[i].data().size() );
+            for ( int i = 0; i < 3; ++i )
+              ens.intra.broadcast( ens.chief, _B[i].data().data(), _B[i].data().size() );
+          });
 
         _J.reset();
 
         if ( is_do(pic::sort_particles_mr, timestep) ) {
-          if (stamp) {
-            lgr::file % "SortParticles" << "==>>" << std::endl;
-            stamp.emplace();
-          }
-          for ( auto sp : _particles ) particle::sort( _particles[sp] );
-          if (stamp) {
-            lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
-          }
+          TIMING("SortParticles", START {
+              for ( auto sp : _particles ) particle::sort( _particles[sp] );
+            });
         }
 
         if ( stamp && _particles.size() != 0 ) {
@@ -298,61 +300,33 @@ namespace pic {
         }
 
         // ----- before this line particles are all within borders --- //
-        if (stamp) {
-          lgr::file % "ParticleUpdate" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        (*_ptc_update) ( _particles, _J, _E, _B, _grid, dt, timestep, _rng );
-        _fbc_axis.setJ(_J);
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("ParticleUpdate", START {
+            (*_ptc_update) ( _particles, _J, _E, _B, _grid, dt, timestep, _rng );
+            _fbc_axis.setJ(_J);
+          });
 
-        // lgr::file % "particle BC" << std::endl;
-
-        if (stamp) {
-          lgr::file % "MigrateParticles" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        migrate_particles( timestep );
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("MigrateParticles", START {
+            migrate_particles( timestep );
+          });
 
         // ----- After this line, particles are all within borders.
-        if (stamp) {
-          lgr::file % "Injection" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("Injection", START {
+            _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
+          });
 
         // ----- Before this line _J is local on each cpu --- //
-        if ( stamp ) {
-          lgr::file % "ReduceJmesh" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        // TODOL reduce number of communications?
-        for ( int i = 0; i < 3; ++i )
-          ens.reduce_to_chief( mpi::by::SUM, _J[i].data().data(), _J[i].data().size() );
-        if ( stamp ) {
-          lgr::file % "\tLapse " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("ReduceJmesh", START {
+            // TODOL reduce number of communications?
+            for ( int i = 0; i < 3; ++i )
+              ens.reduce_to_chief( mpi::by::SUM, _J[i].data().data(), _J[i].data().size() );
+          });
 
         if ( _cart_opt ) {
-          if (stamp) {
-            lgr::file % "FieldUpdate" << "==>>" << std::endl;
-            stamp.emplace();
-          }
-          field::merge_sync_guard_cells( _J, *_cart_opt );
-          (*_field_update)(_E, _B, _J, dt, timestep);
-          _fbc_axis.setEB(_E,_B);
-          if (stamp) {
-            lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-          }
-
+          TIMING("FieldUpdate", START {
+              field::merge_sync_guard_cells( _J, *_cart_opt );
+              (*_field_update)(_E, _B, _J, dt, timestep);
+              _fbc_axis.setEB(_E,_B);
+            });
         }
       }
 
@@ -363,80 +337,59 @@ namespace pic {
       // annihilate_mark_pairs( );
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
-        if (stamp) {
-          lgr::file % "ExportData" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, 4.0 * std::acos(-1.0l) * classic_electron_radius() / pic::w_gyro_unitB ,  *_ens_opt, _grid, _E, _B, _J, _particles  );
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("ExportData", START {
+            io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, 4.0 * std::acos(-1.0l) * classic_electron_radius() / pic::w_gyro_unitB ,  *_ens_opt, _grid, _E, _B, _J, _particles  );
+          });
       }
 
       if ( is_do(pic::dlb_mr, timestep) ) {
-        if (stamp) {
-          lgr::file % "DynamicLoadBalance" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        if ( _ens_opt ) { // first reduce N_scat to avoid data loss
-          const auto& ens = *_ens_opt;
-          ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
-          if ( !ens.is_chief() ) {
-            for ( auto& x : particle::N_scat.data() ) x = 0;
-          }
-        }
-        // TODO has a few hyper parameters
-        // TODO touch create is not multinode safe even buffer is used
-        std::optional<int> old_label;
-        if ( _ens_opt ) old_label.emplace(_ens_opt->label());
+        TIMING("DynamicLoadBalance", START {
+            if ( _ens_opt ) { // first reduce N_scat to avoid data loss
+              const auto& ens = *_ens_opt;
+              ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+              if ( !ens.is_chief() ) {
+                for ( auto& x : particle::N_scat.data() ) x = 0;
+              }
+            }
+            // TODO has a few hyper parameters
+            // TODO touch create is not multinode safe even buffer is used
+            std::optional<int> old_label;
+            if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
-        dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
+            dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
 
-        std::optional<int> new_label;
-        if ( _ens_opt ) new_label.emplace(_ens_opt->label());
-        if (stamp) lgr::file % "  update parts of simulator..." << std::endl;
-        if ( old_label != new_label ) update_parts(*_ens_opt);
-        if (stamp) {
-          lgr::file % "  Done." << std::endl;
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+            std::optional<int> new_label;
+            if ( _ens_opt ) new_label.emplace(_ens_opt->label());
+            if (stamp) lgr::file % "  update parts of simulator..." << std::endl;
+            if ( old_label != new_label ) update_parts(*_ens_opt);
+            if (stamp) lgr::file % "  Done." << std::endl;
+          });
       }
 
       if (_ens_opt && is_do(pic::vitals_mr, timestep) ) {
-        if (stamp) {
-          lgr::file % "Statistics" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _particles, particle::N_scat );
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("Statistics", START {
+            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _particles, particle::N_scat );
+          });
       }
 
       static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0
       if ( is_do(pic::checkpoint_mr, timestep)
            || ( pic::checkpoint_autosave_hourly &&
                 autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
-        if (stamp) {
-          lgr::file % "SaveCheckpoint" << "==>>" << std::endl;
-          stamp.emplace();
-        }
-        if ( _ens_opt ) { // first reduce N_scat to avoid data loss
-          const auto& ens = *_ens_opt;
-          ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
-          if ( !ens.is_chief() ) {
-            for ( auto& x : particle::N_scat.data() ) x = 0;
-          }
-        }
-        auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, particle::N_scat );
-        if ( mpi::world.rank() == 0 ) {
-          auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
-          if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
-        }
-
-        if (stamp) {
-          lgr::file % "\tLapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-        }
+        TIMING("SaveCheckpoint", START {
+            if ( _ens_opt ) { // first reduce N_scat to avoid data loss
+              const auto& ens = *_ens_opt;
+              ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+              if ( !ens.is_chief() ) {
+                for ( auto& x : particle::N_scat.data() ) x = 0;
+              }
+            }
+            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, particle::N_scat );
+            if ( mpi::world.rank() == 0 ) {
+              auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
+              if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
+            }
+          });
       }
 
       // TODOL
