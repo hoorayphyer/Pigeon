@@ -135,9 +135,9 @@ namespace pic {
 }
 
 namespace particle {
-  constexpr pic::real_t gamma_thr = 20.0;
+  constexpr pic::real_t gamma_fd = 20.0;
   constexpr pic::real_t gamma_off = 15.0;
-  constexpr pic::real_t emission_rate = 0.25;
+  constexpr pic::real_t Ndot_fd = 0.25;
   constexpr pic::real_t E_ph = 4.0;
 
   // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
@@ -200,10 +200,10 @@ namespace particle {
 
       ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q()[0] < std::log(9.0); });
 
-      scat::CurvatureRadiation<real_t,Specs>::K_thr = gamma_thr;
+      scat::CurvatureRadiation<real_t,Specs>::gamma_fd = gamma_fd;
       scat::CurvatureRadiation<real_t,Specs>::gamma_off = gamma_off;
-      scat::CurvatureRadiation<real_t,Specs>::emission_rate = emission_rate;
-      scat::CurvatureRadiation<real_t,Specs>::sample_E_ph = []() noexcept -> real_t { return E_ph; };
+      scat::CurvatureRadiation<real_t,Specs>::Ndot_fd = Ndot_fd;
+      scat::CurvatureRadiation<real_t,Specs>::E_ph = E_ph;
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
       if ( properties.has(species::photon) )
@@ -251,16 +251,23 @@ namespace pic {
     auto gamma_0 = std::pow(field::Omega,2.0) * w_gyro_unitB;
     o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
     o << indent << "w_pic dt=" << apt::fmt("%.4f", wdt_pic ) << std::endl;
+    o << indent << "re=" << apt::fmt("%.4f", classic_electron_radius() ) << std::endl;
     o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / classic_electron_radius() ) << std::endl;
 
     o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor);
     o << ", multiplicity=" << apt::fmt("%.1f", N_atm_x);
     o << ", v_th=" << apt::fmt("%.2f", v_th) << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
 
-    o << indent << "PC: gamma_thr=" << apt::fmt("%.0f", particle::gamma_thr);
-    o << ", gamma_off=" << apt::fmt("%.0f", particle::gamma_off);
-    o << ", gamma_ph=" << apt::fmt("%.0f", particle::E_ph);
-    o << ", emission_rate=" << apt::fmt("%.2f", particle::emission_rate);
+    {
+      using namespace particle;
+      o << indent << "PC: gamma_fd=" << apt::fmt("%.0f", gamma_fd);
+      o << ", gamma_off=" << apt::fmt("%.0f", gamma_off);
+      o << ", E_ph=" << apt::fmt("%.0f", E_ph);
+      o << ", Ndot_fd=" << apt::fmt("%.2f", Ndot_fd) << std::endl;
+
+      o << indent << "    gamma_RRL=" << gamma_fd * std::pow(gamma_fd / E_ph, 0.5);
+      o << ", L_CR/L_sd=" << E_ph * Ndot_fd * field::Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
+    }
     return o.str();
   }
 }

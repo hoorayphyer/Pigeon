@@ -65,12 +65,13 @@ namespace particle::scat {
       }
     }
 
-    static T K_thr;
+    static T gamma_fd;
     static T gamma_off;
-    static T emission_rate;
+    static T Ndot_fd;
+    static T E_ph;
     // TODO move calc_Rc out too
     // static T (*calc_Rc) ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt, const Vec& B );
-    static T (*sample_E_ph)();
+    // static T (*sample_E_ph)();
 
     // return sampled energy if any
     static constexpr std::optional<T> test ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt,
@@ -78,8 +79,9 @@ namespace particle::scat {
       T Rc = calc_Rc( ptc, props, dp, dt, B );
       T gamma = std::sqrt( (props.mass_x != 0) + apt::sqabs(ptc.p()) );
 
-      if (gamma > gamma_off && gamma > K_thr *  std::cbrt(Rc) && rng.uniform() < emission_rate * dt * gamma  / Rc ) {
-        return { std::min<T>( sample_E_ph(), gamma - 1.0 ) };
+      if (gamma > gamma_off && gamma > gamma_fd *  std::cbrt(Rc) && rng.uniform() < Ndot_fd * dt * gamma  / Rc ) {
+        // return { std::min<T>( sample_E_ph(), gamma - 1.0 ) };
+        return { std::min<T>( E_ph, gamma - 1.0 ) };
       } else return {};
     }
   };

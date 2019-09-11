@@ -5,13 +5,15 @@ namespace particle {
   using namespace pic;
 
   template <>
-  real_t scat::CurvatureRadiation<real_t,Specs>::K_thr{};
+  real_t scat::CurvatureRadiation<real_t,Specs>::gamma_fd{};
   template <>
   real_t scat::CurvatureRadiation<real_t,Specs>::gamma_off{};
   template <>
-  real_t scat::CurvatureRadiation<real_t,Specs>::emission_rate{};
+  real_t scat::CurvatureRadiation<real_t,Specs>::Ndot_fd{};
   template <>
-  real_t (*scat::CurvatureRadiation<real_t,Specs>::sample_E_ph) () = nullptr;
+  real_t scat::CurvatureRadiation<real_t,Specs>::E_ph{};
+  // template <>
+  // real_t (*scat::CurvatureRadiation<real_t,Specs>::sample_E_ph) () = nullptr;
 
 
   template <>
