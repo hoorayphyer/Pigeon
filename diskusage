@@ -1,0 +1,25 @@
+#! /bin/bash
+lab_dir=$(pwd)
+# check if in a lab
+if [[ -f pic.hpp && -f gen.hpp && -f CMakeLists.txt ]]; then
+    du -sh "$lab_dir"
+
+    ind_lab="\t"
+    find "$lab_dir/" -maxdepth 1 -type d -name ".stages" -exec du -sh {} \; | awk -v dir="$lab_dir/" -v ind=$ind_lab '{gsub(dir, "", $0); print ind,$0 }'
+    find "$lab_dir/" -maxdepth 1 -type d -name ".build" -exec du -sh {} \; | awk -v dir="$lab_dir/" -v ind=$ind_lab '{gsub(dir, "", $0); print ind,$0 }'
+    find "$lab_dir/" -maxdepth 1 -type d -name "bin" -exec du -sh {} \; | awk -v dir="$lab_dir/" -v ind=$ind_lab '{gsub(dir, "", $0); print ind,$0 }'
+    find "$lab_dir/" -maxdepth 1 -type d -name "lib" -exec du -sh {} \; | awk -v dir="$lab_dir/" -v ind=$ind_lab '{gsub(dir, "", $0); print ind,$0 }'
+    find "$lab_dir/" -maxdepth 1 -type d -name "Data" -exec du -shL {} \; | awk -v dir="$lab_dir/" -v ind=$ind_lab '{gsub(dir, "", $0); print ind,$0 }'
+
+    ind_Data="\t$ind_lab"
+    for d in $lab_dir/Data/*; do
+        du -sh $d/ | awk -v ind=$ind_Data -v dir="$lab_dir/Data/" '{gsub(dir, "", $0);print ind,$0}'
+
+        ind_run="\t$ind_Data"
+        find "$d/" -type f -name "*.silo" -exec du -ch '{}' + | grep total$ | awk -v ind=$ind_run '{gsub("total", "master silos", $0);print ind,$0}'
+        find "$d/" -type f -name "vitals.txt" -exec du -h {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -type d -name "data" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -type d -name "checkpoints" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -type d -name "logs" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+    done
+fi
