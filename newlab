@@ -22,6 +22,7 @@ ln -s $top_dir/delrun $(pwd)/delrun
 ln -s $top_dir/jnl $(pwd)/jnl
 ln -s $top_dir/comment $(pwd)/comment
 ln -s $top_dir/vw $(pwd)/vw
+ln -s $top_dir/diskusage $(pwd)/diskusage
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1
