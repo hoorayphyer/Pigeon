@@ -16,10 +16,10 @@ if [[ -f pic.hpp && -f gen.hpp && -f CMakeLists.txt ]]; then
         du -sh $d/ | awk -v ind=$ind_Data -v dir="$lab_dir/Data/" '{gsub(dir, "", $0);print ind,$0}'
 
         ind_run="\t$ind_Data"
-        find "$d/" -type f -name "*.silo" -exec du -ch '{}' + | grep total$ | awk -v ind=$ind_run '{gsub("total", "master silos", $0);print ind,$0}'
-        find "$d/" -type f -name "vitals.txt" -exec du -h {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
-        find "$d/" -type d -name "data" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
-        find "$d/" -type d -name "checkpoints" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
-        find "$d/" -type d -name "logs" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -maxdepth 1 -type f -name "*.silo" -exec du -ch '{}' + | grep total$ | awk -v ind=$ind_run '{gsub("total", "master silos", $0);print ind,$0}'
+        find "$d/" -maxdepth 1 -type f -name "vitals.txt" -exec du -h {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -maxdepth 1 -type d -name "data" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -maxdepth 1 -type d -name "checkpoints" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
+        find "$d/" -maxdepth 1 -type d -name "logs" -exec du -sh {} \; | awk -v dir="$d/" -v ind=$ind_run '{gsub(dir, "", $0);print ind,$0}'
     done
 fi
