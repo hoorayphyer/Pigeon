@@ -10,8 +10,7 @@ namespace io {
              typename Real,
              template < typename > class S,
              typename ShapeF,
-             typename RealJ,
-             typename Metric >
+             typename RealJ >
   class DataExporter {
   private:
     int _ratio = 1;
@@ -20,7 +19,7 @@ namespace io {
     const dye::Ensemble<DGrid>& _ens;
 
   public:
-    using FexpT= FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ, Metric>;
+    using FexpT= FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ>;
     using PexpT = PtcExportee<RealDS, DGrid, Real, S, ShapeF>;
 
     DataExporter( int ratio, int guard, const std::optional<mpi::CartComm>& cart_opt, const dye::Ensemble<DGrid>& ens )

@@ -3,7 +3,7 @@
 
 #include "manifold/grid.hpp"
 
-#include "field/updater.hpp"
+#include "field/updater.hpp" // FIXME this is old field updater
 #include "particle/updater.hpp"
 #include "field/sync.hpp"
 #include "field/yee.hpp"
@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "gen.hpp"
+#include "pic_impl.hpp"
 
 #include "logger/logger.hpp"
 #include "timer/timer.hpp"
@@ -33,37 +33,95 @@ namespace pic {
   std::string this_run_dir;
 
   template < int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs,
+             typename R,
+             template < typename > class S,
              typename ShapeF,
-             typename RealJ,
-             typename Metric >
+             typename RJ >
   struct Simulator {
   private:
-    const mani::Grid< Real, DGrid >& _supergrid;
-    const int _guard;
+    const mani::Grid< R, DGrid >& _supergrid;
     std::optional<mpi::CartComm> _cart_opt;
-    util::Rng<Real> _rng;
+    util::Rng<R> _rng;
 
-    mani::Grid< Real, DGrid > _grid;
+    mani::Grid< R, DGrid > _grid;
     std::optional<dye::Ensemble<DGrid>> _ens_opt;
-    apt::array< apt::pair<Real>, DGrid > _borders;
+    apt::array< apt::pair<R>, DGrid > _borders;
 
-    field::Field<Real, 3, DGrid> _E;
-    field::Field<Real, 3, DGrid> _B;
-    field::Field<RealJ, 3, DGrid> _J;
-    particle::map<particle::array<Real, PtcSpecs>> _particles;
+    field::Field<R, 3, DGrid> _E;
+    field::Field<R, 3, DGrid> _B;
+    field::Field<RJ, 3, DGrid> _J;
+    particle::map<particle::array<R, S>> _particles;
 
-    std::unique_ptr<field::Updater<Real,DGrid,RealJ>> _field_update;
-    std::unique_ptr<particle::Updater<DGrid,Real,PtcSpecs,ShapeF,RealJ,Metric>> _ptc_update;
+    // std::unique_ptr<field::Updater<R,DGrid,RJ>> _field_update; // FIXME
+    std::vector<std::unique_ptr<field::Action<R,DGrid,RJ>>> _field_actions;
+    std::vector<std::unique_ptr<particle::Action<DGrid,R,S,RJ>>> _ptc_actions;
 
-    std::vector<particle::Particle<Real, PtcSpecs>> _migrators;
+    std::vector<particle::Particle<R, S>> _migrators;
 
-    bc::Axissymmetric<DGrid> _fbc_axis;
-    bc::Injector< DGrid, Real > _injector;
+    template < typename Action >
+    void taylor( Action& a ) {
+      // NOTE range is assumed to be [,), and range[1] >= range[0]
+      // TODO check boundary on extent.
+      auto f =
+        [] ( int Ib_global, int Ie_global,
+             const mani::Grid1D<R>& supergrid,
+             const mani::Grid1D<R>& localgrid ) noexcept -> apt::pair<int>
+        {
+         // lb is the Ib_global with respect to the localgrid
+         int lb = Ib_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
+         int ub = Ie_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
 
-    // ScalarField<Scalar> pairCreationEvents; // record the number of pair creation events in each cell.
-    // PairCreationTracker pairCreationTracker;
+         // If localgrid is the last on the supergrid, include the upper boundary. Whether or not it will be used is controled by Ib_global and extent_global
+         int dim = localgrid.dim();
+         if ( std::abs(localgrid.upper() - supergrid.upper() ) < supergrid.delta() ) ++dim; // TODO check
+
+         if ( ub <= 0 || lb >= dim ) {
+           // range not applicable on current local patch
+           return {0,0};
+         } else {
+           lb = std::max<int>( 0, lb );
+           ub = std::min<int>( ub, dim );
+           return { lb, ub - lb };
+         }
+        };
+      apt::Index<DGrid> Ib_new, Ie_new;
+      for ( int i = 0; i < DGrid; ++i ) {
+        apt::tie(Ib_new[i],Ie_new[i]) = f( a.Ib()[i], a.Ie()[i], _supergrid[i], _grid[i] );
+      }
+      a.setIb(Ib_new);
+      a.setIe(Ie_new);
+    }
+
+    apt::pair<std::optional<field::Field<R, 3, DGrid>>> backupEB( int i_this_action ) const {
+      const auto& fa = _field_actions;
+      if ( !fa[i_this_action] ) return {};
+      if ( i_this_action >= fa.size() - 1 ) return {};
+      if ( !fa[i_this_action+1] || !fa[i_this_action+1]->require_original_EB ) return {};
+
+      const auto& ath = *fa[i_this_action];
+      const auto& ane = *fa[i_this_action + 1];
+
+      apt::Index<DGrid> ovIb, ovExt;
+      bool is_empty = false;
+      for ( int i = 0; i < DGrid; ++i ) {
+        ovIb[i] = std::max(ath.actIb[i] - ath.actGuard[i][LFT], ane.actIb[i] - ane.actGuard[i][LFT]);
+        ovExt[i] = std::min(ath.actIb[i] + ath.actExt[i] + ath.actGuard[i][RGT], ane.actIb[i] + ane.actExt[i] + ane.actGuard[i][RGT]) - ovIb[i];
+        if (ovExt[i] <= 0) is_empty = true;
+      }
+
+      if ( is_empty ) return {};
+
+      field::Field<R, 3, DGrid> E_bak({ovExt,0}), B_bak({ovExt,0});
+      for ( const auto& I : apt::Block(ovExt) ) E_bak[0](I) = _E[0](I+ovIb);
+      for ( const auto& I : apt::Block(ovExt) ) E_bak[1](I) = _E[1](I+ovIb);
+      for ( const auto& I : apt::Block(ovExt) ) E_bak[2](I) = _E[2](I+ovIb);
+
+      for ( const auto& I : apt::Block(ovExt) ) B_bak[0](I) = _B[0](I+ovIb);
+      for ( const auto& I : apt::Block(ovExt) ) B_bak[1](I) = _B[1](I+ovIb);
+      for ( const auto& I : apt::Block(ovExt) ) B_bak[2](I) = _B[2](I+ovIb);
+
+      return {{std::move(E_bak)}, {std::move(B_bak)}};
+    }
 
     void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
@@ -72,17 +130,35 @@ namespace pic {
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
-      std::tie(_fbc_axis, _injector) = pic::set_up_boundary_conditions(_grid);
+      // if ( use_old ) { // FIXME
+      //   if ( _cart_opt )
+      //     _field_update.reset(new field::Updater<R,DGrid,RJ>
+      //                         ( *_cart_opt, _grid,
+      //                           ens.is_at_boundary(), 2,
+      //                           field::omega_spinup,
+      //                           pic::classic_electron_radius() / pic::w_gyro_unitB )
+      //                         );
+      // }
 
-      if ( _cart_opt )
-        _field_update.reset(new field::Updater<Real,DGrid,RealJ>
-                            ( *_cart_opt, _grid,
-                              ens.is_at_boundary(), _guard,
-                              field::omega_spinup,
-                              pic::classic_electron_radius() / pic::w_gyro_unitB )
-                            );
+      { // set field actions
+        const auto f_actions = field::set_up_field_actions<DGrid,R,RJ>();
+        _field_actions.resize(f_actions.size());
+        for ( int i = 0; i < f_actions.size(); ++i ) {
+          _field_actions[i].reset(f_actions[i]->Clone());
+          taylor(*_field_actions[i]);
+        }
+        // TODO reorder by require_old_EB
+      }
 
-      _ptc_update.reset(new particle::Updater<DGrid, Real, PtcSpecs, ShapeF, RealJ, Metric> (particle::properties));
+      { // set particle actions
+        const auto p_actions = particle::set_up_particle_actions<DGrid,R,S,ShapeF,RJ>();
+        _ptc_actions.resize(p_actions.size());
+        for ( int i = 0; i < p_actions.size(); ++i ) {
+          _ptc_actions[i].reset(p_actions[i]->Clone());
+          taylor(*_ptc_actions[i]);
+        }
+      }
+
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
     }
 
@@ -147,8 +223,8 @@ namespace pic {
     }
 
   public:
-    Simulator( const mani::Grid< Real, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, int guard )
-      : _supergrid(supergrid), _guard(guard), _cart_opt(cart_opt) {
+    Simulator( const mani::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt )
+      : _supergrid(supergrid), _cart_opt(cart_opt) {
       _grid = supergrid;
       if ( pic::dlb_init_replica_deploy ) {
         std::optional<int> label{};
@@ -181,10 +257,9 @@ namespace pic {
         for ( int i = 0; i < DGrid; ++i ) {
           bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
         }
-        _E = {{ bulk_dims, _guard }};
-        _B = {{ bulk_dims, _guard }};
-        // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
-        _J = {{ bulk_dims, ( ShapeF::support() + 3 ) / 2 }};
+        _E = {{ bulk_dims, field::myguard }};
+        _B = {{ bulk_dims, field::myguard }};
+        _J = {{ bulk_dims, field::myguard }};
 
         for( int i = 0; i < 3; ++i ) {
           _E.set_offset( i, field::yee::ofs_gen<DGrid>( field::yee::Etype, i ) );
@@ -199,7 +274,7 @@ namespace pic {
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
       // 2. data export. PutMultivar requires every patch to output every species
       for ( auto sp : particle::properties )
-        _particles.insert( sp, particle::array<Real, PtcSpecs>() );
+        _particles.insert( sp, particle::array<R, S>() );
 
       if ( _ens_opt ) update_parts(*_ens_opt);
     }
@@ -213,7 +288,8 @@ namespace pic {
       } else {
         // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
         if (_cart_opt) {
-          auto ic = pic::set_up_initial_conditions(_grid);
+          auto ic = pic::set_up_initial_conditions<DGrid,R,RJ,S>();
+          taylor(ic);
           ic(_grid, _E, _B, _J, _particles);
           init_ts = ic.initial_timestep();
           field::copy_sync_guard_cells(_E, *_cart_opt);
@@ -241,7 +317,7 @@ namespace pic {
     inline void set_rng_seed( int seed ) { _rng.set_seed(seed); }
 
     // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
-    void evolve( int timestep, Real dt ) {
+    void evolve( int timestep, R dt ) {
       if ( timestep % pic::cout_ts_interval == 0 && mpi::world.rank() == 0 )
         std::cout << "==== Timestep " << timestep << " ====" << std::endl;
 
@@ -300,9 +376,12 @@ namespace pic {
         }
 
         // ----- before this line particles are all within borders --- //
-        TIMING("ParticleUpdate", START {
-            (*_ptc_update) ( _particles, _J, _E, _B, _grid, dt, timestep, _rng );
-            _fbc_axis.setJ(_J);
+        TIMING("ParticleActions", START {
+            for ( int i = 0; i < _ptc_actions.size(); ++i ) {
+              if ( !_ptc_actions[i] ) continue;
+              auto& act = *_ptc_actions[i];
+              act( _particles, _J, particle::properties, _E, _B, _grid, &ens, dt, timestep, _rng );
+            }
           });
 
         TIMING("MigrateParticles", START {
@@ -310,9 +389,6 @@ namespace pic {
           });
 
         // ----- After this line, particles are all within borders.
-        TIMING("Injection", START {
-            _injector( timestep, dt, _rng, pic::wdt_pic, ens, _grid, _E, _B, _J, _particles );
-          });
 
         // ----- Before this line _J is local on each cpu --- //
         TIMING("ReduceJmesh", START {
@@ -322,11 +398,32 @@ namespace pic {
           });
 
         if ( _cart_opt ) {
-          TIMING("FieldUpdate", START {
-              field::merge_sync_guard_cells( _J, *_cart_opt );
-              (*_field_update)(_E, _B, _J, dt, timestep);
-              _fbc_axis.setEB(_E,_B);
-            });
+          // if ( use_old ) { // FIXME
+          //   TIMING("FieldUpdate", START {
+          //       field::merge_sync_guard_cells( _J, *_cart_opt );
+          //       (*_field_update)(_E, _B, _J, dt, timestep);
+          //       // _fbc_axis.setEB(_E,_B); //FIXME
+          //     });
+          // } else {
+            TIMING("FieldUpdate", START {
+                field::merge_sync_guard_cells( _J, *_cart_opt );
+                for ( int i = 0; i < _field_actions.size(); ++i ) {
+                  if ( !_field_actions[i] ) continue;
+                  const auto& act = *_field_actions[i];
+
+                  // auto[E_bak_opt,B_bak_opt] = backupEB(i);
+                  act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
+                  // if ( E_bak_opt ) {
+                  //   // TODO so, apply these baks before next step. After it, apply them back. TODO what if the next one also needs to save back? If same patch is backed up, no actions. Otherwise, need a new patch.
+                  //   auto& E_bak=*E_bak_opt;
+                  //   auto& B_bak=*B_bak_opt;
+                  // }
+                }
+              });
+          // } // FIXME with use_old
+          if ( stamp ) {
+            std:: cout << "field update lapse = " << stamp->lapse().in_units_of("ms") << std::endl;
+          }
         }
       }
 
@@ -338,7 +435,14 @@ namespace pic {
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
         TIMING("ExportData", START {
-            io::export_data<pic::real_export_t, pic::Metric, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, 4.0 * std::acos(-1.0l) * classic_electron_radius() / pic::w_gyro_unitB ,  *_ens_opt, _grid, _E, _B, _J, _particles  );
+            auto fexps = io::set_up_field_export<real_export_t,ShapeF,DGrid,real_t,real_j_t>();
+            auto pexps = io::set_up_particle_export<real_export_t,ShapeF,DGrid,real_t,particle::Specs>();
+
+            io::set_is_collinear_mesh(io::is_collinear_mesh); // TODO
+
+            io::export_data<pic::real_export_t, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, fexps, pexps );
+            for ( auto ptr : fexps ) delete ptr;
+            for ( auto ptr : pexps ) delete ptr;
           });
       }
 

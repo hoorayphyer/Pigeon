@@ -8,9 +8,9 @@
 
 #include "particle/map.hpp"
 #include "particle/array.hpp"
-// #include "io/exportee.hpp"
 
-namespace mpi { struct CartComm; }
+#include "io/exportee.hpp"
+
 namespace std {
   template <class T> class optional;
 }
@@ -20,29 +20,27 @@ namespace dye {
 
 namespace io {
   std::string init_this_run_dir( std::string prefix, std::string dirname );
-  // template < typename T, int DGrid >
-  // void register_exportee( std::string name, FieldBasedExportee<T,DGrid>* );
 
-  // template < typename T, int DGrid >
-  // void register_exportee( std::string name, ParticleBasedExportee<T,DGrid>* );
+  // TODO ad hoc
+  void set_is_collinear_mesh( bool x );
 
-  template < typename RealDS,
-             typename Metric,
+  template < typename RDS,
              typename ShapeF,
              int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs,
-             typename RealJ
+             typename R,
+             template < typename > class S,
+             typename RJ
              >
-  void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
+  void export_data( std::string prefix, int timestep, R dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
-                    const RealDS factor_before_J,
                     const dye::Ensemble<DGrid>& ens,
-                    const mani::Grid<Real,DGrid>& grid, // local grid
-                    const field::Field<Real, 3, DGrid>& Efield,
-                    const field::Field<Real, 3, DGrid>& Bfield,
-                    const field::Field<RealJ, 3, DGrid>& Jfield,// J is Jmesh on a replica
-                    const particle::map<particle::array<Real,PtcSpecs>>& particles
+                    const mani::Grid<R,DGrid>& grid, // local grid
+                    const field::Field<R, 3, DGrid>& Efield,
+                    const field::Field<R, 3, DGrid>& Bfield,
+                    const field::Field<RJ, 3, DGrid>& Jfield,// J is Jmesh on a replica
+                    const particle::map<particle::array<R,S>>& particles,
+                    const std::vector<FieldExportee<RDS, DGrid, R, ShapeF, RJ>*>& fexps,
+                    const std::vector<PtcExportee<RDS, DGrid, R, S, ShapeF>*>& pexps
                     );
 }
 

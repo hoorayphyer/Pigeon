@@ -63,14 +63,14 @@ SCENARIO("Time particle updater", "[particle]") {
   // }
 
   util::Rng<Real> rng; // TODO seed
-  using PU_t = Updater<DGrid, Real, PtcSpecs, ShapeF, Real_J, Metric>;
+  using PU_t = Updater<DGrid, Real, PtcSpecs, ShapeF, Real_J>;
 
   constexpr apt::Index<DGrid> bulk_dims = {128,128};
   constexpr mani::Grid<Real,DGrid> grid
     = {{ { 0.0, 1.0, bulk_dims[0] }, { 0.0, 1.0, bulk_dims[1] } }};
   constexpr int guard = 1;
 
-  PU_t pu( properties );
+  PU_t pu;
 
   field::Field<Real, 3, DGrid> E;
   field::Field<Real, 3, DGrid> B;
@@ -128,7 +128,7 @@ SCENARIO("Time particle updater", "[particle]") {
 
     tmr::Timestamp t1;
     for ( int i = 0; i < N; ++i ) {
-      pu( particles, J, E, B, grid, dt, i, rng );
+      pu( particles, J, properties, E, B, grid, nullptr, dt, i, rng );
     }
     auto dur = t1.lapse();
     dur.in_units_of("ms");

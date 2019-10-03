@@ -1,6 +1,7 @@
 #ifndef  _FIELD_YEE_HPP_
 #define  _FIELD_YEE_HPP_
 
+#include "apt/array.hpp"
 #include "field/offset.hpp"
 
 namespace field::yee {
@@ -10,14 +11,9 @@ namespace field::yee {
   template < int DGrid >
   constexpr auto ofs_gen( offset_t type, int comp ) noexcept {
     apt::array<field::offset_t, DGrid> res;
-    apt::foreach<0,DGrid>( [&type]( auto& ofs ) { ofs = {!type}; }, res );
+    for ( int i = 0; i < DGrid; ++i ) res[i] = {!type};
     if ( comp < DGrid ) res[comp] = {type};
     return res;
-  }
-
-  template < offset_t Ftype >
-  constexpr offset_t ofs_get( int comp, int grid_dim ) noexcept { // NOTE: order doesn't matter
-    return ( comp == grid_dim ) ? Ftype : !Ftype;
   }
 }
 

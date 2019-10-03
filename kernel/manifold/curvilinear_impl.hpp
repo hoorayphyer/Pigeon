@@ -12,21 +12,21 @@ inline constexpr T PI = std::acos(-1.0L);
 namespace mani {
   struct CartesianCoordSys {
     template < int N, typename T >
-    static inline T h ( T = 0.0, T = 0.0, T = 0.0 ) {
+    static inline T h ( T = 0.0, T = 0.0, T = 0.0 ) noexcept {
       return 1.0;
     }
 
     template < int N, typename T >
-    static inline T hh ( T = 0.0, T = 0.0, T = 0.0 ) {
+    static inline T hh ( T = 0.0, T = 0.0, T = 0.0 ) noexcept {
       static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
       return 1.0;
     }
 
     template < typename T >
-    static inline T hhh ( T = 0.0, T = 0.0, T = 0.0 ) { return 1.0; }
+    static inline T hhh ( T = 0.0, T = 0.0, T = 0.0 ) noexcept { return 1.0; }
 
     template < class X, class P, typename T >
-    static inline auto geodesic_move( X& x, const apt::VecExpression<P>& p, T dt, bool is_massive ) noexcept {
+    static inline auto geodesic_move( X& x, P& p, T dt, bool is_massive ) noexcept {
       apt::array<T, P::NDim> dx;
       dt /= std::sqrt( is_massive + apt::sqabs(p) );
       for ( int i = 0; i < P::NDim; ++i ) {
@@ -39,21 +39,21 @@ namespace mani {
 
   struct LogSphericalCoordSys {
     template < int N, typename T >
-    static inline T h ( T logr, T theta, T = 0.0 ) {
+    static inline T h ( T logr, T theta, T = 0.0 ) noexcept {
       static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
       if constexpr ( N == 2 ) return std::exp(logr) * std::sin(theta);
       else return std::exp(logr);
     }
 
     template < int N, typename T >
-    static inline T hh ( T logr, T theta, T = 0.0 ) {
+    static inline T hh ( T logr, T theta, T = 0.0 ) noexcept {
       static_assert( N == 0 || N == 1 || N == 2, "h index out of bounds" );
       if constexpr ( N == 2 ) return std::exp( 2.0 * logr);
       else return std::exp( 2.0 * logr) * std::sin(theta);
     }
 
     template < typename T >
-    static inline T hhh ( T logr, T theta, T = 0.0 ) {
+    static inline T hhh ( T logr, T theta, T = 0.0 ) noexcept {
       return std::exp( 3.0 * logr ) * std::sin(theta);
     }
 

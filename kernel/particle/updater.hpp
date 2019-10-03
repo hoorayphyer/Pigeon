@@ -1,60 +1,45 @@
 #ifndef  _PARTICLE_UPDATER_HPP_
 #define  _PARTICLE_UPDATER_HPP_
 
+#include "particle/action.hpp"
 #include "particle/species_predef.hpp"
-#include "particle/properties.hpp"
-#include "particle/map.hpp"
-#include "particle/array.hpp"
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
 #include "particle/load_type.hpp"
-
-#include "manifold/grid.hpp"
-
-#include "random/rng.hpp"
-
-namespace field {
-  template < typename, int, int > struct Field;
-}
 
 namespace particle {
   extern map<double> N_scat;
 }
 
+namespace dye {
+  template < int > struct Ensemble;
+}
+
 namespace particle {
   template < int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs,
+             typename R,
+             template < typename > class S,
              typename ShapeF,
-             typename RealJ,
-             typename Metric >
-  class Updater {
+             typename RJ >
+  class Updater : public Action<DGrid,R,S,RJ> {
   private:
-    const map<Properties>& _properties;
+    array<R,S> _buf;
 
-    array<Real,PtcSpecs> _buf;
-
-    void update_species( species sp,
-                         array<Real,PtcSpecs>& sp_ptcs,
-                         field::Field<RealJ,3,DGrid>& J,
-                         Real dt,
-                         const field::Field<Real,3,DGrid>& E,
-                         const field::Field<Real,3,DGrid>& B,
-                         const mani::Grid< Real, DGrid >& grid,
-                         util::Rng<Real>& rng
-                         );
+    apt::array<R, S<R>::Dim> (*_update_q)( typename array<R,S>::particle_type::vec_type& x, typename array<R,S>::particle_type::vec_type& p, R dt, bool is_massive );
 
   public:
-    Updater( const map<Properties>& properties )
-      : _properties(properties) {}
+    Updater* Clone() const override { return new Updater(*this); }
+    Updater& set_update_q( apt::array<R, S<R>::Dim> (*update_q)( typename array<R,S>::particle_type::vec_type&, typename array<R,S>::particle_type::vec_type&, R, bool ) ) { _update_q = update_q; return *this; }
 
-    void operator() ( map<array<Real,PtcSpecs>>& particles,
-                      field::Field<RealJ,3,DGrid>& J,
-                      const field::Field<Real,3,DGrid>& E,
-                      const field::Field<Real,3,DGrid>& B,
-                      const mani::Grid< Real, DGrid >& grid,
-                      Real dt, int timestep, util::Rng<Real>& rng
-                      );
+    void operator() ( map<array<R,S>>& particles,
+                      field::Field<RJ,3,DGrid>& J,
+                      const map<Properties>& properties,
+                      const field::Field<R,3,DGrid>& E,
+                      const field::Field<R,3,DGrid>& B,
+                      const mani::Grid< R, DGrid >& grid,
+                      const dye::Ensemble<DGrid>* ,
+                      R dt, int timestep, util::Rng<R>& rng
+                      ) override;
   };
 
 }

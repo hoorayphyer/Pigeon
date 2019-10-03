@@ -2,7 +2,6 @@
 #define _PIC_HPP_
 
 #include "particle/shapef.hpp"
-#include "manifold/curvilinear.hpp"
 #include "apt/type_traits.hpp"
 
 namespace particle {
@@ -18,17 +17,12 @@ namespace particle {
 }
 
 namespace pic {
-  using real_t = double;
-
   constexpr int DGrid = 2;
+  using real_t = float;
+  using real_j_t = float;
+  using real_export_t = float;
 
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
-
-  using Metric = mani::CartesianCoordSys;
-
-  using real_j_t = double;
-
-  using real_export_t = float;
 };
 
 

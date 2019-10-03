@@ -7,6 +7,13 @@
 namespace apt {
   template < int D >
   using Index = array<int,D>;
+
+  template < int D >
+  constexpr auto trans(int dim, Index<D> Ib, Index<D> extent ) noexcept {
+    Ib[dim] = 0;
+    extent[dim] = 1;
+    return std::make_pair(Ib,extent);
+  }
 }
 
 template < int D >
@@ -14,6 +21,14 @@ constexpr apt::Index<D> operator+( const apt::Index<D>& ind_a, const apt::Index<
   apt::Index<D> res;
   apt::foreach<0,D>
     ( []( auto& r, auto a, auto b ) { r = a + b; }, res, ind_a, ind_b );
+  return res;
+}
+
+template < int D >
+constexpr apt::Index<D> operator-( const apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
+  apt::Index<D> res;
+  apt::foreach<0,D>
+    ( []( auto& r, auto a, auto b ) { r = a - b; }, res, ind_a, ind_b );
   return res;
 }
 

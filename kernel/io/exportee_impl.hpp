@@ -3,7 +3,6 @@
 
 #include "io/exportee.hpp"
 #include "msh/mesh_shape_interplay_impl.hpp" // WeightFinder
-#include "bc/axissymmetric.hpp" // TODO this is specific to LogSpherical2D
 #include <cassert>
 
 namespace io {
@@ -18,9 +17,8 @@ namespace io {
              int DGrid,
              typename Real,
              typename ShapeF,
-             typename RealJ,
-             typename Metric >
-  struct FieldAction : public FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ, Metric> {
+             typename RealJ >
+  struct FieldAction : public FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ> {
     // NOTE we use Real here so RealJ may be downcast. But it is fine since RealJ is mainly to avoid losing precision in current deposition. Here Real is sufficient.
     using F = apt::array<Real,3> (*) ( apt::Index<DGrid> I,
                                        const mani::Grid<Real,DGrid>& grid,

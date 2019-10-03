@@ -2,7 +2,6 @@
 #define _IO_EXPORTER_IMPL_HPP_
 
 #include "io/exporter.hpp"
-#include "io/exportee_impl.hpp"
 
 
 namespace io {
@@ -20,9 +19,8 @@ namespace io {
              typename Real,
              template < typename > class S,
              typename ShapeF,
-             typename RealJ,
-             typename Metric >
-  void DataExporter<RealDS, DGrid, Real, S, ShapeF, RealJ, Metric>::
+             typename RealJ >
+  void DataExporter<RealDS, DGrid, Real, S, ShapeF, RealJ>::
   execute( const DataSaver& saver,
            const mani::Grid<Real,DGrid>& grid,
            const field::Field<Real, 3, DGrid>& E,
