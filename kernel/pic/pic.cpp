@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
                              fs::create_directories(pic::this_run_dir + "/pigeon");
                              fs::copy_file("CMakeLists.txt", pic::this_run_dir + "/pigeon/CMakeLists.txt" );
                              fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp" );
-                             fs::copy_file("gen.hpp", pic::this_run_dir + "/pigeon/gen.hpp" );
+                             fs::copy_file("pic_impl.hpp", pic::this_run_dir + "/pigeon/pic_impl.hpp" );
                            } );
     lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 

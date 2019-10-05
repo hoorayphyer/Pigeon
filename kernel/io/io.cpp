@@ -5,7 +5,7 @@ namespace io {
   using namespace pic;
 
   template
-  void export_data<real_export_t, ShapeF, DGrid, real_t, particle::Specs, real_j_t>
+  void export_data<real_export_t, DGrid, real_t, particle::Specs, real_j_t>
   ( std::string prefix, int timestep, real_t dt, int num_files, int downsample_ratio,
     const std::optional<mpi::CartComm>& cart_opt,
     const dye::Ensemble<DGrid>& ens,
@@ -14,8 +14,8 @@ namespace io {
     const field::Field<real_t, 3, DGrid>& Bfield,
     const field::Field<real_j_t, 3, DGrid>& Jfield,// J is Jmesh on a replica
     const particle::map<particle::array<real_t,particle::Specs>>& particles,
-    const std::vector<FieldExportee<real_export_t, DGrid, real_t, ShapeF, real_j_t>*>& fexps,
-    const std::vector<PtcExportee<real_export_t, DGrid, real_t, particle::Specs, ShapeF>*>& pexps
+    const std::vector<FieldExportee<real_export_t, DGrid, real_t, real_j_t>*>& fexps,
+    const std::vector<PtcExportee<real_export_t, DGrid, real_t, particle::Specs>*>& pexps
     );
 }
 

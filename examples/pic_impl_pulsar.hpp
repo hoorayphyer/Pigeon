@@ -22,6 +22,8 @@
 
 #include "dye/ensemble.hpp"
 
+#include "io/exportee_by_function.hpp"
+
 #include "pic.hpp"
 
 namespace pic {
@@ -43,7 +45,7 @@ namespace pic {
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
-  inline constexpr int total_timesteps = 100;
+  inline constexpr int total_timesteps = 10000;
 
   constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
@@ -55,7 +57,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { false, 0, 100 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 500 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -152,6 +154,7 @@ namespace field {
     Haugbolle<R,DGrid,RJ> fu_bulk;
     {
       auto& fu = fu_bulk;
+      fu.setName("Bulk");
       fu.setIb( { star_interior + myguard, myguard } );
       fu.setIe({ pic::supergrid[0].dim() - myguard, pic::supergrid[1].dim() - myguard });
       fu.setGuard ({ myguard, myguard, myguard, myguard });
@@ -173,6 +176,7 @@ namespace field {
     HaugbolleBdry<R,DGrid,RJ> fu_axis_lo;
     {
       auto& fu = fu_axis_lo;
+      fu.setName("LowerAxis");
       fu.setIb({ fu_bulk.Ib()[0], 0 });
       fu.setIe({ fu_bulk.Ie()[0], myguard });
       fu.setGuard({{ fu_bulk.guard()[0], {0,myguard} }});
@@ -193,6 +197,7 @@ namespace field {
     HaugbolleBdry<R,DGrid,RJ> fu_axis_hi;
     {
       auto& fu = fu_axis_hi;
+      fu.setName("HigherAxis");
       fu.setIb({ fu_bulk.Ib()[0], pic::supergrid[1].dim() - myguard });
       fu.setIe({ fu_bulk.Ie()[0], pic::supergrid[1].dim() + 1 });
       fu.setGuard({{ fu_bulk.guard()[0], {myguard,0} }});
@@ -229,6 +234,7 @@ namespace field {
     HaugbolleBdry<R,DGrid,RJ> fu_surf;
     {
       auto& fu = fu_surf;
+      fu.setName("ConductingSurface");
       fu.setIb({ star_interior, fu_bulk.Ib()[1] });
       fu.setIe({ star_interior+myguard, fu_bulk.Ie()[1] });
       fu.setGuard({{ {0, myguard}, fu_bulk.guard()[1] }});
@@ -249,6 +255,7 @@ namespace field {
         fu.set_preJ(fu_surf.preJ());
         const HaugbolleBdry<R,DGrid,RJ>* fub[2] = {&fu_surf, &fu_axis};
 
+        fu.setName(fub[0]->name()+fub[1]->name());
         fu.setIb({ fub[0]->Ib()[0], fub[1]->Ib()[1] });
         fu.setIe({ fub[0]->Ie()[0], fub[1]->Ie()[1] });
         fu.setGuard( { fub[0]->guard()[0], fub[1]->guard()[1] } );
@@ -355,6 +362,7 @@ namespace field {
     } fu_cond;
     { // interior
       auto& fu = fu_cond;
+      fu.setName("ConductorInterior");
       fu.setIb( { 0, 0 } );
       fu.setIe({ star_interior, pic::supergrid[1].dim()+1 });
       fu.setGuard({});
@@ -431,6 +439,7 @@ namespace field {
           return 0.5 * lnr * lnr;
         };
 
+      fu.setName("DampingLayer");
       fu.setIb({ nb, 0 });
       fu.setIe({ pic::supergrid[0].dim(), pic::supergrid[1].dim() + 1 });
       fu.setGuard({});
@@ -470,11 +479,13 @@ namespace field {
       }
     } fu_asym_lo, fu_asym_hi;
     {
+      fu_asym_lo.setName("AxissymmetrizeEBLower");
       fu_asym_lo.setIb( { 0, -myguard });
       fu_asym_lo.setIe( { pic::supergrid[0].dim(), 1 }); // NOTE 1 so as to set values right on axis
       fu_asym_lo.is_upper_axis(false);
       fu_asym_lo.require_original_EB(false);
 
+      fu_asym_hi.setName("AxissymmetrizeEBHigher");
       fu_asym_hi.setIb( { 0, pic::supergrid[1].dim() });
       fu_asym_hi.setIe( { pic::supergrid[0].dim(), pic::supergrid[1].dim() + myguard }); 
       fu_asym_hi.is_upper_axis(true);
@@ -531,7 +542,7 @@ namespace pic {
 
 namespace particle {
   constexpr pic::real_t N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( pic::dt / pic::wdt_pic, 2.0 );
-  constexpr pic::real_t N_atm_x = 0.0; // TODO
+  constexpr pic::real_t N_atm_x = 1.0; // TODO
   constexpr pic::real_t v_th = 0.3;
   constexpr pic::real_t gravity_strength = 1.8;
 
@@ -544,6 +555,7 @@ namespace particle {
 
     Updater<DGrid,R,S,ShapeF,RJ> pu;
     {
+      pu.setName("MainUpdate");
       pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>, R>);
     }
 
@@ -669,6 +681,7 @@ namespace particle {
       }
     } atm;
     {
+      atm.setName("Atmosphere");
       atm.setIb({ field::star_interior, 0 });
       atm.setIe({ field::star_interior + 1, pic::supergrid[1].dim() });
 
@@ -712,10 +725,12 @@ namespace particle {
       }
     } asym_lo, asym_hi;
     {
+      asym_lo.setName("AxissymmetrizeJLower");
       asym_lo.setIb( { 0, -field::myguard });
       asym_lo.setIe( { pic::supergrid[0].dim(), 1 }); // NOTE +1 so as to set values right on axis
       asym_lo.is_upper_axis(false);
 
+      asym_hi.setName("AxissymmetrizeJHigher");
       asym_hi.setIb( { 0, pic::supergrid[1].dim() });
       asym_hi.setIe( { pic::supergrid[0].dim(), pic::supergrid[1].dim() + field::myguard });
       asym_hi.is_upper_axis(true);
@@ -740,9 +755,9 @@ namespace particle {
   template < typename R = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
   void set_up_properties() {
     properties.insert(species::electron, {1,-1,"electron","el"});
-    properties.insert(species::positron, {1,1,"positron","po"});
+    //properties.insert(species::positron, {1,1,"positron","po"});
     properties.insert(species::ion, { 5, 1, "ion","io"});
-    properties.insert(species::photon, { 0, 0, "photon","ph" });
+    //properties.insert(species::photon, { 0, 0, "photon","ph" });
   }
 
   // NOTE called in particle updater
@@ -808,8 +823,8 @@ namespace particle {
         ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
       if ( properties.has(species::electron) && properties.has(species::positron) ) {
-        ep_scat.Register( species::electron );
-        ep_scat.Register( species::positron );
+        // ep_scat.Register( species::electron );
+        // ep_scat.Register( species::positron );
       }
     }
 
@@ -869,7 +884,7 @@ namespace io {
     using pic::Metric;
     // define a function pointer.
     RDS(*hh_func)(RDS,RDS,RDS) = nullptr;
-    apt::array<RDS,3> q {}; // TODO 3 is hard coded
+    apt::array<RDS,3> q {};
 
     for ( int comp = 0; comp < num_comps; ++comp ) {
       const auto& ofs = fds[comp].offset();
@@ -963,15 +978,15 @@ namespace io {
   // void delB();
 
   template < typename RDS,
-             typename ShapeF,
              int DGrid,
              typename R,
              typename RJ
              >
   auto set_up_field_export() {
-    std::vector<FieldExportee<RDS, DGrid, R, ShapeF, RJ>*> fexps;
+    std::vector<FieldExportee<RDS, DGrid, R, RJ>*> fexps;
     {
-      using FA = FieldAction<RDS,DGrid,R,ShapeF,RJ>;
+      using FA = FexpTbyFunction<RDS,DGrid,R,RJ>;
+      using pic::ShapeF;
 
       fexps.push_back( new FA ( "E", 3,
                                 field_self<0,R, DGrid, ShapeF, RJ>,
@@ -1040,14 +1055,14 @@ namespace io {
   }
 
   template < typename RDS,
-             typename ShapeF,
              int DGrid,
              typename R,
              template < typename > class S>
   auto set_up_particle_export() {
-    std::vector<PtcExportee<RDS, DGrid, R, S, ShapeF>*> pexps;
+    constexpr int DSratio = 1;
+    std::vector<PtcExportee<RDS, DGrid, R, S>*> pexps;
     {
-      using PA = PtcAction<RDS,DGrid,R,S,ShapeF>;
+      using PA = PexpTbyFunction<RDS,DGrid,R,S,particle::induced_shapef_t<pic::ShapeF,DSratio>>;
       pexps.push_back( new PA ("Num", 1,
                                ptc_num<R,S>,
                                fold_back_at_axis< DGrid, RDS, S >

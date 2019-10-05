@@ -18,9 +18,8 @@ namespace io {
              int DGrid,
              typename Real,
              template < typename > class S,
-             typename ShapeF,
              typename RealJ >
-  void DataExporter<RealDS, DGrid, Real, S, ShapeF, RealJ>::
+  void DataExporter<RealDS, DGrid, Real, S, RealJ>::
   execute( const DataSaver& saver,
            const mani::Grid<Real,DGrid>& grid,
            const field::Field<Real, 3, DGrid>& E,

@@ -78,7 +78,6 @@ namespace io {
 
 namespace io {
   template < typename RealDS,
-             typename ShapeF,
              int DGrid,
              typename Real,
              template < typename > class S,
@@ -92,10 +91,10 @@ namespace io {
                     const field::Field<Real, 3, DGrid>& B,
                     const field::Field<RealJ, 3, DGrid>& J,// J is Jmesh on a replica
                     const particle::map<particle::array<Real,S>>& particles,
-                    const std::vector<FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ>*>& fexps,
-                    const std::vector<PtcExportee<RealDS, DGrid, Real, S, ShapeF>*>& pexps
+                    const std::vector<FieldExportee<RealDS, DGrid, Real, RealJ>*>& fexps,
+                    const std::vector<PtcExportee<RealDS, DGrid, Real, S>*>& pexps
                     ) {
-    using Exporter_t = DataExporter<RealDS, DGrid, Real, S, ShapeF, RealJ>;
+    using Exporter_t = DataExporter<RealDS, DGrid, Real, S, RealJ>;
 
     constexpr int silo_mesh_ghost = 1;
     auto silo_mesh_type = is_collinear_mesh_silo ? silo::MeshType::Rect : silo::MeshType::Curv;

@@ -3,6 +3,7 @@
 
 #include "apt/index.hpp"
 #include "apt/pair.hpp"
+#include <string>
 
 namespace apt {
   template < int DGrid >
@@ -11,16 +12,19 @@ namespace apt {
     apt::Index<DGrid> _Ib;
     apt::Index<DGrid> _Ie;
     apt::array<apt::pair<int>,DGrid> _guard;
+    std::string _name = "Unknown";
 
   public:
     ActionBase& setIb(apt::Index<DGrid> Ib) { _Ib = Ib; return *this; }
     ActionBase& setIe(apt::Index<DGrid> Ie) { _Ie = Ie; return *this; }
     ActionBase& setGuard(apt::array<apt::pair<int>,DGrid> guard) { _guard = guard; return *this; }
+    ActionBase& setName(std::string name) { _name = name; return *this; }
 
     const auto& Ib() const noexcept { return _Ib; }
     const auto& Ie() const noexcept { return _Ie; }
     apt::Index<DGrid>  ext() const noexcept { return (_Ie - _Ib); }
     const auto& guard() const noexcept { return _guard; }
+    const auto& name() const noexcept { return _name; }
 
     virtual ~ActionBase() {};
 

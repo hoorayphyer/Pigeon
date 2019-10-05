@@ -47,6 +47,28 @@ namespace particle {
 
   };
 
+  template < class SF, int D >
+  struct induced_shapef_t {
+    static_assert(D>0);
+    constexpr static int support() noexcept {
+      return SF::support() / D;
+    }
+
+    // For fields defined at MIDWAY
+    template < typename T >
+    constexpr T operator() ( T dx ) const noexcept {
+      if constexpr ( D == 1 ) return SF()(dx);
+      else {
+        static_assert(D%2 == 0);
+        SF sf;
+        T sum = 0;
+        for ( int i = 0; i < D; ++i )
+          sum += sf(D * dx + D / 2 - i - 0.5);
+        return sum;
+      }
+    }
+  };
+
 }
 
 

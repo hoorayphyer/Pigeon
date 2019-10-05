@@ -1,8 +1,8 @@
-#ifndef _IO_EXPORTEE_IMPL_HPP_
-#define _IO_EXPORTEE_IMPL_HPP_
+#ifndef _IO_EXPORTEE_BY_FUNCTION_HPP_
+#define _IO_EXPORTEE_BY_FUNCTION_HPP_
 
 #include "io/exportee.hpp"
-#include "msh/mesh_shape_interplay_impl.hpp" // WeightFinder
+#include "msh/mesh_shape_interplay.hpp"
 #include <cassert>
 
 namespace io {
@@ -16,9 +16,8 @@ namespace io {
   template < typename RealDS,
              int DGrid,
              typename Real,
-             typename ShapeF,
              typename RealJ >
-  struct FieldAction : public FieldExportee<RealDS, DGrid, Real, ShapeF, RealJ> {
+  struct FexpTbyFunction : public FieldExportee<RealDS, DGrid, Real, RealJ> {
     // NOTE we use Real here so RealJ may be downcast. But it is fine since RealJ is mainly to avoid losing precision in current deposition. Here Real is sufficient.
     using F = apt::array<Real,3> (*) ( apt::Index<DGrid> I,
                                        const mani::Grid<Real,DGrid>& grid,
@@ -27,7 +26,7 @@ namespace io {
                                        const field::Field<RealJ, 3, DGrid>& J);
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
 
-    FieldAction( std::string a, int b, F c, H d )
+    FexpTbyFunction( std::string a, int b, F c, H d )
       : varname(a), num_comps(b), impl(c), post_hook(d) {}
 
     std::string varname {};
@@ -91,11 +90,11 @@ namespace io {
              template < typename > class S,
              typename ShapeF
              >
-  struct PtcAction : public PtcExportee < RealDS, DGrid, Real, S, ShapeF > {
+  struct PexpTbyFunction : public PtcExportee < RealDS, DGrid, Real, S > {
     using F = apt::array<Real,3> (*) ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc);
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps );
 
-    PtcAction( std::string a, int b, F c, H d )
+    PexpTbyFunction( std::string a, int b, F c, H d )
       : varname(a), num_comps(b), impl(c), post_hook(d) {}
 
     std::string varname {};
@@ -114,33 +113,18 @@ namespace io {
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
+      ShapeF sf;
+
       field::Field<RealDS,3,DGrid> fds( { mani::dims(grid_ds), guard_ds } );
       for ( int i = 0; i < num_comps; ++i ) {
         for ( int dim = 0; dim < DGrid; ++dim )
           fds.set_offset( i, dim, MIDWAY );
       }
 
-      apt::Index<DGrid> ext;
-      for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
-
-      apt::array< field::offset_t, DGrid > ofs;
-      for ( int i = 0; i < DGrid; ++i ) ofs[i] = MIDWAY;
-
       const auto& prop = particle::properties[sp];
-
       for ( const auto& ptc : ptcs ) {
         if ( !ptc.is(particle::flag::exist) ) continue;
-        msh::impl::WeightFinder<Real, DGrid,S<Real>::Dim, ShapeF> wf(msh::to_standard(grid, ptc.q()), ofs, ShapeF() );
-
-        auto var = impl( particle::properties[sp], ptc );
-        for ( int comp = 0; comp < num_comps; ++comp ) {
-          for ( const auto& I : apt::Block(ext) ) {
-            apt::Index<DGrid> Ids;
-            for ( int i = 0; i < DGrid; ++i ) Ids[i] = ( wf.I_b()[i] + I[i] ) / ds_ratio;
-            fds[comp](Ids) += ptc.frac() * var[comp] * wf.weight(I);
-          }
-        }
-
+        msh::deposit( fds, ptc.frac(), impl( prop, ptc ), msh::to_standard(grid_ds, ptc.q()), sf);
       }
 
       if ( post_hook != nullptr ) post_hook( fds, grid_ds, num_comps );

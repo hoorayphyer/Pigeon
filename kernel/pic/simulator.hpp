@@ -379,6 +379,9 @@ namespace pic {
         TIMING("ParticleActions", START {
             for ( int i = 0; i < _ptc_actions.size(); ++i ) {
               if ( !_ptc_actions[i] ) continue;
+              if ( stamp ) {
+                lgr::file % "--" << _ptc_actions[i]->name() << std::endl;
+              }
               auto& act = *_ptc_actions[i];
               act( _particles, _J, particle::properties, _E, _B, _grid, &ens, dt, timestep, _rng );
             }
@@ -409,6 +412,9 @@ namespace pic {
                 field::merge_sync_guard_cells( _J, *_cart_opt );
                 for ( int i = 0; i < _field_actions.size(); ++i ) {
                   if ( !_field_actions[i] ) continue;
+                  if ( stamp ) {
+                    lgr::file % "--" << _field_actions[i]->name() << std::endl;
+                  }
                   const auto& act = *_field_actions[i];
 
                   // auto[E_bak_opt,B_bak_opt] = backupEB(i);
@@ -435,12 +441,12 @@ namespace pic {
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
         TIMING("ExportData", START {
-            auto fexps = io::set_up_field_export<real_export_t,ShapeF,DGrid,real_t,real_j_t>();
-            auto pexps = io::set_up_particle_export<real_export_t,ShapeF,DGrid,real_t,particle::Specs>();
+            auto fexps = io::set_up_field_export<real_export_t,DGrid,real_t,real_j_t>();
+            auto pexps = io::set_up_particle_export<real_export_t,DGrid,real_t,particle::Specs>();
 
             io::set_is_collinear_mesh(io::is_collinear_mesh); // TODO
 
-            io::export_data<pic::real_export_t, pic::ShapeF >( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, fexps, pexps );
+            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
             for ( auto ptr : pexps ) delete ptr;
           });

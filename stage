@@ -53,7 +53,7 @@ fi
 
 mkdir $stage_dir/$tnow
 mkdir $stage_dir/$tnow/bin
-cp CMakeLists.txt pic.hpp gen.hpp $stage_dir/$tnow/
+cp -H CMakeLists.txt pic.hpp pic_impl.hpp $stage_dir/$tnow/ # -H to copy contents of symlinks to the target file
 cp bin/pic $stage_dir/$tnow/bin/
 
 if [[ -f job.sh ]]; then

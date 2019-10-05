@@ -25,7 +25,6 @@ namespace io {
   void set_is_collinear_mesh( bool x );
 
   template < typename RDS,
-             typename ShapeF,
              int DGrid,
              typename R,
              template < typename > class S,
@@ -39,8 +38,8 @@ namespace io {
                     const field::Field<R, 3, DGrid>& Bfield,
                     const field::Field<RJ, 3, DGrid>& Jfield,// J is Jmesh on a replica
                     const particle::map<particle::array<R,S>>& particles,
-                    const std::vector<FieldExportee<RDS, DGrid, R, ShapeF, RJ>*>& fexps,
-                    const std::vector<PtcExportee<RDS, DGrid, R, S, ShapeF>*>& pexps
+                    const std::vector<FieldExportee<RDS, DGrid, R, RJ>*>& fexps,
+                    const std::vector<PtcExportee<RDS, DGrid, R, S>*>& pexps
                     );
 }
 
