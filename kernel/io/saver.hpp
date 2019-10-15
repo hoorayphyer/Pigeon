@@ -59,7 +59,7 @@ namespace io {
     void save( std::string varname, const field::Component<T,DGrid>& fcomp ) const {
       if ( !_cart_opt ) return;
       std::vector<int> dims(DGrid);
-      for ( int i = 0; i < DGrid; ++i ) dims[i] = fcomp.mesh().extent()[i];
+      for ( int i = 0; i < DGrid; ++i ) dims[i] = fcomp.mesh().range(i).full_size();
       pmpio([this,varname,&fcomp,dims=std::move(dims)](auto& dbfile) {
               dbfile.put_var( varname, meshname, fcomp.data().data(), dims );
             });

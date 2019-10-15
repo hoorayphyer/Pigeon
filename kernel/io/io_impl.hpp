@@ -154,7 +154,7 @@ namespace io {
 
       int quadmesh_dims[DGrid] = {};
       for ( int i = 0; i < DGrid; ++i )
-        quadmesh_dims[i] = E.mesh().bulk_dim(i) / downsample_ratio + 1 + lo_ofs[i] + hi_ofs[i]; // plus 1 to include the upper boundary
+        quadmesh_dims[i] = E.mesh().range(i).size() / downsample_ratio + 1 + lo_ofs[i] + hi_ofs[i]; // plus 1 to include the upper boundary
 
       if ( is_collinear_mesh_silo ) {
         std::vector< std::vector<RealDS> > coords(DGrid);

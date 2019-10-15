@@ -8,9 +8,8 @@ using namespace msh;
 SCENARIO("Measure performance of interpolate", "[msh]") {
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
-  constexpr apt::Index<2> extent {128, 128};
   constexpr int guard = 1; // TODO this should depend on ShapeF
-  const field::Mesh<2> mesh ( extent, guard );
+  const field::Mesh<2> mesh ( apt::make_range<2>({},{128,128},guard) );
 
   field::Field<double,3,2> E ( mesh );
   E.set_offset( 0, { INSITU, MIDWAY } );
@@ -48,6 +47,6 @@ SCENARIO("Measure performance of interpolate", "[msh]") {
 
   auto dur = t1.lapse();
   dur.in_units_of("ns");
-  WARN("Timing Interpolating fields of " << extent << " = " << dur.val() / N << " " << dur.unit() );
+  WARN("Timing Interpolating fields of " << apt::range::size(mesh.range()) << " = " << dur.val() / N << " " << dur.unit() );
 
 }

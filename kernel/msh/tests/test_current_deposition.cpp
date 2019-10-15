@@ -118,13 +118,15 @@ SCENARIO("Testing ShapeRange with 2D grid, deposited field has offsets 0.5, 0.5,
 
 // NOTE q0 and q1 are of type double regardlessly
 // J found by brutal force, which for each ptc, looping over all cells in J and deposit, then immediately integrate to find J
-template < typename RealJ, int DGrid, int DPtc, typename ShapeF >
-void direct_deposit( Field<RealJ,3,DGrid>& J,
+template < typename RJ, int DGrid, int DPtc, typename ShapeF >
+void direct_deposit( Field<RJ,3,DGrid>& J,
                      const ShapeF& shapef,
                      const apt::array<double,DPtc>& q0_std,
                      const apt::array<double,DPtc>& q1_std ) {
   // simply loop over all cells including guard
   const auto& mesh = J.mesh();
+  assert(apt::is_margin_uniform( mesh.range() ) );
+  const int guard = mesh.range()[0].margin()[LFT];
 
   // use a "large enough" range to find contributing cells.
   apt::Index<DGrid> Ib;
@@ -138,15 +140,17 @@ void direct_deposit( Field<RealJ,3,DGrid>& J,
 
   for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
     Ib[i_dim] = int_flr( std::min(q0_std[i_dim],q1_std[i_dim]) - 0.5 - ShapeF::support() / 2.0 ) - 1;
-    Ib[i_dim] = std::max(Ib[i_dim], -mesh.guard());
+    Ib[i_dim] = std::max(Ib[i_dim], -guard);
     ext[i_dim] = int_flr( std::max(q0_std[i_dim],q1_std[i_dim]) - 0.5 + ShapeF::support() / 2.0 ) + 2;
-    ext[i_dim] = std::min(ext[i_dim], mesh.bulk_dim(i_dim) + mesh.guard() );
+    ext[i_dim] = std::min(ext[i_dim], mesh.range(i_dim).size() + guard );
     ext[i_dim] -= Ib[i_dim];
   }
 
   apt::array<double,DGrid> s0, s1;
-  Field<RealJ,3,DGrid> W( {ext, 0} );
-  for( auto I : apt::Block(ext) ) {
+  apt::array<apt::Range,DGrid> range;
+  for ( int i = 0; i < DGrid; ++i ) range[i] = {0,ext[i],0};
+  Field<RJ,3,DGrid> W { range };
+  for( auto I : apt::Block({}, ext) ) { // POLEDANCE use Ib and Ie for W
     for ( int i = 0; i < DGrid; ++i ) {
       s0[i] = shapef( I[i] + Ib[i] + 0.5 - q0_std[i] );
       s1[i] = shapef( I[i] + Ib[i] + 0.5 - q1_std[i] );
@@ -165,10 +169,11 @@ void direct_deposit( Field<RealJ,3,DGrid>& J,
 
   { // integrate W right away. J[i+1] = J[i] - W[i], or J[i] = J[i+1] + W[i], where J is for this particle only, and we will store it in W
 
+    const auto& r = W.mesh().range();
     for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
-      for ( auto trI : W.mesh().project(i_dim, W.mesh().origin(), W.mesh().extent() ) ) {
-        for ( int n = W.mesh().extent()[i_dim] - 2; n > W.mesh().origin()[i_dim]-1; --n )
-          W[i_dim][trI | n ] += W[i_dim][ trI | n+1 ];
+      for ( const auto& trI : apt::project_out(i_dim, apt::range::far_begin(r), apt::range::far_end(r)) ) {
+        for ( apt::Longidx n (i_dim, r[i_dim].full_size() - 2 ); n > r[i_dim].far_begin()-1; --n )
+          W[i_dim](trI + n) += W[i_dim](trI + n + 1);
       }
     }
 
@@ -187,7 +192,8 @@ void direct_deposit( Field<RealJ,3,DGrid>& J,
   }
 
   // deposit
-  for( auto I : apt::Block(ext) ) {
+  // POLEDANCE
+  for( auto I : apt::Block({},ext) ) {
     for ( int i = 0; i < 3; ++i )
       J[i](I+Ib) += W[i](I);
   }
@@ -212,15 +218,19 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
   for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = TestType::get()[i];
 
   THEN("bulk_dims should be large enough") {
-    for ( int i = 0; i < 2; ++i )
+    for ( int i = 0; i < DGrid; ++i )
       REQUIRE( bulk_dims[i] >= 2 * ( (shapef.support() + 3) / 2 ) );
   }
 
-  using RealJ = double;
+  using RJ = double;
   constexpr auto guard = ( ShapeF::support() + 3 ) / 2;
 
-  Field<RealJ, 3, DGrid> J_std( { bulk_dims, guard } );
-  Field<RealJ, 3, DGrid> J_direct( { bulk_dims, guard });
+  apt::array<apt::Range,DGrid> range;
+  for ( int i = 0; i < DGrid; ++i )
+    range[i] = {0, bulk_dims[i], guard};
+
+  Field<RJ, 3, DGrid> J_std{ range };
+  Field<RJ, 3, DGrid> J_direct{ range };
 
   J_std.reset();
   J_direct.reset();
@@ -242,7 +252,7 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
 
   // integrate(J_std);
 
-  const auto mesh_size = J_std.mesh().stride(DGrid);
+  const auto mesh_size = J_std.mesh().stride().back();
 
   for ( int iJ = 0; iJ < 3; ++iJ ) {
     const auto& j_std = J_std[iJ].data();
@@ -281,7 +291,7 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
     }
     { // put J fields
       std::vector<int> data_dims(DGrid);
-      for ( int i = 0; i < DGrid; ++i ) data_dims[i] = J_std.mesh().extent()[i];
+      for ( int i = 0; i < DGrid; ++i ) data_dims[i] = J_std.mesh().range()[i].full_size();
 
       dbfile.put_var("J1_std", "mesh", J_std[0].data().data(), data_dims);
       dbfile.put_var("J1_direct", "mesh", J_direct[0].data().data(), data_dims);

@@ -29,6 +29,9 @@ namespace apt {
 
     constexpr const T* end() const noexcept { return _data + D;}
 
+    constexpr const T& back() const noexcept { return _data[D-1];}
+    constexpr T& back() noexcept { return _data[D-1];}
+
     constexpr int size() const noexcept { return NDim; }
 
   };

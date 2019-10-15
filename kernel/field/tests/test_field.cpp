@@ -4,7 +4,7 @@
 using namespace field;
 
 SCENARIO("Test setting offset") {
-  Mesh<2> mesh ( {32, 32}, 1 );
+  Mesh<2> mesh ( {{ {0,32,1}, {0,32,1}}} );
   Field<double,3,2> f(mesh);
   apt::array< offset_t, 2 > offset{ MIDWAY, MIDWAY };
   for ( int i = 0; i < 3; ++i ) {

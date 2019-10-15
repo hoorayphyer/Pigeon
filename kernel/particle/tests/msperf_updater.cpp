@@ -65,10 +65,11 @@ SCENARIO("Time particle updater", "[particle]") {
   util::Rng<Real> rng; // TODO seed
   using PU_t = Updater<DGrid, Real, PtcSpecs, ShapeF, Real_J>;
 
-  constexpr apt::Index<DGrid> bulk_dims = {128,128};
+  // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
+  constexpr int guard = ( ShapeF::support() + 3 ) / 2;
+  constexpr apt::array<apt::Range,DGrid> range {{ {0,128,guard}, {0,128,guard} }};
   constexpr mani::Grid<Real,DGrid> grid
-    = {{ { 0.0, 1.0, bulk_dims[0] }, { 0.0, 1.0, bulk_dims[1] } }};
-  constexpr int guard = 1;
+    = {{ { 0.0, 1.0, range[0].size() }, { 0.0, 1.0, range[1].size() } }};
 
   PU_t pu;
 
@@ -86,10 +87,9 @@ SCENARIO("Time particle updater", "[particle]") {
         if ( but_comp < DGrid ) res[but_comp] = !all;
         return res;
       };
-    E = {{ bulk_dims, guard }};
-    B = {{ bulk_dims, guard }};
-    // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
-    J = {{ bulk_dims, ( ShapeF::support() + 3 ) / 2 }};
+    E = {range};
+    B = {range};
+    J = {range};
 
     for( int i = 0; i < 3; ++i ) {
       E.set_offset( i, all_but( MIDWAY, i ) );

@@ -18,13 +18,15 @@ double field_value( const std::vector<int>& coords, int comp ) {
 }
 
 void test_copy_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
+  const auto& range = mesh.range();
+  const int guard = range[0].margin()[LFT];
   const auto[ my_coords, dims, periodic] = cart.coords_dims_periodic();
   VF vf( mesh );
 
   // only bulk has nonzero values
   for ( int i = 0; i < VF::NDim; ++i ) {
     double val = field_value( my_coords, i );
-    for( auto I_bulk : apt::Block<2>({ mesh.bulk_dim(0), mesh.bulk_dim(1) }) ) {
+    for( auto I_bulk : apt::Block<2>({},apt::range::size(mesh.range())) ) {
       vf[i](I_bulk) = val;
     }
   }
@@ -51,9 +53,9 @@ void test_copy_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
   apt::Index<2> lcr;
   // lcr[ith_dim] can be -1, 0, 1, corresponding to in left guard, in bulk, in right guard
   for ( lcr[1] = -1; lcr[1] < 2; ++lcr[1] ) {
-    std::tie(Ib[1], ext[1]) = region_begin_extent( lcr[1], mesh.extent()[1], mesh.guard() );
+    std::tie(Ib[1], ext[1]) = region_begin_extent( lcr[1], range[1].full_size(), guard );
     for ( lcr[0] = -1; lcr[0] < 2; ++lcr[0] ) {
-      std::tie(Ib[0], ext[0]) = region_begin_extent( lcr[0], mesh.extent()[0], mesh.guard() );
+      std::tie(Ib[0], ext[0]) = region_begin_extent( lcr[0], range[0].full_size(), guard );
       auto neigh = my_coords;
       for ( int i_dim = 0; i_dim < 2; ++i_dim )
         neigh[i_dim] = ( my_coords[i_dim] + lcr[i_dim] + dims[i_dim] ) % dims[i_dim];
@@ -68,14 +70,16 @@ void test_copy_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
       for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
         double region_val = at_bdry ? 0.0 : field_value( neigh, i_fld_dim );
         CAPTURE( mpi::world.rank(), i_fld_dim, Ib, ext, lcr, at_bdry );
-        for ( auto I : apt::Block( ext ) )
-          REQUIRE( vf[i_fld_dim](I + Ib) == region_val );
+        for ( auto I : apt::Block( Ib, Ib + ext ) )
+          REQUIRE( vf[i_fld_dim](I) == region_val );
       }
     }
   }
 }
 
 void test_merge_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
+  const auto& range = mesh.range();
+  const int guard = range[0].margin()[LFT];
   const auto[ my_coords, dims, periodic] = cart.coords_dims_periodic();
   VF vf( mesh );
 
@@ -108,9 +112,9 @@ void test_merge_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
     apt::Index<2> lcr;
     // lcr[ith_dim] can be -1, 0, 1, corresponding to left part in bulk of width guard, bulk, right part in bulk of width guard
     for ( lcr[1] = -1; lcr[1] < 2; ++lcr[1] ) {
-      std::tie(Ib[1], ext[1]) = region_begin_extent( lcr[1], mesh.extent()[1], mesh.guard() );
+      std::tie(Ib[1], ext[1]) = region_begin_extent( lcr[1], range[1].full_size(), guard );
       for ( lcr[0] = -1; lcr[0] < 2; ++lcr[0] ) {
-        std::tie(Ib[0], ext[0]) = region_begin_extent( lcr[0], mesh.extent()[0], mesh.guard() );
+        std::tie(Ib[0], ext[0]) = region_begin_extent( lcr[0], range[0].full_size(), guard );
 
         for ( int i_fld_dim = 0; i_fld_dim < VF::NDim; ++i_fld_dim ) {
           double region_val = 0.0;
@@ -130,8 +134,8 @@ void test_merge_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
           INFO("checking bulk areas in merge_sync");
           CAPTURE( mpi::world.rank(), i_fld_dim, Ib, ext, lcr  );
           // NOTE since there is addition involved, we have to use Approx
-          for ( auto I : apt::Block( ext ) )
-            REQUIRE( vf[i_fld_dim](I + Ib) == Approx(region_val) );
+          for ( auto I : apt::Block(Ib, Ib + ext ) )
+            REQUIRE( vf[i_fld_dim](I) == Approx(region_val) );
         }
       }
     }
@@ -140,14 +144,14 @@ void test_merge_sync ( const Mesh<2>& mesh, const mpi::CartComm& cart ) {
     auto vf_dup = vf;
     copy_sync_guard_cells(vf_dup, cart);
     for ( int D = 0; D < 2; ++D ) {
-      for ( const auto& trI : mesh.project(D,mesh.origin(),mesh.extent()) ) {
-        for ( int n = -mesh.guard(); n < 0; ++n ) {
+      for ( const auto& trI : apt::project_out(D, apt::range::far_begin(range), apt::range::far_end(range)) ) {
+        for ( apt::Longidx n (D, -guard); n < 0; ++n ) {
           for ( int c = 0; c < VF::NDim; ++c )
-            REQUIRE( vf[c][trI|n] == vf_dup[c][trI|n] );
+            REQUIRE( vf[c](trI + n) == vf_dup[c](trI + n) );
         }
-        for ( int n = mesh.bulk_dim(D); n < mesh.bulk_dim(D) + mesh.guard(); ++n ) {
+        for ( apt::Longidx n (D, range[D].size() ); n < range[D].size() + guard; ++n ) {
           for ( int c = 0; c < VF::NDim; ++c )
-            REQUIRE( vf[c][trI|n] == vf_dup[c][trI|n] );
+            REQUIRE( vf[c](trI + n) == vf_dup[c](trI + n) );
         }
       }
     }
@@ -174,11 +178,14 @@ TEMPLATE_TEST_CASE("field commuication on cartesian topology", "[field][mpi]"
                    ) {
   constexpr auto CartTopo = TestType::get();
   CAPTURE(CartTopo);
-  constexpr auto mesh = Mesh<2>( {4, 4}, 1 );
+  constexpr int D = 2;
+  constexpr int guard = 1;
+  constexpr apt::array<apt::Range,D> range {{ {0,4,guard}, {0,4,guard} }};
   THEN("left and right deposited areas should not overlap") {
-    for ( int i = 0; i < 2; ++i )
-      REQUIRE( mesh.extent()[i] >= 4 * mesh.guard() );
+    for ( int i = 0; i < D; ++i )
+      REQUIRE( range[i].full_size() >= 4 * guard );
   }
+  constexpr Mesh mesh ( range );
 
   std::vector<int> cart_dims;
   std::vector<bool> periodic;

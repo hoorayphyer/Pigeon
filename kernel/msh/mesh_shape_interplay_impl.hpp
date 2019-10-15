@@ -63,13 +63,11 @@ namespace msh {
                   const ShapeF& shapef ) noexcept {
     T res{};
     auto wf = impl::WeightFinder( q_std, fcomp.offset(), shapef );
+    apt::Index<DGrid> ext;
+    for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
 
-    for ( const auto& I : apt::Block( []()
-                                      { // create extent filled with ShapeF::support
-                                        apt::Index<DGrid> res;
-                                        for ( int i = 0; i < DGrid; ++i ) res[i] = ShapeF::support();
-                                        return res;
-                                      }() ) )
+    // POLEDANCE reexamine wf.weight(I), make it use I + I_b
+    for ( const auto& I : apt::Block({}, ext) )
       res += fcomp( wf.I_b() + I ) * wf.weight(I);
 
     return res;
@@ -95,20 +93,18 @@ namespace msh {
   template < typename T, int DField, int DGrid, int Dq, typename ShapeF >
   void deposit ( field::Field<T,DField,DGrid>& field,
                  T frac,
-                 apt::array<T, DField> variable,
+                 apt::array<T, DField> var,
                  const apt::array<T, Dq>& q_std,
                  const ShapeF& shapef ) noexcept {
     apt::Index<DGrid> ext;
     for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
-    apt::foreach<0,DField>
-      ( [&] ( const auto& var, auto comp ) { // TODOL comp is proxy, it breaks semantics
-          auto wf = impl::WeightFinder( q_std, comp.offset(), shapef );
+    for ( int C = 0; C < DField; ++C ) {
+      auto wf = impl::WeightFinder( q_std, field[C].offset(), shapef );
 
-          for ( const auto& I : apt::Block(ext) )
-            comp( wf.I_b() + I ) += frac * var * wf.weight(I);
-
-        }, variable, field );
-
+      // POLEDANCE reexamine wf.weight(I), make it use I + I_b
+      for ( const auto& I : apt::Block({},ext) )
+        field[C]( wf.I_b() + I ) += frac * var[C] * wf.weight(I);
+    }
     return;
   }
 

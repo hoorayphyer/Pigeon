@@ -5,53 +5,97 @@
 #include <iterator>
 
 namespace apt {
-  // A wrapper over int so as to utilize type-safe checks
-  struct BlockIteratorEnd {
+  template <int> struct Block;
+
+  // Specialiation of longitudianl block
+  template <>
+  struct Block<1> {
   private:
-    const int _end = 0;
+    int _begin = 0;
+    int _end = 0;
+    Longidx _i {};
 
   public:
-    constexpr BlockIteratorEnd( int end ) noexcept : _end(end) {}
-    constexpr operator int() const noexcept { return _end; }
+    constexpr Block( int longi, int begin, int end ) noexcept
+      : _begin(std::move(begin)), _end(std::move(end)), _i(longi,_begin) {}
+
+    constexpr Block begin() const noexcept { return {_i.dir(),_begin,_end}; }
+
+    constexpr int end() const noexcept {
+      if ( _end <= _begin ) return _begin;
+      else return _end;
+    }
+
+    using difference_type = void;
+    using value_type = void;
+    using reference = Longidx;
+    using pointer = void;
+    using iterator_category = std::forward_iterator_tag;
+
+    constexpr bool operator!= ( int end ) const noexcept { return _i != end; }
+
+    constexpr Block& operator++() noexcept { ++_i; return *this; }
+
+    constexpr Block operator++(int) noexcept {auto res = *this; ++(*this); return res;}
+
+    constexpr reference operator*() noexcept { return _i; }
   };
+}
 
+namespace apt {
   template < int D >
-  struct BlockIterator {
+  struct Block {
   private:
+    Index<D> _begin{};
+    Index<D> _end{};
     Index<D> _ijk{};
-    Index<D> _extent;
 
   public:
+    using end_type = int;
+    constexpr Block( apt::Index<D> begin, apt::Index<D> end ) noexcept
+      : _begin(std::move(begin)), _end(std::move(end)), _ijk(_begin) {}
+
+    constexpr Block begin() const noexcept { return {_begin,_end};}
+
+    constexpr end_type end() const noexcept {
+      // deal with empty or invalid block
+      for ( int i = 0; i < D; ++i ) {
+        if ( _end[i] <= _begin[i] ) return {_begin[D-1]};
+      }
+      return {_end[D-1]};
+    }
+
     using difference_type = void;
     using value_type = void;
     using reference = const Index<D>&;
     using pointer = void;
     using iterator_category = std::forward_iterator_tag;
 
-    constexpr BlockIterator( const Index<D>& extent ) noexcept
-      : _extent( extent ) {}
-
-    constexpr bool operator!= ( const BlockIteratorEnd& end ) const noexcept {
-      return _ijk[D-1] != static_cast<int>(end);
+    constexpr bool operator!= ( const end_type& end ) const noexcept {
+      return _ijk[D-1] != end;
     }
 
     // NOTE separating ++ ijk and ijk %= _extent is the key to make iteration stoppable
-    constexpr BlockIterator& operator++() noexcept {
+    constexpr Block& operator++() noexcept {
       ++ (_ijk[0]);
       if constexpr ( D > 1 ) {
-          _ijk[0] %= _extent[0];
-          if ( 0 != _ijk[0] ) return *this;
-          else ++ (_ijk[1]);
+          if ( _ijk[0] != _end[0] ) return *this;
+          else {
+            _ijk[0] = _begin[0];
+            ++ (_ijk[1]);
+          }
         }
       if constexpr ( D > 2 ) {
-          _ijk[1] %= _extent[1];
-          if ( 0 != _ijk[1]) return *this;
-          else ++ (_ijk[2]);
+          if ( _ijk[1] != _end[1] ) return *this;
+          else {
+            _ijk[1] = _begin[1];
+            ++ (_ijk[2]);
+          }
         }
       return *this;
     }
 
-    constexpr BlockIterator operator++(int) noexcept {
+    constexpr Block operator++(int) noexcept {
       auto res = *this;
       ++(*this);
       return res;
@@ -59,30 +103,13 @@ namespace apt {
 
     constexpr reference operator*() noexcept { return _ijk; }
   };
+
+  template< int D >
+  constexpr apt::Block<D> project_out(int longi, apt::Index<D> b, apt::Index<D> e ) noexcept {
+    b[longi] = 0;
+    e[longi] = 1;
+    return {b,e};
+  }
 }
-
-// NOTE to be used in range-based for, Block and BlockIterator has to be separated classes because there is auto __begin = __range.begin(), which prevents __range.begin() from returning itself as iterator
-namespace apt {
-  template < int D >
-  struct Block {
-  private:
-    apt::Index<D> _extent{};
-
-  public:
-    constexpr Block( const apt::Index<D>& extent ) noexcept : _extent(extent) {}
-
-    constexpr auto begin() const noexcept { return BlockIterator<D>(_extent);}
-
-    constexpr BlockIteratorEnd end() const noexcept {
-      // deal with empty or invalid block
-      for ( int i = 0; i < D; ++i ) {
-        if ( _extent[i] < 1 ) return {0};
-      }
-      return {_extent[D-1]};
-    }
-
-  };
-}
-
 
 #endif

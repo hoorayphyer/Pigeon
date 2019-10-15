@@ -80,8 +80,8 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
       auto intra = rwld_opt->split(color);
       auto ens_opt = dye::create_ensemble<DGrid>( cart_opt, intra );
 
-      field::Field<Real, 3, DGrid> E( {bulk_dims, guard} );
-      field::Field<Real, 3, DGrid> B( {bulk_dims, guard} );
+      field::Field<Real, 3, DGrid> E( apt::make_range({}, bulk_dims, guard) );
+      field::Field<Real, 3, DGrid> B( apt::make_range({}, bulk_dims, guard) );
 
       map<array<Real,Specs>> particles;
 
@@ -242,8 +242,8 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
   apt::array<int, DGrid> bulk_dims { 128, 128 };
   const int guard = 1;
 
-  field::Field<Real, 3, DGrid> E( {bulk_dims, guard} );
-  field::Field<Real, 3, DGrid> B( {bulk_dims, guard} );
+  field::Field<Real, 3, DGrid> E( apt::make_range({}, bulk_dims, guard) );
+  field::Field<Real, 3, DGrid> B( apt::make_range({}, bulk_dims, guard) );
 
   std::string prefix = "PUBG";
   const int num_parts = 4;

@@ -3,7 +3,6 @@
 
 #include "manifold/grid.hpp"
 
-#include "field/updater.hpp" // FIXME this is old field updater
 #include "particle/updater.hpp"
 #include "field/sync.hpp"
 #include "field/yee.hpp"
@@ -24,6 +23,7 @@
 #include "filesys/filesys.hpp"
 
 #include "pic/vitals.hpp"
+#include "pic/action_reserve.hpp"
 
 #ifdef PIC_DEBUG
 #include "debug/debugger.hpp"
@@ -52,44 +52,53 @@ namespace pic {
     field::Field<RJ, 3, DGrid> _J;
     particle::map<particle::array<R, S>> _particles;
 
-    // std::unique_ptr<field::Updater<R,DGrid,RJ>> _field_update; // FIXME
     std::vector<std::unique_ptr<field::Action<R,DGrid,RJ>>> _field_actions;
     std::vector<std::unique_ptr<particle::Action<DGrid,R,S,RJ>>> _ptc_actions;
+
+    ActionReserve<DGrid,R> _rsv;
 
     std::vector<particle::Particle<R, S>> _migrators;
 
     template < typename Action >
     void taylor( Action& a ) {
-      // NOTE range is assumed to be [,), and range[1] >= range[0]
-      // TODO check boundary on extent.
+      // NOTE range is assumed to be noempty [,)
+      // POLEDANCE check the logic here. including one more cell at upper boundary
       auto f =
         [] ( int Ib_global, int Ie_global,
              const mani::Grid1D<R>& supergrid,
-             const mani::Grid1D<R>& localgrid ) noexcept -> apt::pair<int>
-        {
+             const mani::Grid1D<R>& localgrid,
+             bool is_periodic,
+             int guard
+             ) noexcept -> apt::pair<int> {
          // lb is the Ib_global with respect to the localgrid
          int lb = Ib_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
          int ub = Ie_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
 
-         // If localgrid is the last on the supergrid, include the upper boundary. Whether or not it will be used is controled by Ib_global and extent_global
-         int dim = localgrid.dim();
-         if ( std::abs(localgrid.upper() - supergrid.upper() ) < supergrid.delta() ) ++dim; // TODO check
+         // Extend to include guard cells on true boundaries. Whether or not it will be used is controled by Ib_global and Ie_global
+         int lb_local = 0;
+         int ub_local = localgrid.dim();
+         if ( !is_periodic ) {
+           if ( std::abs( localgrid.lower() - supergrid.lower() ) < supergrid.delta() )
+             lb_local -= guard;
+           if ( std::abs( localgrid.upper() - supergrid.upper() ) < supergrid.delta() )
+             ub_local += guard;
+         }
 
-         if ( ub <= 0 || lb >= dim ) {
+         if ( ub <= lb_local || lb >= ub_local ) {
            // range not applicable on current local patch
            return {0,0};
          } else {
-           lb = std::max<int>( 0, lb );
-           ub = std::min<int>( ub, dim );
-           return { lb, ub - lb };
+           lb = std::max<int>( lb_local, lb );
+           ub = std::min<int>( ub, ub_local );
+           return { lb, ub };
          }
         };
-      apt::Index<DGrid> Ib_new, Ie_new;
+
       for ( int i = 0; i < DGrid; ++i ) {
-        apt::tie(Ib_new[i],Ie_new[i]) = f( a.Ib()[i], a.Ie()[i], _supergrid[i], _grid[i] );
+        auto [b_new, e_new] = f( a[i].begin(), a[i].end(), _supergrid[i], _grid[i], pic::periodic[i], field::myguard );
+        a[i].begin() = b_new;
+        a[i].end() = e_new;
       }
-      a.setIb(Ib_new);
-      a.setIe(Ie_new);
     }
 
     apt::pair<std::optional<field::Field<R, 3, DGrid>>> backupEB( int i_this_action ) const {
@@ -130,17 +139,7 @@ namespace pic {
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
-      // if ( use_old ) { // FIXME
-      //   if ( _cart_opt )
-      //     _field_update.reset(new field::Updater<R,DGrid,RJ>
-      //                         ( *_cart_opt, _grid,
-      //                           ens.is_at_boundary(), 2,
-      //                           field::omega_spinup,
-      //                           pic::classic_electron_radius() / pic::w_gyro_unitB )
-      //                         );
-      // }
-
-      { // set field actions
+      { // set field actions and reserve
         const auto f_actions = field::set_up_field_actions<DGrid,R,RJ>();
         _field_actions.resize(f_actions.size());
         for ( int i = 0; i < f_actions.size(); ++i ) {
@@ -148,6 +147,18 @@ namespace pic {
           taylor(*_field_actions[i]);
         }
         // TODO reorder by require_old_EB
+
+        { // only reserve for necessary actions. For example, when there is only one action, or the action doesn't require old_EB, skip it.
+          _rsv = {};
+          std::vector<const apt::ActionBase<DGrid>*> ptrs;
+          int count = 0;
+          for ( int i = 0; i < _field_actions.size(); ++i ) {
+            if ( !_field_actions[i] || !(_field_actions[i] -> orig_EB()) ) continue;
+            ptrs.emplace_back(_field_actions[i].get());
+            ++count;
+          }
+          if ( count > 1) _rsv.init(ptrs);
+        }
       }
 
       { // set particle actions
@@ -257,9 +268,10 @@ namespace pic {
         for ( int i = 0; i < DGrid; ++i ) {
           bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
         }
-        _E = {{ bulk_dims, field::myguard }};
-        _B = {{ bulk_dims, field::myguard }};
-        _J = {{ bulk_dims, field::myguard }};
+        auto range = apt::make_range({}, bulk_dims, field::myguard);
+        _E = {range};
+        _B = {range};
+        _J = {range};
 
         for( int i = 0; i < 3; ++i ) {
           _E.set_offset( i, field::yee::ofs_gen<DGrid>( field::yee::Etype, i ) );
@@ -401,43 +413,28 @@ namespace pic {
           });
 
         if ( _cart_opt ) {
-          // if ( use_old ) { // FIXME
-          //   TIMING("FieldUpdate", START {
-          //       field::merge_sync_guard_cells( _J, *_cart_opt );
-          //       (*_field_update)(_E, _B, _J, dt, timestep);
-          //       // _fbc_axis.setEB(_E,_B); //FIXME
-          //     });
-          // } else {
-            TIMING("FieldUpdate", START {
-                field::merge_sync_guard_cells( _J, *_cart_opt );
-                for ( int i = 0; i < _field_actions.size(); ++i ) {
-                  if ( !_field_actions[i] ) continue;
-                  if ( stamp ) {
-                    lgr::file % "--" << _field_actions[i]->name() << std::endl;
-                  }
-                  const auto& act = *_field_actions[i];
-
-                  // auto[E_bak_opt,B_bak_opt] = backupEB(i);
-                  act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
-                  // if ( E_bak_opt ) {
-                  //   // TODO so, apply these baks before next step. After it, apply them back. TODO what if the next one also needs to save back? If same patch is backed up, no actions. Otherwise, need a new patch.
-                  //   auto& E_bak=*E_bak_opt;
-                  //   auto& B_bak=*B_bak_opt;
-                  // }
+          TIMING("FieldUpdate", START {
+              field::merge_sync_guard_cells( _J, *_cart_opt );
+              _rsv.reserve(_E,_B);
+              for ( int i = 0; i < _field_actions.size(); ++i ) {
+                if ( !_field_actions[i] ) continue;
+                if ( stamp ) {
+                  lgr::file % "--" << _field_actions[i]->name() << std::endl;
                 }
-              });
-          // } // FIXME with use_old
-          if ( stamp ) {
-            std:: cout << "field update lapse = " << stamp->lapse().in_units_of("ms") << std::endl;
-          }
+                const auto& act = *_field_actions[i];
+                // FIXME
+                // std::cout << "ts = " << timestep << std::endl;
+                // std::cout << _field_actions[i]->name() << std::endl;
+                // std::cout << "  revert" << std::endl;
+                // _rsv.revert_to_prior(_E,_B,act);
+                // std::cout << "  action" << std::endl;
+                act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
+                // std::cout << "  back" << std::endl;
+                // _rsv.back_to_current(_E,_B);
+              }
+            });
         }
       }
-
-
-      // TODO NOTE injection and annihilation are more like free sources and sinks of particles users control, in other words they fit the notion of particle boundary conditions. Do them outside of Updater. In contrast, pair creation is a physical process we model, so it is done inside the updater.
-      // inject_particles(); // TODO only coordinate space current is needed in implementing current regulated injection // TODO compatible with ensemble??
-      // TODOL annihilation will affect deposition // NOTE one can deposit in the end
-      // annihilate_mark_pairs( );
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
         TIMING("ExportData", START {

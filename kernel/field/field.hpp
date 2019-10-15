@@ -20,11 +20,11 @@ namespace field {
       : _data(data), _mesh(mesh), _offset(offset) {}
 
     inline T& operator() ( const apt::Index<DGrid>& i_bulk ) {
-      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
+      return _data [_mesh.linear_index(i_bulk) ];
     }
 
     inline const T& operator() ( const apt::Index<DGrid>& i_bulk ) const {
-      return _data [_mesh.linearized_index_of_whole_mesh(i_bulk) ];
+      return _data [_mesh.linear_index(i_bulk) ];
     }
 
     inline T& operator[] ( int i ) { return _data[i]; }
@@ -59,6 +59,8 @@ namespace field {
     friend class ckpt::FieldCkpt<T,DGrid>;
 
     Field() = default;
+    // Field( const Field& ) = default;
+    // Field( Field&& ) noexcept = default;
 
     Field( const Mesh<DGrid>& mesh ) {
       resize(mesh);
@@ -85,20 +87,16 @@ namespace field {
     }
 
     inline void reset() {
-      apt::foreach<0, DField>
-        ( []( auto& comp ) {
-            for ( auto& elm : comp ) elm = 0.0;
-          }, _comps );
+      for ( int C = 0; C < DField; ++C )
+        std::fill(_comps[C].begin(), _comps[C].end(), 0.0 );
     }
 
     inline void resize( const Mesh<DGrid>& mesh ) noexcept {
-      int size = 1;
-      for ( int i = 0; i < DGrid; ++i ) size *= mesh.extent()[i];
-      apt::foreach<0,DField>
-        ( [size] ( auto& comp ) {
-            comp.reserve( size );
-            comp.resize( size );
-          }, _comps );
+      auto size = mesh.stride().back();
+      for ( int C = 0; C < DField; ++C ) {
+        _comps[C].reserve(size);
+        _comps[C].resize(size);
+      }
       _mesh = mesh;
       reset();
     }

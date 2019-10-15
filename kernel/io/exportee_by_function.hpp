@@ -5,6 +5,8 @@
 #include "msh/mesh_shape_interplay.hpp"
 #include <cassert>
 
+// POLEDANCE check if downsampled field can use a better mesh. Range may not work because of the scaling
+
 namespace io {
   constexpr int POW( int B, int E ) {
     if ( E == 0 ) return 1;
@@ -47,7 +49,7 @@ namespace io {
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
-      field::Field<RealDS,3,DGrid> fds( { mani::dims(grid_ds), guard_ds } );
+      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, mani::dims(grid_ds), guard_ds ) };
       for ( int i = 0; i < num_comps; ++i ) {
         for ( int dim = 0; dim < DGrid; ++dim )
           fds.set_offset( i, dim, MIDWAY );
@@ -56,8 +58,8 @@ namespace io {
       apt::Index<DGrid> subext;
       for ( int i = 0; i < DGrid; ++i ) subext[i] = ds_ratio;
 
-      for ( const auto& Ids : apt::Block( fds.mesh().bulk_dims() ) ) {
-        for ( const auto& Isub : apt::Block(subext) ) {
+      for ( const auto& Ids : apt::Block( {}, apt::range::size(fds.mesh().range()) ) ) {
+        for ( const auto& Isub : apt::Block({}, subext) ) {
           apt::Index<DGrid> I;
           for ( int i = 0; i < DGrid; ++i )
             I[i] = ds_ratio * Ids[i] + Isub[i];
@@ -115,7 +117,7 @@ namespace io {
 
       ShapeF sf;
 
-      field::Field<RealDS,3,DGrid> fds( { mani::dims(grid_ds), guard_ds } );
+      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, mani::dims(grid_ds), guard_ds ) };
       for ( int i = 0; i < num_comps; ++i ) {
         for ( int dim = 0; dim < DGrid; ++dim )
           fds.set_offset( i, dim, MIDWAY );

@@ -57,7 +57,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { true, 0, 500 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -84,22 +84,23 @@ namespace field {
   template < int DGrid, typename T >
   void axissymmetrize( field::Component<T,DGrid,false> comp, // TODOL semantics on comp
                        void (*f)( decltype(comp[0])& val_guard, decltype(comp[0])& val_bulk ),
-                       apt::Index<DGrid> Ib, apt::Index<DGrid> ext, bool is_upper ) {
+                       apt::Index<DGrid> Ib, apt::Index<DGrid> Ie, bool is_upper ) {
     static_assert(DGrid==2);
     constexpr int AxisDir = 1;
 
     const auto& mesh = comp.mesh();
     int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
-    mirror_sum += is_upper ? 2 * Ib[AxisDir] : 2 * (Ib[AxisDir] + ext[AxisDir] - 1);
+    mirror_sum += is_upper ? 2 * Ib[AxisDir] : 2 * (Ie[AxisDir] - 1);
 
-    for ( const auto& trI : mesh.project(AxisDir, Ib, ext ) ) {
-      for ( int n = Ib[AxisDir]; n < Ib[AxisDir] + ext[AxisDir]; ++n ) {
-        f( comp[ trI | n ], comp[ trI | (mirror_sum - n) ] );
+    for ( const auto& trI : apt::project_out(AxisDir,Ib,Ie) ) {
+      for ( apt::Longidx n (AxisDir, Ib[AxisDir]); n < Ie[AxisDir]; ++n ) {
+        f( comp(trI + n), comp(trI + (mirror_sum - n)) ); // POLEDANCE check mirror_sum - n
       }
     }
   }
 }
 
+#include "field/updater.hpp" // FIXME this is old field updater
 namespace field {
   using pic::real_t;
   inline constexpr real_t Omega = 1.0 / 6.0;
@@ -107,11 +108,11 @@ namespace field {
   constexpr int star_interior = 5;
 
   constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
-  constexpr int order_derivative = 2; // order of derivative of update before field communication is necessary
+  constexpr int number_iteration = 4; // number of iterations in inverting the operator in Haugbolle
   static_assert( order_precision % 2 == 0 );
   constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
 
-  constexpr int myguard = std::max(order_derivative * order_precision / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+  constexpr int myguard = std::max(order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
@@ -147,18 +148,42 @@ namespace field {
   //   ofs::damping_rate = 10.0;
   // }
 
+
+  const bool use_old = false; // FIXME
+  void set_up_old_field_solver(){
+
+    // TODOL annihilation will affect deposition // NOTE one can deposit in the end
+    // annihilate_mark_pairs( );
+    // if ( use_old ) { // FIXME
+    //   if ( _cart_opt )
+    //     _field_update.reset(new field::Updater<R,DGrid,RJ>
+    //                         ( *_cart_opt, _grid,
+    //                           ens.is_at_boundary(), 2,
+    //                           field::omega_spinup,
+    //                           pic::classic_electron_radius() / pic::w_gyro_unitB )
+    //                         );
+    // }
+
+    //   TIMING("FieldUpdate", START {
+    //       field::merge_sync_guard_cells( _J, *_cart_opt );
+    //       (*_field_update)(_E, _B, _J, dt, timestep);
+    //       // _fbc_axis.setEB(_E,_B); //FIXME
+    //     });
+  }
+
   template < int DGrid, typename R, typename RJ >
   auto set_up_field_actions() {
     std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
+    namespace range = apt::range;
 
     Haugbolle<R,DGrid,RJ> fu_bulk;
     {
       auto& fu = fu_bulk;
       fu.setName("Bulk");
-      fu.setIb( { star_interior + myguard, myguard } );
-      fu.setIe({ pic::supergrid[0].dim() - myguard, pic::supergrid[1].dim() - myguard });
-      fu.setGuard ({ myguard, myguard, myguard, myguard });
+      fu[0] = { star_interior + myguard, pic::supergrid[0].dim() - myguard, myguard };
+      fu[1] = { myguard, pic::supergrid[1].dim() - myguard, myguard };
       fu.set_preJ(PREJ);
+      fu.set_number_iteration(number_iteration);
 
       for ( int i = 0; i < 3; ++i ) { // i is coordinate
         for ( int j = 0; j < 3; ++j ) { // j is Fcomp
@@ -177,9 +202,8 @@ namespace field {
     {
       auto& fu = fu_axis_lo;
       fu.setName("LowerAxis");
-      fu.setIb({ fu_bulk.Ib()[0], 0 });
-      fu.setIe({ fu_bulk.Ie()[0], myguard });
-      fu.setGuard({{ fu_bulk.guard()[0], {0,myguard} }});
+      fu[0] = fu_bulk[0];
+      fu[1] = {0, myguard, {0,myguard}};
       fu.set_boundary(0,-1);
 
       fu.init_from(fu_bulk, myguard);
@@ -198,9 +222,8 @@ namespace field {
     {
       auto& fu = fu_axis_hi;
       fu.setName("HigherAxis");
-      fu.setIb({ fu_bulk.Ib()[0], pic::supergrid[1].dim() - myguard });
-      fu.setIe({ fu_bulk.Ie()[0], pic::supergrid[1].dim() + 1 });
-      fu.setGuard({{ fu_bulk.guard()[0], {myguard,0} }});
+      fu[0] = fu_bulk[0];
+      fu[1] = { pic::supergrid[1].dim() - myguard, pic::supergrid[1].dim() + 1, {myguard,0} };
       fu.set_boundary(0,1);
 
       fu.init_from(fu_bulk, myguard+1);
@@ -235,16 +258,15 @@ namespace field {
     {
       auto& fu = fu_surf;
       fu.setName("ConductingSurface");
-      fu.setIb({ star_interior, fu_bulk.Ib()[1] });
-      fu.setIe({ star_interior+myguard, fu_bulk.Ie()[1] });
-      fu.setGuard({{ {0, myguard}, fu_bulk.guard()[1] }});
+      fu[0] = { star_interior, star_interior+myguard, {0, myguard} };
+      fu[1] = fu_bulk[1];
       fu.set_boundary( -1, 0 );
       fu.enforce_continuous_transverse_E(true, false);
 
       fu.init_from(fu_bulk, myguard);
 
-      fu.set_D( yee::Etype, 1, 0, diff_1sided_from_right<DGrid,R,1,0,MIDWAY>, 0 );
-      fu.set_D( yee::Etype, 2, 0, diff_1sided_from_right<DGrid,R,2,0,MIDWAY>, 0 );
+      fu.set_D( yee::Etype, 1, 0, diff_1sided_from_right<DGrid,R,1,0>, 0 );
+      fu.set_D( yee::Etype, 2, 0, diff_1sided_from_right<DGrid,R,2,0>, 0 );
     }
 
     auto set_double_bdry =
@@ -253,25 +275,24 @@ namespace field {
           const HaugbolleBdry<R,DGrid,RJ>& fu_axis ) {
 
         fu.set_preJ(fu_surf.preJ());
-        const HaugbolleBdry<R,DGrid,RJ>* fub[2] = {&fu_surf, &fu_axis};
 
-        fu.setName(fub[0]->name()+fub[1]->name());
-        fu.setIb({ fub[0]->Ib()[0], fub[1]->Ib()[1] });
-        fu.setIe({ fub[0]->Ie()[0], fub[1]->Ie()[1] });
-        fu.setGuard( { fub[0]->guard()[0], fub[1]->guard()[1] } );
-        fu.set_boundary( fub[0]->boundary()[0], fub[1]->boundary()[1] );
-        fu.enforce_continuous_transverse_E(fub[0]->cont_trans_E()[0], fub[1]->cont_trans_E()[1]);
+        fu.setName( fu_surf.name() + fu_axis.name() );
+        fu[0] = fu_surf[0];
+        fu[1] = fu_axis[1];
+
+        fu.set_boundary( fu_surf.boundary()[0], fu_axis.boundary()[1] );
+        fu.enforce_continuous_transverse_E(fu_surf.cont_trans_E()[0], fu_axis.cont_trans_E()[1]);
 
         int size = 1;
-        for ( int i = 0; i < DGrid; ++i ) size *= fu.ext()[i];
+        for ( int i = 0; i < DGrid; ++i ) size *= range::size(fu,i);
         for ( int Ftype = 0; Ftype < 2; ++Ftype ) {
           // r derivative uses fu_surf, theta derivative uses fu_axis, phi derivative just use diff_zero
           for ( int C = 1; C < 3; ++C ) {
-            for ( int j = 0; j < fu.ext()[1]; ++j ) {
-              for ( int i = 0; i < fu.ext()[0]; ++i ) {
-                int idx = i + j * fu.ext()[0];
-                fu.set_D( Ftype, (C+0)%3, 0, fub[0]->D()[Ftype][(C+0)%3][0][i], idx );
-                fu.set_D( Ftype, (C+1)%3, 1, fub[1]->D()[Ftype][(C+1)%3][1][j], idx ) ;
+            for ( int j = 0; j < range::size(fu,1); ++j ) {
+              for ( int i = 0; i < range::size(fu,0); ++i ) {
+                int idx = i + j * range::size(fu,0);
+                fu.set_D( Ftype, (C+0)%3, 0, fu_surf.D()[Ftype][(C+0)%3][0][i], idx );
+                fu.set_D( Ftype, (C+1)%3, 1, fu_axis.D()[Ftype][(C+1)%3][1][j], idx ) ;
                 fu.set_D( Ftype, (C+2)%3, 2, diff_zero<DGrid,R>, idx );
               }
             }
@@ -279,7 +300,7 @@ namespace field {
           // hh uses that of fu_axis
           for ( int k = 0; k < 3; ++k ) {
             for ( int idx = 0; idx < size; ++idx ) {
-              fu.set_hh( Ftype, k, fub[1]->hh()[Ftype][k][idx/fu.ext()[0]], idx);
+              fu.set_hh( Ftype, k, fu_axis.hh()[Ftype][k][idx/range::size(fu,0)], idx);
             }
           }
         }
@@ -291,7 +312,7 @@ namespace field {
       auto& fu = fu_surf_axis_lo;
       set_double_bdry(fu, fu_surf, fu_axis_lo);
       // for r derivative on the axes, just set them to zero
-      for ( int i = 0; i < fu.ext()[0]; ++i ) {
+      for ( int i = 0; i < range::size(fu,0); ++i ) {
         // theta index is 0
         fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, i );
         fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, i );
@@ -304,14 +325,14 @@ namespace field {
       set_double_bdry(fu, fu_surf, fu_axis_hi);
       // for r derivative on the axes and beyond set them to appropriate diffs so that no values beyond axis are used.
       {
-        static_assert(myguard == 2);
-        int idx_theta =  ( fu.ext()[1] - 1 ) * fu.ext()[0]; // the last cell in theta
+        static_assert(order_precision == 2);
+        int idx_theta =  ( range::size(fu,1) - 1 ) * range::size(fu,0); // the last cell in theta
         fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, idx_theta );
         fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, 1 + idx_theta );
         fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, idx_theta );
         fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, 1 + idx_theta );
 
-        fu.set_D(yee::Etype, 2, 0, diff_1sided_from_right_beyond_hi_axis<DGrid,R,2,0,yee::Etype>, idx_theta); // NOTE diff_1sided used here due to offset, not field continuity
+        fu.set_D(yee::Etype, 2, 0, diff_1sided_from_right_beyond_hi_axis<DGrid,R,2,0>, idx_theta); // NOTE diff_1sided used here due to offset, not field continuity
         fu.set_D(yee::Etype, 2, 0, diff_beyond_hi_axis<DGrid,R,2,0,yee::Etype>, 1+idx_theta);
         fu.set_D(yee::Btype, 1, 0, diff_beyond_hi_axis<DGrid,R,1,0,yee::Btype>, idx_theta); // NOTE diff instead of diff_1sided is used due to offset, not field continuity
         fu.set_D(yee::Btype, 1, 0, diff_beyond_hi_axis<DGrid,R,1,0,yee::Btype>, 1+idx_theta);
@@ -346,8 +367,7 @@ namespace field {
           [&,this,time=timestep*dt]( auto& F, const auto& F_cond, int comp ) {
             const auto& ofs = F[comp].offset();
 
-            for ( auto I : apt::Block(this->ext()) ) {
-              I += this->Ib();
+            for ( const auto& I : apt::Block(range::begin(*this),range::end(*this)) ) {
               apt::array<R,3> q{};
               for ( int i = 0; i < DGrid; ++i )
                 q[i] = grid[i].absc(I[i], ofs[i] * 0.5);
@@ -363,9 +383,8 @@ namespace field {
     { // interior
       auto& fu = fu_cond;
       fu.setName("ConductorInterior");
-      fu.setIb( { 0, 0 } );
-      fu.setIe({ star_interior, pic::supergrid[1].dim()+1 });
-      fu.setGuard({});
+      fu[0] = {0, star_interior};
+      fu[1] = {0, pic::supergrid[1].dim()+1};
       fu.require_original_EB(false);
       fu.set_E({ E_r_star, E_theta_star, E_phi_star });
       fu.set_B({ B_r_star, B_theta_star, B_phi_star });
@@ -376,18 +395,14 @@ namespace field {
     private:
       apt::array<R(*)(R,R,R,R t),3> _E_bg;
       apt::array<R(*)(R,R,R,R t),3> _B_bg;
-      int _n = 0; // normal direction
+      int _ndir = 0; // normal direction
       R _rate {};
       R(* _profile)(R q_normal) = nullptr;
-
-      inline void damp_impl( R& f_target, const R f_bg, const R lambda ) const {
-        f_target = ( f_target - f_bg ) * lambda + f_bg;
-      }
 
     public:
       auto& set_E_background( apt::array<R(*)(R,R,R,R t),3> E ) {_E_bg = E; return *this;}
       auto& set_B_background( apt::array<R(*)(R,R,R,R t),3> B ) {_B_bg = B; return *this;}
-      auto& set_normal_direction( int n ) {_n = n; return *this;}
+      auto& set_normal_direction( int n ) {_ndir = n; return *this;}
       auto& set_damping_rate( R rate ) {_rate = rate; return *this;}
       auto& set_damping_profile( R(*p)(R) ) {_profile = p; return *this;}
 
@@ -401,20 +416,19 @@ namespace field {
                                 int timestep,
                                 R dt
                                 ) const override {
-        const auto[Ib_trans,ext_trans] = apt::trans(_n, this->Ib(), this->ext());
+        const auto transBlock = apt::project_out(_ndir, range::begin(*this), range::end(*this) );
 
         auto impose =
           [&,this]( auto& F, const auto& F_bg, int comp ) {
             const auto& ofs = F[comp].offset();
 
             apt::array<R,3> q{};
-            for ( int n = this->Ib()[_n]; n < this->Ib()[_n] + this->ext()[_n]; ++n ) {
-              q[_n] = grid[_n].absc(n, ofs[n] * 0.5);
-              R lambda = 1.0 - _rate * dt * _profile( q[_n] );
-              for ( auto I : apt::Block(ext_trans) ) {
-                I += Ib_trans;
+            for ( int n = range::begin(*this,_ndir); n < range::end(*this,_ndir); ++n ) {
+              q[_ndir] = grid[_ndir].absc(n, ofs[_ndir] * 0.5);
+              R lambda = 1.0 - _rate * dt * _profile( q[_ndir] );
+              for ( const auto& I : transBlock ) {
                 for ( int i = 0; i < DGrid; ++i )
-                  if ( _n != i ) q[i] = grid[i].absc(I[i], ofs[i] * 0.5);
+                  if ( _ndir != i ) q[i] = grid[i].absc(I[i], ofs[i] * 0.5);
 
                 R f_bg = F_bg[comp](q[0],q[1],q[2],0.0); // time = 0.0, so damp to the initial condition
                 F[comp](I) = ( F[comp](I) - f_bg ) * lambda + f_bg;
@@ -434,15 +448,14 @@ namespace field {
       constexpr int nb = ( std::log(std::exp(pic::supergrid[0].upper()) - thickness) - pic::supergrid[0].lower() ) / pic::supergrid[0].delta();
       damping_profile =
         [](R lnr) -> R {
-          static R r_damp_b = pic::supergrid[0].absc(nb,0);
+          static R r_damp_b = std::exp( pic::supergrid[0].absc(nb,0) );
           lnr = ( std::exp(lnr) - r_damp_b ) / thickness;
           return 0.5 * lnr * lnr;
         };
 
       fu.setName("DampingLayer");
-      fu.setIb({ nb, 0 });
-      fu.setIe({ pic::supergrid[0].dim(), pic::supergrid[1].dim() + 1 });
-      fu.setGuard({});
+      fu[0] = { nb, pic::supergrid[0].dim() };
+      fu[1] = { 0, pic::supergrid[1].dim() + 1 };
       fu.require_original_EB(false);
 
       fu.set_normal_direction(0);
@@ -468,26 +481,26 @@ namespace field {
                             v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
                           };
         // MIDWAY in AxisDir
-        axissymmetrize(E[0], assign, this->Ib(), this->ext(), _is_upper_axis );
-        axissymmetrize(E[2], neg_assign, this->Ib(), this->ext(), _is_upper_axis );
-        axissymmetrize(B[1], neg_assign, this->Ib(), this->ext(), _is_upper_axis );
+        axissymmetrize(E[0], assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(E[2], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[1], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
 
         // INSITU in AxisDir
-        axissymmetrize(E[1], neg_assign, this->Ib(), this->ext(), _is_upper_axis );
-        axissymmetrize(B[0], assign, this->Ib(), this->ext(), _is_upper_axis );
-        axissymmetrize(B[2], neg_assign, this->Ib(), this->ext(), _is_upper_axis );
+        axissymmetrize(E[1], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[0], assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[2], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
       }
     } fu_asym_lo, fu_asym_hi;
     {
       fu_asym_lo.setName("AxissymmetrizeEBLower");
-      fu_asym_lo.setIb( { 0, -myguard });
-      fu_asym_lo.setIe( { pic::supergrid[0].dim(), 1 }); // NOTE 1 so as to set values right on axis
+      fu_asym_lo[0] = { 0, pic::supergrid[0].dim() };
+      fu_asym_lo[1] = { -myguard, 1 }; // NOTE 1 so as to set values right on axis
       fu_asym_lo.is_upper_axis(false);
       fu_asym_lo.require_original_EB(false);
 
       fu_asym_hi.setName("AxissymmetrizeEBHigher");
-      fu_asym_hi.setIb( { 0, pic::supergrid[1].dim() });
-      fu_asym_hi.setIe( { pic::supergrid[0].dim(), pic::supergrid[1].dim() + myguard }); 
+      fu_asym_hi[0] = { 0, pic::supergrid[0].dim() };
+      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard };
       fu_asym_hi.is_upper_axis(true);
       fu_asym_hi.require_original_EB(false);
     }
@@ -509,8 +522,6 @@ namespace field {
 
 }
 
-const bool use_old = false; // FIXME
-
 namespace pic {
   template < int DGrid, typename R, typename RJ, template < typename > class S >
   auto set_up_initial_conditions() {
@@ -524,8 +535,7 @@ namespace pic {
                         field::Field<RJ, 3, DGrid>& ,
                         particle::map<particle::array<R,S>>&
                         ) const {
-        for ( auto I : apt::Block(this->ext()) ) {
-          I += this->Ib();
+        for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
           B[0](I) = field::B_r_star( grid[0].absc(I[0], 0.5 * B[0].offset()[0]), grid[1].absc(I[1], 0.5 * B[0].offset()[1]), 0, 0 );
           B[1](I) = field::B_theta_star( grid[0].absc(I[0], 0.5 * B[1].offset()[0]), grid[1].absc(I[1], 0.5 * B[1].offset()[1]), 0, 0 );
         }
@@ -533,8 +543,8 @@ namespace pic {
 
       int initial_timestep() const noexcept { return 0; }
     } ic;
-    ic.setIb({0,0});
-    ic.setIe({supergrid[0].dim(), supergrid[1].dim()+1});
+    ic[0] = { 0, supergrid[0].dim() };
+    ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
 
     return ic;
   }
@@ -543,14 +553,15 @@ namespace pic {
 namespace particle {
   constexpr pic::real_t N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( pic::dt / pic::wdt_pic, 2.0 );
   constexpr pic::real_t N_atm_x = 1.0; // TODO
-  constexpr pic::real_t v_th = 0.3;
-  constexpr pic::real_t gravity_strength = 1.8;
+  constexpr pic::real_t v_th = 0.2;
+  constexpr pic::real_t gravity_strength = 0.5;
 
 
 
   template < int DGrid, typename R, template < typename > class S,
              typename ShapeF, typename RJ >
   auto set_up_particle_actions() {
+    namespace range = apt::range;
     std::vector<std::unique_ptr<Action<DGrid,R,S,RJ>>> pus;
 
     Updater<DGrid,R,S,ShapeF,RJ> pu;
@@ -591,14 +602,14 @@ namespace particle {
                         const dye::Ensemble<DGrid>* ens,
                         R dt, int timestep, util::Rng<R>& rng
                          ) override {
-        _count_n.resize( {this->ext(),0} );
-        _count_p.resize( {this->ext(),0} );
+        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
+        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
 
         apt::array<R,DGrid> lb;
         apt::array<R,DGrid> ub;
         for ( int i = 0; i < DGrid; ++i ) {
-          lb[i] = grid[i].absc( this->Ib()[i], 0.0 );
-          ub[i] = grid[i].absc( this->Ib()[i] + this->ext()[i], 0.0 );
+          lb[i] = grid[i].absc( range::begin(*this,i), 0.0 );
+          ub[i] = grid[i].absc( range::end(*this,i), 0.0 );
         }
         auto is_in = [&lb,&ub]( const auto& q ) {
                        for ( int i = 0; i < DGrid; ++i ) {
@@ -632,9 +643,8 @@ namespace particle {
         auto itr_po = std::back_inserter(particles[_posion]);
         auto itr_ne = std::back_inserter(particles[_negaon]);
 
-        for ( auto I : apt::Block(this->ext()) ) {
+        for ( const auto& I : apt::Block(range::begin(*this),range::end(*this)) ) {
           auto N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
-          I += this->Ib();
           apt::Vec<R, S<R>::Dim> q{};
           for ( int i = 0; i < DGrid; ++i )
             q[i] = grid[i].absc(I[i], 0.5);
@@ -642,15 +652,15 @@ namespace particle {
           apt::Vec<R,3> nB;
           { // make nB centered in the cell
             const auto& m = B.mesh();
-            auto li = m.linearized_index_of_whole_mesh(I);
+            auto li = m.linear_index(I);
             if constexpr (DGrid == 2) {
-                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride(1)] );
-                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride(0)] );
-                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride()[1]] );
+                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride()[0]] );
+                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
               } else if (DGrid == 3){
-              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
-              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
-              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride()[1]] + B[0][li + m.stride()[2]] + B[0][li + m.stride()[1] + m.stride()[2]] );
+              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride()[2]] + B[1][li + m.stride()[0]] + B[1][li + m.stride()[2] + m.stride()[0]] );
+              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
             }
             if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
             else nB /= apt::abs(nB);
@@ -682,8 +692,8 @@ namespace particle {
     } atm;
     {
       atm.setName("Atmosphere");
-      atm.setIb({ field::star_interior, 0 });
-      atm.setIe({ field::star_interior + 1, pic::supergrid[1].dim() });
+      atm[0] = { field::star_interior, field::star_interior + 1 };
+      atm[1] = { 0, pic::supergrid[1].dim() };
 
       atm.set_thermal_velocity(v_th).set_number_in_atmosphere(N_atm_x * N_atm_floor);
       atm.set_positive_charge(species::ion).set_negative_charge(species::electron);
@@ -718,21 +728,21 @@ namespace particle {
             b = -a;
           };
         // MIDWAY in AxisDir
-        axissymmetrize(J[0], add_assign, this->Ib(),this->ext(),_is_upper_axis );
-        axissymmetrize(J[2], sub_assign, this->Ib(),this->ext(),_is_upper_axis );
+        axissymmetrize(J[0], add_assign, range::begin(*this),range::end(*this),_is_upper_axis );
+        axissymmetrize(J[2], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
         // INSITU in AxisDir
-        axissymmetrize(J[1], sub_assign, this->Ib(),this->ext(),_is_upper_axis );
+        axissymmetrize(J[1], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
       }
     } asym_lo, asym_hi;
     {
       asym_lo.setName("AxissymmetrizeJLower");
-      asym_lo.setIb( { 0, -field::myguard });
-      asym_lo.setIe( { pic::supergrid[0].dim(), 1 }); // NOTE +1 so as to set values right on axis
+      asym_lo[0] = { 0, pic::supergrid[0].dim() };
+      asym_lo[1] = { -field::myguard, 1 }; // NOTE +1 so as to set values right on axis
       asym_lo.is_upper_axis(false);
 
       asym_hi.setName("AxissymmetrizeJHigher");
-      asym_hi.setIb( { 0, pic::supergrid[1].dim() });
-      asym_hi.setIe( { pic::supergrid[0].dim(), pic::supergrid[1].dim() + field::myguard });
+      asym_hi[0] = { 0 , pic::supergrid[0].dim() };
+      asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + field::myguard };
       asym_hi.is_upper_axis(true);
     }
 
@@ -894,10 +904,8 @@ namespace io {
       case 2: hh_func = Metric::template hh<2,RDS>; break;
       }
 
-      for ( const auto& I : apt::Block(fds.mesh().bulk_dims()) ) {
-
+      for ( const auto& I : apt::Block(apt::range::begin(fds.mesh().range()), apt::range::end(fds.mesh().range())) ) {
         for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
-
         auto hh = hh_func(q[0], q[1], q[2]);
         if ( std::abs(hh) > 1e-12 )
           fds[comp](I) /= hh;
@@ -949,7 +957,7 @@ namespace io {
     assert(num_comps == 1);
     auto dFlux = fds[0]; // TODOL semantics
     const auto& mesh = fds.mesh();
-    apt::Index<DGrid> ext = mesh.bulk_dims();
+    apt::Index<DGrid> ext = apt::range::size(mesh.range());
     std::vector<RDS> buf;
     { // one value from each theta row
       std::size_t size = 1;
@@ -957,19 +965,21 @@ namespace io {
       size /= ext[1];
       buf.reserve(size);
     }
-    for ( auto trI : mesh.project( 1, {}, ext ) ) {
-      dFlux[trI | -1] = 0.0;
-      for ( int n = 0; n < ext[1]; ++n ) {
-        dFlux[ trI | n ] += dFlux[ trI | (n-1) ];
+    for ( const auto& trI : apt::project_out( 1, {}, ext ) ) {
+      apt::Longidx n (1,-1);
+      dFlux(trI + n) = 0.0;
+      for ( ++n; n < ext[1]; ++n ) {
+        dFlux(trI + n) += dFlux(trI + (n-1)); // POLEDANCE check n - 1
       }
-      buf.push_back(dFlux[ trI | (ext[1]-1) ]);
+      n = ext[1] - 1;
+      buf.push_back(dFlux(trI + n));
     }
     // do an exclusive scan then add the scanned value back
     cart.exscan_inplace(buf.data(), buf.size());
     int idx = 0;
-    for ( auto trI : mesh.project( 1, {}, ext ) ) {
+    for ( const auto& trI : apt::project_out( 1, {}, ext ) ) {
       auto val = buf[idx++];
-      for ( int n = 0; n < ext[1]; ++n ) dFlux[ trI | n ] += val;
+      for ( apt::Longidx n (1,0); n < ext[1]; ++n ) dFlux(trI + n) += val;
     }
   }
 

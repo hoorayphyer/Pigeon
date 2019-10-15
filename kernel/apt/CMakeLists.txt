@@ -9,6 +9,7 @@ if (${ENABLE_TESTS})
   test_gen(apt handle)
   test_gen(apt priority_queue)
   test_gen(apt csi)
+  test_gen(apt range)
 
   msperf_gen(apt block)
 endif()

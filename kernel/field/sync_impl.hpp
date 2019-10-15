@@ -2,6 +2,7 @@
 #include "field/field.hpp"
 #include "mpipp/mpi++.hpp"
 #include "apt/block.hpp"
+#include <cassert>
 
 // TODOL can we use the most continous part of field for another temporary buffer? More generally, can we change the memory layout? Because guard cells in other directions are not continous anyway. Those guard cells can be used as temporary buffers.
 namespace field {
@@ -11,17 +12,21 @@ namespace field {
     void sync( Field<T, DField, DGrid>& field, const mpi::CartComm& comm, Policy<T> ) {
       // Looping order ( from outer to inner ): DGrid, LeftRightness, DField
       const auto& mesh = field.mesh();
-      auto I_b = mesh.origin();
-      auto extent = mesh.extent();
+      const auto& range = mesh.range();
+      assert(apt::range::is_margin_uniform(range)); // TODO this implementation requires all margins to be equal
+
+      auto I_b = apt::range::far_begin(range);
+      auto extent = apt::range::full_size(range);
+
+      const int guard = range[0].margin()[LFT];
 
       std::vector<T> send_buf, recv_buf;
 
       for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
         int ext_orig = extent[i_grid];
-        extent[i_grid] = Policy<T>::extent(mesh.guard());
+        extent[i_grid] = Policy<T>::extent(guard);
         int ext_size = 1;
-        apt::foreach<0,DGrid>
-          ( [&ext_size] (auto e) { ext_size *= e;}, extent );
+        for ( int i = 0; i < DGrid; ++i ) ext_size *= extent[i];
 
         int I_b_orig = I_b[i_grid];
         for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
@@ -31,28 +36,26 @@ namespace field {
           if ( src && (*src == comm.rank()) ) { // NOTE check on dest is not needed
             // use I_b for I_b_send
             auto I_b_recv = I_b;
-            I_b[i_grid] = Policy<T>::sendIb( mesh.bulk_dim(i_grid), mesh.guard(), lr_send );
-            I_b_recv[i_grid] = Policy<T>::recvIb( mesh.bulk_dim(i_grid), mesh.guard(), lr_send );
-            apt::foreach<0,DField>
-              ( [&]( auto comp ) { // TODOL semantics
-                  for ( const auto& I : apt::Block(extent) ) {
-                    T buf{}; // This is needed to accommodate merge_guard
-                    Policy<T>::to_send_buf( buf, comp(I_b + I) );
-                    Policy<T>::from_recv_buf( comp(I_b_recv + I), buf, lr_send );
-                  }
-                }, field );
+            I_b[i_grid] = Policy<T>::sendIb( range[i_grid].size(), guard, lr_send );
+            I_b_recv[i_grid] = Policy<T>::recvIb( range[i_grid].size(), guard, lr_send );
+            for ( int C = 0; C < DField; ++ C ) {
+              for ( const auto& I : apt::Block({}, extent) ) {
+                T buf{}; // This is needed to accommodate merge_guard
+                Policy<T>::to_send_buf( buf, field[C](I_b + I) );
+                Policy<T>::from_recv_buf( field[C](I_b_recv + I), buf, lr_send );
+              }
+            }
           } else {
             std::vector<mpi::Request> reqs(2);
             // copy all components into one buffer
             if ( dest ) {
               send_buf.resize( ext_size * DField );
               auto itr_s = send_buf.begin();
-              I_b[i_grid] = Policy<T>::sendIb( mesh.bulk_dim(i_grid), mesh.guard(), lr_send );
-              apt::foreach<0,DField>
-                ( [&]( auto comp ) { // TODOL semantics
-                    for ( const auto& I : apt::Block(extent) )
-                      Policy<T>::to_send_buf( *(itr_s++), comp(I_b + I) );
-                  }, field );
+              I_b[i_grid] = Policy<T>::sendIb( range[i_grid].size(), guard, lr_send );
+              for ( int C = 0; C < DField; ++C ) {
+                for ( const auto& I : apt::Block(I_b, I_b + extent) )
+                  Policy<T>::to_send_buf( *(itr_s++), field[C](I) );
+              }
               reqs[0] = comm.Isend( *dest, 924, send_buf.data(), send_buf.size() );
             }
             if ( src ) {
@@ -62,12 +65,11 @@ namespace field {
             mpi::waitall(reqs);
             if ( src ) {
               auto itr_r = recv_buf.cbegin();
-              I_b[i_grid] = Policy<T>::recvIb( mesh.bulk_dim(i_grid), mesh.guard(), lr_send );
-              apt::foreach<0,DField>
-                ( [&]( auto comp ) { // TODOL semantics
-                    for ( const auto& I : apt::Block(extent) )
-                      Policy<T>::from_recv_buf( comp(I_b + I), *(itr_r++), lr_send );
-                  }, field );
+              I_b[i_grid] = Policy<T>::recvIb( range[i_grid].size(), guard, lr_send );
+              for ( int C = 0; C < DField; ++C ) {
+                for ( const auto& I : apt::Block(I_b, I_b + extent) )
+                  Policy<T>::from_recv_buf( field[C](I), *(itr_r++), lr_send );
+              }
             }
           }
 

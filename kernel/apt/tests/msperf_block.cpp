@@ -7,7 +7,7 @@ using namespace apt;
 SCENARIO("Measure performance of Block", "[apt]") {
 
   constexpr Index<3> extent {128, 128, 128};
-  Block<3> block (extent);
+  Block<3> block ({},extent);
 
   const int N = 1000;
   tmr::Timestamp t1;

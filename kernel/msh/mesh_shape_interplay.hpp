@@ -53,9 +53,6 @@ namespace msh {
                  const apt::array<U,DField>& q0_std, // NOTE its DField, not DGrid
                  const apt::array<U,DField>& q1_std );
 
-  // template < typename RealJ, int DField, int DGrid >
-  // void integrate( field::Field<RealJ,DField,DGrid>& J );
-
 }
 
 #endif

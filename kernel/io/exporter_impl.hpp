@@ -33,7 +33,7 @@ namespace io {
 
     std::string varname;
     int dim = 1; // dim of fields
-    field::Field<RealDS,3,DGrid> fds ( {mani::dims(grid_ds), _guard} );
+    field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, mani::dims(grid_ds), _guard) );
 
     auto smart_save =
       [&saver]( const std::string name, const int field_dim, const auto& fds ) {

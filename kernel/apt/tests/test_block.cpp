@@ -4,21 +4,21 @@
 using namespace apt;
 
 SCENARIO("Block", "[apt]") {
-  int N[3] = { 13, 15, 17 };
-  Block block{ Index<3>{ N[0], N[1], N[2] }};
+  Index<3> beg { 2, 3, 4};
+  Index<3> end { 13, 15, 17};
+  Block block(beg, end);
   auto itr = block.begin();
-  auto end = block.end();
-  REQUIRE( end == N[2] );
+  REQUIRE( block.end() == end[2] );
 
-  for ( int k = 0; k < N[2]; ++k )
-    for ( int j = 0; j < N[1]; ++j )
-      for ( int i = 0; i < N[0]; ++i ) {
+  for ( int k = beg[2]; k < end[2]; ++k )
+    for ( int j = beg[1]; j < end[1]; ++j )
+      for ( int i = beg[0]; i < end[0]; ++i ) {
         CAPTURE(*itr, i, j, k);
         REQUIRE( *(itr++) == Index<3>{ i, j, k } );
       }
 }
 
-TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation BrutalForce_dJ_Field", "[field][mpi]"
+TEMPLATE_TEST_CASE("Test empty blocks", "[apt]"
                    , (aio::IndexType<0,0,0>)
                    , (aio::IndexType<1,0,0>)
                    , (aio::IndexType<0,1,0>)
@@ -28,6 +28,7 @@ TEMPLATE_TEST_CASE("Testing deposition in 2D against alternative implementation 
                    , (aio::IndexType<1,1,0>)
                    ) {
   constexpr int DGrid = 3;
-  Block<DGrid> block( TestType::get() );
-  REQUIRE_FALSE( block.begin() != block.end());
+  Block<DGrid> block( {}, TestType::get() );
+  // block.begin() should equal to block.end()
+  REQUIRE_FALSE( ( block.begin() != block.end() ) );
 }
