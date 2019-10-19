@@ -62,7 +62,7 @@ namespace field {
                   R dt
                   ) const {
     // NOTE E,B,J are assumed to have been synced
-    constexpr R alpha = 0.5;
+    constexpr R alpha = 0.501;
     constexpr R beta = 1.0 - alpha;
 
     // running Begin and End
@@ -160,10 +160,10 @@ namespace field {
                   R dt
                   ) const {
     // NOTE E,B,J are assumed to have been synced
-    constexpr R alpha = 0.5;
+    constexpr R alpha = 0.501;
     constexpr R beta = 1.0 - alpha;
 
-    static apt::array<int,DGrid+1> storage_stride;
+    apt::array<int,DGrid+1> storage_stride;
     {
       storage_stride[0] = 1;
       for ( int i = 0; i < DGrid; ++i )
@@ -194,15 +194,30 @@ namespace field {
         return idx;
       };
 
+    auto make_continuous =
+      [&, this](auto& vc, const auto& I) {
+        for ( int i = 0; i < DGrid; ++i ) {
+          if ( 0 == this->_bdry[i] || !this->_continuous_transverse_E[i] ) continue;
+          for ( int s = 1; s < 3; ++s )
+            vc.D[yee::Etype][(i+s)%3][i] = this->_D[yee::Etype][(i+s)%3][i][index_of_continuous_diff_in_direction(i,I)];
+        }
+      };
+
     // running Begin and End
     auto rB = apt::range::far_begin(*this);
     auto rE = apt::range::far_end(*this);
     VectorCalculus<DGrid,R> vc{grid,E.mesh().stride()};
 
-    Field<R,3,DGrid> tmp(B); // tmp holds old B values
+    Field<R,3,DGrid> tmp{*this};
+    Field<R,3,DGrid> tmp2{*this};
+    for ( int C = 0; C < 3; ++C ) {
+      for ( const auto& I : apt::Block(apt::range::far_begin(*this), apt::range::far_end(*this)) )
+        tmp[C](I) = B[C](I); // store old B
+    }
+    tmp2.reset();
 
     auto setvc =
-      [this, storage_idx](auto& vc,const auto& I) {
+      [this, &storage_idx](auto& vc,const auto& I) {
         int idx = storage_idx(I);
         for ( int i = 0; i < 3; ++i ) {
           vc.hh[yee::Etype][i] = _hh[yee::Etype][i][idx];
@@ -219,22 +234,35 @@ namespace field {
       for ( int i = 0; i < DGrid; ++i ) {if ( _bdry[i] != -1 ) ++rB[i];}
       for ( const auto& I : apt::Block(rB,rE) ) {
         setvc(vc,I);
-        // for the first curl of E, enforce continuity
-        for ( int i = 0; i < DGrid; ++i ) {
-          if ( 0 == _bdry[i] || !_continuous_transverse_E[i] ) continue;
-          for ( int s = 1; s < 3; ++s )
-            vc.D[yee::Etype][(i+s)%3][i] = _D[yee::Etype][(i+s)%3][i][index_of_continuous_diff_in_direction(i,I)];
-        }
+        make_continuous(vc,I);
         for ( int C = 0; C < 3; ++C )
           B[C](I) -= prefactor * vc.template Curl<yee::Etype>(C,E,I);
       }
     }
-    { // 2. partial update E. Note the ranges are only the bulk
+    { // 2. Partial Update on E (different from Haugbolle bulk treatment)
+      // store curlB separately because it may be discontinuous across interface
       for ( int i = 0; i < DGrid; ++i ) {if ( _bdry[i] != 1 ) --rE[i];}
       for ( const auto& I : apt::Block(rB,rE) ) {
         setvc(vc,I);
         for ( int C = 0; C < 3; ++C )
-          E[C](I) += dt * vc.template Curl<yee::Btype>(C,B,I);
+          tmp2[C](I) = dt * vc.template Curl<yee::Btype>(C,B,I);
+      }
+
+      // subtract J from E. Divide J by hh.
+      R prefactor = dt*_preJ_factor;
+      for ( int C = 0; C < 3; ++C ) {
+        auto hhinv =
+          [comp=C,this,&storage_idx](R q1, R q2, R q3, const auto& I) -> R {
+            auto x = this->_hh[yee::Etype][comp][storage_idx(I)](q1, q2, q3);
+            if ( std::abs(x) < 1e-8 ) return 0;
+            else return 1 / x;
+          };
+        const auto ofs = J[C].offset();
+        R q[3] = {0, 0, 0};
+        for ( const auto& I : apt::Block(rB,rE) ) {
+          for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
+          E[C](I) -= ( prefactor * J[C](I) * hhinv(q[0],q[1],q[2],I) );
+        }
       }
     }
     // 3. partial update B
@@ -248,26 +276,27 @@ namespace field {
     { // 4. iteratively update E.
       R aatt = alpha*alpha*dt*dt;
       for ( int n = 0; n < _num_iter; ++n ) {
-
         for ( int i = 0; i < DGrid; ++i ) {if ( _bdry[i] != -1 ) ++rB[i];}
-        for ( const auto& I : apt::Block(rB,rE) ) {
-          setvc(vc,I);
-          for ( int C = 0; C < 3; ++C )
-            tmp[C](I) = vc.template Curl<yee::Etype>(C,E,I);
-        }
-
-        if ( 0 == n ) { // subtract curl J and impose continuity if applicable
-          // Divide J by hh
-          R prefactor = dt*_preJ_factor;
-          for ( int C = 0; C < 3; ++C ) {
-            const auto ofs = J[C].offset();
-            R q[3] = {0, 0, 0};
-            for ( const auto& I : apt::Block(rB,rE) ) {
-              for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
-              R hhinv = _hh[yee::Etype][C][storage_idx(I)](q[0],q[1],q[2]);
-              hhinv = ( std::abs(hhinv) < 1e-8 ) ? 0 : 1 / hhinv;
-              E[C](I) -= ( prefactor * J[C](I) * hhinv );
+        if ( 0 == n ) {
+          //  The first iteration is done differently to respect continuity of E and J
+          for ( const auto& I : apt::Block(rB,rE) ) {
+            setvc(vc,I);
+            make_continuous(vc,I);
+            for ( int C = 0; C < 3; ++C )
+              tmp[C](I) = vc.template Curl<yee::Etype>(C,E,I);
+          }
+          for ( const auto& I : apt::Block(rB,rE) ) {
+            setvc(vc,I);
+            for ( int C = 0; C < 3; ++C ) {
+              tmp[C](I) += vc.template Curl<yee::Etype>(C,tmp2,I);
+              E[C](I) -= tmp2[C](I);
             }
+          }
+        } else {
+          for ( const auto& I : apt::Block(rB,rE) ) {
+            setvc(vc,I);
+            for ( int C = 0; C < 3; ++C )
+              tmp[C](I) = vc.template Curl<yee::Etype>(C,E,I);
           }
         }
 
@@ -278,7 +307,7 @@ namespace field {
             E[C](I) -= aatt * vc.template Curl<yee::Btype>(C,tmp,I);
         }
       }
-      copy_sync_guard_cells(E, comm); // TODO FIXME, only sync non boundary direction
+      copy_sync_guard_cells(E, comm, E.mesh().range(), *this);
     }
     // 5. finish updating B
     R prefactor = alpha*dt;
@@ -288,7 +317,7 @@ namespace field {
         B[C](I) -= prefactor * vc.template Curl<yee::Etype>(C,E,I);
     }
 
-    copy_sync_guard_cells(B, comm); // TODO, only sync non boundary direction
+    copy_sync_guard_cells(B, comm, B.mesh().range(), *this);
   }
 }
 

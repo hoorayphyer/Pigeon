@@ -62,40 +62,42 @@ namespace pic {
     template < typename Action >
     void taylor( Action& a ) {
       // NOTE range is assumed to be noempty [,)
-      // POLEDANCE check the logic here. including one more cell at upper boundary
       auto f =
         [] ( int Ib_global, int Ie_global,
              const mani::Grid1D<R>& supergrid,
              const mani::Grid1D<R>& localgrid,
-             bool is_periodic,
-             int guard
-             ) noexcept -> apt::pair<int> {
-         // lb is the Ib_global with respect to the localgrid
-         int lb = Ib_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
-         int ub = Ie_global - static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
+             bool is_periodic
+             ) noexcept -> apt::pair<int>
+        {
+         // shift is the index of local lower in the global grid
+         int shift = static_cast<int>( ( localgrid.lower() - supergrid.lower() ) / localgrid.delta() + 0.5 );
+         Ib_global -= shift;
+         Ie_global -= shift;
+         // now Ib_ and Ie_global are with respect to the current local grid
 
-         // Extend to include guard cells on true boundaries. Whether or not it will be used is controled by Ib_global and Ie_global
+         // Extend to infinity on true boundaries to
+         // NOTE there may be actions done completely in the guard cells, such as assigining values
          int lb_local = 0;
          int ub_local = localgrid.dim();
          if ( !is_periodic ) {
            if ( std::abs( localgrid.lower() - supergrid.lower() ) < supergrid.delta() )
-             lb_local -= guard;
+             lb_local = std::numeric_limits<int>::min();
            if ( std::abs( localgrid.upper() - supergrid.upper() ) < supergrid.delta() )
-             ub_local += guard;
+             ub_local = std::numeric_limits<int>::max();
          }
 
-         if ( ub <= lb_local || lb >= ub_local ) {
+         if ( Ie_global <= lb_local || Ib_global >= ub_local ) {
            // range not applicable on current local patch
            return {0,0};
          } else {
-           lb = std::max<int>( lb_local, lb );
-           ub = std::min<int>( ub, ub_local );
-           return { lb, ub };
+           Ib_global = std::max<int>( lb_local, Ib_global );
+           Ie_global = std::min<int>( Ie_global, ub_local );
+           return { Ib_global, Ie_global };
          }
         };
 
       for ( int i = 0; i < DGrid; ++i ) {
-        auto [b_new, e_new] = f( a[i].begin(), a[i].end(), _supergrid[i], _grid[i], pic::periodic[i], field::myguard );
+        auto [b_new, e_new] = f( a[i].begin(), a[i].end(), _supergrid[i], _grid[i], pic::periodic[i] );
         a[i].begin() = b_new;
         a[i].end() = e_new;
       }
@@ -422,15 +424,9 @@ namespace pic {
                   lgr::file % "--" << _field_actions[i]->name() << std::endl;
                 }
                 const auto& act = *_field_actions[i];
-                // FIXME
-                // std::cout << "ts = " << timestep << std::endl;
-                // std::cout << _field_actions[i]->name() << std::endl;
-                // std::cout << "  revert" << std::endl;
-                // _rsv.revert_to_prior(_E,_B,act);
-                // std::cout << "  action" << std::endl;
+                _rsv.revert_to_prior(_E,_B,act);
                 act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
-                // std::cout << "  back" << std::endl;
-                // _rsv.back_to_current(_E,_B);
+                _rsv.back_to_current(_E,_B);
               }
             });
         }

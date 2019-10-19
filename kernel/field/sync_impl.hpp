@@ -9,35 +9,57 @@ namespace field {
 
   namespace impl {
     template < typename T, int DField, int DGrid, template < typename > class Policy >
-    void sync( Field<T, DField, DGrid>& field, const mpi::CartComm& comm, Policy<T> ) {
+    void sync( Field<T, DField, DGrid>& field, const mpi::CartComm& comm,
+               const apt::array<apt::Range,DGrid>& domain_range,
+               const apt::array<apt::Range,DGrid>& sub_range, Policy<T> ) {
       // Looping order ( from outer to inner ): DGrid, LeftRightness, DField
-      const auto& mesh = field.mesh();
-      const auto& range = mesh.range();
-      assert(apt::range::is_margin_uniform(range)); // TODO this implementation requires all margins to be equal
+      assert(apt::range::is_margin_uniform(domain_range)); // POLEDANCE this implementation requires all margins to be equal
+      // check sub_range \in field.range \in domain_range
+      {
+        const auto& range = field.mesh().range();
+        bool ordered = true;
+        for ( int i = 0; i < DGrid; ++i ) {
+          bool x = (sub_range[i].far_begin() >= range[i].far_begin() and range[i].far_begin() >= domain_range[i].far_begin() );
+          ordered = ( ordered and x );
+          x = (sub_range[i].far_end() <= range[i].far_end() and range[i].far_end() >= domain_range[i].far_end() );
+          ordered = ( ordered and x );
+        }
+        assert(ordered); // POLEDANCE print error message
+      }
 
-      auto I_b = apt::range::far_begin(range);
-      auto extent = apt::range::full_size(range);
-
-      const int guard = range[0].margin()[LFT];
+      const int guard = domain_range[0].margin()[LFT];
 
       std::vector<T> send_buf, recv_buf;
 
       for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
-        int ext_orig = extent[i_grid];
+        { // determine if communication is needed in this direction. Each dimension has two sides, and each side must be fully contained ( i.e. full_size() ) in domain_range bulk to avoid communication, unless that side corresponds to a true boundary.
+          auto neigh = comm.shift( i_grid, 1 );
+          bool in_bulk = true;
+          {
+            bool is_contained = (sub_range[i_grid].far_begin() >= domain_range[i_grid].begin() );
+            in_bulk = (in_bulk and ( is_contained or neigh[LFT] ) );
+            is_contained = (sub_range[i_grid].far_end() <= domain_range[i_grid].end() );
+            in_bulk = (in_bulk and ( is_contained or neigh[RGT] ) );
+          }
+          if ( in_bulk ) continue;
+        }
+
+        auto I_b = apt::range::far_begin(sub_range);
+        auto extent = apt::range::full_size(sub_range);
+
         extent[i_grid] = Policy<T>::extent(guard);
         int ext_size = 1;
         for ( int i = 0; i < DGrid; ++i ) ext_size *= extent[i];
 
-        int I_b_orig = I_b[i_grid];
         for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
 
           auto [ src, dest ] = comm.shift( i_grid, lr_send ? 1 : -1 );
-          // Edge case: cart dim = 1 with periodic boundaries
+          // Edge case: cart dim = 1 with periodic boundaries POLEDANCE see front
           if ( src && (*src == comm.rank()) ) { // NOTE check on dest is not needed
             // use I_b for I_b_send
             auto I_b_recv = I_b;
-            I_b[i_grid] = Policy<T>::sendIb( range[i_grid].size(), guard, lr_send );
-            I_b_recv[i_grid] = Policy<T>::recvIb( range[i_grid].size(), guard, lr_send );
+            I_b[i_grid] = Policy<T>::sendIb( sub_range[i_grid].size(), guard, lr_send );
+            I_b_recv[i_grid] = Policy<T>::recvIb( sub_range[i_grid].size(), guard, lr_send );
             for ( int C = 0; C < DField; ++ C ) {
               for ( const auto& I : apt::Block({}, extent) ) {
                 T buf{}; // This is needed to accommodate merge_guard
@@ -51,7 +73,7 @@ namespace field {
             if ( dest ) {
               send_buf.resize( ext_size * DField );
               auto itr_s = send_buf.begin();
-              I_b[i_grid] = Policy<T>::sendIb( range[i_grid].size(), guard, lr_send );
+              I_b[i_grid] = Policy<T>::sendIb( sub_range[i_grid].size(), guard, lr_send );
               for ( int C = 0; C < DField; ++C ) {
                 for ( const auto& I : apt::Block(I_b, I_b + extent) )
                   Policy<T>::to_send_buf( *(itr_s++), field[C](I) );
@@ -65,18 +87,14 @@ namespace field {
             mpi::waitall(reqs);
             if ( src ) {
               auto itr_r = recv_buf.cbegin();
-              I_b[i_grid] = Policy<T>::recvIb( range[i_grid].size(), guard, lr_send );
+              I_b[i_grid] = Policy<T>::recvIb( sub_range[i_grid].size(), guard, lr_send );
               for ( int C = 0; C < DField; ++C ) {
                 for ( const auto& I : apt::Block(I_b, I_b + extent) )
                   Policy<T>::from_recv_buf( field[C](I), *(itr_r++), lr_send );
               }
             }
           }
-
         }
-        // restroe
-        I_b[i_grid] = I_b_orig;
-        extent[i_grid] = ext_orig;
       }
     }
   }
@@ -109,8 +127,10 @@ namespace field {
   };
 
   template < typename T, int DField, int DGrid >
-  void copy_sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
-    impl::sync( field, comm, copy_policy<T>{} );
+  void copy_sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::CartComm& comm,
+                              const apt::array<apt::Range,DGrid>& domain_range,
+                              const apt::array<apt::Range,DGrid>& sub_range ) {
+    impl::sync( field, comm, domain_range, sub_range, copy_policy<T>{} );
   }
 
   template < typename T >
@@ -140,7 +160,9 @@ namespace field {
   };
 
   template < typename T, int DField, int DGrid >
-  void merge_sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::CartComm& comm ) {
-    impl::sync( field, comm, merge_policy<T>{} );
+  void merge_sync_guard_cells( Field<T, DField, DGrid>& field, const mpi::CartComm& comm,
+                               const apt::array<apt::Range,DGrid>& domain_range,
+                               const apt::array<apt::Range,DGrid>& sub_range ) {
+    impl::sync( field, comm, domain_range, sub_range, merge_policy<T>{} );
   }
 }
