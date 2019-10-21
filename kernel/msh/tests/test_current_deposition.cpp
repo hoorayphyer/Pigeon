@@ -173,7 +173,7 @@ void direct_deposit( Field<RJ,3,DGrid>& J,
     for ( int i_dim = 0; i_dim < DGrid; ++i_dim ) {
       for ( const auto& trI : apt::project_out(i_dim, apt::range::far_begin(r), apt::range::far_end(r)) ) {
         for ( apt::Longidx n (i_dim, r[i_dim].full_size() - 2 ); n > r[i_dim].far_begin()-1; --n )
-          W[i_dim](trI + n) += W[i_dim](trI + n + 1);
+          W[i_dim](trI + n) += W[i_dim](trI + (n + 1) = default);
       }
     }
 

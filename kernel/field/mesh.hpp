@@ -37,7 +37,7 @@ namespace field {
 
     constexpr int linear_index( const apt::Longidx& i ) const noexcept {
       // TODO check bounds on I
-      return _linear_offset + i * _stride[i.dir()];
+      return _linear_offset + i.val() * _stride[i.dir()];
     }
 
     // // TODOL this potentially will introduce subtle bugs when using trI from the full mesh. Naturally the goal here is to have a mesh that is 1 dim short. But such a mesh doesn't work well with trI from the full mesh. One solution is to provide trI to int by subtracting g * stride_normal

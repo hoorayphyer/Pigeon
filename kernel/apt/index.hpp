@@ -2,7 +2,6 @@
 #define  _APT_INDEX_HPP_
 
 #include "apt/array.hpp"
-#include "apt/foreach.hpp"
 
 namespace apt {
   template < int D >
@@ -12,31 +11,27 @@ namespace apt {
 template < int D >
 constexpr apt::Index<D> operator+( const apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
   apt::Index<D> res;
-  apt::foreach<0,D>
-    ( []( auto& r, auto a, auto b ) { r = a + b; }, res, ind_a, ind_b );
+  for ( int i = 0; i < D; ++i ) res[i] = ind_a[i] + ind_b[i];
   return res;
 }
 
 template < int D >
 constexpr apt::Index<D> operator-( const apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
   apt::Index<D> res;
-  apt::foreach<0,D>
-    ( []( auto& r, auto a, auto b ) { r = a - b; }, res, ind_a, ind_b );
+  for ( int i = 0; i < D; ++i ) res[i] = ind_a[i] - ind_b[i];
   return res;
 }
 
 template < int D >
 constexpr apt::Index<D>& operator+=( apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
-  apt::foreach<0,D>
-    ( []( auto& a, auto b ) { a += b; }, ind_a, ind_b );
+  for ( int i = 0; i < D; ++i ) ind_a[i] += ind_b[i];
   return ind_a;
 }
 
 template < int D >
 constexpr bool operator==( const apt::Index<D>& ind_a, const apt::Index<D>& ind_b ) noexcept {
   bool res = true;
-  apt::foreach<0,D>
-    ( [&res]( auto a, auto b ) { res = ( res && (a == b) ); }, ind_a, ind_b );
+  for ( int i = 0; i < D; ++i ) res = ( res and (ind_a[i] == ind_b[i]) );
   return res;
 }
 
@@ -58,16 +53,61 @@ namespace apt {
 
     constexpr Longidx& operator=( const Longidx& ) = default;
     constexpr Longidx& operator=( Longidx&& ) noexcept = default;
+    constexpr Longidx& operator=( int a ) noexcept { _val = a; return *this; }
 
-    constexpr Longidx( int dir, int val = 0) noexcept : _dir(dir), _val(val) {}
-    constexpr Longidx& operator=( int v ) noexcept { _val = v; return *this; }
-    constexpr operator int() const noexcept { return _val; }
+    constexpr Longidx( int dir, int val ) noexcept : _dir(dir), _val(val) {}
 
-    constexpr const int dir() const noexcept { return _dir; }
+    constexpr int dir() const noexcept { return _dir; }
+    constexpr int val() const noexcept { return _val; }
 
     template < int D >
     constexpr Index<D> operator+( Index<D> x ) const noexcept {
       x[_dir] += _val; return x;
+    }
+
+    template < int D >
+    constexpr Index<D> operator-( Index<D> x ) const noexcept {
+      for ( int i = 0; i < D; ++i ) x[i] *= -1;
+      x[_dir] += _val;
+      return x;
+    }
+
+    constexpr Longidx operator+( int a ) const noexcept {
+      auto res (*this);
+      res._val += a;
+      return res;
+    }
+    constexpr Longidx operator-( int a ) const noexcept {
+      auto res (*this);
+      res._val -= a;
+      return res;
+    }
+    constexpr Longidx operator*( int a ) const noexcept {
+      auto res (*this);
+      res._val *= a;
+      return res;
+    }
+    constexpr Longidx operator/( int a ) const noexcept {
+      auto res (*this);
+      res._val /= a;
+      return res;
+    }
+
+    constexpr Longidx& operator+=( int a ) noexcept {
+      _val += a;
+      return *this;
+    }
+    constexpr Longidx& operator-=( int a ) noexcept {
+      _val -= a;
+      return *this;
+    }
+    constexpr Longidx& operator*=( int a ) noexcept {
+      _val *= a;
+      return *this;
+    }
+    constexpr Longidx& operator/=( int a ) noexcept {
+      _val /= a;
+      return *this;
     }
 
     constexpr Longidx& operator++() noexcept { ++_val; return *this; }
@@ -85,12 +125,24 @@ namespace apt {
 }
 
 template < int D >
-constexpr apt::Index<D> operator+( const apt::Index<D>& ind, const apt::Longidx& l ) noexcept { return l + ind;}
+constexpr apt::Index<D> operator+( apt::Index<D> ind, const apt::Longidx& l ) noexcept {
+  ind[l.dir()] += l.val();
+  return ind;
+}
 
 template < int D >
 constexpr apt::Index<D> operator-( apt::Index<D> ind, const apt::Longidx& l ) noexcept {
-  ind[l.dir()] -= l;
+  ind[l.dir()] -= l.val();
   return ind;
+}
+
+constexpr apt::Longidx operator+( int a, apt::Longidx l ) noexcept { l += a; return l; }
+
+constexpr apt::Longidx operator*( int a, apt::Longidx l ) noexcept { l *= a; return l; }
+
+constexpr apt::Longidx operator-( int a, apt::Longidx l ) noexcept {
+  l = a - l.val();
+  return l;
 }
 
 
