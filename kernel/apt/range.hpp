@@ -25,12 +25,22 @@ namespace apt {
     constexpr Range( int begin, int end, int margin ) noexcept :
       Range(begin, end, {margin,margin}) {}
 
+    constexpr bool operator==( const Range& other ) const noexcept {
+      return _begin == other._begin and _end == other._end and _margin[LFT] == other._margin[LFT] and _margin[RGT] == other._margin[RGT];
+    }
+
+    constexpr bool operator!=( const Range& other ) const noexcept {
+      return !(*this == other);
+    }
+
     constexpr const int& begin() const noexcept { return _begin; }
     constexpr int& begin() noexcept { return _begin; }
     constexpr const int& end() const noexcept { return _end; }
     constexpr int& end() noexcept { return _end; }
     constexpr const auto& margin() const noexcept { return _margin; }
     constexpr auto& margin() noexcept { return _margin; }
+    constexpr const auto& margin(bool i) const noexcept { return _margin[i]; }
+    constexpr auto& margin(bool i) noexcept { return _margin[i]; }
 
     constexpr int size() const noexcept { return _end - _begin; }
     constexpr int far_begin() const noexcept { return _begin - _margin[LFT]; }
@@ -109,7 +119,7 @@ namespace apt::range {
   constexpr bool is_margin_uniform( const array<Range,D>& range ) noexcept {
     int mg = range[0].margin()[LFT];
     for ( int i = 0; i < D; ++i ) {
-      if ( range[i].margin()[LFT] != mg || range[i].margin()[RGT] != mg ) return false;
+      if ( range[i].margin(LFT) != mg or range[i].margin(RGT) != mg ) return false;
     }
     return true;
   }
@@ -132,7 +142,10 @@ namespace apt::range {
 
   template < int D >
   constexpr void set_margin( array<Range,D>& range, int mg ) noexcept {
-    for ( int i = 0; i < D; ++i ) range[i].margin() = {mg,mg};
+    for ( int i = 0; i < D; ++i ) {
+      range[i].margin(LFT) = mg;
+      range[i].margin(RGT) = mg;
+    }
   }
 
   // the following are handy when there is templated class deriving from it. See ActionBase or Haugbolle for example

@@ -18,17 +18,24 @@ SCENARIO("Block", "[apt]") {
       }
 }
 
-TEMPLATE_TEST_CASE("Test empty blocks", "[apt]"
-                   , (aio::IndexType<0,0,0>)
-                   , (aio::IndexType<1,0,0>)
-                   , (aio::IndexType<0,1,0>)
-                   , (aio::IndexType<0,0,1>)
-                   , (aio::IndexType<0,1,1>)
-                   , (aio::IndexType<1,0,1>)
-                   , (aio::IndexType<1,1,0>)
-                   ) {
-  constexpr int DGrid = 3;
-  Block<DGrid> block( {}, TestType::get() );
-  // block.begin() should equal to block.end()
-  REQUIRE_FALSE( ( block.begin() != block.end() ) );
+SCENARIO("Test empty blocks", "[apt]") {
+  constexpr int D = 3;
+  auto is_empty =
+    []( const Block<D>& b ) noexcept {
+      return !( b.begin() != b.end() );
+    };
+  REQUIRE_FALSE( is_empty({ {0,0,0}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {1,0,0}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {2,0,0}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {0,1,0}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {0,2,0}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {0,0,1}, {1,1,1} } ) );
+  REQUIRE( is_empty({ {0,0,2}, {1,1,1} } ) );
+
+  WHEN("loop over empty block") {
+    Block<D> block( { 12, 23, 34}, { 12, 26, 37 });
+    int n = 0;
+    for ( const auto& I : block ) ++n;
+    REQUIRE( 0 == n );
+  }
 }

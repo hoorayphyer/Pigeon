@@ -134,7 +134,7 @@ namespace pic {
           for ( int i = D-2 ; i > -1; --i ) {
             shift = shift * ( Ie[i] - Ib[i] ) + b[i] - Ib[i];
           }
-          for ( auto I : apt::Block(e-b) ) {
+          for ( auto I : apt::Block({},e-b) ) {
             int i_rsv = I[D-1];
             for ( int i = D-2; i > -1; --i ) i_rsv = i_rsv * (Ie[i]-Ib[i]) + I[i];
             i_rsv += shift;
