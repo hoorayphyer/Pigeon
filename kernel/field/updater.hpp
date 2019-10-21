@@ -2,7 +2,7 @@
 #define _FIELDUPDATER_HPP_
 
 #include "field/field.hpp"
-#include "manifold/grid.hpp"
+#include "apt/grid.hpp"
 
 namespace mpi { struct CartComm; }
 
@@ -19,7 +19,7 @@ namespace field {
 
     // apt::array< apt::pair<std::optional<int>>, DGrid > neigh_cart_ranks; // TODOL currently used in old_field_solver, and link_neighbors
     Updater( const mpi::CartComm& cart,
-             const mani::Grid<Real,DGrid>& local_grid,
+             const apt::Grid<Real,DGrid>& local_grid,
              apt::array< apt::pair<bool>, DGrid > is_at_boundary,
              int guard,
              Real (*omega_t) (Real),

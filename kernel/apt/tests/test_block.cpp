@@ -39,3 +39,24 @@ SCENARIO("Test empty blocks", "[apt]") {
     REQUIRE( 0 == n );
   }
 }
+
+SCENARIO("Test project_out", "[apt]") {
+  Index<3> b {3, 5, 7};
+  Index<3> e { 13, 17, 19};
+  {
+    auto b0 = project_out(0, b, e);
+    REQUIRE( b0.block_begin() == Index<3>{0,5,7} );
+    REQUIRE( b0.block_end() == Index<3>{1,17,19} );
+  }
+  {
+    auto b1 = project_out(1, b, e);
+    REQUIRE( b1.block_begin() == Index<3>{3,0,7} );
+    REQUIRE( b1.block_end() == Index<3>{13,1,19} );
+  }
+  {
+    auto b2 = project_out(2, b, e);
+    REQUIRE( b2.block_begin() == Index<3>{3,5,0} );
+    REQUIRE( b2.block_end() == Index<3>{13,17,1} );
+  }
+
+}

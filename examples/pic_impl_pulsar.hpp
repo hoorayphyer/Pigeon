@@ -3,13 +3,12 @@
 
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
+#include "apt/grid.hpp"
 
 #include "pic/module_range.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
-#include "pic/diffs/diff_logspherical.hpp"
-
-#include "manifold/grid.hpp"
+#include "metric/log_spherical.hpp"
 
 #include "field/field.hpp"
 #include "field/params.hpp"
@@ -27,7 +26,7 @@
 #include "pic.hpp"
 
 namespace pic {
-  using Metric = mani::LogSphericalCoordSys;
+  using Metric = metric::LogSpherical<real_t>;
 
   constexpr long double PI = std::acos(-1.0l);
 
@@ -38,13 +37,14 @@ namespace pic {
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
   inline constexpr real_t dt = 0.003;
 
-  constexpr mani::Grid<real_t,DGrid> supergrid
+  constexpr apt::Grid<real_t,DGrid> supergrid
   = {{ { 0.0, std::log(30.0), 256 }, { 0.0, PI, 256 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
+  inline constexpr int initial_timestep = 0;
   inline constexpr int total_timesteps = 10000;
 
   constexpr real_t classic_electron_radius () noexcept {
@@ -358,7 +358,7 @@ namespace field {
       virtual void operator() ( Field<R,3,DGrid>& E,
                                 Field<R,3,DGrid>& B,
                                 const Field<RJ,3,DGrid>& ,
-                                const mani::Grid<R,DGrid>& grid,
+                                const apt::Grid<R,DGrid>& grid,
                                 const mpi::CartComm&,
                                 int timestep,
                                 R dt
@@ -411,7 +411,7 @@ namespace field {
       virtual void operator() ( Field<R,3,DGrid>& E,
                                 Field<R,3,DGrid>& B,
                                 const Field<RJ,3,DGrid>&,
-                                const mani::Grid<R,DGrid>& grid,
+                                const apt::Grid<R,DGrid>& grid,
                                 const mpi::CartComm&,
                                 int timestep,
                                 R dt
@@ -472,7 +472,7 @@ namespace field {
       auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
       virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
       virtual void operator() ( Field<R,3,DGrid>& E, Field<R,3,DGrid>& B,
-                                const Field<RJ,3,DGrid>& , const mani::Grid<R,DGrid>& grid,
+                                const Field<RJ,3,DGrid>& , const apt::Grid<R,DGrid>& grid,
                                 const mpi::CartComm&, int , R) const override {
         // NOTE Guard cells values are needed when interpolating E and B
         // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
@@ -506,16 +506,16 @@ namespace field {
     }
 
     fus.emplace_back(fu_bulk.Clone());
-    fus.emplace_back(fu_axis_lo.Clone());
-    fus.emplace_back(fu_axis_hi.Clone());
-    fus.emplace_back(fu_surf.Clone());
-    fus.emplace_back(fu_surf_axis_lo.Clone());
-    fus.emplace_back(fu_surf_axis_hi.Clone());
+    // fus.emplace_back(fu_axis_lo.Clone());
+    // fus.emplace_back(fu_axis_hi.Clone());
+    // fus.emplace_back(fu_surf.Clone());
+    // fus.emplace_back(fu_surf_axis_lo.Clone());
+    // fus.emplace_back(fu_surf_axis_hi.Clone());
 
-    fus.emplace_back(fu_cond.Clone());
-    fus.emplace_back(fu_damp.Clone());
-    fus.emplace_back(fu_asym_lo.Clone());
-    fus.emplace_back(fu_asym_hi.Clone());
+    // fus.emplace_back(fu_cond.Clone());
+    // fus.emplace_back(fu_damp.Clone());
+    // fus.emplace_back(fu_asym_lo.Clone());
+    // fus.emplace_back(fu_asym_hi.Clone());
 
     return fus;
   }
@@ -529,7 +529,7 @@ namespace pic {
     struct InitialCondition : public apt::ActionBase<DGrid> {
       InitialCondition* Clone() const override { return new InitialCondition(*this); }
 
-      void operator() ( const mani::Grid<R,DGrid>& grid,
+      void operator() ( const apt::Grid<R,DGrid>& grid,
                         field::Field<R, 3, DGrid>& ,
                         field::Field<R, 3, DGrid>& B,
                         field::Field<RJ, 3, DGrid>& ,
@@ -541,7 +541,6 @@ namespace pic {
         }
       }
 
-      int initial_timestep() const noexcept { return 0; }
     } ic;
     ic[0] = { 0, supergrid[0].dim() };
     ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
@@ -567,7 +566,7 @@ namespace particle {
     Updater<DGrid,R,S,ShapeF,RJ> pu;
     {
       pu.setName("MainUpdate");
-      pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>, R>);
+      pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
     }
 
     struct Atmosphere: Action<DGrid,R,S,RJ> {
@@ -598,7 +597,7 @@ namespace particle {
                         const map<Properties>& properties,
                         const field::Field<R,3,DGrid>& E,
                         const field::Field<R,3,DGrid>& B,
-                        const mani::Grid< R, DGrid >& grid,
+                        const apt::Grid< R, DGrid >& grid,
                         const dye::Ensemble<DGrid>* ens,
                         R dt, int timestep, util::Rng<R>& rng
                          ) override {
@@ -712,7 +711,7 @@ namespace particle {
                                 const map<Properties>&,
                                 const field::Field<R,3,DGrid>&,
                                 const field::Field<R,3,DGrid>&,
-                                const mani::Grid< R, DGrid >& grid,
+                                const apt::Grid< R, DGrid >& grid,
                                 const dye::Ensemble<DGrid>* ,
                                 R, int, util::Rng<R>&
                                 ) override {
@@ -746,10 +745,10 @@ namespace particle {
       asym_hi.is_upper_axis(true);
     }
 
-    pus.emplace_back(pu.Clone());
-    pus.emplace_back(atm.Clone());
-    pus.emplace_back(asym_lo.Clone());
-    pus.emplace_back(asym_hi.Clone());
+    // pus.emplace_back(pu.Clone());
+    // pus.emplace_back(atm.Clone());
+    // pus.emplace_back(asym_lo.Clone());
+    // pus.emplace_back(asym_hi.Clone());
 
     return pus;
   }
@@ -846,7 +845,7 @@ namespace particle {
       scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
-      scat::TwoPhotonCollide<real_t,Specs>::mfp = 5.0;;
+      scat::TwoPhotonCollide<real_t,Specs>::mfp = 5.0;
       photon_scat.channels.push_back( scat::TwoPhotonCollide<real_t,Specs>::test );
 
       photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
@@ -872,7 +871,7 @@ namespace io {
 
   template < int F, typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> field_self ( apt::Index<DGrid> I,
-                               const mani::Grid<R,DGrid>& grid,
+                               const apt::Grid<R,DGrid>& grid,
                                const field::Field<R, 3, DGrid>& E,
                                const field::Field<R, 3, DGrid>& B,
                                const field::Field<RJ, 3, DGrid>& J ) {
@@ -890,8 +889,8 @@ namespace io {
   }
 
   template < typename RDS, int DGrid >
-  void divide_flux_by_area ( field::Field<RDS,3,DGrid>& fds, const mani::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& ) {
-    using pic::Metric;
+  void divide_flux_by_area ( field::Field<RDS,3,DGrid>& fds, const apt::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& ) {
+    using Metric = metric::LogSpherical<RDS>;
     // define a function pointer.
     RDS(*hh_func)(RDS,RDS,RDS) = nullptr;
     apt::array<RDS,3> q {};
@@ -899,9 +898,9 @@ namespace io {
     for ( int comp = 0; comp < num_comps; ++comp ) {
       const auto& ofs = fds[comp].offset();
       switch(comp) {
-      case 0: hh_func = Metric::template hh<0,RDS>; break;
-      case 1: hh_func = Metric::template hh<1,RDS>; break;
-      case 2: hh_func = Metric::template hh<2,RDS>; break;
+      case 0: hh_func = Metric::template hh<0>; break;
+      case 1: hh_func = Metric::template hh<1>; break;
+      case 2: hh_func = Metric::template hh<2>; break;
       }
 
       for ( const auto& I : apt::Block(apt::range::begin(fds.mesh().range()), apt::range::end(fds.mesh().range())) ) {
@@ -917,7 +916,7 @@ namespace io {
 
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> EparaB ( apt::Index<DGrid> I,
-                              const mani::Grid<R,DGrid>& grid,
+                              const apt::Grid<R,DGrid>& grid,
                               const field::Field<R, 3, DGrid>& E,
                               const field::Field<R, 3, DGrid>& B,
                               const field::Field<RJ, 3, DGrid>& J ) {
@@ -929,7 +928,7 @@ namespace io {
 
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> EdotJ ( apt::Index<DGrid> I,
-                             const mani::Grid<R,DGrid>& grid,
+                             const apt::Grid<R,DGrid>& grid,
                              const field::Field<R, 3, DGrid>& E,
                              const field::Field<R, 3, DGrid>& B,
                              const field::Field<RJ, 3, DGrid>& J ) {
@@ -941,7 +940,7 @@ namespace io {
   // Poloidal flux function, LogSpherical
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> dFlux_pol ( apt::Index<DGrid> I,
-                                 const mani::Grid<R,DGrid>& grid,
+                                 const apt::Grid<R,DGrid>& grid,
                                  const field::Field<R, 3, DGrid>& E,
                                  const field::Field<R, 3, DGrid>& B,
                                  const field::Field<RJ, 3, DGrid>& J ) {
@@ -951,7 +950,7 @@ namespace io {
   }
 
   template < typename RDS, int DGrid >
-  void integrate_dFlux ( field::Field<RDS,3,DGrid>& fds, const mani::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& cart ) {
+  void integrate_dFlux ( field::Field<RDS,3,DGrid>& fds, const apt::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& cart ) {
     // Flux_t - Flux_{t-1} = dFlux_t, can be in-placed
     // integrate in theta direction
     assert(num_comps == 1);
@@ -969,7 +968,7 @@ namespace io {
       apt::Longidx n (1,-1);
       dFlux(trI + n) = 0.0;
       for ( ++n; n < ext[1]; ++n ) {
-        dFlux(trI + n) += dFlux(trI + (n-1)); // POLEDANCE check n - 1
+        dFlux(trI + n) += dFlux(trI + (n-1));
       }
       n = ext[1] - 1;
       buf.push_back(dFlux(trI + n));
@@ -1045,7 +1044,7 @@ namespace io {
   }
 
   template < int DGrid, typename RDS, template < typename > class S >
-  void fold_back_at_axis ( field::Field<RDS,3,DGrid>& field, const mani::Grid<RDS,DGrid>& grid, int num_comps ) {
+  void fold_back_at_axis ( field::Field<RDS,3,DGrid>& field, const apt::Grid<RDS,DGrid>& grid, int num_comps ) {
     // NOTE field is assumed to have all-MIDWAY offset
     for ( int i = 0; i < num_comps; ++i ) {
       for ( int dim = 0; dim < DGrid; ++dim )

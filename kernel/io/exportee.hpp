@@ -11,8 +11,8 @@ namespace io {
     virtual std::tuple< std::string, int, field::Field<RDS,3,DGrid> >
     action ( const int ds_ratio,
              const std::optional<mpi::CartComm>& cart_opt, // in case some global operation is needed
-             const mani::Grid<R,DGrid>& grid, // local grid
-             const mani::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
+             const apt::Grid<R,DGrid>& grid, // local grid
+             const apt::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
              const int guard_ds,
              const field::Field<R, 3, DGrid>& E,
              const field::Field<R, 3, DGrid>& B,
@@ -28,8 +28,8 @@ namespace io {
   struct PtcExportee {
     virtual std::tuple< std::string, int, field::Field<RDS,3,DGrid> >
     action ( const int ds_ratio,
-             const mani::Grid<R,DGrid>& grid, // local grid
-             const mani::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
+             const apt::Grid<R,DGrid>& grid, // local grid
+             const apt::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
              const int guard_ds,
              particle::species sp,
              const particle::array<R,S>& ptcs

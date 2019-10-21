@@ -1,22 +1,7 @@
 #include "testfw/testfw.hpp"
-#include "manifold/curvilinear_impl.hpp"
+#include "metric/log_spherical/geodesic.hpp"
 
 using namespace apt;
-
-// SCENARIO("Cartesian", "[metric]") {
-//   using Coord = mani::coord<mani::coordsys::Cartesian>;
-//   util::Rng<double> rng;
-//   rng.set_seed(std::time(0));
-
-//   Vec<double,3> x_old( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
-//   auto x = x_old;
-//   Vec<double,3> v( rng.uniform(-10,10), rng.uniform(-10,10), rng.uniform(-10,10) );
-//   double dt = rng.uniform();
-
-//   Coord::geodesic_move( x, v, dt );
-//   for ( int i = 0; i < 3; ++i )
-//     REQUIRE( x[i] == Approx( v[i] * dt + x_old[i] ));
-// }
 
 #include "old_caldisp.h"
 
@@ -30,7 +15,6 @@ auto PV = []( auto phi ) {
           };
 
 SCENARIO("LogSpherical special cases", "[metric]") {
-  using Coord = mani::LogSphericalCoordSys;
   aio::unif_real<double> unif;
 
   WHEN("velocity is radial") {
@@ -43,7 +27,7 @@ SCENARIO("LogSpherical special cases", "[metric]") {
       auto p = p_old;
       bool is_massive = unif() > 0.5;
 
-      Coord::geodesic_move( x, p, dt, is_massive );
+      metric::LogSpherical::geodesic_move( x, p, dt, is_massive );
 
       CAPTURE( N, dt, x_old, p_old, x, p, is_massive );
 
@@ -141,7 +125,6 @@ SCENARIO("LogSpherical special cases", "[metric]") {
 }
 
 SCENARIO("LogSpherical, test against with old geodesic mover, which presumably is correct", "[metric]") {
-  using Coord = mani::LogSphericalCoordSys;
   aio::unif_real<double> unif;
 
   int N = 1000000;
@@ -160,7 +143,7 @@ SCENARIO("LogSpherical, test against with old geodesic mover, which presumably i
     auto det = ( std::exp( x2[0] ) + v2[0] * dt ) * std::sin(x2[1]) + v2[1] * dt * std::cos(x2[1] );
 
     // --- run ----
-    auto dx = Coord::geodesic_move( x1, p1, dt, is_massive );
+    auto dx = metric::LogSpherical::geodesic_move( x1, p1, dt, is_massive );
     OLD_geodesic_move( x2, v2, dt );
 
     // --- test ---

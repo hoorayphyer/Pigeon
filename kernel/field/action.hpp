@@ -3,7 +3,7 @@
 
 #include "apt/action_base.hpp"
 #include "field/field.hpp"
-#include "manifold/grid.hpp"
+#include "apt/grid.hpp"
 
 namespace mpi { struct CartComm; }
 
@@ -25,7 +25,7 @@ namespace field {
     virtual void operator() ( Field<Real,3,DGrid>& E,
                               Field<Real,3,DGrid>& B,
                               const Field<RealJ,3,DGrid>& Jmesh,
-                              const mani::Grid<Real,DGrid>& grid,
+                              const apt::Grid<Real,DGrid>& grid,
                               const mpi::CartComm& cart,
                               int timestep,
                               Real dt

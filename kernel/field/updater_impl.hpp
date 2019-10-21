@@ -122,7 +122,7 @@ namespace field {
 
   template < typename Real, int DGrid, typename RealJ >
   Updater<Real, DGrid, RealJ>::Updater( const mpi::CartComm& cart,
-                                        const mani::Grid<Real,DGrid>& local_grid,
+                                        const apt::Grid<Real,DGrid>& local_grid,
                                         apt::array< apt::pair<bool>, DGrid > is_at_boundary,
                                         int guard,
                                         Real (*omega_t) (Real),

@@ -46,8 +46,8 @@ namespace apt {
   template < int D >
   struct Block {
   private:
-    Index<D> _begin{};
-    Index<D> _end{};
+    const Index<D> _begin{};
+    const Index<D> _end{};
     Index<D> _ijk{};
 
   public:
@@ -55,8 +55,13 @@ namespace apt {
     constexpr Block( apt::Index<D> begin, apt::Index<D> end ) noexcept
       : _begin(std::move(begin)), _end(std::move(end)), _ijk(_begin) {}
 
+    constexpr Index<D> block_begin() const noexcept { return _begin; }
+    constexpr Index<D> block_end() const noexcept { return _end; }
+
+    // For range for
     constexpr Block begin() const noexcept { return {_begin,_end};}
 
+    // For range for
     constexpr end_type end() const noexcept {
       // deal with empty or invalid block
       for ( int i = 0; i < D; ++i ) {

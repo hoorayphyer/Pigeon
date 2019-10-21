@@ -2,7 +2,7 @@
 #define _IO_DATA_EXPORT_HPP_
 
 #include <string>
-#include "manifold/grid.hpp"
+#include "apt/grid.hpp"
 
 #include "field/field.hpp"
 
@@ -33,7 +33,7 @@ namespace io {
   void export_data( std::string prefix, int timestep, R dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
-                    const mani::Grid<R,DGrid>& grid, // local grid
+                    const apt::Grid<R,DGrid>& grid, // local grid
                     const field::Field<R, 3, DGrid>& Efield,
                     const field::Field<R, 3, DGrid>& Bfield,
                     const field::Field<RJ, 3, DGrid>& Jfield,// J is Jmesh on a replica

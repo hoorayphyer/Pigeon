@@ -22,11 +22,11 @@ namespace io {
   struct FexpTbyFunction : public FieldExportee<RealDS, DGrid, Real, RealJ> {
     // NOTE we use Real here so RealJ may be downcast. But it is fine since RealJ is mainly to avoid losing precision in current deposition. Here Real is sufficient.
     using F = apt::array<Real,3> (*) ( apt::Index<DGrid> I,
-                                       const mani::Grid<Real,DGrid>& grid,
+                                       const apt::Grid<Real,DGrid>& grid,
                                        const field::Field<Real, 3, DGrid>& E,
                                        const field::Field<Real, 3, DGrid>& B,
                                        const field::Field<RealJ, 3, DGrid>& J);
-    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
+    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
 
     FexpTbyFunction( std::string a, int b, F c, H d )
       : varname(a), num_comps(b), impl(c), post_hook(d) {}
@@ -39,8 +39,8 @@ namespace io {
     virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
     action( const int ds_ratio,
             const std::optional<mpi::CartComm>& cart_opt,
-            const mani::Grid<Real,DGrid>& grid, // local grid
-            const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
+            const apt::Grid<Real,DGrid>& grid, // local grid
+            const apt::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
             const int guard_ds,
             const field::Field<Real, 3, DGrid>& E,
             const field::Field<Real, 3, DGrid>& B,
@@ -49,7 +49,7 @@ namespace io {
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
-      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, mani::dims(grid_ds), guard_ds ) };
+      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, apt::dims(grid_ds), guard_ds ) };
       for ( int i = 0; i < num_comps; ++i ) {
         for ( int dim = 0; dim < DGrid; ++dim )
           fds.set_offset( i, dim, MIDWAY );
@@ -94,7 +94,7 @@ namespace io {
              >
   struct PexpTbyFunction : public PtcExportee < RealDS, DGrid, Real, S > {
     using F = apt::array<Real,3> (*) ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc);
-    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const mani::Grid<RealDS,DGrid>& grid_ds, int num_comps );
+    using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps );
 
     PexpTbyFunction( std::string a, int b, F c, H d )
       : varname(a), num_comps(b), impl(c), post_hook(d) {}
@@ -106,8 +106,8 @@ namespace io {
 
     virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
     action( const int ds_ratio,
-            const mani::Grid<Real,DGrid>& grid, // local grid
-            const mani::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
+            const apt::Grid<Real,DGrid>& grid, // local grid
+            const apt::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
             const int guard_ds,
             particle::species sp,
             const particle::array<Real,S>& ptcs
@@ -117,7 +117,7 @@ namespace io {
 
       ShapeF sf;
 
-      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, mani::dims(grid_ds), guard_ds ) };
+      field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, apt::dims(grid_ds), guard_ds ) };
       for ( int i = 0; i < num_comps; ++i ) {
         for ( int dim = 0; dim < DGrid; ++dim )
           fds.set_offset( i, dim, MIDWAY );

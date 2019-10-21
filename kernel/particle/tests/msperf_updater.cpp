@@ -1,5 +1,5 @@
 #include "testfw/testfw.hpp"
-#include "manifold/curvilinear.hpp"
+#include "metric/log_spherical.hpp"
 #include "particle/shapef.hpp"
 #include "particle/array_impl.hpp"
 #include "particle/forces_impl.hpp"
@@ -28,7 +28,7 @@ SCENARIO("Time particle updater", "[particle]") {
   constexpr int DGrid = 2;
   using Real = double;
   using Real_J = double;
-  using Metric = mani::LogSphericalCoordSys;
+  using Metric = metric::LogSpherical<Real>;
   using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
 
   properties.insert(species::electron, {1,-1,"electron"});
@@ -68,7 +68,7 @@ SCENARIO("Time particle updater", "[particle]") {
   // NOTE minimum number of guards of J on one side is ( supp + 1 ) / 2 + 1
   constexpr int guard = ( ShapeF::support() + 3 ) / 2;
   constexpr apt::array<apt::Range,DGrid> range {{ {0,128,guard}, {0,128,guard} }};
-  constexpr mani::Grid<Real,DGrid> grid
+  constexpr apt::Grid<Real,DGrid> grid
     = {{ { 0.0, 1.0, range[0].size() }, { 0.0, 1.0, range[1].size() } }};
 
   PU_t pu;

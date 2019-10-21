@@ -5,13 +5,9 @@
 #include "apt/index.hpp"
 
 #include "pic/module_range.hpp"
-#include "pic/diffs/diff_cartesian.hpp"
-#include "manifold/curvilinear_impl.hpp"
-
-#include "manifold/grid.hpp"
+#include "metric/cartesian.hpp"
 
 #include "field/field.hpp"
-#include "field/params.hpp"
 #include "field/haugbolle_solver/updater.hpp"
 
 #include "particle/properties.hpp"
@@ -21,28 +17,31 @@
 
 #include "dye/ensemble.hpp"
 
+#include "io/exportee_by_function.hpp"
+
 #include "pic.hpp"
 
 namespace pic {
-  using Metric = mani::CartesianCoordSys;
+  using Metric = metric::Cartesian<real_t>;
 
-  inline constexpr const char* project_name = "Cartesian256";
-  inline constexpr const char* datadir_prefix = "/home/hooray/Projects/Pigeon/Data/";
+  inline constexpr const char* project_name = "NameNotSpecified";
+  inline constexpr const char* datadir_prefix = "../Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {true,true};
   inline constexpr real_t dt = 0.003;
 
-  constexpr mani::Grid<real_t,DGrid> supergrid
+  constexpr apt::Grid<real_t,DGrid> supergrid
   = {{ { 0.0, 1.0, 256 }, { 0.0, 1.0, 256 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
-  inline constexpr int total_timesteps = 1000;
+  inline constexpr int initial_timestep = 0;
+  inline constexpr int total_timesteps = 10000;
 
-  constexpr real_t classic_electron_radius () noexcept {
+  constexpr real_t r_e () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
     apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
     return res;
@@ -52,7 +51,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { false, 0, 100 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -77,24 +76,27 @@ namespace pic {
 
 namespace field {
   using pic::real_t;
-  constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
-  constexpr int order_derivative = 2; // order of derivative of update before field communication is necessary
-  static_assert( order_precision % 2 == 0 );
-  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
 
-  constexpr int myguard = std::max(order_derivative * order_precision / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+  constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
+  constexpr int number_iteration = 4; // number of iterations in inverting the operator in Haugbolle
+  static_assert( order_precision % 2 == 0 );
+  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::r_e() / pic::w_gyro_unitB;
+
+  constexpr int myguard = std::max(order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   template < int DGrid, typename R, typename RJ >
   auto set_up_field_actions() {
     std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
+    namespace range = apt::range;
 
     Haugbolle<R,DGrid,RJ> fu_bulk;
     {
       auto& fu = fu_bulk;
-      fu.setIb( { 0, 0 } );
-      fu.setIe({ pic::supergrid[0].dim(), pic::supergrid[1].dim() });
-      fu.setGuard ({ myguard, myguard, myguard, myguard });
+      fu.setName("Bulk");
+      fu[0] = { 0, pic::supergrid[0].dim(), myguard };
+      fu[1] = { 0, pic::supergrid[1].dim(), myguard };
       fu.set_preJ(PREJ);
+      fu.set_number_iteration(number_iteration);
 
       for ( int i = 0; i < 3; ++i ) { // i is coordinate
         for ( int j = 0; j < 3; ++j ) { // j is Fcomp
@@ -109,6 +111,7 @@ namespace field {
     }
 
     fus.emplace_back(fu_bulk.Clone());
+
     return fus;
   }
 
@@ -117,21 +120,23 @@ namespace field {
 namespace pic {
   template < int DGrid, typename R, typename RJ, template < typename > class S >
   auto set_up_initial_conditions() {
+    // local class in a function
     struct InitialCondition : public apt::ActionBase<DGrid> {
       InitialCondition* Clone() const override { return new InitialCondition(*this); }
 
-      void operator() ( const mani::Grid<R,DGrid>& grid,
-                        field::Field<R, 3, DGrid>& E,
+      void operator() ( const apt::Grid<R,DGrid>& grid,
+                        field::Field<R, 3, DGrid>& ,
                         field::Field<R, 3, DGrid>& B,
-                        field::Field<RJ, 3, DGrid>& J,
-                        particle::map<particle::array<R,S>>& particles
+                        field::Field<RJ, 3, DGrid>& ,
+                        particle::map<particle::array<R,S>>&
                         ) const {
+        for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
+          // TODO implement your own conditions
+        }
       }
-
-      int initial_timestep() const noexcept { return 0; }
     } ic;
-    ic.setIb({0,0});
-    ic.setIe({supergrid[0].dim(), supergrid[1].dim()+1});
+    ic[0] = { 0, supergrid[0].dim() };
+    ic[1] = { 0, supergrid[1].dim() }; // NOTE +1 to include upper boundary
 
     return ic;
   }
@@ -141,21 +146,27 @@ namespace particle {
   template < int DGrid, typename R, template < typename > class S,
              typename ShapeF, typename RJ >
   auto set_up_particle_actions() {
+    namespace range = apt::range;
     std::vector<std::unique_ptr<Action<DGrid,R,S,RJ>>> pus;
 
     Updater<DGrid,R,S,ShapeF,RJ> pu;
-    pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>, R>);
+    {
+      pu.setName("MainUpdate");
+      pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
+    }
 
     pus.emplace_back(pu.Clone());
+
     return pus;
   }
 }
 
 namespace particle {
+  // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
   template < typename R = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
   void set_up_properties() {
     properties.insert(species::electron, {1,-1,"electron","el"});
-    properties.insert(species::positron, {1,1,"positron","po"});
+    properties.insert(species::ion, { 5, 1, "ion","io"});
   }
 
   // NOTE called in particle updater
@@ -174,8 +185,8 @@ namespace particle {
 
         force.Register(sp);
       }
-      if ( properties.has(species::positron) ) {
-        auto sp = species::positron;
+      if ( properties.has(species::ion) ) {
+        auto sp = species::ion;
         Force<real_t,Specs> force;
         const auto& prop = properties[sp];
 
@@ -184,7 +195,6 @@ namespace particle {
         force.Register(sp);
       }
     }
-
   }
 
 }
@@ -204,7 +214,7 @@ namespace io {
 
   template < int F, typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> field_self ( apt::Index<DGrid> I,
-                               const mani::Grid<R,DGrid>& grid,
+                               const apt::Grid<R,DGrid>& grid,
                                const field::Field<R, 3, DGrid>& E,
                                const field::Field<R, 3, DGrid>& B,
                                const field::Field<RJ, 3, DGrid>& J ) {
@@ -221,15 +231,25 @@ namespace io {
     }
   }
 
-  template < typename RDS, typename ShapeF, int DGrid, typename R, typename RJ>
+  template < typename RDS, int DGrid, typename R, typename RJ>
   auto set_up_field_export() {
-    std::vector<FieldExportee<RDS, DGrid, R, ShapeF, RJ>*> fexps;
+    std::vector<FieldExportee<RDS, DGrid, R, RJ>*> fexps;
     {
-      using FA = FieldAction<RDS,DGrid,R,ShapeF,RJ>;
+      using FA = FexpTbyFunction<RDS,DGrid,R,RJ>;
+      using pic::ShapeF;
 
-      fexps.push_back( new FA ( "E", 3, field_self<0,R, DGrid, ShapeF, RJ>, nullptr) );
-      fexps.push_back( new FA ( "B", 3, field_self<1,R, DGrid, ShapeF, RJ>, nullptr) );
-      fexps.push_back( new FA ( "J4X", 3, field_self<2,R, DGrid, ShapeF, RJ>, nullptr) );
+      fexps.push_back( new FA ( "E", 3,
+                                field_self<0,R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "B", 3,
+                                field_self<1,R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "J4X", 3,
+                                field_self<2,R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
     }
     return fexps;
   }
@@ -252,18 +272,26 @@ namespace io {
     return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
   }
 
-  template < typename RDS,
-             typename ShapeF,
-             int DGrid,
-             typename R,
-             template < typename > class S>
+  template < typename RDS, int DGrid, typename R, template < typename > class S >
   auto set_up_particle_export() {
-    std::vector<PtcExportee<RDS, DGrid, R, S, ShapeF>*> pexps;
+    constexpr int DSratio = 1;
+    std::vector<PtcExportee<RDS, DGrid, R, S>*> pexps;
     {
-      using PA = PtcAction<RDS,DGrid,R,S,ShapeF>;
-      pexps.push_back( new PA ("Num", 1, ptc_num<R,S>, nullptr) );
-      pexps.push_back( new PA ("E", 1, ptc_energy<R,S>, nullptr ) );
-      pexps.push_back( new PA ("P", 3, ptc_momentum<R,S>, nullptr ) );
+      using PA = PexpTbyFunction<RDS,DGrid,R,S,particle::induced_shapef_t<pic::ShapeF,DSratio>>;
+      pexps.push_back( new PA ("Num", 1,
+                               ptc_num<R,S>,
+                               nullptr
+                               ) );
+
+      pexps.push_back( new PA ("E", 1,
+                               ptc_energy<R,S>,
+                               nullptr
+                               ) );
+
+      pexps.push_back( new PA ("P", 3,
+                               ptc_momentum<R,S>,
+                               nullptr
+                               ) );
     }
 
     return pexps;
@@ -271,13 +299,14 @@ namespace io {
 }
 
 namespace io {
-  constexpr bool is_collinear_mesh = true; // TODO this is an ad hoc fix
+  constexpr bool is_collinear_mesh = true;
 }
 
 #include <sstream>
 #include "apt/print.hpp"
 
 namespace pic {
+
   std::string characteristics(std::string indent) {
     std::ostringstream o;
     return o.str();

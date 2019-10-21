@@ -6,10 +6,10 @@
 
 namespace io {
   template < typename Tcoarse, int DGrid, typename Tfine >
-  mani::Grid<Tcoarse,DGrid> coarsen(const mani::Grid<Tfine,DGrid>& grid, int downsample_ratio) {
-    mani::Grid<Tcoarse,DGrid> res;
+  apt::Grid<Tcoarse,DGrid> coarsen(const apt::Grid<Tfine,DGrid>& grid, int downsample_ratio) {
+    apt::Grid<Tcoarse,DGrid> res;
     for ( int i = 0; i < DGrid; ++i ) {
-      res[i] = mani::Grid1D<Tcoarse>( grid[i].lower(), grid[i].upper(), grid[i].dim() / downsample_ratio );
+      res[i] = apt::Grid1D<Tcoarse>( grid[i].lower(), grid[i].upper(), grid[i].dim() / downsample_ratio );
     }
     return res;
   }
@@ -21,7 +21,7 @@ namespace io {
              typename RealJ >
   void DataExporter<RealDS, DGrid, Real, S, RealJ>::
   execute( const DataSaver& saver,
-           const mani::Grid<Real,DGrid>& grid,
+           const apt::Grid<Real,DGrid>& grid,
            const field::Field<Real, 3, DGrid>& E,
            const field::Field<Real, 3, DGrid>& B,
            const field::Field<RealJ, 3, DGrid>& J,
@@ -33,7 +33,7 @@ namespace io {
 
     std::string varname;
     int dim = 1; // dim of fields
-    field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, mani::dims(grid_ds), _guard) );
+    field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, apt::dims(grid_ds), _guard) );
 
     auto smart_save =
       [&saver]( const std::string name, const int field_dim, const auto& fds ) {

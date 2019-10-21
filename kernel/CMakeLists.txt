@@ -67,8 +67,6 @@ add_subdirectory(mpipp)
 add_subdirectory(silopp)
 add_subdirectory(random)
 
-add_subdirectory(manifold)
-
 add_subdirectory(field)
 add_subdirectory(msh)
 add_subdirectory(particle)

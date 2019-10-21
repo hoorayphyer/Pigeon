@@ -1,8 +1,6 @@
 #ifndef  _PIC_SIMULATOR_HPP_
 #define  _PIC_SIMULATOR_HPP_
 
-#include "manifold/grid.hpp"
-
 #include "particle/updater.hpp"
 #include "field/sync.hpp"
 #include "field/yee.hpp"
@@ -39,11 +37,11 @@ namespace pic {
              typename RJ >
   struct Simulator {
   private:
-    const mani::Grid< R, DGrid >& _supergrid;
+    const apt::Grid< R, DGrid >& _supergrid;
     std::optional<mpi::CartComm> _cart_opt;
     util::Rng<R> _rng;
 
-    mani::Grid< R, DGrid > _grid;
+    apt::Grid< R, DGrid > _grid;
     std::optional<dye::Ensemble<DGrid>> _ens_opt;
     apt::array< apt::pair<R>, DGrid > _borders;
 
@@ -64,8 +62,8 @@ namespace pic {
       // NOTE range is assumed to be noempty [,)
       auto f =
         [] ( int Ib_global, int Ie_global,
-             const mani::Grid1D<R>& supergrid,
-             const mani::Grid1D<R>& localgrid,
+             const apt::Grid1D<R>& supergrid,
+             const apt::Grid1D<R>& localgrid,
              bool is_periodic
              ) noexcept -> apt::pair<int>
         {
@@ -236,7 +234,7 @@ namespace pic {
     }
 
   public:
-    Simulator( const mani::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt )
+    Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt )
       : _supergrid(supergrid), _cart_opt(cart_opt) {
       _grid = supergrid;
       if ( pic::dlb_init_replica_deploy ) {
@@ -294,7 +292,7 @@ namespace pic {
     }
 
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
-      int init_ts = 0;
+      int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
         init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, particle::N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
@@ -305,7 +303,6 @@ namespace pic {
           auto ic = pic::set_up_initial_conditions<DGrid,R,RJ,S>();
           taylor(ic);
           ic(_grid, _E, _B, _J, _particles);
-          init_ts = ic.initial_timestep();
           field::copy_sync_guard_cells(_E, *_cart_opt);
           field::copy_sync_guard_cells(_B, *_cart_opt);
           field::copy_sync_guard_cells(_J, *_cart_opt);

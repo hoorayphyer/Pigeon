@@ -18,7 +18,7 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
   CAPTURE(Cartesian_Partition);
 
   constexpr apt::Index<DGrid> bulk_dims = {128,128};
-  constexpr mani::Grid<Real,DGrid> supergrid
+  constexpr apt::Grid<Real,DGrid> supergrid
     = {{ { 0.0, 1.0, bulk_dims[0] }, { 0.0, 1.0, bulk_dims[1] } }};
 
   auto cart_opt = aio::make_cart( Cartesian_Partition, mpi::world );
@@ -32,7 +32,7 @@ TEMPLATE_TEST_CASE("Time field updater 2D", "[mpi]"
       }
     }
 
-    mani::Grid<Real,DGrid> grid; // local grid
+    apt::Grid<Real,DGrid> grid; // local grid
     for ( int i = 0; i < DGrid; ++i )
       grid[i] = supergrid[i].divide( std::abs(Cartesian_Partition[i]), coords[i] );
 

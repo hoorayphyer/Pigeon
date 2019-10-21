@@ -1,8 +1,7 @@
-#ifndef  _MANIFOLD_GRID_HPP_
-#define  _MANIFOLD_GRID_HPP_
+#ifndef  _APT_GRID_HPP_
+#define  _APT_GRID_HPP_
 
 #include "apt/array.hpp"
-#include "apt/index.hpp"
 
 // NOTE convention: the zero of all indices exposed to users start at the first cell in BULK. In other words, guard cells have indices outside [0, dim_of_bulk). Guard is important only when converting from vectorial to linear index, which can be encapsulated in a dedicated function
 
@@ -58,7 +57,7 @@
 //   };
 // }
 
-namespace mani {
+namespace apt {
   template < typename T >
   struct Grid1D {
   private:
@@ -100,13 +99,13 @@ namespace mani {
 
 }
 
-namespace mani {
+namespace apt {
   template < typename T, int DGrid >
-  using Grid = apt::array< Grid1D<T>, DGrid >;
+  using Grid = array< Grid1D<T>, DGrid >;
 
   template < typename T, int DGrid >
-  constexpr apt::Index<DGrid> dims(const Grid<T,DGrid>& grid) noexcept {
-    apt::Index<DGrid> ext;
+  constexpr array<int,DGrid> dims(const Grid<T,DGrid>& grid) noexcept {
+    array<int,DGrid> ext;
     for ( int i = 0; i < DGrid; ++i )
       ext[i] = grid[i].dim();
     return ext;

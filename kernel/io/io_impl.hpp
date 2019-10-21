@@ -86,7 +86,7 @@ namespace io {
   void export_data( std::string prefix, int timestep, Real dt, int num_files, int downsample_ratio,
                     const std::optional<mpi::CartComm>& cart_opt,
                     const dye::Ensemble<DGrid>& ens,
-                    const mani::Grid<Real,DGrid>& grid, // local grid
+                    const apt::Grid<Real,DGrid>& grid, // local grid
                     const field::Field<Real, 3, DGrid>& E,
                     const field::Field<Real, 3, DGrid>& B,
                     const field::Field<RealJ, 3, DGrid>& J,// J is Jmesh on a replica

@@ -6,7 +6,7 @@
 #include "particle/array.hpp"
 #include "particle/properties.hpp"
 #include "random/rng.hpp"
-#include "manifold/grid.hpp"
+#include "apt/grid.hpp"
 
 
 namespace field {
@@ -29,7 +29,7 @@ namespace particle {
                               const map<Properties>& properties,
                               const field::Field<R,3,DGrid>& E,
                               const field::Field<R,3,DGrid>& B,
-                              const mani::Grid< R, DGrid >& grid,
+                              const apt::Grid< R, DGrid >& grid,
                               const dye::Ensemble<DGrid>* ens,
                               R dt, int timestep, util::Rng<R>& rng
                               );

@@ -12,7 +12,7 @@ namespace field {
     static_assert( DGrid > 1 && DGrid < 4 );
 
   public:
-    const mani::Grid<T,DGrid>& g; // grid
+    const apt::Grid<T,DGrid>& g; // grid
     const apt::array<int,DGrid+1>& s; // stride
     apt::array<apt::array<apt::array<Deriv_t<T,DGrid>,3>,3>,2> D{}; // derivatives D[Ftype][Fcomp][coordinate]
     apt::array<apt::array<HH_t<T>,3>,2> hh;
@@ -56,7 +56,7 @@ namespace field {
   :: operator() ( Field<R,3,DGrid>& E,
                   Field<R,3,DGrid>& B,
                   const Field<RJ,3,DGrid>& J,
-                  const mani::Grid<R,DGrid>& grid,
+                  const apt::Grid<R,DGrid>& grid,
                   const mpi::CartComm& comm,
                   int timestep,
                   R dt
@@ -154,7 +154,7 @@ namespace field {
   :: operator() ( Field<R,3,DGrid>& E,
                   Field<R,3,DGrid>& B,
                   const Field<RJ,3,DGrid>& J,
-                  const mani::Grid<R,DGrid>& grid,
+                  const apt::Grid<R,DGrid>& grid,
                   const mpi::CartComm& comm,
                   int timestep,
                   R dt

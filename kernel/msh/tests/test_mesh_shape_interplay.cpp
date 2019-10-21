@@ -1,6 +1,5 @@
 #include "testfw/testfw.hpp"
 #include "msh/mesh_shape_interplay_impl.hpp"
-#include "manifold/grid.hpp"
 #include "particle/shapef.hpp"
 
 using namespace field;

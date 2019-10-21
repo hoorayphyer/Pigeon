@@ -5,7 +5,7 @@
 
 namespace field {
   template < typename R, int DGrid >
-  using Deriv_t = R(*)(const R& , R, R, const mani::Grid<R,DGrid>&, const apt::Index<DGrid+1>&);
+  using Deriv_t = R(*)(const R& , R, R, const apt::Grid<R,DGrid>&, const apt::Index<DGrid+1>&);
 
   template < typename T >
   using HH_t = T(*)(T,T,T);
@@ -51,7 +51,7 @@ namespace field {
     virtual void operator() ( Field<R,3,DGrid>& E,
                               Field<R,3,DGrid>& B,
                               const Field<RJ,3,DGrid>& Jmesh,
-                              const mani::Grid<R,DGrid>& grid,
+                              const apt::Grid<R,DGrid>& grid,
                               const mpi::CartComm& cart,
                               int timestep,
                               R dt
@@ -138,7 +138,7 @@ namespace field {
     virtual void operator() ( Field<R,3,DGrid>& E,
                               Field<R,3,DGrid>& B,
                               const Field<RJ,3,DGrid>& Jmesh,
-                              const mani::Grid<R,DGrid>& grid,
+                              const apt::Grid<R,DGrid>& grid,
                               const mpi::CartComm& cart,
                               int timestep,
                               R dt

@@ -22,7 +22,7 @@ namespace io {
 
     void execute( const DataSaver& saver,
 
-                  const mani::Grid<R,DGrid>& grid,
+                  const apt::Grid<R,DGrid>& grid,
                   const field::Field<R, 3, DGrid>& E,
                   const field::Field<R, 3, DGrid>& B,
                   const field::Field<RJ, 3, DGrid>& J,// J is Jmesh on a replica

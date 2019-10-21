@@ -1,6 +1,5 @@
 #include "particle/updater.hpp"
 #include "msh/mesh_shape_interplay.hpp"
-#include "manifold/grid.hpp"
 
 #ifdef PIC_DEBUG
 #include "debug/debugger.hpp"
@@ -27,7 +26,7 @@ namespace particle {
                  const map<Properties>& properties,
                  const field::Field<R,3,DGrid>& E,
                  const field::Field<R,3,DGrid>& B,
-                 const mani::Grid< R, DGrid >& grid,
+                 const apt::Grid< R, DGrid >& grid,
                  const dye::Ensemble<DGrid>* ,
                  R dt, int timestep, util::Rng<R>& rng
                  ) {
