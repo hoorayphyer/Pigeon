@@ -110,7 +110,7 @@ FiniteDiff::Derivative(const MultiArray<Scalar>& input, MultiArray<Scalar>& outp
   // Determine the thickness of boundary layer
   // When stagger[dir] = 1 and at least one end assumes zero,
   // it still needs special treatment.
-  // FIXME: maintain bndry_layers separately for lower and upper?
+  // TODOL: maintain bndry_layers separately for lower and upper?
   int bndy_layer = 0;
   if (_order == 2) bndy_layer = 1 - stagger[dir];
 //          * static_cast<int>( !( mod.assume_zero[0] ) && !( mod.assume_zero[1] ) );
@@ -207,7 +207,7 @@ FiniteDiff::Derivative(const MultiArray<Scalar>& input, MultiArray<Scalar>& outp
           // Fill the buffer array with values first
           for (int n = 0; n < block_size + 2 * _grid.guard[dir]; n++ ) {
             // if (i - _grid.g)
-            // FIXME: _order / 2 is a good indicator?
+            // TODOL: _order / 2 is a good indicator?
             if (i - _order/2 + n > _grid.dims[dir] - 1) continue;
             // printf ("Exceeding limit: i is %d, n is %d!\n", i, n);
             int idx = std::min(i - _order/2 + n, _grid.dims[dir] - 1) * DirIncrement(dir, _grid.extent()) + transIdx;

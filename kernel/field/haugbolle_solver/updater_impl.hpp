@@ -3,7 +3,7 @@
 
 #include "field/yee.hpp"
 #include "field/haugbolle_solver/updater.hpp"
-#include "field/sync.hpp"
+#include "field/sync.hpp" // FIXME not in use right now
 
 namespace field {
   template < int DGrid, typename T >
@@ -31,7 +31,7 @@ namespace field {
       auto absc_hh
         = [&idx,&g=this->g]( int dir, int f_comp ) noexcept {
             // needs f's anti-offset, which is !Ftype when dim == f_comp
-            return dir < DGrid ? g[dir].absc( idx[dir], 0.5 * ( (dir==f_comp) xor Ftype ) ) : 0.0;
+            return dir < DGrid ? g[dir].absc( idx[dir], 0.5 * ( (dir==f_comp) xor Ftype ) ) : 0;
           };
       return
         ( D[Ftype][K][J]( f[K][li], absc_fh(0,K), absc_fh(1,K), g, f.mesh().stride() )
@@ -89,26 +89,23 @@ namespace field {
         }
       }
 
-      // POLEDANCE
-      // // subtract J from E. Divide J by hh
-      // R prefactor = dt*_preJ_factor;
-      // for ( int C = 0; C < 3; ++C ) {
-      //   auto hhinv =
-      //     [comp=C,this](R q1, R q2, R q3) -> R {
-      //       auto x = this->_hh[yee::Etype][comp](q1, q2, q3);
-      //       if ( std::abs(x) < 1e-8 ) return 0;
-      //       else return 1 / x;
-      //     };
-      //   const auto ofs = J[C].offset();
-      //   R q[3] = {0, 0, 0};
-      //   for ( const auto& I : apt::Block(rB,rE) ) {
-      //     for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
-      //     E[C](I) -= ( prefactor * J[C](I) * hhinv(q[0],q[1],q[2]) );
-      //   }
-      // }
+      // subtract J from E. Divide J by hh
+      R prefactor = dt*_preJ_factor;
+      for ( int C = 0; C < 3; ++C ) {
+        auto hhinv =
+          [comp=C,this](R q1, R q2, R q3) -> R {
+            auto x = _hh[yee::Etype][comp](q1, q2, q3);
+            if ( std::abs(x) < 1e-8 ) return 0;
+            else return 1 / x;
+          };
+        const auto ofs = J[C].offset();
+        R q[3] = {0, 0, 0};
+        for ( const auto& I : apt::Block(rB,rE) ) {
+          for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
+          E[C](I) -= ( prefactor * J[C](I) * hhinv(q[0],q[1],q[2]) );
+        }
+      }
     }
-    // POLEDANCE
-    std::swap(B,tmp);
     // 3. partial update B.
     for ( int C = 0; C < 3; ++C ) {
       for ( const auto& I : apt::Block(rB, rE) ) {
@@ -138,17 +135,16 @@ namespace field {
         }
 
       }
-      copy_sync_guard_cells(E, comm); // NOTE this needs to be done before updating B
     }
 
     // 5. finish updating B
+    for ( int i = 0; i < DGrid; ++i ) ++rB[i]; // FIXME
     R prefactor = alpha*dt;
     for ( int C = 0; C < 3; ++C ) {
       for ( const auto& I : apt::Block(rB,rE) ) {
         B[C](I) -= prefactor * vc.template Curl<yee::Etype>(C,E,I);
       }
     }
-    copy_sync_guard_cells(B, comm);
   }
 
   template < typename R, int DGrid, typename RJ >
@@ -278,19 +274,18 @@ namespace field {
             E[C](I) -= aatt * vc.template Curl<yee::Btype>(C,tmp,I);
         }
       }
-      copy_sync_guard_cells(E, comm, E.mesh().range(), *this);
     }
     { // 5. finish updating B
+      for ( int i = 0; i < DGrid; ++i ) ++rB[i]; // FIXME
       R prefactor = alpha*dt;
       for ( const auto& I : apt::Block(rB,rE) ) {
         setvc(vc,I);
         for ( int C = 0; C < 3; ++C )
           B[C](I) -= prefactor * vc.template Curl<yee::Etype>(C,E,I);
       }
-
-      copy_sync_guard_cells(B, comm, B.mesh().range(), *this);
     }
   }
+
 }
 
 #endif

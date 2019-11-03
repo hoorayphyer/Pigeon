@@ -2,7 +2,6 @@
 #define FIELDBC_ROTATING_CONDUCTOR_H
 
 #include "FieldBC.h"
-#include "FUParams.h"
 
 class FieldBC_rotating_conductor : public FieldBC {
 private:

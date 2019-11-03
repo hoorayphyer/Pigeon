@@ -12,8 +12,6 @@ struct FBC {
   FieldBCType type;
   int indent;
 
-  // FIXME how to better set boundaryCondition without exposing too much unneeded information
-
   // for rotating conductor
   BCFunc_split_t ft;
   BCFunc_split_x B1;
@@ -25,17 +23,25 @@ struct FBC {
 
   // for damping
   Scalar damping_rate;
-  // Scalar thickness; // physical value FIXME setting this requires coordinate system
+  // Scalar thickness; // physical value
   // std::function<Scalar(Scalar, Scalar)> profile;
 };
 
 
 // TODO listen on locale
 struct FUParams {
-  std::array<bool, 6> is_at_boundary{};
   std::array<int, 3> neighbor_left{};
   std::array<int, 3> neighbor_right{};
   Grid grid;
+
+  std::array<bool, 6> is_at_boundary() const {
+    std::array<bool, 6> res;
+    for ( int i = 0; i < 3; ++i ) {
+      res[2*i] = ( neighbor_left[i] == NEIGHBOR_NULL );
+      res[2*i + 1] = ( neighbor_right[i] == NEIGHBOR_NULL );
+    }
+    return res;
+  }
 
   std::unordered_map< BoundaryPosition, FBC > fieldBC;
 };

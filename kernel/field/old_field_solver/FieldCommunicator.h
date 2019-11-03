@@ -272,7 +272,7 @@ public:
 
     //first send right
     //Note: it is crucial that sentaway values are cleared in the case of scanning in the longitudinal.
-    //FIXME: the case of unstaggered array is not treated yet.
+    //TODOL: the case of unstaggered array is not treated yet.
     sendId[dir] = grid.dims[dir] - grid.guard[dir] - static_cast<int>(scanLong);
     recvId[dir] = grid.guard[dir] - static_cast<int>(scanLong);
     SendAddCellsLeftRight( dir, SEND_RIGHT, array, sendId, recvId, sendExt );

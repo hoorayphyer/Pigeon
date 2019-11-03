@@ -1,13 +1,12 @@
-#include "field/updater.hpp"
+#include "field/old_field_solver/updater.hpp"
 
-#include "field/params.hpp"
 #include "field/field.hpp"
 #include "field/sync.hpp"
 
-#include "old_field_solver/FieldUpdater.h"
-#include "old_field_solver/FieldCommunicator.h"
-#include "old_field_solver/FiniteDiff.h"
-#include "old_field_solver/CoordSystem.h"
+#include "field/old_field_solver/FieldUpdater.h"
+#include "field/old_field_solver/FieldCommunicator.h"
+#include "field/old_field_solver/FiniteDiff.h"
+#include "field/old_field_solver/CoordSystem.h"
 
 #include "mpipp/mpi++.hpp"
 #include <cmath>
@@ -92,70 +91,53 @@ namespace field {
   std::unique_ptr<FiniteDiff> fd{};
   std::unique_ptr<FieldUpdater> fu{};
 
-  // Set field BCs for rotating conductor in 2D log spherical coordinates with a damping layer
-  template < typename FBCs >
-  void Set_FBC_RC_2DLogSph_Damp( FBCs& fieldBC, int guard, Scalar (*omega_t)(Scalar) ) {
-    // field BC, specialized for pulsar
-    { auto& fbc = fieldBC[LOWER_1];
-      fbc.type = FieldBCType::ROTATING_CONDUCTOR;
-      fbc.indent = ofs::indent[LOWER_1];
-      fbc.ft = omega_t;
-      if ( ofs::magnetic_pole == 1 )
-        Rotating_Monopole_LogSph( fbc );
-      else if ( ofs::magnetic_pole == 2 )
-        Rotating_Dipole_LogSph( fbc );
-    }
-    { auto& fbc = fieldBC[UPPER_1];
-      fbc.type = FieldBCType::DAMPING;
-      fbc.damping_rate = ofs::damping_rate;
-      fbc.indent = ofs::indent[UPPER_1];
-    }
-    { auto& fbc = fieldBC[LOWER_2];
-      fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = ofs::indent[LOWER_2];
-    }
-    { auto& fbc = fieldBC[UPPER_2];
-      fbc.type = FieldBCType::COORDINATE;
-      fbc.indent = ofs::indent[UPPER_2];
-    }
-  }
-
-  template < typename Real, int DGrid, typename RealJ >
-  Updater<Real, DGrid, RealJ>::Updater( const mpi::CartComm& cart,
-                                        const apt::Grid<Real,DGrid>& local_grid,
-                                        apt::array< apt::pair<bool>, DGrid > is_at_boundary,
-                                        int guard,
-                                        Real (*omega_t) (Real),
-                                        Real re_over_w_gyro_unitB )
-    : _cart(cart),
-      _4pi_times_re_over_w_gyro_unitB( 4.0 * std::acos(-1.0l) * re_over_w_gyro_unitB ) {
-    static_assert( DGrid == 2 );
+  template < typename R, int DGrid, typename RJ >
+  void OldSolve<R,DGrid,RJ>::Init( const mpi::CartComm& cart,
+                                   const apt::Grid<R,DGrid>& local_grid) const {
     for ( int i = 0; i < DGrid; ++i ) {
-      fuparams.is_at_boundary[2*i] = is_at_boundary[i][LFT];
-      fuparams.is_at_boundary[2*i + 1] = is_at_boundary[i][RGT];
       auto[ src, dest ] = cart.shift(i, 1);
       fuparams.neighbor_left[i] = src ? *(src) : NEIGHBOR_NULL;
       fuparams.neighbor_right[i] = dest ? *(dest) : NEIGHBOR_NULL;
     }
     for ( int i = DGrid; i < 3; ++i ) {
-      fuparams.is_at_boundary[2*i] = false;
-      fuparams.is_at_boundary[2*i + 1] = false;
       fuparams.neighbor_left[i] = NEIGHBOR_NULL;
       fuparams.neighbor_right[i] = NEIGHBOR_NULL;
     }
 
-    // set fieldBC
-    Set_FBC_RC_2DLogSph_Damp(fuparams.fieldBC, guard, omega_t);
+    { // field BC, specialized for pulsar
+      { auto& fbc = fuparams.fieldBC[LOWER_1];
+        fbc.type = FieldBCType::ROTATING_CONDUCTOR;
+        fbc.indent = _surface_indent;
+        fbc.ft = _omega_t;
+        if ( _magnetic_pole == 1 )
+          Rotating_Monopole_LogSph( fbc );
+        else if ( _magnetic_pole == 2 )
+          Rotating_Dipole_LogSph( fbc );
+      }
+      { auto& fbc = fuparams.fieldBC[UPPER_1];
+        fbc.type = FieldBCType::DAMPING;
+        fbc.damping_rate = _damping_rate;
+        fbc.indent = _damp_indent;
+      }
+      { auto& fbc = fuparams.fieldBC[LOWER_2];
+        fbc.type = FieldBCType::COORDINATE;
+        fbc.indent = _guard;
+      }
+      { auto& fbc = fuparams.fieldBC[UPPER_2];
+        fbc.type = FieldBCType::COORDINATE;
+        fbc.indent = _guard;
+      }
+    }
 
     // grid
     { auto& grid = fuparams.grid;
       grid.dimension = DGrid;
       for ( int i = 0; i < DGrid; ++i ) {
-        grid.dims[i] = local_grid[i].dim() + 2 * guard;
+        grid.dims[i] = local_grid[i].dim() + 2 * _guard;
         grid.delta[i] = local_grid[i].delta();
         grid.lower[i] = local_grid[i].lower();
 
-        grid.guard[i] = guard;
+        grid.guard[i] = _guard;
         for ( int j = 0; j < 2; ++j )
           grid.indent[2*i+j] = fuparams.fieldBC[2*i+j].indent;
       }
@@ -182,9 +164,9 @@ namespace field {
           Scalar r = exp(grid.pos(0, i, 0));
           Scalar r_s = exp(grid.pos(0, i, 1));
 
-          if ( ofs::magnetic_pole == 1 ) {
+          if ( _magnetic_pole == 1 ) {
             Bfield(0, i, j ) = 1.0 / (r * r);
-          } else if ( ofs::magnetic_pole == 2 ) {
+          } else if ( _magnetic_pole == 2 ) {
             Bfield(0, i, j) = 2.0 * cos(theta_s) / (r * r * r);
             Bfield(1, i, j) = sin(theta) / (r_s * r_s * r_s);
           }
@@ -199,40 +181,47 @@ namespace field {
 
   }
 
-  template < typename Real, int DGrid, typename RealJ >
-  void Updater<Real,DGrid,RealJ>::operator() ( field_type& E,
-                                               field_type& B,
-                                               const J_type& Jmesh,
-                                               Real dt, int timestep ) {
-    static bool is_EB_initialized = false; // A hotfix to apply
+  template < typename R, int DGrid, typename RJ >
+  void OldSolve<R,DGrid,RJ>::operator() ( Field<R,3,DGrid>& E,
+                                          Field<R,3,DGrid>& B,
+                                          const Field<RJ,3,DGrid>& Jmesh,
+                                          const apt::Grid<R,DGrid>& grid,
+                                          const mpi::CartComm& cart,
+                                          int timestep,
+                                          R dt
+                                          ) const {
+    static bool is_initialized = false;
+    if ( !is_initialized ) Init(cart, grid);
+
     // NOTE
-    // due to different stagger labeling systems, during conversion, only copy the bulk and send guards cells
+    // due to different staggering systems, during conversion, only copy the bulk and send guards cells
     // For 0 <= i < dim_bulk,
     // 1) for unstaggered components (MIDWAY), indexing is field::Field[i] <-> VectorField[guard + i];
     // 2) for staggered components (INSITU), indexing is field::Field[i] <-> VectorField[guard + i - 1];
 
     { // convert from new to old
-      const auto& grid = fuparams.grid;
+      const auto& fugrid = fuparams.grid;
       auto convert_from_new =
         [&]( auto& old_f, const auto& new_f ) {
-          const auto& g = grid.guard;
+          const auto& g = fugrid.guard;
+          const auto beg_new = apt::range::begin(new_f.mesh().range());
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
-            for ( int j = 0; j < grid.reducedDim(1) + (o[1] == INSITU); ++j ) {
-              for ( int i = 0; i < grid.reducedDim(0) + (o[0] == INSITU); ++i ) {
+            for ( int j = 0; j < fugrid.reducedDim(1) + (o[1] == INSITU); ++j ) {
+              for ( int i = 0; i < fugrid.reducedDim(0) + (o[0] == INSITU); ++i ) {
                 old_f( c,
                        i + g[0] - (o[0] == INSITU),
                        j + g[1] - (o[1] == INSITU)
-                       ) = new_f[c]({i,j});
+                       ) = new_f[c]({beg_new[0]+i,beg_new[1]+j});
               }}}
           // TODOL there is no need to copy guard cell values to current right? Because field solver doesn't use those values, instead they have boundary conditions
         };
-      if ( !is_EB_initialized ) {
+      if ( !is_initialized ) {
         convert_from_new( Efield, E );
         fc->SendGuardCells(Efield);
         convert_from_new( Bfield, B );
         fc->SendGuardCells(Bfield);
-        is_EB_initialized = true;
+        is_initialized = true;
       }
       convert_from_new( current, Jmesh );
       fc->SendGuardCells(current);
@@ -242,9 +231,9 @@ namespace field {
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= _4pi_times_re_over_w_gyro_unitB;
+          current.ptr(c)[i] *= _fourpi;
 
-      RestoreJToRealSpace(current, grid);
+      RestoreJToRealSpace(current, fugrid);
       fc->SendGuardCells(current);
     }
 
@@ -257,27 +246,21 @@ namespace field {
         [&]( const auto& old_f, auto& new_f ) {
           const auto& grid = fuparams.grid;
           const auto& g = grid.guard;
+          const auto beg_new = apt::range::begin(new_f.mesh().range());
           for ( int c = 0; c < 3; ++ c) {
             const auto& o = new_f[c].offset();
             for ( int j = 0; j < grid.reducedDim(1) + (o[1] == INSITU); ++j ) {
               for ( int i = 0; i < grid.reducedDim(0) + (o[0] == INSITU); ++i ) {
-                new_f[c]({i,j}) = old_f( c,
-                                         i + g[0] - (o[0] == INSITU),
-                                         j + g[1] - (o[1] == INSITU)
-                                         );
+                new_f[c]({beg_new[0]+i,beg_new[1]+j}) = old_f( c,
+                                                               i + g[0] - (o[0] == INSITU),
+                                                               j + g[1] - (o[1] == INSITU)
+                                                               );
               }}}
         };
       convert_to_new( Efield, E );
       convert_to_new( Bfield, B );
-      field::copy_sync_guard_cells( E, _cart );
-      field::copy_sync_guard_cells( B, _cart );
+      field::copy_sync_guard_cells( E, cart );
+      field::copy_sync_guard_cells( B, cart );
     }
   }
 }
-
-namespace field::ofs {
-  int magnetic_pole = 2;
-  apt::array<int,4> indent {};
-  double damping_rate = 10.0;
-}
-

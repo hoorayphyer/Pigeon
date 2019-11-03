@@ -268,6 +268,7 @@ namespace pic {
         for ( int i = 0; i < DGrid; ++i ) {
           bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
         }
+        // FIXME : should include upper boundary ???
         auto range = apt::make_range({}, bulk_dims, field::myguard);
         _E = {range};
         _B = {range};
@@ -414,18 +415,36 @@ namespace pic {
         if ( _cart_opt ) {
           TIMING("FieldUpdate", START {
               field::merge_sync_guard_cells( _J, *_cart_opt );
-              _rsv.reserve(_E,_B);
+              // FIXME reserves may store garbage
+              // _rsv.reserve(_E,_B);
+
+              const auto E_old = _E;
+              const auto B_old = _B;
               for ( int i = 0; i < _field_actions.size(); ++i ) {
                 if ( !_field_actions[i] ) continue;
                 if ( stamp ) {
                   lgr::file % "--" << _field_actions[i]->name() << std::endl;
                 }
                 const auto& act = *_field_actions[i];
-                _rsv.revert_to_prior(_E,_B,act);
-                act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
-                _rsv.back_to_current(_E,_B);
+                // _rsv.revert_to_prior(_E,_B,act);
+                // FIXME, use efficient reserve
+                {
+                  auto E_tmp = E_old;
+                  auto B_tmp = B_old;
+                  act(E_tmp, B_tmp, _J, _grid, *_cart_opt, timestep, dt);
+                  for ( const auto& I : apt::Block(apt::range::begin(act), apt::range::end(act)) ) {
+                    for ( int C = 0; C < 3; ++C ) {
+                      _E[C](I) = E_tmp[C](I);
+                      _B[C](I) = B_tmp[C](I);
+                    }
+                  }
+                }
+                // _rsv.back_to_current(_E,_B);
               }
             });
+          // NOTE sub_range same as domain_range FIXME rethink domain and sub range
+          copy_sync_guard_cells(_E, *_cart_opt );
+          copy_sync_guard_cells(_B, *_cart_opt );
         }
       }
 

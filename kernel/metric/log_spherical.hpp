@@ -62,7 +62,7 @@ namespace field {
     const apt::Index<DGrid+1>& s;
 
     constexpr T operator()(int shift) const noexcept {
-      return *(&f + shift * s[I]) * Metric::template h<Fcomp>(lnr + (0==I) * shift * g[I].delta(), theta + (1==I) * shift * g[I].delta() );
+      return *(&f + shift * s[I]) * Metric::template h<Fcomp>(lnr + (0==I) * shift * g[0].delta(), theta + (1==I) * shift * g[1].delta() );
     }
   };
 
@@ -116,40 +116,14 @@ namespace field {
     return ( - 2.0 * fh(0) + 3.0 * fh(1) - fh(2) ) / g[I].delta();
   }
 
-  template < int DGrid, typename T, int Fcomp, int I >
-  constexpr T diff_1sided_from_left( const T& f, T lnr, T theta, const apt::Grid<T,DGrid>& g, const apt::Index<DGrid+1>& s ) noexcept {
-    if constexpr ( I >= DGrid ) return 0.0;
-    // NOTE For B, the upper boundary is actually a guard cell. We use the same convention that f is in the same cell as the evaluated derivative
-    FH<DGrid,T,Fcomp,I> fh{f,lnr,theta,g,s};
-    return ( 2.0 * fh(-1) - 3.0 * fh(-2) + fh(2) ) / g[I].delta();
-  }
-
   template < int DGrid, typename T, bool IsUpper >
   constexpr T diff_axis_Ephi_theta( const T& f, T lnr, T theta, const apt::Grid<T,DGrid>& g, const apt::Index<DGrid+1>& s ) noexcept {
     constexpr int Fcomp = 2;
     constexpr int I = 1;
     if constexpr ( I >= DGrid ) return 0.0;
 
-    FH<DGrid,T,Fcomp,I> fh{f,lnr,theta,g,s};
-    if constexpr (IsUpper) return ( - 81 * fh(-1) + fh(-2) ) / std::pow( 3*std::exp(lnr)*g[I].delta(), 2.0);
-    else return ( 81 * fh(0) - fh(1) ) / std::pow( 3*std::exp(lnr)*g[I].delta(), 2.0);
-  }
-
-  template < int DGrid, typename T, int Fcomp, int I, offset_t f_ofs >
-  constexpr T diff_beyond_hi_axis( const T& f, T lnr, T theta, const apt::Grid<T,DGrid>& g, const apt::Index<DGrid+1>& s ) noexcept {
-    constexpr bool IsAxissymmetric = ( Fcomp + I == 3 );
-    return ( IsAxissymmetric ? 1 : -1 ) * diff<DGrid,T,Fcomp,I,f_ofs>( *(&f-s[1]), lnr, theta - g[1].delta(), g, s );
-  }
-
-  template < int DGrid, typename T, int Fcomp, int I >
-  constexpr T diff_1sided_from_right_beyond_hi_axis( const T& f, T lnr, T theta, const apt::Grid<T,DGrid>& g, const apt::Index<DGrid+1>& s ) noexcept {
-    constexpr bool IsAxissymmetric = ( Fcomp + I == 3 );
-    return ( IsAxissymmetric ? 1 : -1 ) * diff_1sided_from_right<DGrid,T,Fcomp,I>( *(&f-s[1]), lnr, theta - g[1].delta(), g, s );
-  }
-
-  template < int I, typename T >
-  constexpr T hh_beyond_hi_axis( T lnr, T theta, T = 0 ) noexcept {
-    return std::abs(metric::LogSpherical<T>::template hh<I>(lnr, theta, 0));
+    if constexpr (IsUpper) return 2 * (*( &f - s[I] )) * std::exp(-lnr) / std::sin(theta); // NOTE theta here is larger than pi, and this formula is correct.
+    else return 2 * f * std::exp(-lnr) / std::sin(theta);
   }
 
 }

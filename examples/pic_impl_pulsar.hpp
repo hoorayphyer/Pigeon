@@ -11,7 +11,8 @@
 #include "metric/log_spherical.hpp"
 
 #include "field/field.hpp"
-#include "field/params.hpp"
+
+#include "field/old_field_solver/updater.hpp" // FIXME
 #include "field/haugbolle_solver/updater.hpp"
 
 #include "particle/properties.hpp"
@@ -35,17 +36,17 @@ namespace pic {
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr real_t dt = 0.003;
+  inline constexpr real_t dt = 0.01;
 
   constexpr apt::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, std::log(30.0), 256 }, { 0.0, PI, 256 } }};
+  = {{ { 0.0, std::log(30.0), 64 }, { 0.0, PI, 64 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 10000;
+  inline constexpr int total_timesteps = 4000;
 
   constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
@@ -88,7 +89,6 @@ namespace field {
     static_assert(DGrid==2);
     constexpr int AxisDir = 1;
 
-    const auto& mesh = comp.mesh();
     int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
     mirror_sum += is_upper ? 2 * Ib[AxisDir] : 2 * (Ie[AxisDir] - 1);
 
@@ -100,10 +100,10 @@ namespace field {
   }
 }
 
-#include "field/updater.hpp" // FIXME this is old field updater
+// FIXME: add index bound check in mesh. Be careful about E,B range which doesn't include upper boundary versus action range. There may be index out of bound
 namespace field {
   using pic::real_t;
-  inline constexpr real_t Omega = 1.0 / 6.0;
+  inline constexpr real_t Omega = 0.0 / 6.0; // FIXME
 
   constexpr int star_interior = 5;
 
@@ -112,7 +112,8 @@ namespace field {
   static_assert( order_precision % 2 == 0 );
   constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
 
-  constexpr int myguard = std::max(order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+  // FIXME NOTE the 1 + 
+  constexpr int myguard = std::max(1 + order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
@@ -140,41 +141,89 @@ namespace field {
 
   real_t (*damping_profile)( real_t q ) = nullptr;
 
-  // // FIXME remove
-  // template < typename R >
-  // void set_up() {
-  //   ofs::magnetic_pole = 2; // 1 for mono-, 2 for di-
-  //   ofs::indent = { 5, 43, field::myguard, field::myguard };
-  //   ofs::damping_rate = 10.0;
-  // }
+  // TODOL annihilation will affect deposition // NOTE one can deposit in the end
+}
 
+namespace field {
+  constexpr bool use_new = true;
 
-  const bool use_old = false; // FIXME
-  void set_up_old_field_solver(){
+  template < int DGrid, typename R, typename RJ >
+  auto set_up_old_field_actions() {
+    std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
+    namespace range = apt::range;
 
-    // TODOL annihilation will affect deposition // NOTE one can deposit in the end
-    // annihilate_mark_pairs( );
-    // if ( use_old ) { // FIXME
-    //   if ( _cart_opt )
-    //     _field_update.reset(new field::Updater<R,DGrid,RJ>
-    //                         ( *_cart_opt, _grid,
-    //                           ens.is_at_boundary(), 2,
-    //                           field::omega_spinup,
-    //                           pic::classic_electron_radius() / pic::w_gyro_unitB )
-    //                         );
-    // }
+    OldSolve<R,DGrid,RJ> fu;
+    {
+      const int guard = fu.guard();
+      fu.setName("OldSolve");
+      fu[0] = { 0, pic::supergrid[0].dim(), guard };
+      fu[1] = { 0, pic::supergrid[1].dim(), guard };
 
-    //   TIMING("FieldUpdate", START {
-    //       field::merge_sync_guard_cells( _J, *_cart_opt );
-    //       (*_field_update)(_E, _B, _J, dt, timestep);
-    //       // _fbc_axis.setEB(_E,_B); //FIXME
-    //     });
+      fu.set_fourpi(PREJ);
+      fu.set_magnetic_pole(2);
+      fu.set_damping_rate(1.0); // FIXME
+      fu.set_surface_indent(5);
+      fu.set_damp_indent(43);
+      fu.set_omega_t(field::omega_spinup);
+    }
+
+    struct Axissymmetric : public Action<R,DGrid,RJ> {
+    private:
+      bool _is_upper_axis = false;
+    public:
+      auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
+      virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
+      virtual void operator() ( Field<R,3,DGrid>& E, Field<R,3,DGrid>& B,
+                                const Field<RJ,3,DGrid>& , const apt::Grid<R,DGrid>& grid,
+                                const mpi::CartComm&, int , R) const override {
+        // NOTE Guard cells values are needed when interpolating E and B
+        // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
+        auto assign = []( R& v_g, R& v_b ) noexcept { v_g = v_b; };
+        auto neg_assign = []( R& v_g, R& v_b ) noexcept {
+                            v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
+                          };
+        // MIDWAY in AxisDir
+        axissymmetrize(E[0], assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(E[2], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[1], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+
+        // INSITU in AxisDir
+        axissymmetrize(E[1], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[0], assign, range::begin(*this), range::end(*this), _is_upper_axis );
+        axissymmetrize(B[2], neg_assign, range::begin(*this), range::end(*this), _is_upper_axis );
+      }
+    } fu_asym_lo, fu_asym_hi;
+    {
+      fu_asym_lo.setName("AxissymmetrizeEBLower");
+      fu_asym_lo[0] = { 0, pic::supergrid[0].dim() };
+      fu_asym_lo[1] = { -myguard, 1 }; // NOTE 1 so as to set values right on axis
+      fu_asym_lo.is_upper_axis(false);
+      fu_asym_lo.require_original_EB(false);
+
+      fu_asym_hi.setName("AxissymmetrizeEBHigher");
+      fu_asym_hi[0] = { 0, pic::supergrid[0].dim() };
+      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard };
+      fu_asym_hi.is_upper_axis(true);
+      fu_asym_hi.require_original_EB(false);
+    }
+
+    fus.emplace_back(fu.Clone());
+    fus.emplace_back(fu_asym_lo.Clone());
+    fus.emplace_back(fu_asym_hi.Clone());
+
+    return fus;
   }
 
   template < int DGrid, typename R, typename RJ >
   auto set_up_field_actions() {
+    if constexpr ( !use_new ) return set_up_old_field_actions<DGrid,R,RJ>();
+
     std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
     namespace range = apt::range;
+
+    auto set_all_to_trivial
+      = []( HaugbolleBdry<R,DGrid,RJ>& fu, const apt::Index<DGrid>& I ) {
+        };
 
     Haugbolle<R,DGrid,RJ> fu_bulk;
     {
@@ -182,8 +231,9 @@ namespace field {
       fu.setName("Bulk");
       fu[0] = { star_interior + myguard, pic::supergrid[0].dim() - myguard, myguard };
       fu[1] = { myguard, pic::supergrid[1].dim() - myguard, myguard };
-      fu.set_preJ(PREJ);
+      fu.set_fourpi(PREJ);
       fu.set_number_iteration(number_iteration);
+      fu.set_implicit(0.8); // 0.8 is stable for E_phi FIXME not really, grows after t = 15
 
       for ( int i = 0; i < 3; ++i ) { // i is coordinate
         for ( int j = 0; j < 3; ++j ) { // j is Fcomp
@@ -206,16 +256,17 @@ namespace field {
       fu[1] = {0, myguard, {0,myguard}};
       fu.set_boundary(0,-1);
 
-      fu.init_from(fu_bulk, myguard);
+      fu.init_from(fu_bulk);
 
-      fu.set_D( yee::Etype, 0, 1, diff_zero<DGrid,R>, 0 );
-      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,false>, 0 ); // curl E_phi has 1/sin0
-      fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, 0 ); // not necessary but good to have
-      fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, 0 );
+      apt::Index<DGrid> I = range::begin(fu);
+      fu.set_D( yee::Etype, 0, 1, diff_zero<DGrid,R>, I ); // zero because E_r is polar vector, it's derivative sits on the axis. So zero.
+      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,false>, I ); // curl E_phi has 1/sin0
+      fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, I ); // not necessary but good to have
+      fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, I );
 
-      fu.set_hh( yee::Etype, 0, 1, diff_one<DGrid,R>, 0 );
-      fu.set_hh( yee::Etype, 2, 1, diff_one<DGrid,R>, 0 );
-      fu.set_hh( yee::Btype, 2, 0, diff_one<DGrid,R>, 0 );
+      fu.set_hh( yee::Etype, 0, 1, diff_one<DGrid,R>, I ); // because numerator will be zero
+      fu.set_hh( yee::Etype, 2, 1, diff_one<DGrid,R>, I );
+      fu.set_hh( yee::Btype, 2, 0, diff_one<DGrid,R>, I );
     }
 
     HaugbolleBdry<R,DGrid,RJ> fu_axis_hi;
@@ -223,35 +274,28 @@ namespace field {
       auto& fu = fu_axis_hi;
       fu.setName("HigherAxis");
       fu[0] = fu_bulk[0];
-      fu[1] = { pic::supergrid[1].dim() - myguard, pic::supergrid[1].dim() + 1, {myguard,0} };
+      fu[1] = { pic::supergrid[1].dim() - myguard, pic::supergrid[1].dim() + 1, {myguard,0} }; // NOTE +1 to include upper boundary
       fu.set_boundary(0,1);
 
-      fu.init_from(fu_bulk, myguard+1);
+      fu.init_from(fu_bulk);
 
-      // ensure that no values beyond the axis will be used in the update. The asymmetry of item number is because of the favoring-lower convention of grid indexing
-      const int last = myguard;
-      fu.set_D( yee::Etype, 0, 1, diff_zero<DGrid,R>, last );
-      fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, last );
-      fu.set_D( yee::Etype, 1, 2, diff_zero<DGrid,R>, last );
-      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,true>, last );
-      fu.set_D( yee::Etype, 2, 0, diff_beyond_hi_axis<DGrid,R,2,0,yee::Etype>, last );
-      fu.set_D( yee::Etype, 0, 2, diff_zero<DGrid,R>, last );
-
-      fu.set_D( yee::Btype, 0, 1, diff_beyond_hi_axis<DGrid,R,0,1,yee::Btype>, last );
-      fu.set_D( yee::Btype, 1, 0, diff_beyond_hi_axis<DGrid,R,1,0,yee::Btype>, last );
-      fu.set_D( yee::Btype, 1, 2, diff_zero<DGrid,R>, last );
-      fu.set_D( yee::Btype, 2, 1, diff_beyond_hi_axis<DGrid,R,2,1,yee::Btype>, last );
-      fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, last );
-      fu.set_D( yee::Btype, 0, 2, diff_zero<DGrid,R>, last );
-
-
-      fu.set_hh( yee::Etype, 0, 1, diff_one<DGrid,R>, last );
-      fu.set_hh( yee::Etype, 1, 2, diff_one<DGrid,R>, last );
-      fu.set_hh( yee::Etype, 2, 0, hh_beyond_hi_axis<1,R>, last );
-
-      fu.set_hh( yee::Etype, 0, 1, hh_beyond_hi_axis<2,R>, last );
-      fu.set_hh( yee::Btype, 1, 2, hh_beyond_hi_axis<0,R>, last );
-      fu.set_hh( yee::Btype, 2, 0, diff_one<DGrid,R>, last );
+      // ---Axis cells----
+      // because we always calculate the derivative that is in the same cell
+      // of the field, we really need to look at the high axis to the LOWER
+      // bound of a cell that is beyond the axis. The values of derivatives in
+      // that cell don't matter unless it's right on the axis. So we first use
+      // trivial derivative for all, then only d E_phi / d theta nees a diff_from_left
+      apt::Index<DGrid> I = { fu[0].begin(), fu[1].end() -1 };
+      for ( int Ftype = 0; Ftype < 2; ++Ftype ) {
+        for ( int c = 0; c < 3; ++c ) {
+          fu.set_hh( Ftype, c, diff_one<DGrid,R>, I );
+          for ( int i = 0; i < DGrid; ++i ) { // NOTE DGrid is just fine
+            if ( c == i ) continue; // only need transverse
+            fu.set_D( Ftype, c, i, diff_zero<DGrid,R>, I );
+          }
+        }
+      }
+      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,true>, I );
     }
 
     HaugbolleBdry<R,DGrid,RJ> fu_surf;
@@ -263,18 +307,17 @@ namespace field {
       fu.set_boundary( -1, 0 );
       fu.enforce_continuous_transverse_E(true, false);
 
-      fu.init_from(fu_bulk, myguard);
+      fu.init_from(fu_bulk);
 
-      fu.set_D( yee::Etype, 1, 0, diff_1sided_from_right<DGrid,R,1,0>, 0 );
-      fu.set_D( yee::Etype, 2, 0, diff_1sided_from_right<DGrid,R,2,0>, 0 );
+      apt::Index<DGrid> I = range::begin(fu);
+      fu.set_D( yee::Etype, 1, 0, diff_1sided_from_right<DGrid,R,1,0>, I );
+      fu.set_D( yee::Etype, 2, 0, diff_1sided_from_right<DGrid,R,2,0>, I );
     }
 
     auto set_double_bdry =
-      []( HaugbolleBdry<R,DGrid,RJ>& fu,
+      [&fu_bulk]( HaugbolleBdry<R,DGrid,RJ>& fu,
           const HaugbolleBdry<R,DGrid,RJ>& fu_surf,
           const HaugbolleBdry<R,DGrid,RJ>& fu_axis ) {
-
-        fu.set_preJ(fu_surf.preJ());
 
         fu.setName( fu_surf.name() + fu_axis.name() );
         fu[0] = fu_surf[0];
@@ -282,25 +325,21 @@ namespace field {
 
         fu.set_boundary( fu_surf.boundary()[0], fu_axis.boundary()[1] );
         fu.enforce_continuous_transverse_E(fu_surf.cont_trans_E()[0], fu_axis.cont_trans_E()[1]);
+        fu.init_from(fu_bulk);
 
-        int size = 1;
-        for ( int i = 0; i < DGrid; ++i ) size *= range::size(fu,i);
         for ( int Ftype = 0; Ftype < 2; ++Ftype ) {
           // r derivative uses fu_surf, theta derivative uses fu_axis, phi derivative just use diff_zero
           for ( int C = 1; C < 3; ++C ) {
-            for ( int j = 0; j < range::size(fu,1); ++j ) {
-              for ( int i = 0; i < range::size(fu,0); ++i ) {
-                int idx = i + j * range::size(fu,0);
-                fu.set_D( Ftype, (C+0)%3, 0, fu_surf.D()[Ftype][(C+0)%3][0][i], idx );
-                fu.set_D( Ftype, (C+1)%3, 1, fu_axis.D()[Ftype][(C+1)%3][1][j], idx ) ;
-                fu.set_D( Ftype, (C+2)%3, 2, diff_zero<DGrid,R>, idx );
-              }
+            for ( const auto& I : apt::Block(range::begin(fu), range::end(fu)) ) {
+              fu.set_D( Ftype, (C+0)%3, 0, fu_surf.D(Ftype, (C+0)%3, 0, I), I );
+              fu.set_D( Ftype, (C+1)%3, 1, fu_axis.D(Ftype, (C+1)%3, 1, I), I ) ;
+              fu.set_D( Ftype, (C+2)%3, 2, diff_zero<DGrid,R>, I );
             }
           }
           // hh uses that of fu_axis
           for ( int k = 0; k < 3; ++k ) {
-            for ( int idx = 0; idx < size; ++idx ) {
-              fu.set_hh( Ftype, k, fu_axis.hh()[Ftype][k][idx/range::size(fu,0)], idx);
+            for ( const auto& I : apt::Block(range::begin(fu), range::end(fu)) ) {
+              fu.set_hh( Ftype, k, fu_axis.hh(Ftype,k,I), I);
             }
           }
         }
@@ -312,10 +351,9 @@ namespace field {
       auto& fu = fu_surf_axis_lo;
       set_double_bdry(fu, fu_surf, fu_axis_lo);
       // for r derivative on the axes, just set them to zero
-      for ( int i = 0; i < range::size(fu,0); ++i ) {
-        // theta index is 0
-        fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, i );
-        fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, i );
+      for ( int i = range::begin(fu, 0); i < range::end(fu,0); ++i ) {
+        fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, {i,fu[1].begin()} );
+        fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, {i,fu[1].begin()} );
       }
     }
 
@@ -326,16 +364,13 @@ namespace field {
       // for r derivative on the axes and beyond set them to appropriate diffs so that no values beyond axis are used.
       {
         static_assert(order_precision == 2);
-        int idx_theta =  ( range::size(fu,1) - 1 ) * range::size(fu,0); // the last cell in theta
-        fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, idx_theta );
-        fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, 1 + idx_theta );
-        fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, idx_theta );
-        fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, 1 + idx_theta );
-
-        fu.set_D(yee::Etype, 2, 0, diff_1sided_from_right_beyond_hi_axis<DGrid,R,2,0>, idx_theta); // NOTE diff_1sided used here due to offset, not field continuity
-        fu.set_D(yee::Etype, 2, 0, diff_beyond_hi_axis<DGrid,R,2,0,yee::Etype>, 1+idx_theta);
-        fu.set_D(yee::Btype, 1, 0, diff_beyond_hi_axis<DGrid,R,1,0,yee::Btype>, idx_theta); // NOTE diff instead of diff_1sided is used due to offset, not field continuity
-        fu.set_D(yee::Btype, 1, 0, diff_beyond_hi_axis<DGrid,R,1,0,yee::Btype>, 1+idx_theta);
+        int last_theta = fu[1].end() - 1;
+        for ( int i = range::begin(fu, 0); i < range::end(fu,0); ++i ) {
+          fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, {i,last_theta} );
+          fu.set_D(yee::Etype, 2, 0, diff_zero<DGrid,R>, {i,last_theta} ); // beyond axis
+          fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, {i,last_theta} );
+          fu.set_D(yee::Btype, 1, 0, diff_zero<DGrid,R>, {i,last_theta} ); // beyond axis
+        }
       }
 
     }
@@ -506,20 +541,19 @@ namespace field {
     }
 
     fus.emplace_back(fu_bulk.Clone());
-    // fus.emplace_back(fu_axis_lo.Clone());
-    // fus.emplace_back(fu_axis_hi.Clone());
-    // fus.emplace_back(fu_surf.Clone());
-    // fus.emplace_back(fu_surf_axis_lo.Clone());
-    // fus.emplace_back(fu_surf_axis_hi.Clone());
+    fus.emplace_back(fu_surf.Clone());
+    fus.emplace_back(fu_axis_lo.Clone());
+    fus.emplace_back(fu_axis_hi.Clone());
+    fus.emplace_back(fu_surf_axis_lo.Clone());
+    fus.emplace_back(fu_surf_axis_hi.Clone());
 
-    // fus.emplace_back(fu_cond.Clone());
+    fus.emplace_back(fu_cond.Clone());
     // fus.emplace_back(fu_damp.Clone());
-    // fus.emplace_back(fu_asym_lo.Clone());
-    // fus.emplace_back(fu_asym_hi.Clone());
+    fus.emplace_back(fu_asym_lo.Clone());
+    fus.emplace_back(fu_asym_hi.Clone());
 
     return fus;
   }
-
 }
 
 namespace pic {

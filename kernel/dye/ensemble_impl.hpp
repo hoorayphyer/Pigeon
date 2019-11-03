@@ -129,8 +129,7 @@ namespace dye {
     return chief_cart_rank;
   }
 
-
-  // TODO at_boundary should check cart_dim = 1 and periodic
+  // FIXME at_boundary should check cart_dim = 1 and periodic
   template < int DGrid >
   apt::pair<bool> Ensemble<DGrid>::is_at_boundary( int ith_dim ) const noexcept {
     return { !(inter[ith_dim][LFT]), !(inter[ith_dim][RGT]) };

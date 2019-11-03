@@ -15,7 +15,7 @@ static void CleanField (MultiArray<Scalar>& input, Scalar upper_lim) {
 
 template < typename FBCParams_t >
 void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond, const FUParams& params, const FBCParams_t& fieldBC, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg ) {
-  const auto& isBoundary = params.is_at_boundary;
+  const auto isBoundary = params.is_at_boundary();
   for ( const auto& elm : fieldBC ) {
     auto b = elm.first;
     if ( !isBoundary[b] ) continue;
@@ -36,7 +36,7 @@ void SetFieldBC(std::unordered_map<BoundaryPosition, FieldBC*>& field_bdry_cond,
 }
 
 FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg)
-  : _grid(params.grid), _is_at_boundary(params.is_at_boundary),
+  : _grid(params.grid), _is_at_boundary(params.is_at_boundary()),
     _fd(fd), _fc(fc) {
 
   const auto& grid = params.grid;
@@ -55,7 +55,7 @@ FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunic
   // unless for the following boundary conditions: damping.
 
   for ( BoundaryPosition b = 0; b < NUM_BOUNDARIES; ++b ) {
-    if ( !params.is_at_boundary[b] ) continue;
+    if ( !_is_at_boundary[b] ) continue;
     int dir = b / 2;
     bool islower = (b % 2 == 0);
     // check for damping
@@ -74,7 +74,7 @@ FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunic
   _fd.SetDefaultComputeDomain( _d_start, _d_ext);
 
 
-  // FIXME: Maybe the distinction between staggered and unstaggered fields?
+  // Maybe the distinction between staggered and unstaggered fields?
   // Using the indent information to calculate the correct size of
   // domain of computation
 //  for (int i = 0; i < NUM_BOUNDARIES; i++) {
@@ -87,7 +87,7 @@ FieldUpdater::FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunic
 //    } else if (indent > grid.guard[dir]) {
 //      _d_ext[dir] -= (indent - grid.guard[dir]);
 //    }
-//    // FIXME: Is there anything wrong with the limits?
+//    // Is there anything wrong with the limits?
 //    // if (pBC != nullptr && isConductor(pBC -> fieldBC((BoundaryPosition)i))) {
 //    //   if (i % 2 == 0 && dir < grid.dim()) {
 //    //     _d_start[dir] -= 1;
@@ -105,7 +105,7 @@ FieldUpdater::~FieldUpdater() {
 
 void
 FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, const VectorField<Scalar>& current) {
-  // FIXME: There is something wrong with the extent of the
+  // There is something wrong with the extent of the
   // laplacian. Maybe I neglected the distinction between staggered
   // and unstaggered fields
 
@@ -126,7 +126,7 @@ FieldUpdater::ComputeBfieldUpdate( Scalar dt, VectorField<Scalar>& Efield, Vecto
   _fc.SendGuardCells(Efield);
 
 
-  // FIXME: using _isBdry_EJ as an expediency. Should use _domain->isBoundary().
+  // using _isBdry_EJ as an expediency. Should use _domain->isBoundary().
   bool isBdry_E[NUM_BOUNDARIES] = {};
   for ( int b = 0; b < NUM_BOUNDARIES; ++b ) {
     isBdry_E[b] = _is_at_boundary[b];
@@ -220,7 +220,7 @@ FieldUpdater::ComputeEfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& Bfield
 }
 
 void
-// FIXME see the line about elm.second -> Apply
+// see the line about elm.second -> Apply
 FieldUpdater::Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,
                      const VectorField<Scalar>& current, Scalar dt, int timestep) {
 
@@ -229,20 +229,20 @@ FieldUpdater::Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,
   // ComputeBfieldUpdateExplicit(dt, Efield, Bfield, current);
   // ComputeEfieldUpdateExplicit(dt, Bfield, Efield, current);
 
-  //FIXME remove t_applyFieldBC from infocollector
-  // FIXME need data rather than just E and B because damping will set particles flags. Improve this.
+  // remove t_applyFieldBC from infocollector
+  // need data rather than just E and B because damping will set particles flags. Improve this.
   for ( auto& elm : _fieldBC )
     elm.second->Apply( dt, Efield, Bfield, timestep * dt );
 
-  // TODO FIXME TODO
+  // TODO TODO
   // auto& ssProxy = InfoCollector::Instance().ssProxy;
   // if ( ssProxy.saveThisSnapshot ) {
   //   CopyToSnapshot( ssProxy );
   // }
 
 }
-// TODO FIXME TODO
-// //FIXME what is a way to remove this
+// TODO TODO
+// // what is a way to remove this
 // void FieldUpdater::CopyToSnapshot(SaveSnapshotProxy &proxy) const {
 //   // the following BCs have data to be saved into snapshots: damping
 //   for ( auto& elm : _fieldBC ) {

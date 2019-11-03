@@ -37,7 +37,7 @@ private:
     }
   }
 
-  // TODO FIXME TODO
+  // TODO  TODO
   // void ReadFromSnapshot( const SaveSnapshotProxy& proxy ) {
 
   //   int size = _E_bg.grid().size();
@@ -85,7 +85,7 @@ public:
     _E_bg.resize( _grid_damp );
     _B_bg.resize( _grid_damp );
 
-    // TODO FIXME TODO
+    // TODO TODO
     // const auto& proxy = InfoCollector::Instance().ssProxy;
     // if ( proxy.isReadDampingBg ) {
     //   ReadFromSnapshot(proxy);
@@ -172,7 +172,7 @@ public:
 
   }
 
-  // TODO FIXME TODO
+  // TODO TODO
   // For saving snapshots. This function is not a virtual
   // void CopyToSnapshot( SaveSnapshotProxy& proxy ) const {
   //   unsigned int size = _E_bg.grid().size();

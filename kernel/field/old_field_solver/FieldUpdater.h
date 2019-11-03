@@ -28,7 +28,7 @@ class FieldCommunicator;
 //     }
 //   }
 
-// TODO TODO during restart, damping bg should be read in. There is the storing damping data into snapshot in FieldUpdater.cpp, look for TODO FIXME TODO
+// TODO TODO during restart, damping bg should be read in. There is the storing damping data into snapshot in FieldUpdater.cpp
 // const auto& proxy = InfoCollector::Instance().ssProxy;
 // if ( proxy.isReadDampingBg ) {
 //   ReadFromSnapshot(proxy);
@@ -57,7 +57,7 @@ class FieldUpdater {
   void ComputeBfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& E, VectorField<Scalar>& B, const VectorField<Scalar>& current);
 
   const Grid& _grid;
-  const std::array<bool, 6>& _is_at_boundary;
+  std::array<bool, 6> _is_at_boundary;
 
   FiniteDiff& _fd;
   FieldCommunicator& _fc;
@@ -75,7 +75,7 @@ class FieldUpdater {
   vector_field_type _EfieldTmp;
   vector_field_type _EfieldDelta;
 
-//  //FIXME: this is a hack for invoking ordinary diff along r for E and J transverse
+//  // this is a hack for invoking ordinary diff along r for E and J transverse
 //  bool _isBdry_EJ[NUM_BOUNDARIES];
 
 };  // ----- end of class FieldUpdater -----

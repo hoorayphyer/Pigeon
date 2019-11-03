@@ -50,7 +50,6 @@ namespace field {
       _D[Ftype][field_comp][drv] = f;
       return *this;
     }
-
     constexpr Haugbolle& set_hh( offset_t Ftype, int k, HH_t<R> f ) noexcept {
       _hh[Ftype][k] = f;
       return *this;
@@ -58,7 +57,6 @@ namespace field {
     constexpr Haugbolle& set_hh( offset_t Ftype, int field_comp, int drv, HH_t<R> f ) noexcept {
       return set_hh(!Ftype, 3 - field_comp - drv, f);
     }
-
 
     constexpr const auto& hh() const { return _hh; }
     constexpr const auto& D() const { return _D; }
