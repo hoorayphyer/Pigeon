@@ -21,11 +21,12 @@
 #include "filesys/filesys.hpp"
 
 #include "pic/vitals.hpp"
-#include "pic/action_reserve.hpp"
 
 #ifdef PIC_DEBUG
 #include "debug/debugger.hpp"
 #endif
+
+#include <unordered_map>
 
 namespace pic {
   std::string this_run_dir;
@@ -153,7 +154,7 @@ namespace pic {
           std::vector<const apt::ActionBase<DGrid>*> ptrs;
           int count = 0;
           for ( int i = 0; i < _field_actions.size(); ++i ) {
-            if ( !_field_actions[i] || !(_field_actions[i] -> orig_EB()) ) continue;
+            if ( !_field_actions[i] || !(_field_actions[i] -> require_original_EB()) ) continue;
             ptrs.emplace_back(_field_actions[i].get());
             ++count;
           }
@@ -415,33 +416,72 @@ namespace pic {
         if ( _cart_opt ) {
           TIMING("FieldUpdate", START {
               field::merge_sync_guard_cells( _J, *_cart_opt );
-              // FIXME reserves may store garbage
-              // _rsv.reserve(_E,_B);
 
-              const auto E_old = _E;
-              const auto B_old = _B;
+              std::unordered_map<int,field::Field<R, 3, DGrid>> E_old_patch;
+              std::unordered_map<int,field::Field<R, 3, DGrid>> B_old_patch;
+              int i_max = -1; // action index with the largest range
+              {
+                int full_size_max = 0;
+                for ( int i = 0; i < _field_actions.size(); ++i ) {
+                  if ( !_field_actions[i] or !_field_actions[i] -> require_original_EB() ) continue;
+                  const auto& act = *_field_actions[i];
+                  int full_size = 1;
+                  for ( int j = 0; j < act.size(); ++j )
+                    full_size *= act[j].full_size();
+
+                  int i_to_be_cached = 0;
+                  if ( full_size > full_size_max ) {
+                    i_to_be_cached = i_max;
+                    i_max = i;
+                    full_size_max = full_size;
+                  } else
+                    i_to_be_cached = i;
+                  if ( -1 == i_to_be_cached  ) continue;
+
+                  const auto& a = *_field_actions[i_to_be_cached];
+                  E_old_patch.insert( {i_to_be_cached, {a}} );
+                  B_old_patch.insert( {i_to_be_cached, {a}} );
+                  for ( int C = 0; C < 3; ++ C ) {
+                    for ( const auto& I : apt::Block(apt::range::far_begin(a), apt::range::far_end(a)) ) {
+                      E_old_patch.at(i_to_be_cached)[C](I) = _E[C](I);
+                      B_old_patch.at(i_to_be_cached)[C](I) = _B[C](I);
+                    }
+                  }
+                }
+              }
+
+              // FIXME: i_max must go first in this category
+              if ( -1 != i_max ) {
+                if ( stamp ) {
+                  lgr::file % "--" << _field_actions[i_max]->name() << std::endl;
+                }
+                (*_field_actions[i_max])(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
+              }
+
               for ( int i = 0; i < _field_actions.size(); ++i ) {
-                if ( !_field_actions[i] ) continue;
+                if ( !_field_actions[i] or i_max == i ) continue; // FIXME NOTE the i_max
                 if ( stamp ) {
                   lgr::file % "--" << _field_actions[i]->name() << std::endl;
                 }
                 const auto& act = *_field_actions[i];
-                // _rsv.revert_to_prior(_E,_B,act);
-                // FIXME, use efficient reserve
-                {
-                  auto E_tmp = E_old;
-                  auto B_tmp = B_old;
-                  act(E_tmp, B_tmp, _J, _grid, *_cart_opt, timestep, dt);
+
+                if ( E_old_patch.find(i) != E_old_patch.end() ) {
+                  auto& E_old = E_old_patch.at(i);
+                  auto& B_old = B_old_patch.at(i);
+                  act(E_old, B_old, _J, _grid, *_cart_opt, timestep, dt);
                   for ( const auto& I : apt::Block(apt::range::begin(act), apt::range::end(act)) ) {
                     for ( int C = 0; C < 3; ++C ) {
-                      _E[C](I) = E_tmp[C](I);
-                      _B[C](I) = B_tmp[C](I);
+                      _E[C](I) = E_old[C](I);
+                      _B[C](I) = B_old[C](I);
                     }
                   }
-                }
-                // _rsv.back_to_current(_E,_B);
+
+                } else
+                  act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
               }
             });
+
+
           // NOTE sub_range same as domain_range FIXME rethink domain and sub range
           copy_sync_guard_cells(_E, *_cart_opt );
           copy_sync_guard_cells(_B, *_cart_opt );

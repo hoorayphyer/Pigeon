@@ -16,7 +16,7 @@ namespace field {
   public:
     Action& require_original_EB(bool x) { _orig_EB = x; return *this; }
 
-    const auto& orig_EB() const noexcept { return _orig_EB; }
+    const auto& require_original_EB() const noexcept { return _orig_EB; }
 
     virtual ~Action() {};
 

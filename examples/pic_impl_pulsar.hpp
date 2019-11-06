@@ -46,7 +46,7 @@ namespace pic {
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 4000;
+  inline constexpr int total_timesteps = 2000;
 
   constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
@@ -58,7 +58,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 50 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -94,16 +94,15 @@ namespace field {
 
     for ( const auto& trI : apt::project_out(AxisDir,Ib,Ie) ) {
       for ( apt::Longidx n (AxisDir, Ib[AxisDir]); n < Ie[AxisDir]; ++n ) {
-        f( comp(trI + n), comp(trI + (mirror_sum - n)) ); // POLEDANCE check mirror_sum - n
+        f( comp(trI + n), comp(trI + (mirror_sum - n)) );
       }
     }
   }
 }
 
-// FIXME: add index bound check in mesh. Be careful about E,B range which doesn't include upper boundary versus action range. There may be index out of bound
 namespace field {
   using pic::real_t;
-  inline constexpr real_t Omega = 0.0 / 6.0; // FIXME
+  inline constexpr real_t Omega = 1.0 / 6.0;
 
   constexpr int star_interior = 5;
 
@@ -221,16 +220,12 @@ namespace field {
     std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
     namespace range = apt::range;
 
-    auto set_all_to_trivial
-      = []( HaugbolleBdry<R,DGrid,RJ>& fu, const apt::Index<DGrid>& I ) {
-        };
-
     Haugbolle<R,DGrid,RJ> fu_bulk;
     {
       auto& fu = fu_bulk;
       fu.setName("Bulk");
       fu[0] = { star_interior + myguard, pic::supergrid[0].dim() - myguard, myguard };
-      fu[1] = { myguard, pic::supergrid[1].dim() - myguard, myguard };
+      fu[1] = { myguard, pic::supergrid[1].dim() + 1 - myguard, myguard }; // NOTE +1 because need values on the upper boundary
       fu.set_fourpi(PREJ);
       fu.set_number_iteration(number_iteration);
       fu.set_implicit(0.8); // 0.8 is stable for E_phi FIXME not really, grows after t = 15
@@ -245,7 +240,6 @@ namespace field {
       for ( int Ftype = Ftype; Ftype < 2; ++Ftype )
         for ( int i = 0; i < 3; ++i )
           fu.set_hh( Ftype,i, HHk<R>(i) );
-
     }
 
     HaugbolleBdry<R,DGrid,RJ> fu_axis_lo;
@@ -274,7 +268,7 @@ namespace field {
       auto& fu = fu_axis_hi;
       fu.setName("HigherAxis");
       fu[0] = fu_bulk[0];
-      fu[1] = { pic::supergrid[1].dim() - myguard, pic::supergrid[1].dim() + 1, {myguard,0} }; // NOTE +1 to include upper boundary
+      fu[1] = { pic::supergrid[1].dim() + 1 - myguard, pic::supergrid[1].dim() + 1, {myguard,0} }; // NOTE +1 to include upper boundary
       fu.set_boundary(0,1);
 
       fu.init_from(fu_bulk);
@@ -302,7 +296,7 @@ namespace field {
     {
       auto& fu = fu_surf;
       fu.setName("ConductingSurface");
-      fu[0] = { star_interior, star_interior+myguard, {0, myguard} };
+      fu[0] = { star_interior, star_interior+myguard, {1, myguard} }; // NOTE use 1 because need values from interior
       fu[1] = fu_bulk[1];
       fu.set_boundary( -1, 0 );
       fu.enforce_continuous_transverse_E(true, false);
@@ -328,12 +322,11 @@ namespace field {
         fu.init_from(fu_bulk);
 
         for ( int Ftype = 0; Ftype < 2; ++Ftype ) {
-          // r derivative uses fu_surf, theta derivative uses fu_axis, phi derivative just use diff_zero
+          // r derivative uses fu_surf, theta derivative uses fu_axis
           for ( int C = 1; C < 3; ++C ) {
             for ( const auto& I : apt::Block(range::begin(fu), range::end(fu)) ) {
               fu.set_D( Ftype, (C+0)%3, 0, fu_surf.D(Ftype, (C+0)%3, 0, I), I );
-              fu.set_D( Ftype, (C+1)%3, 1, fu_axis.D(Ftype, (C+1)%3, 1, I), I ) ;
-              fu.set_D( Ftype, (C+2)%3, 2, diff_zero<DGrid,R>, I );
+              fu.set_D( Ftype, (C+1)%3, 1, fu_axis.D(Ftype, (C+1)%3, 1, I), I );
             }
           }
           // hh uses that of fu_axis
@@ -535,7 +528,7 @@ namespace field {
 
       fu_asym_hi.setName("AxissymmetrizeEBHigher");
       fu_asym_hi[0] = { 0, pic::supergrid[0].dim() };
-      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard };
+      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard - 1 }; // FIXME NOTE -1
       fu_asym_hi.is_upper_axis(true);
       fu_asym_hi.require_original_EB(false);
     }

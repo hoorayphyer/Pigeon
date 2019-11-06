@@ -17,7 +17,7 @@ namespace field {
     apt::array<apt::array<HH_t<T>,3>,2> hh;
 
     template < int I, offset_t Ftype >
-    constexpr T curl( Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept { // idx is with respect to f
+    constexpr T curl( const Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept { // idx is with respect to f
       // NOTE do not use f.offset. Use Ftype
       // NOTE Ftype is the offset for the ith-direction of f[i]. So transverse directions have !Ftype.
       constexpr int J = (I+1)%3;
@@ -40,7 +40,7 @@ namespace field {
     }
 
     template < offset_t Ftype >
-    constexpr T Curl(int i, Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept {
+    constexpr T Curl(int i, const Field<T,3,DGrid>& f, const apt::Index<DGrid>& idx ) const noexcept {
       switch (i) {
       case 0 : return curl<0,Ftype>(f,idx);
       case 1 : return curl<1,Ftype>(f,idx);
@@ -138,7 +138,7 @@ namespace field {
     }
 
     // 5. finish updating B
-    for ( int i = 0; i < DGrid; ++i ) ++rB[i]; // FIXME
+    for ( int i = 0; i < DGrid; ++i ) ++rB[i];
     R prefactor = alpha*dt;
     for ( int C = 0; C < 3; ++C ) {
       for ( const auto& I : apt::Block(rB,rE) ) {
@@ -164,6 +164,12 @@ namespace field {
     // running Begin and End
     auto rB = apt::range::far_begin(*this);
     auto rE = apt::range::far_end(*this);
+    // FIXME double check
+    for ( int i = 0; i < DGrid; ++i ) {
+      if ( _bdry[i] == -1 ) rB[i] = apt::range::begin(*this,i);
+      if ( _bdry[i] == 1 ) rE[i] = apt::range::end(*this,i);
+    }
+
     VectorCalculus<DGrid,R> vc{grid};
 
     Field<R,3,DGrid> tmp{*this};
@@ -276,7 +282,7 @@ namespace field {
       }
     }
     { // 5. finish updating B
-      for ( int i = 0; i < DGrid; ++i ) ++rB[i]; // FIXME
+      for ( int i = 0; i < DGrid; ++i ) ++rB[i];
       R prefactor = alpha*dt;
       for ( const auto& I : apt::Block(rB,rE) ) {
         setvc(vc,I);

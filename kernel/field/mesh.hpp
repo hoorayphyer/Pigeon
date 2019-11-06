@@ -30,6 +30,12 @@ namespace field {
 
     constexpr int linear_index( const apt::Index<D>& I ) const noexcept {
       // TODO check that _range.far_begin <= I < _range.far_end. NOTE that I failing to to so may still result in a valid linear index;
+      // for ( int i = 0; i < D; ++i ) {
+      //   if ( I[i] < _range[i].far_begin() or I[i] >= _range[i].far_end() ) {
+      //     std::cout << "  I = " << I[0] << ", " << I[1] << ", range = " << _range[0].far_begin() << ", " << _range[0].far_end() << ", " << _range[1].far_begin() << ", " << _range[1].far_end() << std::endl;
+      //     throw std::runtime_error("linear_index bad");
+      //   }
+      // }
       int res = _linear_offset;
       for ( int i = 0; i < D; ++i ) res += I[i] * _stride[i];
       return res;

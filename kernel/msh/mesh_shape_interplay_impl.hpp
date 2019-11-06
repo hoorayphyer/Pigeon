@@ -66,7 +66,7 @@ namespace msh {
     apt::Index<DGrid> ext;
     for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
 
-    // POLEDANCE reexamine wf.weight(I), make it use I + I_b
+    // FIXME reexamine wf.weight(I), make it use I + I_b
     for ( const auto& I : apt::Block({}, ext) )
       res += fcomp( wf.I_b() + I ) * wf.weight(I);
 
@@ -101,7 +101,7 @@ namespace msh {
     for ( int C = 0; C < DField; ++C ) {
       auto wf = impl::WeightFinder( q_std, field[C].offset(), shapef );
 
-      // POLEDANCE reexamine wf.weight(I), make it use I + I_b
+      // FIXME reexamine wf.weight(I), make it use I + I_b
       for ( const auto& I : apt::Block({},ext) )
         field[C]( wf.I_b() + I ) += frac * var[C] * wf.weight(I);
     }
