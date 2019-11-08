@@ -46,6 +46,7 @@ namespace pic {
     std::optional<dye::Ensemble<DGrid>> _ens_opt;
     apt::array< apt::pair<R>, DGrid > _borders;
 
+    particle::map<particle::Properties> _properties;
     field::Field<R, 3, DGrid> _E;
     field::Field<R, 3, DGrid> _B;
     field::Field<RJ, 3, DGrid> _J;
@@ -53,8 +54,6 @@ namespace pic {
 
     std::vector<std::unique_ptr<field::Action<R,DGrid,RJ>>> _field_actions;
     std::vector<std::unique_ptr<particle::Action<DGrid,R,S,RJ>>> _ptc_actions;
-
-    ActionReserve<DGrid,R> _rsv;
 
     std::vector<particle::Particle<R, S>> _migrators;
 
@@ -140,25 +139,12 @@ namespace pic {
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
-      { // set field actions and reserve
+      { // set field actions
         const auto f_actions = field::set_up_field_actions<DGrid,R,RJ>();
         _field_actions.resize(f_actions.size());
         for ( int i = 0; i < f_actions.size(); ++i ) {
           _field_actions[i].reset(f_actions[i]->Clone());
           taylor(*_field_actions[i]);
-        }
-        // TODO reorder by require_old_EB
-
-        { // only reserve for necessary actions. For example, when there is only one action, or the action doesn't require old_EB, skip it.
-          _rsv = {};
-          std::vector<const apt::ActionBase<DGrid>*> ptrs;
-          int count = 0;
-          for ( int i = 0; i < _field_actions.size(); ++i ) {
-            if ( !_field_actions[i] || !(_field_actions[i] -> require_original_EB()) ) continue;
-            ptrs.emplace_back(_field_actions[i].get());
-            ++count;
-          }
-          if ( count > 1) _rsv.init(ptrs);
         }
       }
 
@@ -235,8 +221,8 @@ namespace pic {
     }
 
   public:
-    Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt )
-      : _supergrid(supergrid), _cart_opt(cart_opt) {
+    Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, const particle::map<particle::Properties>& props )
+      : _supergrid(supergrid), _cart_opt(cart_opt), _properties(props) {
       _grid = supergrid;
       if ( pic::dlb_init_replica_deploy ) {
         std::optional<int> label{};
@@ -287,7 +273,7 @@ namespace pic {
       // NOTE all species in the game should be created regardless of whether they appear on certain processes. This is to make the following work
       // 1. detailed balance. Absence of some species may lead to deadlock to transferring particles of that species.
       // 2. data export. PutMultivar requires every patch to output every species
-      for ( auto sp : particle::properties )
+      for ( auto sp : _properties )
         _particles.insert( sp, particle::array<R, S>() );
 
       if ( _ens_opt ) update_parts(*_ens_opt);
@@ -296,7 +282,7 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, particle::N_scat );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, particle::N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
@@ -385,7 +371,7 @@ namespace pic {
         if ( stamp && _particles.size() != 0 ) {
           lgr::file % "ParticleCounts:" << std::endl;
           for ( auto sp : _particles )
-            lgr::file % "\t" << particle::properties[sp].name << " = " << _particles[sp].size() << std::endl;
+            lgr::file % "\t" << _properties[sp].name << " = " << _particles[sp].size() << std::endl;
         }
 
         // ----- before this line particles are all within borders --- //
@@ -396,7 +382,7 @@ namespace pic {
                 lgr::file % "--" << _ptc_actions[i]->name() << std::endl;
               }
               auto& act = *_ptc_actions[i];
-              act( _particles, _J, particle::properties, _E, _B, _grid, &ens, dt, timestep, _rng );
+              act( _particles, _J, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
             }
           });
 
@@ -495,7 +481,7 @@ namespace pic {
 
             io::set_is_collinear_mesh(io::is_collinear_mesh); // TODO
 
-            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, fexps, pexps );
+            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, _properties, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
             for ( auto ptr : pexps ) delete ptr;
           });
@@ -527,7 +513,7 @@ namespace pic {
 
       if (_ens_opt && is_do(pic::vitals_mr, timestep) ) {
         TIMING("Statistics", START {
-            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _particles, particle::N_scat );
+            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, particle::N_scat );
           });
       }
 
@@ -543,7 +529,7 @@ namespace pic {
                 for ( auto& x : particle::N_scat.data() ) x = 0;
               }
             }
-            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, particle::N_scat );
+            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties, particle::N_scat );
             if ( mpi::world.rank() == 0 ) {
               auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
               if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);

@@ -14,6 +14,7 @@ namespace io {
     const field::Field<real_t, 3, DGrid>& Bfield,
     const field::Field<real_j_t, 3, DGrid>& Jfield,// J is Jmesh on a replica
     const particle::map<particle::array<real_t,particle::Specs>>& particles,
+    const particle::map<particle::Properties>& properties,
     const std::vector<FieldExportee<real_export_t, DGrid, real_t, real_j_t>*>& fexps,
     const std::vector<PtcExportee<real_export_t, DGrid, real_t, particle::Specs>*>& pexps
     );

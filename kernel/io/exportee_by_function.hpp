@@ -2,7 +2,7 @@
 #define _IO_EXPORTEE_BY_FUNCTION_HPP_
 
 #include "io/exportee.hpp"
-#include "msh/mesh_shape_interplay.hpp"
+#include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with induced shape
 #include <cassert>
 
 // POLEDANCE check if downsampled field can use a better mesh. Range may not work because of the scaling
@@ -109,7 +109,7 @@ namespace io {
             const apt::Grid<Real,DGrid>& grid, // local grid
             const apt::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
             const int guard_ds,
-            particle::species sp,
+            const particle::Properties& prop,
             const particle::array<Real,S>& ptcs
             ) override {
       if ( num_comps < 1 ) return {};
@@ -123,7 +123,6 @@ namespace io {
           fds.set_offset( i, dim, MIDWAY );
       }
 
-      const auto& prop = particle::properties[sp];
       for ( const auto& ptc : ptcs ) {
         if ( !ptc.is(particle::flag::exist) ) continue;
         msh::deposit( fds, ptc.frac(), impl( prop, ptc ), msh::to_standard(grid_ds, ptc.q()), sf);

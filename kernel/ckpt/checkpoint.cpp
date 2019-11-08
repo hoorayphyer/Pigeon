@@ -11,6 +11,7 @@ namespace ckpt {
                                const field::Field<real_t, 3, DGrid>& E,
                                const field::Field<real_t, 3, DGrid>& B,
                                const particle::map<particle::array<real_t,particle::Specs>>& particles,
+                               const particle::map<particle::Properties>& properties,
                                const particle::map<double>& N_scat
                                );
 
@@ -21,6 +22,7 @@ namespace ckpt {
                        field::Field<real_t, 3, DGrid>& E,
                        field::Field<real_t, 3, DGrid>& B,
                        particle::map<particle::array<real_t,particle::Specs>>& particles,
+                       const particle::map<particle::Properties>& properties,
                        particle::map<double>& N_scat,
                        int target_load
                        );

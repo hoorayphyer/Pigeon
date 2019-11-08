@@ -26,6 +26,7 @@ namespace io {
            const field::Field<Real, 3, DGrid>& B,
            const field::Field<RealJ, 3, DGrid>& J,
            const particle::map<particle::array<Real,S>>& particles,
+           const particle::map<particle::Properties>& properties,
            const std::vector<FexpT*>& fexps,
            const std::vector<PexpT*>& pexps
            ) const {
@@ -58,10 +59,10 @@ namespace io {
 
     for ( auto sp : particles ) {
       fds.reset();
-      const auto& prop = particle::properties[sp];
+      const auto& prop = properties[sp];
 
       for ( auto* pe : pexps ) {
-        std::tie(varname,dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, sp, particles[sp]);
+        std::tie(varname,dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
         if ( dim > 1 ) varname += "#";
         varname += "_" + prop.name;
 

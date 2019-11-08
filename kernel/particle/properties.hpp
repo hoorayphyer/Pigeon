@@ -1,7 +1,6 @@
 #ifndef _PARTICLE_PROPERTIES_HPP_
 #define _PARTICLE_PROPERTIES_HPP_
 
-#include "particle/map.hpp"
 #include <string>
 
 namespace particle {
@@ -11,9 +10,6 @@ namespace particle {
     std::string name = "";
     std::string nickname = "";
   };
-
-  // defined at particle updater
-  extern map<Properties> properties;
 }
 
 #endif

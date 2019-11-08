@@ -91,6 +91,7 @@ namespace io {
                     const field::Field<Real, 3, DGrid>& B,
                     const field::Field<RealJ, 3, DGrid>& J,// J is Jmesh on a replica
                     const particle::map<particle::array<Real,S>>& particles,
+                    const particle::map<particle::Properties>& properties,
                     const std::vector<FieldExportee<RealDS, DGrid, Real, RealJ>*>& fexps,
                     const std::vector<PtcExportee<RealDS, DGrid, Real, S>*>& pexps
                     ) {
@@ -198,7 +199,7 @@ namespace io {
       saver.PutMultimesh ( silo_mesh_type, saver.optlist ); // NOTE use saver.optlist here, not optlist_mesh
     }
 
-    exporter.execute( saver, grid, E, B, J, particles, fexps, pexps );
+    exporter.execute( saver, grid, E, B, J, particles, properties, fexps, pexps );
 
   }
 }

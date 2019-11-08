@@ -47,11 +47,6 @@ std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, 
 }
 
 
-// define here to avoid multiple definition
-namespace particle{
-  map<Properties> properties;
-}
-
 int main(int argc, char** argv) {
   auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
@@ -111,13 +106,13 @@ int main(int argc, char** argv) {
                            } );
     lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
-    particle::set_up_properties();
-    for ( auto sp : particle::properties )
+    // FIXME move into simulator?
+    auto properties = particle::set_up<pic::real_t>();
+    for ( auto sp : properties )
       particle::N_scat.insert( sp, 0 );
-    particle::set_up<pic::real_t>();
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t >
-      sim( pic::supergrid, cart_opt );
+      sim( pic::supergrid, cart_opt, properties );
 
     int init_timestep = sim.load_initial_condition( resume_dir );
     sim.set_rng_seed( init_timestep + mpi::world.rank() );

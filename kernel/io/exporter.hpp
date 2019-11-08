@@ -27,7 +27,7 @@ namespace io {
                   const field::Field<R, 3, DGrid>& B,
                   const field::Field<RJ, 3, DGrid>& J,// J is Jmesh on a replica
                   const particle::map<particle::array<R,S>>& particles,
-
+                  const particle::map<particle::Properties>& properties,
                   const std::vector<FexpT*>& fexps,
                   const std::vector<PexpT*>& Pexps
                   ) const;

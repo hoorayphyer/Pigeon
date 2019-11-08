@@ -43,8 +43,8 @@ namespace ckpt {
 
   template < typename T, template < typename > class PtcSpecs >
   struct ParticleArrayCkpt {
-    void save( silo::file_t& dbfile, const particle::species& sp, const particle::array<T,PtcSpecs>& ptcs ) {
-      dbfile.mkcd(particle::properties[sp].name);
+    void save( silo::file_t& dbfile, const particle::Properties& prop, const particle::array<T,PtcSpecs>& ptcs ) {
+      dbfile.mkcd(prop.name);
       particle::load_t num = ptcs.size();
       // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
       dbfile.write("load", num);
@@ -60,11 +60,11 @@ namespace ckpt {
       dbfile.cd("..");
     }
 
-    void load( silo::file_t& dbfile, const particle::species& sp, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
-      dbfile.cd( particle::properties[sp].name );
+    void load( silo::file_t& dbfile, const particle::Properties& prop, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
+      dbfile.cd( prop.name );
       auto N = dbfile.read1<particle::load_t>("load");
 #ifdef PIC_DEBUG
-      lgr::file << "LDCKPT SPECIES " << particle::properties[sp].name << ", Load = " << N << std::endl;
+      lgr::file << "LDCKPT SPECIES " << prop.name << ", Load = " << N << std::endl;
 #endif
 
       if ( 0 != N ) {
@@ -112,6 +112,7 @@ namespace ckpt {
                                const field::Field<Real, 3, DGrid>& E,
                                const field::Field<Real, 3, DGrid>& B,
                                const particle::map<particle::array<Real,PtcSpecs>>& particles,
+                               const particle::map<particle::Properties>& properties,
                                const particle::map<double>& N_scat
 
                                ) {
@@ -174,7 +175,7 @@ namespace ckpt {
               if ( ens.intra.rank() == ens.chief ) {
                 int idx = 0;
                 for ( auto sp : particles )
-                  dbfile.write( particle::properties[sp].name + "_load", loads[idx++] );
+                  dbfile.write( properties[sp].name + "_load", loads[idx++] );
 
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
@@ -194,7 +195,7 @@ namespace ckpt {
               dbfile.write( "r", r );
               ParticleArrayCkpt<Real, PtcSpecs> ckpt;
               for ( auto sp : particles ) {
-                ckpt.save( dbfile, sp, particles[sp] );
+                ckpt.save( dbfile, properties[sp], particles[sp] );
               }
             }
             dbfile.cd("..");
@@ -214,6 +215,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       const particle::map<particle::Properties>& properties,
                        particle::map<double>& N_scat,
                        int target_load
                        ) {
@@ -299,7 +301,7 @@ namespace ckpt {
               sf.cd(dname);
               for ( int i = 0; i < num_sps; ++i ) {
                 auto sp = static_cast<particle::species>(sps[i]);
-                std::string entry = particle::properties[sp].name + "_load";
+                std::string entry = properties[sp].name + "_load";
                 assert( sf.var_exists(entry) );
                 myload += sf.read1<particle::load_t>(entry);
               }
@@ -379,7 +381,7 @@ namespace ckpt {
 #endif
           for ( auto i : sps ) {
             auto sp = static_cast<particle::species>(i);
-            p_ckpt.load( sf, sp, particles[sp], myrank + r, ens_size );
+            p_ckpt.load( sf,  properties[sp], particles[sp], myrank + r, ens_size );
           }
           sf.cd("..");
         }

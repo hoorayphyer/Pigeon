@@ -1,7 +1,7 @@
 add_library(io SHARED "io.cpp")
 target_include_directories(io PRIVATE ${KERNEL_DIR} )
 target_compile_definitions(io PRIVATE APPARENT_DATA_DIR="${CMAKE_SOURCE_DIR}/Data")
-target_link_libraries( io PRIVATE silopp dye filesys field_sync )
+target_link_libraries( io PRIVATE silopp dye filesys field_sync mpipp )
 
 if (${ENABLE_TESTS})
   test_gen(io io mpipp filesys silopp) # DONE

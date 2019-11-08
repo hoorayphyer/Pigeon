@@ -787,18 +787,17 @@ namespace particle {
   constexpr pic::real_t Ndot_fd = 0.25;
   constexpr pic::real_t E_ph = 4.0;
 
-  // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
-  template < typename R = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
-  void set_up_properties() {
-    properties.insert(species::electron, {1,-1,"electron","el"});
-    //properties.insert(species::positron, {1,1,"positron","po"});
-    properties.insert(species::ion, { 5, 1, "ion","io"});
-    //properties.insert(species::photon, { 0, 0, "photon","ph" });
-  }
-
   // NOTE called in particle updater
   template < typename R >
-  void set_up() {
+  auto set_up() {
+    map<Properties> properties;
+    {
+      properties.insert(species::electron, {1,-1,"electron","el"});
+      //properties.insert(species::positron, {1,1,"positron","po"});
+      properties.insert(species::ion, { 5, 1, "ion","io"});
+      //properties.insert(species::photon, { 0, 0, "photon","ph" });
+    }
+
     using namespace pic;
     {
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
@@ -879,6 +878,8 @@ namespace particle {
 
       photon_scat.Register( species::photon );
     }
+
+    return properties;
   }
 
 }

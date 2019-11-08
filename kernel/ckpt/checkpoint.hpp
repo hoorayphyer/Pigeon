@@ -12,6 +12,7 @@ namespace field {
 namespace particle {
   template < typename > struct map;
   template < typename, template < typename > class > struct array;
+  struct Properties;
 }
 
 // TODO other things to save, like initial conditions, shape functions? No, use gen.hpp and build a target called resume
@@ -25,6 +26,7 @@ namespace ckpt {
                                const field::Field<Real, 3, DGrid>& E,
                                const field::Field<Real, 3, DGrid>& B,
                                const particle::map<particle::array<Real,PtcSpecs>>& particles,
+                               const particle::map<particle::Properties>& properties,
                                const particle::map<double>& N_scat
                                );
 
@@ -37,6 +39,7 @@ namespace ckpt {
                        field::Field<Real, 3, DGrid>& E,
                        field::Field<Real, 3, DGrid>& B,
                        particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       const particle::map<particle::Properties>& properties,
                        particle::map<double>& N_scat,
                        int target_load = 0
                        );

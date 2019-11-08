@@ -31,7 +31,7 @@ namespace io {
              const apt::Grid<R,DGrid>& grid, // local grid
              const apt::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
              const int guard_ds,
-             particle::species sp,
+             const particle::Properties& prop,
              const particle::array<R,S>& ptcs
              ) { return {}; }
     virtual ~PtcExportee() = default;
