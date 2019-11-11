@@ -1,0 +1,99 @@
+#!/bin/bash
+PWD_DIR=$(pwd) # no trailing slash
+SAVE_FILE=$PWD_DIR"/.buick"
+
+### read cached .buick if existed
+LINES=()
+if [[ -f $SAVE_FILE ]]; then
+    #|| [[ -n $line ]] prevents the last line from being ignored if it doesn't end with a \n (since read returns a non-zero exit code when it encounters EOF).
+    while read -r line || [[ -n "$line" ]]; do
+        LINES+=("$line")
+    done < ${SAVE_FILE} # redirect stdin for read
+else
+    LINES+=("### BUILD_DIR")
+    LINES+=($PWD_DIR"/.build")
+    LINES+=("### LAST_CMAKE_CMD")
+    LINES+=("echo \"Last cmake command doesn't exist\"")
+fi
+
+BUILD_DIR=1
+LAST_CMAKE_CMD=3
+
+CURRENT_CMAKE_CMD="cmake"
+CURRENT_BUILD_DIR=${LINES[$BUILD_DIR]}
+
+# if there is no argments, simply build the targets
+# $@ catches everything except $0
+if [[ ! -n "$@" ]]; then
+    cd ${CURRENT_BUILD_DIR} && make
+    exit 0
+fi
+
+# check if --clean exists
+if echo "$@" | grep -q "\--clean"; then
+    if [[ -d ${LINES[$BUILD_DIR]} ]]; then
+        rm -rf ${LINES[$BUILD_DIR]}
+    else
+        echo "no such directory to clean: "${LINES[$BUILD_DIR]}
+    fi
+    exit 0
+fi
+
+for i in "$@"
+do
+    case $i in
+        --build-dir=*)
+            dir="${PWD_DIR=}/${i#*=}"
+            read -p "Clean current build directory ${CURRENT_BUILD_DIR}? (Y/n) : " key
+            if [ "$key" != "n" ] && [ "$key" != "N" ]; then
+                rm -rf ${CURRENT_BUILD_DIR}
+            fi
+            LINES[$BUILD_DIR]=$dir
+            ;;
+        --no-buick-save-command-to-file)
+            SAVE_FILE=""
+            ;;
+        .|./*|..|../*)
+            # turn relative paths to absolute. NOTE This is crucial otherwise it's incorrect to feed cached LAST_CMAKE_CMD to buick
+            # FIXME: how to correct relative paths used in other cmake commandline options
+            CURRENT_CMAKE_CMD+=" "${PWD_DIR=}"/$i"
+            ;;
+        *)
+            # items here will be forwarded to cmake
+            CURRENT_CMAKE_CMD+=" $i"
+            ;;
+    esac
+done
+
+# check if --last-cmake exists
+if echo "$@" | grep -q "\--last-cmake"; then
+    CURRENT_CMAKE_CMD=${LINES[$LAST_CMAKE_CMD]}
+fi
+
+### use LAST_CMAKE_CMD when no CURRENT_CMAKE_CMD is provided
+if [ "cmake" == "$CURRENT_CMAKE_CMD" ]; then
+    read -p "No cmake arguments specified. Use Last_Cmake_Command? (Y/n) : " key
+    if [ "$key" == "n" ] || [ "$key" == "N" ]; then
+        exit 0
+    else
+        CURRENT_CMAKE_CMD=${LINES[$LAST_CMAKE_CMD]}
+    fi
+fi
+
+if [[ ! -d ${LINES[$BUILD_DIR]} ]]; then
+    mkdir ${LINES[$BUILD_DIR]}
+fi
+
+eval "cd ${LINES[$BUILD_DIR]} && ${CURRENT_CMAKE_CMD}"
+
+# update when cmake is successful
+if [ $? -eq 0 ]; then
+    LINES[$LAST_CMAKE_CMD]=${CURRENT_CMAKE_CMD}
+fi
+
+if [[ -n "$SAVE_FILE" ]]; then # -n checks if the string has zero length
+    for line in "${LINES[@]}"
+    do
+        printf "${line}\n"
+    done > $SAVE_FILE
+fi

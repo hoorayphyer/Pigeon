@@ -1,6 +1,7 @@
 /*
 
 !.gitignore
+!buick
 !CMakeLists.txt
 
 !apt/

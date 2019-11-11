@@ -23,6 +23,7 @@ ln -s $top_dir/jnl $(pwd)/jnl
 ln -s $top_dir/comment $(pwd)/comment
 ln -s $top_dir/vw $(pwd)/vw
 ln -s $top_dir/diskusage $(pwd)/diskusage
+ln -s $top_dir/.subtrees/Buick/buick $(pwd)/buick
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1
