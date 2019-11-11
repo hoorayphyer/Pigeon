@@ -9,8 +9,6 @@
 
 #include "io/exporter_impl.hpp"
 
-#include <silo.h> // for an ad hoc DBPutQuadmesh
-
 namespace io {
   // local directory for storing data symlinks
 #ifdef APPARENT_DATA_DIR
@@ -68,7 +66,7 @@ namespace io {
   }
 }
 
-// TODO remove this
+// FIXME remove this
 namespace io {
   bool is_collinear_mesh_silo = true;
   void set_is_collinear_mesh( bool x ) {
@@ -190,7 +188,7 @@ namespace io {
         }
 
         saver.pmpio( [&](auto& dbfile) {
-                       DBPutQuadmesh(dbfile, saver.meshname.c_str(), NULL, coords, quadmesh_dims, DGrid, DB_FLOAT, DB_NONCOLLINEAR, optlist_mesh);
+                       dbfile.put_mesh_noncollinear(saver.meshname, coords, quadmesh_dims, DGrid, optlist_mesh);
                } );
 
         delete [] coords[0];

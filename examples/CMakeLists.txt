@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.14)
 project () # specify your project name here
 option(ENABLE_TESTS "Enable tests" ON)
 option(ENABLE_DEBUG "Enable debug" OFF)
@@ -13,16 +13,16 @@ if (${ENABLE_DEBUG})
 endif()
 
 # Set CXX flags
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++17 -pthread -O3 -g -DNDEBUG -Wall -Wextra -fPIC ${CXX_EXTRA_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE_INIT "-std=c++17 -pthread -O3 -g -DNDEBUG -Wall -Wextra -fPIC ${CXX_EXTRA_FLAGS}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  string(APPEND CMAKE_CXX_FLAGS_RELEASE "-xHost -no-prec-div")
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE_INIT "-xHost -no-prec-div")
 else()
-  string(APPEND CMAKE_CXX_FLAGS_RELEASE "-march=native")
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE_INIT "-march=native")
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
+set(CMAKE_CXX_FLAGS_DEBUG_INIT "-pthread -g3 -O0 -Wall -Wno-unused-variable -std=gnu++17 -fPIC")
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE_INIT})
 # set(CMAKE_CXX_COMPILER "g++")
 
 function(add_custom_test name)

@@ -12,5 +12,5 @@ if (${ENABLE_TESTS})
   test_gen(apt csi)
   test_gen(apt range)
 
-  msperf_gen(apt block)
+  # msperf_gen(apt block)
 endif()

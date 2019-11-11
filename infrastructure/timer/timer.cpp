@@ -1,4 +1,4 @@
-#include "timer/timer.hpp"
+#include "timer.hpp"
 #include <chrono>
 using namespace std::chrono;
 

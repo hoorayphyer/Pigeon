@@ -38,6 +38,12 @@ namespace silo{
 
   template < typename file_t >
   template < typename T >
+  void Operations<file_t>::put_mesh_noncollinear( std::string meshname, const T* const coords [], int* quadmesh_dims, int ndims, OptList optlist ) {
+    DBPutQuadmesh( _dbfile(), meshname.c_str(), NULL, coords, quadmesh_dims, ndims, datatype((T)0), DB_NONCOLLINEAR, optlist);
+  }
+
+  template < typename file_t >
+  template < typename T >
   void Operations<file_t>::put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims, OptList optlist ) {
     DBPutQuadvar1(_dbfile(), varname.c_str(), meshname.c_str(), vardata, dims.data(), dims.size(), NULL, 0, datatype((T)0), DB_ZONECENT, optlist);
   }
@@ -107,6 +113,7 @@ namespace silo {
 
 #define INSTANTIATE_PUTTER(_TYPE_)                                      \
   template void Operations<file_t>::put_mesh( std::string, const std::vector<std::vector<_TYPE_>>&, MeshType, OptList ); \
+  template void Operations<file_t>::put_mesh_noncollinear( std::string, const _TYPE_* const [], int *, int , OptList ); \
   template void Operations<file_t>::put_var( std::string, std::string, const _TYPE_*, const std::vector<int>& dims, OptList ); \
   template void Operations<file_t>::put_var( std::string, std::string, const std::vector<const _TYPE_*>&, const std::vector<int>& dims, OptList )
 

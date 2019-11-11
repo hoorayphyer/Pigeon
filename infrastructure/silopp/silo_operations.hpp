@@ -20,6 +20,10 @@ namespace silo {
     template < typename T >
     void put_mesh( std::string meshname, const std::vector<std::vector<T>>& coords, MeshType mt, OptList optlist = {} );
 
+    // FIXME ad hoc for LogSpherical2D
+    template < typename T >
+    void put_mesh_noncollinear( std::string meshname, const T* const coords[], int* quadmesh_dims, int ndims, OptList optlist = {} );
+
     // put scalar field
     template < typename T >
     void put_var( std::string varname, std::string meshname, const T* vardata, const std::vector<int>& dims, OptList optlist = {} );

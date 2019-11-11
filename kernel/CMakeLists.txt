@@ -52,20 +52,14 @@ function(msperf_gen category name)
   target_link_libraries( ${test_target} PRIVATE timer logger )
 endfunction()
 
-add_subdirectory(logger)
+# FIXME use imported library
+include_directories(${CMAKE_CURRENT_LIST_DIR}/../infrastructure)
+link_directories(${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
 
 if (${ENABLE_DEBUG})
   add_subdirectory(debug)
   link_libraries(debugger logger)
 endif()
-
-add_subdirectory(apt)
-add_subdirectory(timer)
-
-add_subdirectory(filesys)
-add_subdirectory(mpipp)
-add_subdirectory(silopp)
-add_subdirectory(random)
 
 add_subdirectory(field)
 add_subdirectory(msh)
@@ -76,7 +70,3 @@ add_subdirectory(io)
 add_subdirectory(ckpt)
 
 add_subdirectory(pic)
-
-if(${ENABLE_TESTS})
-  add_subdirectory(testfw)
-endif()

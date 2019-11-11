@@ -1,6 +1,8 @@
 #ifndef _DEBUGGER_NAN_HPP_
 #define _DEBUGGER_NAN_HPP_
+
 #include "apt/block.hpp"
+#include "apt/range.hpp"
 #include <cmath>
 
 namespace debug {
@@ -18,10 +20,8 @@ namespace debug {
   inline int show_nan( const Field<T,DField,DGrid>& f, Logger& log ) {
     int num = 0;
     const auto& mesh = f.mesh();
-    const auto origin = mesh.origin();
     for ( int i = 0; i < DField; ++i ) {
-      for ( auto I : apt::Block( mesh.extent() ) ) {
-        I += origin;
+      for ( auto I : apt::Block<DGrid>( apt::range::far_begin(mesh.range()), apt::range::far_end(mesh.range()) ) ) {
         if ( std::isnan(f[i](I)) ) {
           log % "  Found NAN! comp=" << i << ", indices=" << I << std::endl;
           ++num;
