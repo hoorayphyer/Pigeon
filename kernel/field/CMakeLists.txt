@@ -9,6 +9,6 @@ if (${ENABLE_TESTS})
   test_gen(field field) # DONE
   test_gen(field mesh) # DONE
   test_gen(field sync mpipp) # DONE
-  # POLEDANCE
+  # FIXME
   # msperf_gen(field updater mpipp old_field_solver field_sync) # TODO old field solver can only work with Scalar with is float now
 endif()

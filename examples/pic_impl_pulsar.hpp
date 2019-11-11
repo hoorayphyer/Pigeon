@@ -31,8 +31,8 @@ namespace pic {
 
   constexpr long double PI = std::acos(-1.0l);
 
-  inline constexpr const char* project_name = "Pulsar256";
-  inline constexpr const char* datadir_prefix = "/home/hooray/Projects/Pigeon/Data/";
+  inline constexpr const char* project_name = "Pulsar64";
+  inline constexpr const char* datadir_prefix = "../Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
@@ -541,7 +541,7 @@ namespace field {
     fus.emplace_back(fu_surf_axis_hi.Clone());
 
     fus.emplace_back(fu_cond.Clone());
-    // fus.emplace_back(fu_damp.Clone());
+    fus.emplace_back(fu_damp.Clone());
     fus.emplace_back(fu_asym_lo.Clone());
     fus.emplace_back(fu_asym_hi.Clone());
 
@@ -772,10 +772,10 @@ namespace particle {
       asym_hi.is_upper_axis(true);
     }
 
-    // pus.emplace_back(pu.Clone());
-    // pus.emplace_back(atm.Clone());
-    // pus.emplace_back(asym_lo.Clone());
-    // pus.emplace_back(asym_hi.Clone());
+    pus.emplace_back(pu.Clone());
+    pus.emplace_back(atm.Clone());
+    pus.emplace_back(asym_lo.Clone());
+    pus.emplace_back(asym_hi.Clone());
 
     return pus;
   }
@@ -787,7 +787,6 @@ namespace particle {
   constexpr pic::real_t Ndot_fd = 0.25;
   constexpr pic::real_t E_ph = 4.0;
 
-  // NOTE called in particle updater
   template < typename R >
   auto set_up() {
     map<Properties> properties;
@@ -944,10 +943,10 @@ namespace io {
 
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> EparaB ( apt::Index<DGrid> I,
-                              const apt::Grid<R,DGrid>& grid,
-                              const field::Field<R, 3, DGrid>& E,
-                              const field::Field<R, 3, DGrid>& B,
-                              const field::Field<RJ, 3, DGrid>& J ) {
+                           const apt::Grid<R,DGrid>& grid,
+                           const field::Field<R, 3, DGrid>& E,
+                           const field::Field<R, 3, DGrid>& B,
+                           const field::Field<RJ, 3, DGrid>& J ) {
     auto B_itpl = msh::interpolate( B, I2std<R>(I), ShapeF() );
     B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
     return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ), B_itpl ),
@@ -956,10 +955,10 @@ namespace io {
 
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> EdotJ ( apt::Index<DGrid> I,
-                             const apt::Grid<R,DGrid>& grid,
-                             const field::Field<R, 3, DGrid>& E,
-                             const field::Field<R, 3, DGrid>& B,
-                             const field::Field<RJ, 3, DGrid>& J ) {
+                          const apt::Grid<R,DGrid>& grid,
+                          const field::Field<R, 3, DGrid>& E,
+                          const field::Field<R, 3, DGrid>& B,
+                          const field::Field<RJ, 3, DGrid>& J ) {
     return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ),
                       msh::interpolate( J, I2std<RJ>(I), ShapeF() ) ),
             0.0, 0.0};
@@ -968,10 +967,10 @@ namespace io {
   // Poloidal flux function, LogSpherical
   template < typename R, int DGrid, typename ShapeF, typename RJ >
   apt::array<R,3> dFlux_pol ( apt::Index<DGrid> I,
-                                 const apt::Grid<R,DGrid>& grid,
-                                 const field::Field<R, 3, DGrid>& E,
-                                 const field::Field<R, 3, DGrid>& B,
-                                 const field::Field<RJ, 3, DGrid>& J ) {
+                              const apt::Grid<R,DGrid>& grid,
+                              const field::Field<R, 3, DGrid>& E,
+                              const field::Field<R, 3, DGrid>& B,
+                              const field::Field<RJ, 3, DGrid>& J ) {
     // F = \int_Br_d\theta, we want F to be all MIDWAY. Since Br is (MIDWAY, INSITU), it is automatically the natural choice
     const auto& Br = B[0];
     return { Br(I) * std::exp( 2.0 * grid[0].absc( I[0], 0.5 ) ) * std::sin( grid[1].absc( I[1], 0.0 ) ), 0.0, 0.0 };
@@ -1121,7 +1120,7 @@ namespace io {
 }
 
 namespace io {
-  constexpr bool is_collinear_mesh = false; // TODO this is an ad hoc fix
+  constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
 }
 
 #include <sstream>

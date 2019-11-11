@@ -22,6 +22,7 @@ function(test_gen category name)
   set(test_target "test_${category}_${name}")
   add_executable( ${test_target} "tests/test_${name}.cpp")
   target_include_directories(${test_target} PRIVATE ${KERNEL_DIR})
+  target_include_directories(${test_target} PRIVATE ${KERNEL_DIR}/../.subtrees/Catch2/single_include) # NOTE
   target_compile_options( ${test_target} PRIVATE -O0 ) # -Wmissing-braces
 
   set(link_testfw testfw)

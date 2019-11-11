@@ -64,4 +64,4 @@ add_subdirectory(filesys)
 add_subdirectory(mpipp)
 add_subdirectory(silopp)
 add_subdirectory(random)
-# add_subdirectory(testfw) #FIXME
+add_subdirectory(testfw)

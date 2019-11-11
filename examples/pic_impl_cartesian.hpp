@@ -3,11 +3,13 @@
 
 #include "apt/numeric.hpp"
 #include "apt/index.hpp"
+#include "apt/grid.hpp"
 
 #include "pic/module_range.hpp"
 #include "metric/cartesian.hpp"
 
 #include "field/field.hpp"
+
 #include "field/haugbolle_solver/updater.hpp"
 
 #include "particle/properties.hpp"
@@ -24,24 +26,24 @@
 namespace pic {
   using Metric = metric::Cartesian<real_t>;
 
-  inline constexpr const char* project_name = "NameNotSpecified";
+  inline constexpr const char* project_name = "Cartesian";
   inline constexpr const char* datadir_prefix = "../Data/";
 
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {true,true};
-  inline constexpr real_t dt = 0.003;
+  inline constexpr real_t dt = 0.01;
 
   constexpr apt::Grid<real_t,DGrid> supergrid
-  = {{ { 0.0, 1.0, 256 }, { 0.0, 1.0, 256 } }};
+  = {{ { 0.0, 1.0, 64 }, { 0.0, 1.0, 64 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 10000;
+  inline constexpr int total_timesteps = 2000;
 
-  constexpr real_t r_e () noexcept {
+  constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
     apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
     return res;
@@ -51,7 +53,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { true, 0, 100 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 50 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -80,10 +82,13 @@ namespace field {
   constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
   constexpr int number_iteration = 4; // number of iterations in inverting the operator in Haugbolle
   static_assert( order_precision % 2 == 0 );
-  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::r_e() / pic::w_gyro_unitB;
+  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
 
-  constexpr int myguard = std::max(order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+  // FIXME NOTE the 1 + 
+  constexpr int myguard = std::max(1 + order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+}
 
+namespace field {
   template < int DGrid, typename R, typename RJ >
   auto set_up_field_actions() {
     std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
@@ -95,8 +100,9 @@ namespace field {
       fu.setName("Bulk");
       fu[0] = { 0, pic::supergrid[0].dim(), myguard };
       fu[1] = { 0, pic::supergrid[1].dim(), myguard };
-      fu.set_preJ(PREJ);
+      fu.set_fourpi(PREJ);
       fu.set_number_iteration(number_iteration);
+      fu.set_implicit(0.8);
 
       for ( int i = 0; i < 3; ++i ) { // i is coordinate
         for ( int j = 0; j < 3; ++j ) { // j is Fcomp
@@ -114,7 +120,6 @@ namespace field {
 
     return fus;
   }
-
 }
 
 namespace pic {
@@ -129,14 +134,11 @@ namespace pic {
                         field::Field<R, 3, DGrid>& B,
                         field::Field<RJ, 3, DGrid>& ,
                         particle::map<particle::array<R,S>>&
-                        ) const {
-        for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
-          // TODO implement your own conditions
-        }
-      }
+                        ) const {}
+
     } ic;
     ic[0] = { 0, supergrid[0].dim() };
-    ic[1] = { 0, supergrid[1].dim() }; // NOTE +1 to include upper boundary
+    ic[1] = { 0, supergrid[1].dim() };
 
     return ic;
   }
@@ -162,20 +164,17 @@ namespace particle {
 }
 
 namespace particle {
-  // NOTE called in main. This guarantees that idles also have properties set up correctly, which is currently a requirement for doing dynamic balance correct
-  template < typename R = double > // TODOL this is an ad hoc trick to prevent calling properties in routines where it is not needed
-  void set_up_properties() {
-    properties.insert(species::electron, {1,-1,"electron","el"});
-    properties.insert(species::ion, { 5, 1, "ion","io"});
-  }
-
-  // NOTE called in particle updater
   template < typename R >
-  void set_up() {
+  auto set_up() {
+    map<Properties> properties;
+    {
+      properties.insert(species::electron, {1,-1,"electron","el"});
+      properties.insert(species::ion, { 5, 1, "ion","io"});
+    }
+
     using namespace pic;
     {
       constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-
       if ( properties.has(species::electron) ) {
         auto sp = species::electron;
         Force<real_t,Specs> force;
@@ -195,6 +194,8 @@ namespace particle {
         force.Register(sp);
       }
     }
+
+    return properties;
   }
 
 }
@@ -231,7 +232,34 @@ namespace io {
     }
   }
 
-  template < typename RDS, int DGrid, typename R, typename RJ>
+  template < typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> EparaB ( apt::Index<DGrid> I,
+                           const apt::Grid<R,DGrid>& grid,
+                           const field::Field<R, 3, DGrid>& E,
+                           const field::Field<R, 3, DGrid>& B,
+                           const field::Field<RJ, 3, DGrid>& J ) {
+    auto B_itpl = msh::interpolate( B, I2std<R>(I), ShapeF() );
+    B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
+    return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ), B_itpl ),
+            0.0, 0.0};
+  }
+
+  template < typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> EdotJ ( apt::Index<DGrid> I,
+                          const apt::Grid<R,DGrid>& grid,
+                          const field::Field<R, 3, DGrid>& E,
+                          const field::Field<R, 3, DGrid>& B,
+                          const field::Field<RJ, 3, DGrid>& J ) {
+    return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ),
+                      msh::interpolate( J, I2std<RJ>(I), ShapeF() ) ),
+            0.0, 0.0};
+  }
+
+  template < typename RDS,
+             int DGrid,
+             typename R,
+             typename RJ
+             >
   auto set_up_field_export() {
     std::vector<FieldExportee<RDS, DGrid, R, RJ>*> fexps;
     {
@@ -248,6 +276,14 @@ namespace io {
                                 ) );
       fexps.push_back( new FA ( "J4X", 3,
                                 field_self<2,R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "EparaB", 1,
+                                EparaB<R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "EdotJ", 1,
+                                EdotJ<R, DGrid, ShapeF, RJ>,
                                 nullptr
                                 ) );
     }
@@ -272,26 +308,17 @@ namespace io {
     return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
   }
 
-  template < typename RDS, int DGrid, typename R, template < typename > class S >
+  template < typename RDS, int DGrid, typename R, template < typename > class S>
   auto set_up_particle_export() {
     constexpr int DSratio = 1;
     std::vector<PtcExportee<RDS, DGrid, R, S>*> pexps;
     {
       using PA = PexpTbyFunction<RDS,DGrid,R,S,particle::induced_shapef_t<pic::ShapeF,DSratio>>;
-      pexps.push_back( new PA ("Num", 1,
-                               ptc_num<R,S>,
-                               nullptr
-                               ) );
+      pexps.push_back( new PA ("Num", 1, ptc_num<R,S>, nullptr) );
 
-      pexps.push_back( new PA ("E", 1,
-                               ptc_energy<R,S>,
-                               nullptr
-                               ) );
+      pexps.push_back( new PA ("E", 1, ptc_energy<R,S>, nullptr) );
 
-      pexps.push_back( new PA ("P", 3,
-                               ptc_momentum<R,S>,
-                               nullptr
-                               ) );
+      pexps.push_back( new PA ("P", 3, ptc_momentum<R,S>, nullptr) );
     }
 
     return pexps;
@@ -299,7 +326,7 @@ namespace io {
 }
 
 namespace io {
-  constexpr bool is_collinear_mesh = true;
+  constexpr bool is_collinear_mesh = true; // FIXME this is an ad hoc fix
 }
 
 #include <sstream>
