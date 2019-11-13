@@ -1,5 +1,5 @@
 #include "silopp/silo++.hpp"
-#include <silo.h>
+#include "silo.h"
 
 namespace silo :: traits {
   bool display_guard = true;

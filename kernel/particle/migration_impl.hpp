@@ -117,16 +117,19 @@ namespace particle {
              template < typename > class PtcSpecs,
              int DGrid, int I = DGrid-1 >
   void migrate ( std::vector<Particle< Real, PtcSpecs >>& buffer,
+                 const apt::array< mpi::Topo, DGrid >& topos,
                  const apt::array< apt::pair<std::optional<mpi::InterComm>>, DGrid >& intercomms,
                  unsigned int pairing_shift ) {
+    // NOTE when topo[I] is a single-cpu ring, there is no going outside of bulk. Hence nothing needs to be done.
+    if ( !( topos[I].periodic() && topos[I].dim() == 1 ) ) {
+      auto lcr =
+        [](const auto& ptc) noexcept {
+          return ( migrInt<DGrid>(ptc) % apt::pow3(I+1) ) / apt::pow3(I);
+        };
 
-    auto lcr =
-      [](const auto& ptc) noexcept {
-        return ( migrInt<DGrid>(ptc) % apt::pow3(I+1) ) / apt::pow3(I);
-      };
-
-    impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
+      impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );
+    }
     if constexpr ( I > 0 )
-      migrate<Real,PtcSpecs,DGrid,I-1>( buffer, intercomms, pairing_shift );
+      migrate<Real,PtcSpecs,DGrid,I-1>( buffer, topos, intercomms, pairing_shift );
   }
 }

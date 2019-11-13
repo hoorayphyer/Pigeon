@@ -250,9 +250,9 @@ namespace mpi {
   }
 
   std::optional<int> CartComm::coords2rank( const std::vector<int>& coords ) const {
-    const auto[c,d,p] = coords_dims_periodic();
-    for ( int i = 0; i < p.size(); ++i ) {
-      if( !p[i] && ( coords[i] < 0 || coords[i] > d[i] - 1  ) )
+    const auto[c,topos] = coords_topos();
+    for ( int i = 0; i < c.size(); ++i ) {
+      if( !topos[i].periodic() && ( coords[i] < 0 || coords[i] > topos[i].dim() - 1  ) )
         return {};
     }
 
@@ -261,18 +261,18 @@ namespace mpi {
     return {rank};
   }
 
-  std::tuple<std::vector<int>, std::vector<int>, std::vector<bool> >
-  CartComm::coords_dims_periodic() const {
+  std::tuple<std::vector<int>, std::vector<Topo> >
+  CartComm::coords_topos() const {
     int ndims = 0;
     MPI_Cartdim_get( *this, &ndims );
     std::vector<int> coords (ndims);
-    std::vector<int> dims(ndims);
-    std::vector<int> is_per (ndims);
-    MPI_Cart_get( *this, ndims, dims.data(), is_per.data(), coords.data() );
-    std::vector<bool> periodic(ndims);
+    std::vector<Topo> topos(ndims);
+    std::vector<int> periodic (ndims);
+    MPI_Cart_get( *this, ndims, reinterpret_cast<int*>(topos.data()), periodic.data(), coords.data() );
+
     for ( int i = 0; i < ndims; ++i )
-      periodic[i] = is_per[i];
-    return make_tuple( coords, dims, periodic );
+      if ( periodic[i] ) topos[i] = {-1 * topos[i].dim()};
+    return make_tuple( coords, topos );
   }
 
   apt::pair<std::optional<int>> CartComm::shift( int ith_dim, int disp ) const {

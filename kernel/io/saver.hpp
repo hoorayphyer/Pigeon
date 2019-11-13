@@ -32,17 +32,17 @@ namespace io {
 
       {
         _block_ns_prefix = delimiter + std::string("cart");
-        auto [c, dims, p] = _cart_opt->coords_dims_periodic();
-        for ( int i = 0; i < dims.size(); ++i ) _block_ns_prefix += "_%03d";
+        auto [c, topos] = _cart_opt->coords_topos();
+        for ( int i = 0; i < topos.size(); ++i ) _block_ns_prefix += "_%03d";
         _block_ns_prefix += "/";
 
         _block_ns_postfix = "";
         // mpi uses row major numbering to map cartesian rank to coordinates, e.g. (0,0) -> 0, (0,1) -> 1, (1,0) -> 2, (1,1) -> 3
-        std::vector<int> strides ( dims.size() + 1 ); // strides = ( DzDyDx, DzDy, Dz, 1 )
+        std::vector<int> strides ( topos.size() + 1 ); // strides = ( DzDyDx, DzDy, Dz, 1 )
         strides.back() = 1;
-        for ( int i = dims.size() - 1; i > -1; --i ) strides[i] = strides[i+1] * dims[i];
+        for ( int i = topos.size() - 1; i > -1; --i ) strides[i] = strides[i+1] * topos[i].dim();
 
-        for ( int i = 0; i < dims.size(); ++i ) {
+        for ( int i = 0; i < topos.size(); ++i ) {
           _block_ns_postfix += delimiter + std::string("(n%" + std::to_string(strides[i]) + ")/") + std::to_string(strides[i+1]);
         }
       }

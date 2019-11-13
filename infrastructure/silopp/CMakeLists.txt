@@ -7,11 +7,11 @@ ExternalProject_Add(silo-llnl
   INSTALL_DIR "${SILO_ROOT}"
   URL https://wci.llnl.gov/content/assets/docs/simulation/computer-codes/silo/silo-4.10.2/silo-4.10.2.tar.gz
   CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=yes --enable-fortran=no --enable-static=no --enable-optimization=yes --enable-browser=no --with-hdf5=${HDF5_INCLUDE_DIRS},${HDF5_INCLUDE_DIRS}/../lib
-  STEP_TARGETS build
+  STEP_TARGETS install
   )
 
 add_library(silopp SHARED "silo++.cpp" "silo_optlist.cpp" "silo_operations.cpp" "silo_navigation.cpp" "silo_reader.cpp" "silo_toc.cpp")
-add_dependencies(silopp silo-llnl-build)
+add_dependencies(silopp silo-llnl-install)
 target_include_directories(silopp PUBLIC "${SILO_ROOT}/include" ${PROJECT_SOURCE_DIR})
 target_link_directories( silopp PUBLIC "${SILO_ROOT}/lib" )
 target_link_libraries( silopp PUBLIC siloh5 )

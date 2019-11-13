@@ -17,8 +17,7 @@ namespace dye {
 
     // need the following so replicas can also know
     apt::array< int, DGrid > cart_coords;
-    apt::array< int, DGrid > cart_dims;
-    apt::array< bool, DGrid > is_periodic;
+    apt::array< mpi::Topo, DGrid > cart_topos;
 
     int label() const noexcept;
     inline auto size() const noexcept { return intra.size(); }

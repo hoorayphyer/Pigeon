@@ -71,6 +71,19 @@ namespace mpi {
 }
 
 namespace mpi {
+  class Topo {
+  private:
+    int _signed_dim = 1; // negative values mean periodic
+  public:
+    constexpr Topo() = default;
+    explicit constexpr Topo( int dim, bool periodic )
+      : _signed_dim( periodic ? -std::abs(dim) : std::abs(dim) ) {}
+    constexpr Topo( int dim ) : _signed_dim(dim) {}
+
+    constexpr int dim() const noexcept { return std::abs(_signed_dim); }
+    constexpr bool periodic() const noexcept { return _signed_dim < 0; }
+  };
+
   struct CartComm : public Comm {
     CartComm( const Comm& comm, std::vector<int> dims, std::vector<bool> periodic );
 
@@ -83,8 +96,8 @@ namespace mpi {
       return rank2coords( rank());
     }
 
-    std::tuple<std::vector<int>, std::vector<int>, std::vector<bool>>
-    coords_dims_periodic() const;
+    std::tuple<std::vector<int>, std::vector<Topo>>
+    coords_topos() const;
 
     // Sending in the `ith_dim` by `disp`, returns [ src_rank, dest_rank ]. If disp = 0, both src_rank and dest_rank will be self
     apt::pair<std::optional<int>> shift(int ith_dim, int disp = 1 ) const;

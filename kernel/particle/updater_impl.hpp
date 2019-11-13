@@ -133,7 +133,7 @@ namespace particle {
               debug::throw_error("NANUPDATEQ");
             }
 #endif
-            // TODO pusher handle boundary condition. Is it needed?
+            // FIXME pusher handle boundary condition. Is it needed?
             if ( prop.charge_x != 0 ) {
               // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()
               for ( int i = 0; i < DGrid; ++i ) {

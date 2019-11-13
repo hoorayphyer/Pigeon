@@ -154,7 +154,7 @@ namespace ckpt {
           {
             // write global data
             if ( !dbfile.exists("/timestep") ) {
-              dbfile.write( "/cartesian_partition", ens.cart_dims.begin(), {DGrid} );
+              dbfile.write( "/cartesian_topology", reinterpret_cast<const int*>(ens.cart_topos.begin()), {DGrid} );
 
               using T = std::underlying_type_t<particle::species>;
               std::vector<T> sps;
@@ -231,7 +231,7 @@ namespace ckpt {
       auto dir_itr = fs::directory_iterator(dir);
       auto dbfile = silo::open(*dir_itr, silo::Mode::Read);
       assert( dbfile.var_exists("/timestep") );
-      assert( dbfile.var_exists("/cartesian_partition") );
+      assert( dbfile.var_exists("/cartesian_topology") );
       assert( dbfile.var_exists("/species") );
 
       dbfile.read("/timestep", &checkpoint_ts);
@@ -240,17 +240,17 @@ namespace ckpt {
       lgr::file << silo::errmsg() << std::endl;
 #endif
       {
-        int ndims = dbfile.var_length("/cartesian_partition");
-        std::vector<int> parts(ndims);
-        dbfile.read("/cartesian_partition", parts.data());
+        int ndims = dbfile.var_length("/cartesian_topology");
+        std::vector<int> topos(ndims);
+        dbfile.read("/cartesian_topology", topos.data());
 #ifdef PIC_DEBUG
-        lgr::file << "LDCKPT cartesian_partition = (";
-        for ( auto x : parts ) lgr::file << x << ",";
+        lgr::file << "LDCKPT cartesian_topology = (";
+        for ( auto x : topos ) lgr::file << x << ",";
         lgr::file << ")" << std::endl;
         lgr::file << silo::errmsg() << std::endl;
 #endif
         num_ens = 1;
-        for ( auto x : parts ) num_ens *= x;
+        for ( auto x : topos ) num_ens *= std::abs(x);
       }
       {
         num_sps = dbfile.var_length("/species");

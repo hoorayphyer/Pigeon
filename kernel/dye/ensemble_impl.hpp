@@ -81,19 +81,18 @@ namespace dye {
       ens.chief_cart_rank = cart.rank();
 
       {
-        auto[c, d, p] = cart.coords_dims_periodic();
+        auto[c, t] = cart.coords_topos();
         for ( int i = 0; i < DGrid; ++i ) {
           ens.cart_coords[i] = c[i];
-          ens.cart_dims[i] = d[i];
-          ens.is_periodic[i] = p[i];
+          ens.cart_topos[i] = t[i];
         }
       }
 
       buf[0] = ens.chief_cart_rank;
       for ( int i = 0; i < DGrid; ++i ) {
         buf[1+i] = ens.cart_coords[i];
-        buf[1+DGrid+i] = ens.cart_dims[i];
-        buf[1+ 2*DGrid+i] = ens.is_periodic[i];
+        buf[1+DGrid+i] = ens.cart_topos[i].dim();
+        buf[1+ 2*DGrid+i] = ens.cart_topos[i].periodic();
       }
     }
 
@@ -103,13 +102,12 @@ namespace dye {
       ens.chief_cart_rank = buf[0];
       for ( int i = 0; i < DGrid; ++i ) {
         ens.cart_coords[i] = buf[1+i];
-        ens.cart_dims[i] = buf[1+DGrid+i];
-        ens.is_periodic[i] = buf[1+2*DGrid+i];
+        ens.cart_topos[i] = mpi::Topo( buf[1+DGrid+i], static_cast<bool>(buf[1+2*DGrid+i]) );
       }
     }
 
     for ( int i = 0; i < DGrid; ++i )
-      ens.inter[i] = impl::link_neighbors( intra, cart_comm, i, ens.chief, ens.cart_coords[i], ens.cart_dims[i], ens.is_periodic[i] );
+      ens.inter[i] = impl::link_neighbors( intra, cart_comm, i, ens.chief, ens.cart_coords[i], ens.cart_topos[i].dim(), ens.cart_topos[i].periodic() );
 
     return ens_opt;
   }
@@ -129,10 +127,10 @@ namespace dye {
     return chief_cart_rank;
   }
 
-  // FIXME at_boundary should check cart_dim = 1 and periodic
   template < int DGrid >
   apt::pair<bool> Ensemble<DGrid>::is_at_boundary( int ith_dim ) const noexcept {
-    return { !(inter[ith_dim][LFT]), !(inter[ith_dim][RGT]) };
+    if ( cart_topos[ith_dim].periodic() ) return {};
+    else return { !(inter[ith_dim][LFT]), !(inter[ith_dim][RGT]) };
   }
 
   template < int DGrid >

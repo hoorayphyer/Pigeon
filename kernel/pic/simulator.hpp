@@ -57,8 +57,7 @@ namespace pic {
 
     std::vector<particle::Particle<R, S>> _migrators;
 
-    template < typename Action >
-    void taylor( Action& a ) {
+    void taylor( apt::ActionBase<DGrid>& a ) {
       // NOTE range is assumed to be noempty [,)
       auto f =
         [] ( int Ib_global, int Ie_global,
@@ -134,8 +133,7 @@ namespace pic {
 
     void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
-        _grid[i] = _supergrid[i].divide( ens.cart_dims[i], ens.cart_coords[i] );
-        // TODO cart_dim = 1 and periodic
+        _grid[i] = _supergrid[i].divide( ens.cart_topos[i].dim(), ens.cart_coords[i] );
         _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
@@ -183,7 +181,29 @@ namespace pic {
         }
       }
 
-      migrate( _migrators, _ens_opt->inter, timestep );
+      migrate( _migrators, _ens_opt->cart_topos, _ens_opt->inter, timestep );
+
+      // NOTE adjust particle positions in the ring topology, regardless how many cpus there are on that ring.
+      {
+        bool has_periodic = false;
+        for ( int i = 0; i < DGrid; ++i ) {
+          has_periodic = has_periodic || _ens_opt->cart_topos[i].periodic();
+        }
+        if ( has_periodic ) {
+          for ( auto& ptc : _migrators ) {
+            if ( !ptc.is(flag::exist) ) continue;
+
+            for ( int i = 0; i < DGrid; ++i ) {
+              if ( !_ens_opt->cart_topos[i].periodic() ) continue;
+              int idx = static_cast<int>( ( ptc.q()[i] - _supergrid[i].lower() ) / _supergrid[i].delta() + 0.5 );
+              if ( idx >= 0 ) idx /= _supergrid[i].dim();
+              else idx = - ( (-idx) / _supergrid[i].dim() + 1 );
+
+              ptc.q()[i] -= idx * _supergrid[i].dim() * _supergrid[i].delta();
+            }
+          }
+        }
+      }
 
       for ( auto&& ptc : _migrators ) {
         if ( !ptc.is(flag::exist) ) continue;
@@ -286,7 +306,7 @@ namespace pic {
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
-        // TODOL a temporary fix, which may crash under the edge case in which initially many particles are created
+        // FIXME a temporary fix, which may crash under the edge case in which initially many particles are created.
         if (_cart_opt) {
           auto ic = pic::set_up_initial_conditions<DGrid,R,RJ,S>();
           taylor(ic);
