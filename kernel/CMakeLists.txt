@@ -18,6 +18,21 @@ if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 endif()
 
+# FIXME use imported library
+include_directories(${CMAKE_CURRENT_LIST_DIR}/../infrastructure)
+
+add_library(mpi INTERFACE)
+# FIXME not sure why the RPATH info in mpipp is not transitive here. Build? Install?
+find_package(MPI)
+target_compile_options(mpi INTERFACE "${MPI_CXX_COMPILE_OPTIONS}")
+separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # a workaround since findMPI doesn't provide this yet
+target_include_directories(mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure)
+target_link_options(mpi INTERFACE ${MPI_CXX_LINK_OPTIONS})
+target_link_directories(mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
+target_link_libraries(mpi INTERFACE ${MPI_CXX_LIBRARIES})
+target_link_libraries(mpi INTERFACE -lmpipp)
+
+
 function(test_gen category name)
   set(test_target "test_${category}_${name}")
   add_executable( ${test_target} "tests/test_${name}.cpp")
@@ -28,8 +43,8 @@ function(test_gen category name)
   set(link_testfw testfw)
   foreach( lib IN LISTS ARGN)
     target_link_libraries(${test_target} PRIVATE ${lib})
-    if( ${lib} STREQUAL "mpipp" )
-      set(link_testfw testfw_mpi)
+    if( ${lib} STREQUAL "mpi" )
+      set(link_testfw testfw_mpi mpi)
     endif()
   endforeach()
   target_link_libraries( ${test_target} PRIVATE ${link_testfw} )
@@ -45,17 +60,13 @@ function(msperf_gen category name)
   set(link_testfw testfw)
   foreach( lib IN LISTS ARGN)
     target_link_libraries(${test_target} PRIVATE ${lib})
-    if( ${lib} STREQUAL "mpipp" )
-      set(link_testfw testfw_mpi)
+    if( ${lib} STREQUAL "mpi" )
+      set(link_testfw testfw_mpi mpi)
     endif()
   endforeach()
   target_link_libraries( ${test_target} PRIVATE ${link_testfw} )
   target_link_libraries( ${test_target} PRIVATE timer logger )
 endfunction()
-
-# FIXME use imported library
-include_directories(${CMAKE_CURRENT_LIST_DIR}/../infrastructure)
-link_directories(${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
 
 if (${ENABLE_DEBUG})
   add_subdirectory(debug)

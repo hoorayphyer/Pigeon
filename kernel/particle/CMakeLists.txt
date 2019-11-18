@@ -15,11 +15,11 @@ target_link_libraries(particle_updater PRIVATE particle_forces particle_scatteri
 
 add_library(mpi_particle SHARED "mpi_particle.cpp")
 target_include_directories(mpi_particle PUBLIC ${KERNEL_DIR})
-target_link_libraries(mpi_particle PRIVATE mpipp picgen)
+target_link_libraries(mpi_particle PRIVATE mpi picgen)
 
 add_library( particle_migration SHARED migration.cpp )
 target_include_directories(particle_migration PUBLIC ${KERNEL_DIR} PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(particle_migration PRIVATE mpipp mpi_particle picgen)
+target_link_libraries(particle_migration PRIVATE mpi mpi_particle picgen)
 
 if (${ENABLE_TESTS})
   test_gen(particle state)
@@ -29,7 +29,7 @@ if (${ENABLE_TESTS})
   test_gen(particle map)
   test_gen(particle forces)
   test_gen(particle sorter)
-  test_gen(particle migration mpipp) # TODO add test on buffer has size 0 and nonzero capacity
+  test_gen(particle migration mpi) # TODO add test on buffer has size 0 and nonzero capacity
 
   msperf_gen( particle updater )
 endif()
