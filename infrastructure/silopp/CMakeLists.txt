@@ -1,12 +1,14 @@
 find_package(HDF5 REQUIRED)
 
+list(GET HDF5_INCLUDE_DIRS 0 HDF5_INC) # in case more than one dir is found
+
 set(SILO_ROOT "${CMAKE_CURRENT_LIST_DIR}/silo-llnl")
 include(ExternalProject)
 ExternalProject_Add(silo-llnl
   PREFIX "${SILO_ROOT}"
   INSTALL_DIR "${SILO_ROOT}"
   URL https://wci.llnl.gov/content/assets/docs/simulation/computer-codes/silo/silo-4.10.2/silo-4.10.2.tar.gz
-  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=yes --enable-fortran=no --enable-static=no --enable-optimization=yes --enable-browser=no --with-hdf5=${HDF5_INCLUDE_DIRS},${HDF5_INCLUDE_DIRS}/../lib
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=yes --enable-fortran=no --enable-static=no --enable-optimization=yes --enable-browser=no --with-hdf5=${HDF5_INC},${HDF5_INC}/../lib
   STEP_TARGETS install
   )
 
