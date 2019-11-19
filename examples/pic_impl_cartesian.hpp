@@ -74,6 +74,9 @@ namespace pic {
   inline constexpr ModuleRange vitals_mr { true, 0, 100 };
 
   inline constexpr int cout_ts_interval = 100;
+
+  inline constexpr ModuleRange tracing_mr { false, 1, 1000 };
+  inline constexpr int num_tracing_parts = 4;
 }
 
 namespace field {
@@ -130,10 +133,10 @@ namespace pic {
       InitialCondition* Clone() const override { return new InitialCondition(*this); }
 
       void operator() ( const apt::Grid<R,DGrid>& grid,
-                        field::Field<R, 3, DGrid>& ,
+                        field::Field<R, 3, DGrid>& E,
                         field::Field<R, 3, DGrid>& B,
-                        field::Field<RJ, 3, DGrid>& ,
-                        particle::map<particle::array<R,S>>&
+                        field::Field<RJ, 3, DGrid>& J,
+                        particle::map<particle::array<R,S>>& particles
                         ) const {}
 
     } ic;
@@ -142,6 +145,39 @@ namespace pic {
 
     return ic;
   }
+}
+
+namespace particle {
+  template < typename R, int D >
+  struct RTD { // runtime data
+    static map<R> N_scat;
+    static field::Field<R,1,D> pc_counter;
+    static R pc_cumulative_time;
+
+    static map<unsigned int> trace_counter;
+
+    static void init( const map<Properties>& properties, const apt::Grid< R, D >& localgrid ) {
+      for ( auto sp : properties )
+        N_scat.insert( sp, 0 ); // FIXME check insert if existed
+
+      apt::Index<D> bulk_dims;
+      for ( int i = 0; i < D; ++i ) bulk_dims[i] = localgrid[i].dim();
+      auto range = apt::make_range({}, bulk_dims, 0);
+      pc_counter = {range};
+    };
+  };
+
+  template < typename R, int D >
+  map<R> RTD<R,D>::N_scat {};
+
+  template < typename R, int D >
+  field::Field<R,1,D> RTD<R,D>::pc_counter {};
+
+  template < typename R, int D >
+  R RTD<R,D>::pc_cumulative_time = 0;
+
+  template < typename R, int D >
+  map<unsigned int> RTD<R,D>::trace_counter {};
 }
 
 namespace particle {
@@ -162,6 +198,7 @@ namespace particle {
     return pus;
   }
 }
+
 
 namespace particle {
   template < typename R >
@@ -327,6 +364,12 @@ namespace io {
 
 namespace io {
   constexpr bool is_collinear_mesh = true; // FIXME this is an ad hoc fix
+
+  template < typename R, int DGrid >
+  void export_prior_hook( const apt::Grid< R, DGrid >& grid, const dye::Ensemble<DGrid>& ens ) {}
+
+  template < typename R, int DGrid >
+  void export_post_hook() {}
 }
 
 #include <sstream>

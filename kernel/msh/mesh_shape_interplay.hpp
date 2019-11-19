@@ -25,7 +25,7 @@ namespace msh {
 namespace msh {
   // NOTE q_std refers to the same "standard" as above
   template < typename T, int DGrid, int Dq, typename ShapeF >
-  T interpolate ( const typename field::Component<T,DGrid>& fcomp,
+  T interpolate ( const field::Component<T,DGrid>& fcomp,
                   const apt::array<T,Dq>& q_std,
                   const ShapeF& shapef ) noexcept;
 

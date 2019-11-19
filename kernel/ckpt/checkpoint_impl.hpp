@@ -41,15 +41,15 @@ namespace ckpt {
     }
   };
 
-  template < typename T, template < typename > class PtcSpecs >
+  template < typename T, template < typename > class S >
   struct ParticleArrayCkpt {
-    void save( silo::file_t& dbfile, const particle::Properties& prop, const particle::array<T,PtcSpecs>& ptcs ) {
+    void save( silo::file_t& dbfile, const particle::Properties& prop, const particle::array<T,S>& ptcs ) {
       dbfile.mkcd(prop.name);
       particle::load_t num = ptcs.size();
       // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
       dbfile.write("load", num);
       if ( num != 0 ) {
-        constexpr auto DPtc = PtcSpecs<T>::Dim;
+        constexpr auto DPtc = S<T>::Dim;
         for ( int i = 0; i < DPtc; ++i ) {
           dbfile.write("q"+std::to_string(i+1), ptcs._q[i].data(), {ptcs._q[i].size()} );
           dbfile.write("p"+std::to_string(i+1), ptcs._p[i].data(), {ptcs._p[i].size()} );
@@ -60,7 +60,7 @@ namespace ckpt {
       dbfile.cd("..");
     }
 
-    void load( silo::file_t& dbfile, const particle::Properties& prop, particle::array<T,PtcSpecs>& ptcs, int receiver_idx, int num_receivers ) {
+    void load( silo::file_t& dbfile, const particle::Properties& prop, particle::array<T,S>& ptcs, int receiver_idx, int num_receivers ) {
       dbfile.cd( prop.name );
       auto N = dbfile.read1<particle::load_t>("load");
 #ifdef PIC_DEBUG
@@ -72,7 +72,7 @@ namespace ckpt {
         auto size_old = ptcs.size();
         ptcs.resize(size_old + num);
 
-        constexpr auto DPtc = PtcSpecs<T>::Dim;
+        constexpr auto DPtc = S<T>::Dim;
         apt::array<int, 3> slice { from, num, 1 };
 #ifdef PIC_DEBUG
         lgr::file << "LDCKPT Slice from = " << from << ", length = " << num << ", stride = " << 1 << std::endl;
@@ -103,18 +103,15 @@ namespace ckpt {
 
 namespace ckpt {
   // TODO save random seed
-  template < int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs >
+  template < int DGrid, typename R, template < typename > class S >
   std::string save_checkpoint( std::string prefix, const int num_parts,
                                const std::optional<dye::Ensemble<DGrid>>& ens_opt,
                                int timestep,
-                               const field::Field<Real, 3, DGrid>& E,
-                               const field::Field<Real, 3, DGrid>& B,
-                               const particle::map<particle::array<Real,PtcSpecs>>& particles,
+                               const field::Field<R, 3, DGrid>& E,
+                               const field::Field<R, 3, DGrid>& B,
+                               const particle::map<particle::array<R,S>>& particles,
                                const particle::map<particle::Properties>& properties,
-                               const particle::map<double>& N_scat
-
+                               const particle::map<R>& N_scat
                                ) {
     bool is_idle = !ens_opt;
     int key = 0;
@@ -171,7 +168,7 @@ namespace ckpt {
                 dbfile.write( "label", ens.label() );
               }
 
-              FieldCkpt<Real,DGrid> ckpt;
+              FieldCkpt<R,DGrid> ckpt;
               if ( ens.intra.rank() == ens.chief ) {
                 int idx = 0;
                 for ( auto sp : particles )
@@ -193,7 +190,7 @@ namespace ckpt {
             { // write process specific data
               int r = ens.intra.rank();
               dbfile.write( "r", r );
-              ParticleArrayCkpt<Real, PtcSpecs> ckpt;
+              ParticleArrayCkpt<R, S> ckpt;
               for ( auto sp : particles ) {
                 ckpt.save( dbfile, properties[sp], particles[sp] );
               }
@@ -206,17 +203,15 @@ namespace ckpt {
 
   }
 
-  template < int DGrid,
-             typename Real,
-             template < typename > class PtcSpecs >
+  template < int DGrid, typename R, template < typename > class S >
   int load_checkpoint( std::string dir,
                        std::optional<dye::Ensemble<DGrid>>& ens_opt,
                        const std::optional<mpi::CartComm>& cart_opt,
-                       field::Field<Real, 3, DGrid>& E,
-                       field::Field<Real, 3, DGrid>& B,
-                       particle::map<particle::array<Real,PtcSpecs>>& particles,
+                       field::Field<R, 3, DGrid>& E,
+                       field::Field<R, 3, DGrid>& B,
+                       particle::map<particle::array<R,S>>& particles,
                        const particle::map<particle::Properties>& properties,
-                       particle::map<double>& N_scat,
+                       particle::map<R>& N_scat,
                        int target_load
                        ) {
     int checkpoint_ts = 0;
@@ -332,8 +327,8 @@ namespace ckpt {
     const int myrank = ens_opt->intra.rank();
     const auto ens_size = ens_opt->intra.size();
 
-    FieldCkpt<Real,DGrid> f_ckpt;
-    ParticleArrayCkpt<Real, PtcSpecs> p_ckpt;
+    FieldCkpt<R,DGrid> f_ckpt;
+    ParticleArrayCkpt<R, S> p_ckpt;
     for ( auto f : fs::directory_iterator(dir) ) {
 #ifdef PIC_DEBUG
       lgr::file << "Reading file " << f << std::endl;
@@ -390,5 +385,89 @@ namespace ckpt {
     }
 
     return checkpoint_ts;
+  }
+
+
+  template < int DGrid, typename R, template < typename > class S >
+  std::string save_tracing( std::string prefix, const int num_parts,
+                            const std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                            int timestep,
+                            const particle::map<particle::array<R,S>>& particles,
+                            const particle::map<particle::Properties>& properties
+                            ) {
+    bool is_idle = !ens_opt;
+    int key = 0;
+    if ( !is_idle ) key = ens_opt -> label();
+    // use ensemble label to put processes from same ensemble together
+    auto active = mpi::world.split( {is_idle}, key );
+    if ( is_idle ) return "";
+    const auto& ens = *ens_opt;
+
+    char str_ts [10];
+    sprintf(str_ts, "%06d\0", timestep);
+
+    prefix = prefix + "/tracing/timestep" + str_ts;
+
+    silo::Pmpio pmpio;
+
+    int num_per_part = active->size() / num_parts + ( active->size() % num_parts != 0 );
+
+    {
+      pmpio.filename = prefix + "/part" + std::to_string( active->rank() / num_per_part ) + ".silo";
+      pmpio.dirname = "/ensemble" + std::to_string(ens.label());
+
+      pmpio.comm = active -> split( active->rank() / num_per_part );
+      fs::mpido(*active, [&](){fs::create_directories(prefix);} );
+    }
+
+    active->barrier();
+
+    std::vector<particle::load_t> loads;
+    loads.reserve(particles.size());
+    for ( auto sp : particles )
+      loads.push_back(particles[sp].size());
+
+    ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
+
+    pmpio([&]( auto& dbfile )
+          {
+            // write global data
+            if ( !dbfile.exists("/timestep") ) {
+              using T = std::underlying_type_t<particle::species>;
+              std::vector<T> sps;
+              for ( auto sp : particles )
+                sps.push_back( static_cast<T>(sp) );
+              dbfile.write( "/species", sps  );
+
+              dbfile.write( "/timestep", timestep );
+            }
+
+            { // write ensemble-wise data
+              if ( !dbfile.exists("label") ) {
+                dbfile.write( "cartesian_coordinates", ens.cart_coords.begin(), {DGrid} );
+                dbfile.write( "label", ens.label() );
+              }
+            }
+
+            dbfile.mkcd( "rank" + std::to_string(ens.intra.rank()) );
+            { // write process specific data
+              int r = ens.intra.rank();
+              dbfile.write( "r", r );
+              ParticleArrayCkpt<R, S> ckpt;
+              for ( auto sp : particles ) {
+                particle::array<R,S> traced;
+                for ( const auto& ptc : particles[sp] ) {
+                  if ( !ptc.is(particle::flag::exist) || !ptc.is(particle::flag::traced) ) continue;
+                  traced.push_back(ptc);
+                }
+
+                ckpt.save( dbfile, properties[sp], traced );
+              }
+            }
+            dbfile.cd("..");
+          }
+      );
+
+    return prefix;
   }
 }

@@ -92,7 +92,7 @@ namespace pic {
                      const std::optional<mpi::CartComm>& cart,
                      const particle::map<particle::Properties>& properties,
                      const particle::map<particle::array<T,S>>& particles,
-                     const particle::map<double>& N_scat ) {
+                     const particle::map<T>& N_scat ) {
     using namespace particle;
     static int counter = 0;
     constexpr int interval = 40;
