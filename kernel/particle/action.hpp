@@ -26,6 +26,7 @@ namespace particle {
 
     virtual void operator() ( map<array<R,S>>& particles,
                               field::Field<RJ,3,DGrid>& J,
+                              std::vector<Particle<R,S>>* new_ptc_buf,
                               const map<Properties>& properties,
                               const field::Field<R,3,DGrid>& E,
                               const field::Field<R,3,DGrid>& B,

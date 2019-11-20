@@ -79,6 +79,9 @@ namespace pic {
   inline constexpr ModuleRange vitals_mr { true, 0, 100 };
 
   inline constexpr int cout_ts_interval = 100;
+
+  inline constexpr ModuleRange tracing_mr { false, 1, 1000 };
+  inline constexpr int num_tracing_parts = 4;
 }
 
 namespace field {
@@ -160,7 +163,7 @@ namespace field {
 
       fu.set_fourpi(PREJ);
       fu.set_magnetic_pole(2);
-      fu.set_damping_rate(1.0); // FIXME
+      fu.set_damping_rate(10.0);
       fu.set_surface_indent(5);
       fu.set_damp_indent(43);
       fu.set_omega_t(field::omega_spinup);
@@ -528,7 +531,7 @@ namespace field {
 
       fu_asym_hi.setName("AxissymmetrizeEBHigher");
       fu_asym_hi[0] = { 0, pic::supergrid[0].dim() };
-      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard - 1 }; // FIXME NOTE -1
+      fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard - 1 }; // FIXME NOTE -1 to avoid index out of bound on E or B
       fu_asym_hi.is_upper_axis(true);
       fu_asym_hi.require_original_EB(false);
     }
@@ -576,13 +579,45 @@ namespace pic {
   }
 }
 
+// FIXME singleton?
+namespace particle {
+  template < typename R, int D >
+  struct RTD { // runtime data
+    static map<R> N_scat;
+    static field::Field<R,1,D> pc_counter;
+    static R pc_cumulative_time;
+
+    static map<unsigned int> trace_counter;
+
+    static void init( const map<Properties>& properties, const apt::Grid< R, D >& localgrid ) {
+      for ( auto sp : properties )
+        N_scat.insert( sp, 0 );
+
+      apt::Index<D> bulk_dims;
+      for ( int i = 0; i < D; ++i ) bulk_dims[i] = localgrid[i].dim();
+      auto range = apt::make_range({}, bulk_dims, 0);
+      pc_counter = {range};
+    };
+  };
+
+  template < typename R, int D >
+  map<R> RTD<R,D>::N_scat {};
+
+  template < typename R, int D >
+  field::Field<R,1,D> RTD<R,D>::pc_counter {};
+
+  template < typename R, int D >
+  R RTD<R,D>::pc_cumulative_time = 0;
+
+  template < typename R, int D >
+  map<unsigned int> RTD<R,D>::trace_counter {};
+}
+
 namespace particle {
   constexpr pic::real_t N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( pic::dt / pic::wdt_pic, 2.0 );
   constexpr pic::real_t N_atm_x = 1.0; // TODO
   constexpr pic::real_t v_th = 0.2;
   constexpr pic::real_t gravity_strength = 0.5;
-
-
 
   template < int DGrid, typename R, template < typename > class S,
              typename ShapeF, typename RJ >
@@ -621,6 +656,7 @@ namespace particle {
 
       void operator() ( map<array<R,S>>& particles,
                         field::Field<RJ,3,DGrid>& J,
+                        std::vector<Particle<R,S>>*,
                         const map<Properties>& properties,
                         const field::Field<R,3,DGrid>& E,
                         const field::Field<R,3,DGrid>& B,
@@ -735,6 +771,7 @@ namespace particle {
 
       virtual void operator() ( map<array<R,S>>&,
                                 field::Field<RJ,3,DGrid>& J,
+                                std::vector<Particle<R,S>>*,
                                 const map<Properties>&,
                                 const field::Field<R,3,DGrid>&,
                                 const field::Field<R,3,DGrid>&,
@@ -772,10 +809,58 @@ namespace particle {
       asym_hi.is_upper_axis(true);
     }
 
+    struct ScatteringAnalyzer : public Action<DGrid,R,S,RJ> {
+      virtual ScatteringAnalyzer* Clone() const { return new ScatteringAnalyzer(*this); }
+
+      virtual void operator() ( map<array<R,S>>& particles,
+                                field::Field<RJ,3,DGrid>& J,
+                                std::vector<Particle<R,S>>* new_ptc_buf,
+                                const map<Properties>&,
+                                const field::Field<R,3,DGrid>&,
+                                const field::Field<R,3,DGrid>&,
+                                const apt::Grid< R, DGrid >& grid,
+                                const dye::Ensemble<DGrid>* ,
+                                R dt, int, util::Rng<R>& rng
+                                ) override {
+        auto& buf = *new_ptc_buf;
+        // Put particles where they belong after scattering
+        for ( int i = 0; i < buf.size(); ++i ) {
+          auto this_sp = buf[i].template get<species>();
+
+          // log scattering events
+          RTD<R,DGrid>::N_scat[this_sp] += buf[i].frac();
+
+          // log pair creation locations
+          if ( species::electron == this_sp ) {
+            apt::Index<DGrid> I; // domain index, not the global index
+            for ( int j = 0; j < DGrid; ++j )
+              I[j] = ( buf[i].q()[j] - grid[j].lower() ) / grid[j].delta();
+            RTD<R,DGrid>::pc_counter[0](I) += 1;
+
+            // trace electrons near Y point
+            if ( std::log(6.0) < buf[i].q()[0] and buf[i].q()[0] < std::log(7.0)
+                 and 1.47 < buf[i].q()[1] and buf[i].q()[1] < 1.67
+                 and rng.uniform() < 0.01 ) {
+              buf[i].set(flag::traced);
+              buf[i].set(serial_number(RTD<R,DGrid>::trace_counter[species::electron]++));
+            }
+          }
+
+          particles[this_sp].push_back(std::move(buf[i]));
+        }
+        buf.resize(0);
+        RTD<R,DGrid>::pc_cumulative_time += dt;
+      }
+    } scat_anlz;
+    {
+      scat_anlz.setName("ScatteringAnalysis");
+    }
+
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());
     pus.emplace_back(asym_lo.Clone());
     pus.emplace_back(asym_hi.Clone());
+    pus.emplace_back(scat_anlz.Clone());
 
     return pus;
   }
@@ -1009,6 +1094,16 @@ namespace io {
     }
   }
 
+  template < typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> pair_creation_rate ( apt::Index<DGrid> I,
+                                       const apt::Grid<R,DGrid>& grid,
+                                       const field::Field<R, 3, DGrid>& ,
+                                       const field::Field<R, 3, DGrid>& ,
+                                       const field::Field<RJ, 3, DGrid>&  ) {
+    auto x = msh::interpolate( particle::RTD<R,DGrid>::pc_counter, I2std<R>(I), ShapeF() );
+    return { x[0] / particle::RTD<R,DGrid>::pc_cumulative_time, 0, 0};
+  }
+
   // void delE_v_J();
 
   // void delB();
@@ -1048,6 +1143,10 @@ namespace io {
                                 dFlux_pol<R, DGrid, ShapeF, RJ>,
                                 integrate_dFlux<RDS, DGrid>
                                 ) );
+      fexps.push_back( new FA ( "PairCreationRate", 1,
+                                pair_creation_rate<R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
     }
     return fexps;
   }
@@ -1078,16 +1177,33 @@ namespace io {
         assert( field[i].offset()[dim] == MIDWAY );
     }
 
-    // TODO these are duplicate
     constexpr int axis_dir = 1;
     constexpr auto PI = std::acos(-1.0l);
     bool is_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
     bool is_upper = std::abs( grid[axis_dir].upper() - PI ) < grid[axis_dir].delta();
 
-    auto add_assign = []( RDS& a, RDS& b ) noexcept -> void {a += b; b = a;}; // TODO only add_assign
-    // FIXME finish this
-    // for ( int i = 0; i < num_comps; ++i )
-    //   field::axissymmetrize( field[i], add_assign, is_upper ); // FIXME Ib and ext
+    auto add_assign = []( RDS& a, RDS& b ) noexcept -> void {a += b; b = a;};
+    auto sub_assign = []( RDS& a, RDS& b ) noexcept -> void {a -= b; b = -a;};
+
+    const auto& range = field.mesh().range();
+    if ( is_lower ) {
+      auto rb = apt::range::begin(range);
+      auto re = apt::range::end(range);
+      rb[axis_dir] = -1;
+      re[axis_dir] = 0; // 0 as the end is appropriate because field is MIDWAY
+      axissymmetrize( field[0], add_assign, rb, re, false );
+      for ( int i = 1; i < num_comps; ++i )
+        axissymmetrize( field[0], sub_assign, rb, re, false );
+    }
+    if ( is_upper ) {
+      auto rb = apt::range::begin(range);
+      auto re = apt::range::end(range);
+      rb[axis_dir] = re[axis_dir]; // FIXME double check. There are domain indices not global indices
+      re[axis_dir] += 1;
+      axissymmetrize( field[0], add_assign, rb, re, true );
+      for ( int i = 1; i < num_comps; ++i )
+        axissymmetrize( field[0], sub_assign, rb, re, true );
+    }
   }
 
   template < typename RDS,
@@ -1121,6 +1237,19 @@ namespace io {
 
 namespace io {
   constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
+
+  template < typename R, int DGrid >
+  void export_prior_hook( const apt::Grid< R, DGrid >& grid, const dye::Ensemble<DGrid>& ens ) {
+    auto& pc = particle::RTD<R,DGrid>::pc_counter;
+    ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
+  }
+
+  template < typename R, int DGrid >
+  void export_post_hook() {
+    auto& pc = particle::RTD<R,DGrid>::pc_counter;
+    std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
+    particle::RTD<R,DGrid>::pc_cumulative_time = 0;
+  }
 }
 
 #include <sstream>

@@ -4,7 +4,7 @@
 
 namespace particle::scat {
   template < bool Instant, typename T, template < typename > class S >
-  void RadiationFromCharges ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T E_ph ) {
+  void RadiationFromCharges ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T E_ph ) {
     {
       auto gamma_ptc = std::sqrt( 1.0 + apt::sqabs(ptc.p()) );
       // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
@@ -36,7 +36,7 @@ namespace particle::scat {
   }
 
   template < typename T, template < typename > class S >
-  void PhotonPairProduction ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& photon, T ) {
+  void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T ) {
     Particle<T,S> ptc_sec ( photon.q(),
                             photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
                             photon.frac(),

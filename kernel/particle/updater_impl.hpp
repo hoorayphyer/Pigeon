@@ -11,10 +11,6 @@
 #endif
 
 namespace particle {
-  map<double> N_scat;
-}
-
-namespace particle {
   template < int DGrid,
              typename R,
              template < typename > class S,
@@ -23,6 +19,7 @@ namespace particle {
   void Updater< DGrid, R, S, ShapeF, RJ >
   ::operator() ( map<array<R,S>>& particles,
                  field::Field<RJ,3,DGrid>& J,
+                 std::vector<Particle<R,S>>* new_ptc_buf,
                  const map<Properties>& properties,
                  const field::Field<R,3,DGrid>& E,
                  const field::Field<R,3,DGrid>& B,
@@ -112,7 +109,7 @@ namespace particle {
 #endif
 
             dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
-            scatter( ptc, _buf, prop, dp, dt, B_itpl, rng );
+            scatter( ptc, *new_ptc_buf, prop, dp, dt, B_itpl, rng ); // FIXME new_ptc_buf may be null?
 #ifdef PIC_DEBUG
             if(debug::has_nan(ptc)) {
               lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
@@ -148,19 +145,8 @@ namespace particle {
           }
         };
 
-
-
     for ( auto sp : particles ) {
       update_species(sp);
-    }
-
-    { // Put particles where they belong after scattering
-      for ( int i = 0; i < _buf.size(); ++i ) {
-        auto this_sp = _buf[i].template get<species>();
-        N_scat[this_sp] += _buf[i].frac();
-        particles[this_sp].push_back(std::move(_buf[i]));
-      }
-      _buf.resize(0);
     }
 
     { // NOTE rescale Jmesh back to real grid delta

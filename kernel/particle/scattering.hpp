@@ -19,13 +19,16 @@ namespace particle {
 
     template < typename T, template < typename > class S >
     using Channel_t = std::optional<T> (*)( const Ptc_t<T,S>& ptc, const Properties& props, const apt::Vec<T,S<T>::Dim>& dp, T dt, const apt::Vec<T,S<T>::Dim>& B, util::Rng<T>& rng );
+
+    template < typename T, template < typename > class S >
+    using back_insert_iterator_t = std::back_insert_iterator<std::vector<Particle<T,S>>>;
   }
 
   template < typename T, template < typename > class S >
   struct Scat {
     std::vector<scat::Eligible_t<T,S>> eligs;
     std::vector<scat::Channel_t<T,S>> channels;
-    void (*impl) ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T ) = nullptr;
+    void (*impl) ( scat::back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T ) = nullptr;
 
     void Register( species sp ) const;
     static void Unregister( species sp );
@@ -116,10 +119,10 @@ namespace particle::scat {
 // Impls
 namespace particle::scat {
   template < bool Instant, typename T, template < typename > class S >
-  void RadiationFromCharges ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& ptc, T E_ph );
+  void RadiationFromCharges ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T E_ph );
 
   template < typename T, template < typename > class S >
-  void PhotonPairProduction ( std::back_insert_iterator<array<T,S>> itr, Ptc_t<T,S>& photon, T );
+  void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T );
 }
 
 #endif

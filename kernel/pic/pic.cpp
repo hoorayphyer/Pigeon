@@ -106,10 +106,7 @@ int main(int argc, char** argv) {
                            } );
     lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
-    // FIXME move into simulator?
     auto properties = particle::set_up<pic::real_t>();
-    for ( auto sp : properties )
-      particle::N_scat.insert( sp, 0 );
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t >
       sim( pic::supergrid, cart_opt, properties );

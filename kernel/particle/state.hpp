@@ -33,7 +33,7 @@ namespace particle {
   struct layout {
   private:
     using ordering = std::tuple<species, destination, flag, birthplace, serial_number>;
-    static constexpr auto sizing = std::make_tuple(3, 5, 16, 16, 24); // TODO remove the hard coded sum to 64
+    static constexpr auto sizing = std::make_tuple(3, 5, 16, 16, 24); // FIXME remove the hard coded sum to 64
 
   public:
     template < typename Attr, std::size_t I = 0 >

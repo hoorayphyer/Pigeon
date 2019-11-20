@@ -7,10 +7,6 @@
 #include "particle/scattering.hpp"
 #include "particle/load_type.hpp"
 
-namespace particle {
-  extern map<double> N_scat;
-}
-
 namespace dye {
   template < int > struct Ensemble;
 }
@@ -23,8 +19,6 @@ namespace particle {
              typename RJ >
   class Updater : public Action<DGrid,R,S,RJ> {
   private:
-    array<R,S> _buf;
-
     apt::array<R, S<R>::Dim> (*_update_q)( typename array<R,S>::particle_type::vec_type& x, typename array<R,S>::particle_type::vec_type& p, R dt, bool is_massive );
 
   public:
@@ -33,6 +27,7 @@ namespace particle {
 
     void operator() ( map<array<R,S>>& particles,
                       field::Field<RJ,3,DGrid>& J,
+                      std::vector<Particle<R,S>>* new_ptc_buf,
                       const map<Properties>& properties,
                       const field::Field<R,3,DGrid>& E,
                       const field::Field<R,3,DGrid>& B,

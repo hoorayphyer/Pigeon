@@ -55,7 +55,7 @@ namespace pic {
     std::vector<std::unique_ptr<field::Action<R,DGrid,RJ>>> _field_actions;
     std::vector<std::unique_ptr<particle::Action<DGrid,R,S,RJ>>> _ptc_actions;
 
-    std::vector<particle::Particle<R, S>> _migrators;
+    std::vector<particle::Particle<R, S>> _ptc_buffer;
 
     void taylor( apt::ActionBase<DGrid>& a ) {
       // NOTE range is assumed to be noempty [,)
@@ -100,37 +100,6 @@ namespace pic {
       }
     }
 
-    apt::pair<std::optional<field::Field<R, 3, DGrid>>> backupEB( int i_this_action ) const {
-      const auto& fa = _field_actions;
-      if ( !fa[i_this_action] ) return {};
-      if ( i_this_action >= fa.size() - 1 ) return {};
-      if ( !fa[i_this_action+1] || !fa[i_this_action+1]->require_original_EB ) return {};
-
-      const auto& ath = *fa[i_this_action];
-      const auto& ane = *fa[i_this_action + 1];
-
-      apt::Index<DGrid> ovIb, ovExt;
-      bool is_empty = false;
-      for ( int i = 0; i < DGrid; ++i ) {
-        ovIb[i] = std::max(ath.actIb[i] - ath.actGuard[i][LFT], ane.actIb[i] - ane.actGuard[i][LFT]);
-        ovExt[i] = std::min(ath.actIb[i] + ath.actExt[i] + ath.actGuard[i][RGT], ane.actIb[i] + ane.actExt[i] + ane.actGuard[i][RGT]) - ovIb[i];
-        if (ovExt[i] <= 0) is_empty = true;
-      }
-
-      if ( is_empty ) return {};
-
-      field::Field<R, 3, DGrid> E_bak({ovExt,0}), B_bak({ovExt,0});
-      for ( const auto& I : apt::Block(ovExt) ) E_bak[0](I) = _E[0](I+ovIb);
-      for ( const auto& I : apt::Block(ovExt) ) E_bak[1](I) = _E[1](I+ovIb);
-      for ( const auto& I : apt::Block(ovExt) ) E_bak[2](I) = _E[2](I+ovIb);
-
-      for ( const auto& I : apt::Block(ovExt) ) B_bak[0](I) = _B[0](I+ovIb);
-      for ( const auto& I : apt::Block(ovExt) ) B_bak[1](I) = _B[1](I+ovIb);
-      for ( const auto& I : apt::Block(ovExt) ) B_bak[2](I) = _B[2](I+ovIb);
-
-      return {{std::move(E_bak)}, {std::move(B_bak)}};
-    }
-
     void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
         _grid[i] = _supergrid[i].divide( ens.cart_topos[i].dim(), ens.cart_coords[i] );
@@ -155,6 +124,10 @@ namespace pic {
         }
       }
 
+      { // init runtime data
+        particle::RTD<R,DGrid>::init( _properties, _grid );
+      }
+
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
     }
 
@@ -176,12 +149,12 @@ namespace pic {
 
           if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
             mig_dir.imprint(ptc);
-            _migrators.emplace_back(std::move(ptc));
+            _ptc_buffer.emplace_back(std::move(ptc));
           }
         }
       }
 
-      migrate( _migrators, _ens_opt->cart_topos, _ens_opt->inter, timestep );
+      migrate( _ptc_buffer, _ens_opt->cart_topos, _ens_opt->inter, timestep );
 
       // NOTE adjust particle positions in the ring topology, regardless how many cpus there are on that ring.
       {
@@ -190,7 +163,7 @@ namespace pic {
           has_periodic = has_periodic || _ens_opt->cart_topos[i].periodic();
         }
         if ( has_periodic ) {
-          for ( auto& ptc : _migrators ) {
+          for ( auto& ptc : _ptc_buffer ) {
             if ( !ptc.is(flag::exist) ) continue;
 
             for ( int i = 0; i < DGrid; ++i ) {
@@ -205,7 +178,7 @@ namespace pic {
         }
       }
 
-      for ( auto&& ptc : _migrators ) {
+      for ( auto&& ptc : _ptc_buffer ) {
         if ( !ptc.is(flag::exist) ) continue;
         auto sp = ptc.template get<species>();
 #ifdef PIC_DEBUG
@@ -232,7 +205,7 @@ namespace pic {
         ptc.template reset<destination>();
         _particles[sp].push_back( std::move(ptc) );
       }
-      _migrators.resize(0);
+      _ptc_buffer.resize(0);
     }
 
     template < typename MR >
@@ -302,7 +275,7 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, particle::N_scat );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, particle::RTD<R,DGrid>::N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
@@ -327,7 +300,17 @@ namespace pic {
             if ( ptc.is(particle::flag::exist) ) num += ptc.frac();
           }
           vital::num_ptcs_prev.push_back(num);
-          vital::num_scat_prev.push_back(particle::N_scat[sp]);
+          vital::num_scat_prev.push_back(particle::RTD<R,DGrid>::N_scat[sp]);
+        }
+      }
+      { // initialize trace_counters to ensure unique trace serial numbers across runs
+        for ( auto sp : _properties ) {
+          unsigned int n = 0;
+          for ( const auto& ptc : _particles[sp] )
+            if ( ptc.is(particle::flag::traced) )
+              n = std::max<unsigned int>( n, ptc.template get<particle::serial_number>() );
+
+          particle::RTD<R,DGrid>::trace_counter.insert( sp, n+1 );
         }
       }
       return init_ts;
@@ -402,7 +385,7 @@ namespace pic {
                 lgr::file % "--" << _ptc_actions[i]->name() << std::endl;
               }
               auto& act = *_ptc_actions[i];
-              act( _particles, _J, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
+              act( _particles, _J, &_ptc_buffer, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
             }
           });
 
@@ -496,24 +479,29 @@ namespace pic {
 
       if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
         TIMING("ExportData", START {
-            auto fexps = io::set_up_field_export<real_export_t,DGrid,real_t,real_j_t>();
-            auto pexps = io::set_up_particle_export<real_export_t,DGrid,real_t,particle::Specs>();
+            io::export_prior_hook( _grid, *_ens_opt );
+
+            auto fexps = io::set_up_field_export<real_export_t,DGrid,R,real_j_t>();
+            auto pexps = io::set_up_particle_export<real_export_t,DGrid,R,particle::Specs>();
 
             io::set_is_collinear_mesh(io::is_collinear_mesh); // TODO
 
             io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, _properties, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
             for ( auto ptr : pexps ) delete ptr;
+
+            io::export_post_hook<R,DGrid>();
           });
       }
 
+      auto& Ns = particle::RTD<R,DGrid>::N_scat;
       if ( is_do(pic::dlb_mr, timestep) ) {
         TIMING("DynamicLoadBalance", START {
             if ( _ens_opt ) { // first reduce N_scat to avoid data loss
               const auto& ens = *_ens_opt;
-              ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+              ens.reduce_to_chief( mpi::by::SUM, Ns.data().data(), Ns.data().size() );
               if ( !ens.is_chief() ) {
-                for ( auto& x : particle::N_scat.data() ) x = 0;
+                for ( auto& x : Ns.data() ) x = 0;
               }
             }
             // TODO has a few hyper parameters
@@ -533,7 +521,7 @@ namespace pic {
 
       if (_ens_opt && is_do(pic::vitals_mr, timestep) ) {
         TIMING("Statistics", START {
-            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, particle::N_scat );
+            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, Ns );
           });
       }
 
@@ -544,16 +532,22 @@ namespace pic {
         TIMING("SaveCheckpoint", START {
             if ( _ens_opt ) { // first reduce N_scat to avoid data loss
               const auto& ens = *_ens_opt;
-              ens.reduce_to_chief( mpi::by::SUM, particle::N_scat.data().data(), particle::N_scat.data().size() );
+              ens.reduce_to_chief( mpi::by::SUM, Ns.data().data(), Ns.data().size() );
               if ( !ens.is_chief() ) {
-                for ( auto& x : particle::N_scat.data() ) x = 0;
+                for ( auto& x : Ns.data() ) x = 0;
               }
             }
-            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties, particle::N_scat );
+            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties, Ns );
             if ( mpi::world.rank() == 0 ) {
               auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
               if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
             }
+          });
+      }
+
+      if ( is_do(pic::tracing_mr, timestep) ) {
+        TIMING("SaveTracing", START {
+            auto dir = ckpt::save_tracing( this_run_dir, num_tracing_parts, _ens_opt, timestep, _particles, _properties );
           });
       }
 
