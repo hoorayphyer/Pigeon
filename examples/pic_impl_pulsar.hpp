@@ -580,18 +580,26 @@ namespace pic {
 }
 
 // FIXME singleton?
-namespace particle {
+namespace {
   template < typename R, int D >
   struct RTD { // runtime data
-    static map<R> N_scat;
+    static particle::map<R> N_scat;
     static field::Field<R,1,D> pc_counter;
     static R pc_cumulative_time;
 
-    static map<unsigned int> trace_counter;
+    static particle::map<unsigned int> trace_counter;
 
-    static void init( const map<Properties>& properties, const apt::Grid< R, D >& localgrid ) {
+    static particle::map<field::Field<pic::real_j_t,3,D>> Jsp; // current by species
+    static bool is_export_Jsp;
+
+    static void init( const particle::map<particle::Properties>& properties, const apt::Grid< R, D >& localgrid ) {
+      is_export_Jsp = false;
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
+      if ( is_export_Jsp ) {
+        for ( auto sp : properties )
+          Jsp.insert( sp, {} );
+      }
 
       apt::Index<D> bulk_dims;
       for ( int i = 0; i < D; ++i ) bulk_dims[i] = localgrid[i].dim();
@@ -601,7 +609,7 @@ namespace particle {
   };
 
   template < typename R, int D >
-  map<R> RTD<R,D>::N_scat {};
+  particle::map<R> RTD<R,D>::N_scat {};
 
   template < typename R, int D >
   field::Field<R,1,D> RTD<R,D>::pc_counter {};
@@ -610,7 +618,13 @@ namespace particle {
   R RTD<R,D>::pc_cumulative_time = 0;
 
   template < typename R, int D >
-  map<unsigned int> RTD<R,D>::trace_counter {};
+  particle::map<unsigned int> RTD<R,D>::trace_counter {};
+
+  template < typename R, int D >
+  particle::map<field::Field<pic::real_j_t,3,D>> RTD<R,D>::Jsp {};
+
+  template < typename R, int D >
+  bool RTD<R,D>::is_export_Jsp = false;
 }
 
 namespace particle {
@@ -625,10 +639,53 @@ namespace particle {
     namespace range = apt::range;
     std::vector<std::unique_ptr<Action<DGrid,R,S,RJ>>> pus;
 
-    Updater<DGrid,R,S,ShapeF,RJ> pu;
+    struct Updater_with_J_species: Action<DGrid,R,S,RJ> {
+    private:
+      Updater<DGrid,R,S,ShapeF,RJ> _pu;
+
+    public:
+      void set_updater( Updater<DGrid,R,S,ShapeF,RJ>&& pu) noexcept { _pu = std::move(pu); }
+
+      Updater_with_J_species* Clone() const override { return new Updater_with_J_species(*this); }
+
+      void operator() ( map<array<R,S>>& particles,
+                        field::Field<RJ,3,DGrid>& J,
+                        std::vector<Particle<R,S>>* new_ptc_buf,
+                        const map<Properties>& properties,
+                        const field::Field<R,3,DGrid>& E,
+                        const field::Field<R,3,DGrid>& B,
+                        const apt::Grid< R, DGrid >& grid,
+                        const dye::Ensemble<DGrid>* ens,
+                        R dt, int timestep, util::Rng<R>& rng
+                        ) override {
+        if ( !RTD<R,DGrid>::is_export_Jsp || !pic::export_data_mr.is_do(timestep) ) {
+          _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
+        } else {
+          auto& Jsp = RTD<R,DGrid>::Jsp;
+          // store J by species separately for data export
+          for ( auto sp : particles ) {
+            map<array<R,S>> ptcs_sp;
+            ptcs_sp.insert(sp);
+            std::swap( ptcs_sp[sp], particles[sp] ); // FIXME make sure there is no copying
+            Jsp[sp] = J;
+            Jsp[sp].reset();
+            _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
+            std::swap( ptcs_sp[sp], particles[sp] );
+
+            for ( int C = 0; C < 3; ++C ) {
+              for ( int i = 0; i < J.mesh().linear_size(); ++i )
+                J[C][i] += Jsp[sp][C][i];
+            }
+          }
+        }
+      }
+    } pu;
     {
+      Updater<DGrid,R,S,ShapeF,RJ> pu0;
+      pu0.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
+
       pu.setName("MainUpdate");
-      pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
+      pu.set_updater(std::move(pu0));
     }
 
     struct Atmosphere: Action<DGrid,R,S,RJ> {
@@ -1100,10 +1157,34 @@ namespace io {
                                        const field::Field<R, 3, DGrid>& ,
                                        const field::Field<R, 3, DGrid>& ,
                                        const field::Field<RJ, 3, DGrid>&  ) {
-    auto x = msh::interpolate( particle::RTD<R,DGrid>::pc_counter, I2std<R>(I), ShapeF() );
-    return { x[0] / particle::RTD<R,DGrid>::pc_cumulative_time, 0, 0};
+    auto x = msh::interpolate( RTD<R,DGrid>::pc_counter, I2std<R>(I), ShapeF() );
+    return { x[0] / RTD<R,DGrid>::pc_cumulative_time, 0, 0};
   }
 
+  template < typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> volume_scale ( apt::Index<DGrid> I,
+                                 const apt::Grid<R,DGrid>& grid,
+                                 const field::Field<R, 3, DGrid>& ,
+                                 const field::Field<R, 3, DGrid>& ,
+                                 const field::Field<RJ, 3, DGrid>&  ) {
+    return { pic::Metric::hhh(grid[0].absc( I[0],0.5), grid[1].absc( I[1],0.5) ), 0, 0 };
+  }
+
+  template < particle::species SP, typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> frac_J_sp ( apt::Index<DGrid> I,
+                              const apt::Grid<R,DGrid>& grid,
+                              const field::Field<R, 3, DGrid>& ,
+                              const field::Field<R, 3, DGrid>& ,
+                              const field::Field<RJ, 3, DGrid>& J ) {
+    auto q = I2std<RJ>(I);
+    auto j_sp = msh::interpolate( RTD<R,DGrid>::Jsp[SP], q, ShapeF() );
+    auto j = msh::interpolate( J, q, ShapeF() );
+    for ( int i = 0; i < 3; ++i ) {
+      if ( j[i] == 0 ) j_sp[i] = 0;
+      else j_sp[i] /= j[i];
+    }
+    return { j_sp[0], j_sp[1], j_sp[2] };
+  }
   // void delE_v_J();
 
   // void delB();
@@ -1147,6 +1228,34 @@ namespace io {
                                 pair_creation_rate<R, DGrid, ShapeF, RJ>,
                                 nullptr
                                 ) );
+      fexps.push_back( new FA ( "VolumeScale", 1,
+                                volume_scale<R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+
+      if ( RTD<R,DGrid>::is_export_Jsp ) {
+        using namespace particle;
+        for ( auto sp : RTD<R,DGrid>::Jsp ) {
+          switch(sp) {
+          case species::electron :
+            fexps.push_back( new FA ( "fJ_Electron", 3,
+                                      frac_J_sp<species::electron,R, DGrid, ShapeF, RJ>,
+                                      divide_flux_by_area<RDS, DGrid>
+                                      ) ); break;
+          case species::positron :
+            fexps.push_back( new FA ( "fJ_Positron", 3,
+                                      frac_J_sp<species::positron,R, DGrid, ShapeF, RJ>,
+                                      divide_flux_by_area<RDS, DGrid>
+                                      ) ); break;
+          case species::ion :
+            fexps.push_back( new FA ( "fJ_Ion", 3,
+                                      frac_J_sp<species::ion,R, DGrid, ShapeF, RJ>,
+                                      divide_flux_by_area<RDS, DGrid>
+                                      ) ); break;
+          default: ;
+          }
+        }
+      }
     }
     return fexps;
   }
@@ -1240,15 +1349,20 @@ namespace io {
 
   template < typename R, int DGrid >
   void export_prior_hook( const apt::Grid< R, DGrid >& grid, const dye::Ensemble<DGrid>& ens ) {
-    auto& pc = particle::RTD<R,DGrid>::pc_counter;
+    auto& pc = RTD<R,DGrid>::pc_counter;
     ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
   }
 
   template < typename R, int DGrid >
   void export_post_hook() {
-    auto& pc = particle::RTD<R,DGrid>::pc_counter;
+    auto& pc = RTD<R,DGrid>::pc_counter;
     std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
-    particle::RTD<R,DGrid>::pc_cumulative_time = 0;
+    RTD<R,DGrid>::pc_cumulative_time = 0;
+    if ( RTD<R,DGrid>::is_export_Jsp ) {
+      // clear Jsp to save some space
+      for ( auto sp : RTD<R,DGrid>::Jsp )
+        RTD<R,DGrid>::Jsp[sp] = {};
+    }
   }
 }
 

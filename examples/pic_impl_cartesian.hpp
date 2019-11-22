@@ -41,7 +41,7 @@ namespace pic {
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 2000;
+  inline constexpr int total_timesteps = 100;
 
   constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
@@ -137,7 +137,10 @@ namespace pic {
                         field::Field<R, 3, DGrid>& B,
                         field::Field<RJ, 3, DGrid>& J,
                         particle::map<particle::array<R,S>>& particles
-                        ) const {}
+                        ) const {
+        using namespace particle;
+        // particles[species::electron].emplace_back({0.5,0.5,0.0}, {10.0,0.0,0.0}, 1.0, species::electron);
+      }
 
     } ic;
     ic[0] = { 0, supergrid[0].dim() };
@@ -147,18 +150,18 @@ namespace pic {
   }
 }
 
-namespace particle {
+namespace {
   template < typename R, int D >
   struct RTD { // runtime data
-    static map<R> N_scat;
+    static particle::map<R> N_scat;
     static field::Field<R,1,D> pc_counter;
     static R pc_cumulative_time;
 
-    static map<unsigned int> trace_counter;
+    static particle::map<unsigned int> trace_counter;
 
-    static void init( const map<Properties>& properties, const apt::Grid< R, D >& localgrid ) {
+    static void init( const particle::map<particle::Properties>& properties, const apt::Grid< R, D >& localgrid ) {
       for ( auto sp : properties )
-        N_scat.insert( sp, 0 ); // FIXME check insert if existed
+        N_scat.insert( sp, 0 );
 
       apt::Index<D> bulk_dims;
       for ( int i = 0; i < D; ++i ) bulk_dims[i] = localgrid[i].dim();
@@ -168,7 +171,7 @@ namespace particle {
   };
 
   template < typename R, int D >
-  map<R> RTD<R,D>::N_scat {};
+  particle::map<R> RTD<R,D>::N_scat {};
 
   template < typename R, int D >
   field::Field<R,1,D> RTD<R,D>::pc_counter {};
@@ -177,7 +180,7 @@ namespace particle {
   R RTD<R,D>::pc_cumulative_time = 0;
 
   template < typename R, int D >
-  map<unsigned int> RTD<R,D>::trace_counter {};
+  particle::map<unsigned int> RTD<R,D>::trace_counter {};
 }
 
 namespace particle {

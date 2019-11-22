@@ -25,6 +25,7 @@ namespace field {
     }
 
     constexpr const auto& stride() const noexcept { return _stride; }
+    constexpr auto linear_size() const noexcept { return _stride.back(); }
     constexpr const auto& range() const noexcept { return _range; }
     constexpr const auto& range(int i) const noexcept { return _range[i]; }
 

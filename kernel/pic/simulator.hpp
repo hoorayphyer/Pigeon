@@ -125,7 +125,7 @@ namespace pic {
       }
 
       { // init runtime data
-        particle::RTD<R,DGrid>::init( _properties, _grid );
+        RTD<R,DGrid>::init( _properties, _grid );
       }
 
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
@@ -208,11 +208,6 @@ namespace pic {
       _ptc_buffer.resize(0);
     }
 
-    template < typename MR >
-    inline bool is_do( const MR& mr, int timestep ) const noexcept {
-      return mr.is_on && timestep >= mr.init_ts && (timestep % mr.interval == 0 );
-    }
-
   public:
     Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, const particle::map<particle::Properties>& props )
       : _supergrid(supergrid), _cart_opt(cart_opt), _properties(props) {
@@ -275,7 +270,7 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, particle::RTD<R,DGrid>::N_scat );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, RTD<R,DGrid>::N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
@@ -300,7 +295,7 @@ namespace pic {
             if ( ptc.is(particle::flag::exist) ) num += ptc.frac();
           }
           vital::num_ptcs_prev.push_back(num);
-          vital::num_scat_prev.push_back(particle::RTD<R,DGrid>::N_scat[sp]);
+          vital::num_scat_prev.push_back(RTD<R,DGrid>::N_scat[sp]);
         }
       }
       { // initialize trace_counters to ensure unique trace serial numbers across runs
@@ -310,7 +305,7 @@ namespace pic {
             if ( ptc.is(particle::flag::traced) )
               n = std::max<unsigned int>( n, ptc.template get<particle::serial_number>() );
 
-          particle::RTD<R,DGrid>::trace_counter.insert( sp, n+1 );
+          RTD<R,DGrid>::trace_counter.insert( sp, n+1 );
         }
       }
       return init_ts;
@@ -331,7 +326,7 @@ namespace pic {
 
       std::optional<tmr::Timestamp> stamp_all;
       std::optional<tmr::Timestamp> stamp;
-      if ( is_do(pic::msperf_mr, timestep) && pic::msperf_qualified(_ens_opt) ) {
+      if ( pic::msperf_mr.is_do(timestep) && pic::msperf_qualified(_ens_opt) ) {
         stamp_all.emplace();
         stamp.emplace();
         if ( msperf_max_entries &&
@@ -365,7 +360,7 @@ namespace pic {
 
         _J.reset();
 
-        if ( is_do(pic::sort_particles_mr, timestep) ) {
+        if ( pic::sort_particles_mr.is_do(timestep) ) {
           TIMING("SortParticles", START {
               for ( auto sp : _particles ) particle::sort( _particles[sp] );
             });
@@ -477,7 +472,7 @@ namespace pic {
         }
       }
 
-      if ( is_do(pic::export_data_mr, timestep) && _ens_opt ) {
+      if ( pic::export_data_mr.is_do(timestep) && _ens_opt ) {
         TIMING("ExportData", START {
             io::export_prior_hook( _grid, *_ens_opt );
 
@@ -494,8 +489,8 @@ namespace pic {
           });
       }
 
-      auto& Ns = particle::RTD<R,DGrid>::N_scat;
-      if ( is_do(pic::dlb_mr, timestep) ) {
+      auto& Ns = RTD<R,DGrid>::N_scat;
+      if ( pic::dlb_mr.is_do(timestep) ) {
         TIMING("DynamicLoadBalance", START {
             if ( _ens_opt ) { // first reduce N_scat to avoid data loss
               const auto& ens = *_ens_opt;
@@ -519,14 +514,14 @@ namespace pic {
           });
       }
 
-      if (_ens_opt && is_do(pic::vitals_mr, timestep) ) {
+      if (_ens_opt && pic::vitals_mr.is_do(timestep) ) {
         TIMING("Statistics", START {
             pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, Ns );
           });
       }
 
       static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0
-      if ( is_do(pic::checkpoint_mr, timestep)
+      if ( pic::checkpoint_mr.is_do(timestep)
            || ( pic::checkpoint_autosave_hourly &&
                 autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
         TIMING("SaveCheckpoint", START {
@@ -545,7 +540,7 @@ namespace pic {
           });
       }
 
-      if ( is_do(pic::tracing_mr, timestep) ) {
+      if ( pic::tracing_mr.is_do(timestep) ) {
         TIMING("SaveTracing", START {
             auto dir = ckpt::save_tracing( this_run_dir, num_tracing_parts, _ens_opt, timestep, _particles, _properties );
           });
