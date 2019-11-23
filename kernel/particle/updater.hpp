@@ -36,6 +36,110 @@ namespace particle {
                       R dt, int timestep, util::Rng<R>& rng
                       ) override;
   };
+}
+
+#include "particle/migration.hpp"
+
+namespace particle {
+
+  template < int DGrid,
+             typename R,
+             template < typename > class S,
+             typename ShapeF,
+             typename RJ >
+  class Migrator : public Action<DGrid,R,S,RJ> {
+  private:
+    apt::Grid< R, DGrid > _supergrid;
+
+  public:
+    Migrator& set_supergrid( const apt::Grid< R, DGrid >& supergrid ) noexcept { _supergrid = supergrid; return *this; }
+    Migrator* Clone() const override { return new Migrator(*this); }
+
+    void operator() ( map<array<R,S>>& particles,
+                      field::Field<RJ,3,DGrid>& J,
+                      std::vector<Particle<R,S>>* new_ptc_buf,
+                      const map<Properties>& properties,
+                      const field::Field<R,3,DGrid>& E,
+                      const field::Field<R,3,DGrid>& B,
+                      const apt::Grid< R, DGrid >& grid,
+                      const dye::Ensemble<DGrid>* ens,
+                      R dt, int timestep, util::Rng<R>& rng
+                      ) override {
+      // bulk range = [lb, ub)
+      constexpr auto migrate_code =
+        []( auto q, auto lb, auto ub ) noexcept {
+          return ( q >= lb ) + ( q >= ub );
+        };
+
+      for ( auto sp : particles ) {
+        for ( auto ptc : particles[sp] ) { // TODOL semantics
+          if ( !ptc.is(flag::exist) ) continue;
+          migrInt<DGrid> mig_dir{};
+          for ( int i = 0; i < DGrid; ++i ) {
+            mig_dir += migrate_code( ptc.q()[i], grid[i].lower(), grid[i].upper() ) * apt::pow3(i);
+          }
+
+          if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
+            mig_dir.imprint(ptc);
+            new_ptc_buf->emplace_back(std::move(ptc));
+          }
+        }
+      }
+
+      migrate( *new_ptc_buf, ens->cart_topos, ens->inter, timestep );
+
+      // NOTE adjust particle positions in the ring topology, regardless how many cpus there are on that ring.
+      {
+        bool has_periodic = false;
+        for ( int i = 0; i < DGrid; ++i ) {
+          has_periodic = has_periodic || ens->cart_topos[i].periodic();
+        }
+        if ( has_periodic ) {
+          for ( auto& ptc : *new_ptc_buf ) {
+            if ( !ptc.is(flag::exist) ) continue;
+
+            for ( int i = 0; i < DGrid; ++i ) {
+              if ( !ens->cart_topos[i].periodic() ) continue;
+              int idx = static_cast<int>( ( ptc.q()[i] - _supergrid[i].lower() ) / _supergrid[i].delta() + 0.5 );
+              if ( idx >= 0 ) idx /= _supergrid[i].dim();
+              else idx = - ( (-idx) / _supergrid[i].dim() + 1 );
+
+              ptc.q()[i] -= idx * _supergrid[i].dim() * _supergrid[i].delta();
+            }
+          }
+        }
+      }
+
+      for ( auto&& ptc : *new_ptc_buf ) {
+        if ( !ptc.is(flag::exist) ) continue;
+        auto sp = ptc.template get<species>();
+#ifdef PIC_DEBUG
+        // // check if the received ptc trully resides in this ensemble.
+        // apt::array<int,DGrid> mig_co;
+        // bool is_OK = true;
+        // for ( int i = 0; i < DGrid; ++i ) {
+        //   mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
+        //   if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
+        //     is_OK = false;
+        // }
+        // if ( !is_OK ) {
+        //   lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+        //   lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << ", birth = " << static_cast<int>(ptc.template get<birthplace>()) << std::endl;
+        //   lgr::file << "  mig_dir on new ensemble  = " << mig_co;
+        //   // get old mig_co
+        //   for ( int i = 0; i < DGrid; ++i ) {
+        //     mig_co[i] = ( migrInt<DGrid>(ptc) % apt::pow3(i+1) ) / apt::pow3(i);
+        //   }
+        //   lgr::file << ", mig_dir on old ensemble = " << mig_co << std::endl;
+        //   debug::throw_error("Received across-ensemble particles!");
+        // }
+#endif
+        ptc.template reset<destination>();
+        particles[sp].push_back( std::move(ptc) );
+      }
+      new_ptc_buf->resize(0);
+    }
+  };
 
 }
 

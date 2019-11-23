@@ -196,7 +196,14 @@ namespace particle {
       pu.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
     }
 
+    Migrator<DGrid,R,S,ShapeF,RJ> migrate;
+    {
+      migrate.setName("MigrateParticles");
+      migrate.set_supergrid(pic::supergrid);
+    }
+
     pus.emplace_back(pu.Clone());
+    pus.emplace_back(migrate.Clone());
 
     return pus;
   }

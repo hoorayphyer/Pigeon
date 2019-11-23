@@ -5,7 +5,6 @@
 #include "field/sync.hpp"
 #include "field/yee.hpp"
 
-#include "particle/migration.hpp"
 #include "particle/sorter.hpp"
 #include "io/io.hpp"
 #include "dye/dynamic_balance.hpp"
@@ -44,7 +43,6 @@ namespace pic {
 
     apt::Grid< R, DGrid > _grid;
     std::optional<dye::Ensemble<DGrid>> _ens_opt;
-    apt::array< apt::pair<R>, DGrid > _borders;
 
     particle::map<particle::Properties> _properties;
     field::Field<R, 3, DGrid> _E;
@@ -103,7 +101,6 @@ namespace pic {
     void update_parts( const dye::Ensemble<DGrid>& ens ) {
       for ( int i = 0; i < DGrid; ++i ) {
         _grid[i] = _supergrid[i].divide( ens.cart_topos[i].dim(), ens.cart_coords[i] );
-        _borders[i] = { _grid[i].lower(), _grid[i].upper() };
       }
 
       { // set field actions
@@ -129,83 +126,6 @@ namespace pic {
       }
 
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
-    }
-
-    void migrate_particles( int timestep ) {
-      using namespace particle;
-      // bulk range = [lb, ub)
-      constexpr auto migrate_code =
-        []( auto q, auto lb, auto ub ) noexcept {
-          return ( q >= lb ) + ( q >= ub );
-        };
-
-      for ( auto sp : _particles ) {
-        for ( auto ptc : _particles[sp] ) { // TODOL semantics
-          if ( !ptc.is(flag::exist) ) continue;
-          migrInt<DGrid> mig_dir{};
-          for ( int i = 0; i < DGrid; ++i ) {
-            mig_dir += migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] ) * apt::pow3(i);
-          }
-
-          if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
-            mig_dir.imprint(ptc);
-            _ptc_buffer.emplace_back(std::move(ptc));
-          }
-        }
-      }
-
-      migrate( _ptc_buffer, _ens_opt->cart_topos, _ens_opt->inter, timestep );
-
-      // NOTE adjust particle positions in the ring topology, regardless how many cpus there are on that ring.
-      {
-        bool has_periodic = false;
-        for ( int i = 0; i < DGrid; ++i ) {
-          has_periodic = has_periodic || _ens_opt->cart_topos[i].periodic();
-        }
-        if ( has_periodic ) {
-          for ( auto& ptc : _ptc_buffer ) {
-            if ( !ptc.is(flag::exist) ) continue;
-
-            for ( int i = 0; i < DGrid; ++i ) {
-              if ( !_ens_opt->cart_topos[i].periodic() ) continue;
-              int idx = static_cast<int>( ( ptc.q()[i] - _supergrid[i].lower() ) / _supergrid[i].delta() + 0.5 );
-              if ( idx >= 0 ) idx /= _supergrid[i].dim();
-              else idx = - ( (-idx) / _supergrid[i].dim() + 1 );
-
-              ptc.q()[i] -= idx * _supergrid[i].dim() * _supergrid[i].delta();
-            }
-          }
-        }
-      }
-
-      for ( auto&& ptc : _ptc_buffer ) {
-        if ( !ptc.is(flag::exist) ) continue;
-        auto sp = ptc.template get<species>();
-#ifdef PIC_DEBUG
-        // // check if the received ptc trully resides in this ensemble.
-        // apt::array<int,DGrid> mig_co;
-        // bool is_OK = true;
-        // for ( int i = 0; i < DGrid; ++i ) {
-        //   mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
-        //   if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
-        //     is_OK = false;
-        // }
-        // if ( !is_OK ) {
-        //   lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-        //   lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << ", birth = " << static_cast<int>(ptc.template get<birthplace>()) << std::endl;
-        //   lgr::file << "  mig_dir on new ensemble  = " << mig_co;
-        //   // get old mig_co
-        //   for ( int i = 0; i < DGrid; ++i ) {
-        //     mig_co[i] = ( migrInt<DGrid>(ptc) % apt::pow3(i+1) ) / apt::pow3(i);
-        //   }
-        //   lgr::file << ", mig_dir on old ensemble = " << mig_co << std::endl;
-        //   debug::throw_error("Received across-ensemble particles!");
-        // }
-#endif
-        ptc.template reset<destination>();
-        _particles[sp].push_back( std::move(ptc) );
-      }
-      _ptc_buffer.resize(0);
     }
 
   public:
@@ -383,12 +303,6 @@ namespace pic {
               act( _particles, _J, &_ptc_buffer, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
             }
           });
-
-        TIMING("MigrateParticles", START {
-            migrate_particles( timestep );
-          });
-
-        // ----- After this line, particles are all within borders.
 
         // ----- Before this line _J is local on each cpu --- //
         TIMING("ReduceJmesh", START {

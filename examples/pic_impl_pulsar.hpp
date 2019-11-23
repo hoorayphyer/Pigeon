@@ -592,6 +592,8 @@ namespace {
     static particle::map<field::Field<pic::real_j_t,3,D>> Jsp; // current by species
     static bool is_export_Jsp;
 
+    static field::Field<R,1,D> skin_depth;
+
     static void init( const particle::map<particle::Properties>& properties, const apt::Grid< R, D >& localgrid ) {
       is_export_Jsp = false;
       for ( auto sp : properties )
@@ -625,6 +627,9 @@ namespace {
 
   template < typename R, int D >
   bool RTD<R,D>::is_export_Jsp = false;
+
+  template < typename R, int D >
+  field::Field<R,1,D> RTD<R,D>::skin_depth {};
 }
 
 namespace particle {
@@ -686,6 +691,12 @@ namespace particle {
 
       pu.setName("MainUpdate");
       pu.set_updater(std::move(pu0));
+    }
+
+    Migrator<DGrid,R,S,ShapeF,RJ> migrate;
+    {
+      migrate.setName("MigrateParticles");
+      migrate.set_supergrid(pic::supergrid);
     }
 
     struct Atmosphere: Action<DGrid,R,S,RJ> {
@@ -913,11 +924,59 @@ namespace particle {
       scat_anlz.setName("ScatteringAnalysis");
     }
 
+    struct ExportPrep : public Action<DGrid,R,S,RJ> {
+    public:
+      virtual ExportPrep* Clone() const { return new ExportPrep(*this); }
+
+      virtual void operator() ( map<array<R,S>>& particles,
+                                field::Field<RJ,3,DGrid>& J,
+                                std::vector<Particle<R,S>>*,
+                                const map<Properties>& properties,
+                                const field::Field<R,3,DGrid>& E,
+                                const field::Field<R,3,DGrid>& B,
+                                const apt::Grid< R, DGrid >& grid,
+                                const dye::Ensemble<DGrid>* ens,
+                                R dt, int timestep, util::Rng<R>&
+                                ) override {
+        if ( !pic::export_data_mr.is_do(timestep) ) return;
+        auto& skin_depth = RTD<R,DGrid>::skin_depth;
+        skin_depth = {J.mesh()};
+        skin_depth.reset();
+
+        for ( auto sp : particles ) {
+          auto q2m = std::pow<R>( properties[sp].charge_x, 2.0 ) / R(properties[sp].mass_x);
+          for ( const auto& ptc : particles[sp] ) {
+            if ( !ptc.is(flag::exist) ) continue;
+            apt::Index<DGrid> I;
+            for ( int i = 0; i < DGrid; ++i )
+              I[i] = ( ptc.q()[i] - grid[i].lower() ) / grid[i].delta();
+            skin_depth[0](I) += q2m * ptc.frac();
+          }
+        }
+        ens->reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
+        if ( ens->is_chief() ) {
+          for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
+            R r = grid[0].absc(I[0], 0.5);
+            R theta = grid[1].absc(I[1], 0.5);
+            R h = std::sqrt( pic::Metric::h<2>(r,theta) ) * dt / ( pic::wdt_pic * grid[0].delta() );
+            auto& v = skin_depth[0](I);
+            v = h / v;
+          }
+        }
+
+      }
+    } export_prep;
+    {
+      export_prep.setName("ExportPrep");
+    }
+
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());
     pus.emplace_back(asym_lo.Clone());
     pus.emplace_back(asym_hi.Clone());
     pus.emplace_back(scat_anlz.Clone());
+    pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
+    pus.emplace_back(export_prep.Clone());
 
     return pus;
   }
@@ -1363,6 +1422,7 @@ namespace io {
       for ( auto sp : RTD<R,DGrid>::Jsp )
         RTD<R,DGrid>::Jsp[sp] = {};
     }
+    RTD<R,DGrid>::skin_depth = {};
   }
 }
 
