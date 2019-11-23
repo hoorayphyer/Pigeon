@@ -1244,7 +1244,16 @@ namespace io {
     }
     return { j_sp[0], j_sp[1], j_sp[2] };
   }
-  // void delE_v_J();
+
+  template < typename R, int DGrid, typename ShapeF, typename RJ >
+  apt::array<R,3> skin_depth ( apt::Index<DGrid> I,
+                               const apt::Grid<R,DGrid>& grid,
+                               const field::Field<R, 3, DGrid>& ,
+                               const field::Field<R, 3, DGrid>& ,
+                               const field::Field<RJ, 3, DGrid>& ) {
+    return { msh::interpolate( RTD<R,DGrid>::skin_depth, I2std<R>(I), ShapeF() )[0], 0, 0  };
+  }
+  // void delE_v_rho();
 
   // void delB();
 
@@ -1289,6 +1298,10 @@ namespace io {
                                 ) );
       fexps.push_back( new FA ( "VolumeScale", 1,
                                 volume_scale<R, DGrid, ShapeF, RJ>,
+                                nullptr
+                                ) );
+      fexps.push_back( new FA ( "SkinDepth", 1,
+                                skin_depth<R, DGrid, ShapeF, RJ>,
                                 nullptr
                                 ) );
 
