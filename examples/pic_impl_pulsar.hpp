@@ -898,12 +898,12 @@ namespace particle {
           // log scattering events
           RTD<R,DGrid>::N_scat[this_sp] += buf[i].frac();
 
-          // log pair creation locations
-          if ( species::electron == this_sp ) {
+          // log pair creation events
+          if ( species::electron == this_sp and buf[i].is(flag::secondary) ) {
             apt::Index<DGrid> I; // domain index, not the global index
             for ( int j = 0; j < DGrid; ++j )
               I[j] = ( buf[i].q()[j] - grid[j].lower() ) / grid[j].delta();
-            RTD<R,DGrid>::pc_counter[0](I) += 1;
+            RTD<R,DGrid>::pc_counter[0](I) += buf[i].frac();
 
             // trace electrons near Y point
             if ( std::log(6.0) < buf[i].q()[0] and buf[i].q()[0] < std::log(7.0)
