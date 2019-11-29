@@ -6,9 +6,18 @@
 namespace mpi { struct CartComm; }
 
 namespace io {
+  struct ExporteeBase {
+  protected:
+    std::string _name;
+
+  public:
+    const std::string& name() const noexcept { return _name; }
+  };
+
+
   template < typename RDS, int DGrid, typename R, typename RJ >
-  struct FieldExportee {
-    virtual std::tuple< std::string, int, field::Field<RDS,3,DGrid> >
+  struct FieldExportee : public ExporteeBase {
+    virtual std::tuple< int, field::Field<RDS,3,DGrid> >
     action ( const int ds_ratio,
              const std::optional<mpi::CartComm>& cart_opt, // in case some global operation is needed
              const apt::Grid<R,DGrid>& grid, // local grid
@@ -25,8 +34,8 @@ namespace io {
 
 namespace io {
   template < typename RDS, int DGrid, typename R, template < typename > class S>
-  struct PtcExportee {
-    virtual std::tuple< std::string, int, field::Field<RDS,3,DGrid> >
+  struct PtcExportee : public ExporteeBase {
+    virtual std::tuple< int, field::Field<RDS,3,DGrid> >
     action ( const int ds_ratio,
              const apt::Grid<R,DGrid>& grid, // local grid
              const apt::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field

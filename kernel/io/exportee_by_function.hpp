@@ -29,14 +29,13 @@ namespace io {
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
 
     FexpTbyFunction( std::string a, int b, F c, H d )
-      : varname(a), num_comps(b), impl(c), post_hook(d) {}
+      : num_comps(b), impl(c), post_hook(d) { this->_name = a; }
 
-    std::string varname {};
     int num_comps = 1;
     F impl = nullptr;
     H post_hook = nullptr;
 
-    virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
+    virtual std::tuple< int, field::Field<RealDS,3,DGrid> >
     action( const int ds_ratio,
             const std::optional<mpi::CartComm>& cart_opt,
             const apt::Grid<Real,DGrid>& grid, // local grid
@@ -79,7 +78,7 @@ namespace io {
 
       if ( post_hook != nullptr && cart_opt ) post_hook( fds, grid_ds, num_comps, *cart_opt );
 
-      return std::make_tuple( varname, num_comps, fds );
+      return std::make_tuple( num_comps, fds );
     }
   };
 
@@ -97,14 +96,13 @@ namespace io {
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps );
 
     PexpTbyFunction( std::string a, int b, F c, H d )
-      : varname(a), num_comps(b), impl(c), post_hook(d) {}
+      : num_comps(b), impl(c), post_hook(d) {this->_name = a;}
 
-    std::string varname {};
     int num_comps = 1;
     F impl = nullptr;
     H post_hook = nullptr; // here to apply boundary conditions
 
-    virtual std::tuple< std::string, int, field::Field<RealDS,3,DGrid> >
+    virtual std::tuple< int, field::Field<RealDS,3,DGrid> >
     action( const int ds_ratio,
             const apt::Grid<Real,DGrid>& grid, // local grid
             const apt::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
@@ -130,7 +128,7 @@ namespace io {
 
       if ( post_hook != nullptr ) post_hook( fds, grid_ds, num_comps );
 
-      return std::make_tuple(varname, num_comps, fds);
+      return std::make_tuple(num_comps, fds);
     }
 
 

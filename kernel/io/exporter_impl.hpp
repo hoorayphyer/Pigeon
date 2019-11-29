@@ -49,7 +49,8 @@ namespace io {
 
     if ( _cart_opt ) {
       for ( auto* fe : fexps ) {
-        std::tie(varname,dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
+        varname = fe->name();
+        std::tie(dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
         if ( dim > 1 ) varname += "#";
 
         field::copy_sync_guard_cells( fds, *_cart_opt );
@@ -62,11 +63,12 @@ namespace io {
       const auto& prop = properties[sp];
 
       for ( auto* pe : pexps ) {
-        std::tie(varname,dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
+        varname = pe->name();
+        std::tie(dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
         if ( dim > 1 ) varname += "#";
         varname += "_" + prop.name;
 
-        // TODO reduce number of communication
+        // FIXME reduce number of communication
         for ( int i = 0; i < dim; ++i )
           _ens.reduce_to_chief( mpi::by::SUM, fds[i].data().data(), fds[i].data().size() );
         if ( _cart_opt ) {
