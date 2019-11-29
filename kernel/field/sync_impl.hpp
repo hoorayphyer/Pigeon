@@ -13,7 +13,7 @@ namespace field {
                const apt::array<apt::Range,DGrid>& domain_range,
                const apt::array<apt::Range,DGrid>& sub_range, Policy<T> ) {
       // Looping order ( from outer to inner ): DGrid, LeftRightness, DField
-      assert(apt::range::is_margin_uniform(domain_range)); // POLEDANCE this implementation requires all margins to be equal
+      assert(apt::range::is_margin_uniform(domain_range)); // FIXME this implementation requires all margins to be equal
       // check sub_range \in field.range \in domain_range
       {
         const auto& range = field.mesh().range();
@@ -24,7 +24,7 @@ namespace field {
           x = (sub_range[i].far_end() <= range[i].far_end() and range[i].far_end() >= domain_range[i].far_end() );
           ordered = ( ordered and x );
         }
-        assert(ordered); // POLEDANCE print error message
+        assert(ordered); // FIXME print error message
       }
 
       const int guard = domain_range[0].margin()[LFT];
@@ -32,16 +32,11 @@ namespace field {
       std::vector<T> send_buf, recv_buf;
 
       for ( int i_grid = 0; i_grid < DGrid; ++ i_grid ) {
-        { // determine if communication is needed in this direction. Each dimension has two sides, and each side must be fully contained ( i.e. full_size() ) in domain_range bulk to avoid communication, unless that side corresponds to a true boundary.
-          auto neigh = comm.shift( i_grid, 1 );
-          bool in_bulk = true;
-          {
-            bool is_contained = (sub_range[i_grid].far_begin() >= domain_range[i_grid].begin() );
-            in_bulk = (in_bulk and ( is_contained or neigh[LFT] ) );
-            is_contained = (sub_range[i_grid].far_end() <= domain_range[i_grid].end() );
-            in_bulk = (in_bulk and ( is_contained or neigh[RGT] ) );
-          }
-          if ( in_bulk ) continue;
+
+        bool is_ignore[2]; // NOTE is_ignore[i] ignores both send and recv on i-th side
+        { // determine if communication is needed on each side of this direction
+          is_ignore[0] = ( sub_range[i_grid].far_begin() >= domain_range[i_grid].begin() );
+          is_ignore[1] = ( sub_range[i_grid].far_end() <= domain_range[i_grid].end() );
         }
 
         auto I_b = apt::range::far_begin(sub_range);
@@ -52,9 +47,10 @@ namespace field {
         for ( int i = 0; i < DGrid; ++i ) ext_size *= extent[i];
 
         for ( int lr_send = 0; lr_send < 2; ++lr_send ) { // 0 is to left, 1 is to right
+          if ( is_ignore[lr_send] ) continue;
 
           auto [ src, dest ] = comm.shift( i_grid, lr_send ? 1 : -1 );
-          // Edge case: cart dim = 1 with periodic boundaries POLEDANCE see front
+          // FIXME Edge case: cart dim = 1 with periodic boundaries
           if ( src && (*src == comm.rank()) ) { // NOTE check on dest is not needed
             // use I_b for I_b_send
             auto I_b_recv = I_b;

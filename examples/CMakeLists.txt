@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project () # specify your project name here
-option(ENABLE_TESTS "Enable tests" ON)
+option(ENABLE_TESTS "Enable tests" OFF)
 option(ENABLE_DEBUG "Enable debug" OFF)
 
 # message ("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
