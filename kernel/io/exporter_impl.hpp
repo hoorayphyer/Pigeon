@@ -3,7 +3,6 @@
 
 #include "io/exporter.hpp"
 
-
 namespace io {
   template < typename Tcoarse, int DGrid, typename Tfine >
   apt::Grid<Tcoarse,DGrid> coarsen(const apt::Grid<Tfine,DGrid>& grid, int downsample_ratio) {
@@ -32,8 +31,6 @@ namespace io {
            ) const {
     const auto grid_ds = coarsen<RealDS>( grid, _ratio );
 
-    std::string varname;
-    int dim = 1; // dim of fields
     field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, apt::dims(grid_ds), _guard) ); // FIXME _guard??
 
     auto smart_save =
@@ -49,9 +46,10 @@ namespace io {
 
     if ( _cart_opt ) {
       for ( auto* fe : fexps ) {
-        varname = fe->name();
+        auto varname = fe->name();
+        auto dim = fe->num_comps();
         if ( dim > 1 ) varname += "#";
-        std::tie(dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
+        fds = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
 
         field::copy_sync_guard_cells( fds, *_cart_opt );
         smart_save( varname, dim, fds );
@@ -63,10 +61,11 @@ namespace io {
       const auto& prop = properties[sp];
 
       for ( auto* pe : pexps ) {
-        varname = pe->name();
+        auto varname = pe->name();
+        auto dim = pe->num_comps();
         if ( dim > 1 ) varname += "#";
         varname += "_" + prop.name;
-        std::tie(dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
+        fds = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
 
         // FIXME reduce number of communication
         for ( int i = 0; i < dim; ++i )

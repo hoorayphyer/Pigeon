@@ -5,7 +5,7 @@
 #include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with induced shape
 #include <cassert>
 
-// POLEDANCE check if downsampled field can use a better mesh. Range may not work because of the scaling
+// FIXME check if downsampled field can use a better mesh. Range may not work because of the scaling
 
 namespace io {
   constexpr int POW( int B, int E ) {
@@ -29,13 +29,12 @@ namespace io {
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps, const mpi::CartComm& cart );
 
     FexpTbyFunction( std::string a, int b, F c, H d )
-      : num_comps(b), impl(c), post_hook(d) { this->_name = a; }
+      : impl(c), post_hook(d) { this->_name = a; this->_num_comps = b; }
 
-    int num_comps = 1;
     F impl = nullptr;
     H post_hook = nullptr;
 
-    virtual std::tuple< int, field::Field<RealDS,3,DGrid> >
+    virtual field::Field<RealDS,3,DGrid>
     action( const int ds_ratio,
             const std::optional<mpi::CartComm>& cart_opt,
             const apt::Grid<Real,DGrid>& grid, // local grid
@@ -45,6 +44,7 @@ namespace io {
             const field::Field<Real, 3, DGrid>& B,
             const field::Field<RealJ, 3, DGrid>& J// J is Jmesh on a replica // TODO double check
             ) override {
+      const auto& num_comps = this->_num_comps;
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
@@ -78,7 +78,7 @@ namespace io {
 
       if ( post_hook != nullptr && cart_opt ) post_hook( fds, grid_ds, num_comps, *cart_opt );
 
-      return std::make_tuple( num_comps, fds );
+      return fds;
     }
   };
 
@@ -96,13 +96,12 @@ namespace io {
     using H = void (*) ( field::Field<RealDS,3,DGrid>& fds, const apt::Grid<RealDS,DGrid>& grid_ds, int num_comps );
 
     PexpTbyFunction( std::string a, int b, F c, H d )
-      : num_comps(b), impl(c), post_hook(d) {this->_name = a;}
+      : impl(c), post_hook(d) {this->_name = a; this->_num_comps = b; }
 
-    int num_comps = 1;
     F impl = nullptr;
     H post_hook = nullptr; // here to apply boundary conditions
 
-    virtual std::tuple< int, field::Field<RealDS,3,DGrid> >
+    virtual field::Field<RealDS,3,DGrid>
     action( const int ds_ratio,
             const apt::Grid<Real,DGrid>& grid, // local grid
             const apt::Grid<RealDS,DGrid>& grid_ds, // grid of downsampled field
@@ -110,6 +109,7 @@ namespace io {
             const particle::Properties& prop,
             const particle::array<Real,S>& ptcs
             ) override {
+      const auto& num_comps = this->_num_comps;
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
@@ -128,7 +128,7 @@ namespace io {
 
       if ( post_hook != nullptr ) post_hook( fds, grid_ds, num_comps );
 
-      return std::make_tuple(num_comps, fds);
+      return fds;
     }
 
 

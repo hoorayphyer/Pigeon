@@ -24,6 +24,7 @@ ln -s $top_dir/comment $(pwd)/comment
 ln -s $top_dir/vw $(pwd)/vw
 ln -s $top_dir/diskusage $(pwd)/diskusage
 ln -s $top_dir/.subtrees/Buick/buick $(pwd)/buick
+cp $top_dir/examples/CMakeLists.txt $top_dir/examples/pic.hpp $(pwd)/
 if [ $? -ne 0 ]; then
     echo "Lab $name incomplete. Code 0002"
     exit 1

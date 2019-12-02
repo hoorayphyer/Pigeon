@@ -9,15 +9,17 @@ namespace io {
   struct ExporteeBase {
   protected:
     std::string _name;
+    int _num_comps = 1;
 
   public:
-    const std::string& name() const noexcept { return _name; }
+    inline const std::string& name() const noexcept { return _name; }
+    inline const int& num_comps() const noexcept { return _num_comps; }
   };
 
 
   template < typename RDS, int DGrid, typename R, typename RJ >
   struct FieldExportee : public ExporteeBase {
-    virtual std::tuple< int, field::Field<RDS,3,DGrid> >
+    virtual field::Field<RDS,3,DGrid>
     action ( const int ds_ratio,
              const std::optional<mpi::CartComm>& cart_opt, // in case some global operation is needed
              const apt::Grid<R,DGrid>& grid, // local grid
@@ -35,7 +37,7 @@ namespace io {
 namespace io {
   template < typename RDS, int DGrid, typename R, template < typename > class S>
   struct PtcExportee : public ExporteeBase {
-    virtual std::tuple< int, field::Field<RDS,3,DGrid> >
+    virtual field::Field<RDS,3,DGrid>
     action ( const int ds_ratio,
              const apt::Grid<R,DGrid>& grid, // local grid
              const apt::Grid<RDS,DGrid>& grid_ds, // grid of downsampled field
