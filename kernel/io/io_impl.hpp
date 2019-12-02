@@ -189,7 +189,7 @@ namespace io {
 
         saver.pmpio( [&](auto& dbfile) {
                        dbfile.put_mesh_noncollinear(saver.meshname, coords, quadmesh_dims, DGrid, optlist_mesh);
-               } );
+                     } );
 
         delete [] coords[0];
         delete [] coords[1];

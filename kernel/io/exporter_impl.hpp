@@ -34,7 +34,7 @@ namespace io {
 
     std::string varname;
     int dim = 1; // dim of fields
-    field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, apt::dims(grid_ds), _guard) );
+    field::Field<RealDS,3,DGrid> fds ( apt::make_range({}, apt::dims(grid_ds), _guard) ); // FIXME _guard??
 
     auto smart_save =
       [&saver]( const std::string name, const int field_dim, const auto& fds ) {
@@ -50,8 +50,8 @@ namespace io {
     if ( _cart_opt ) {
       for ( auto* fe : fexps ) {
         varname = fe->name();
-        std::tie(dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
         if ( dim > 1 ) varname += "#";
+        std::tie(dim,fds) = fe->action(_ratio, _cart_opt, grid, grid_ds, _guard, E, B, J );
 
         field::copy_sync_guard_cells( fds, *_cart_opt );
         smart_save( varname, dim, fds );
@@ -64,9 +64,9 @@ namespace io {
 
       for ( auto* pe : pexps ) {
         varname = pe->name();
-        std::tie(dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
         if ( dim > 1 ) varname += "#";
         varname += "_" + prop.name;
+        std::tie(dim,fds) = pe->action(_ratio, grid, grid_ds, _guard, prop, particles[sp]);
 
         // FIXME reduce number of communication
         for ( int i = 0; i < dim; ++i )

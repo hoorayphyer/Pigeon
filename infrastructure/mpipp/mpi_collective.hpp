@@ -45,7 +45,6 @@ namespace mpi {
     template < typename T >
     void scatter( int root, T* buffer, int count ) const;
 
-    // TODO finish this
     template < typename T >
     void exscan_inplace( T* send_buf, int count ) const;
   };

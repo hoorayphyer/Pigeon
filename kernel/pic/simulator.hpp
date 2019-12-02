@@ -104,7 +104,8 @@ namespace pic {
       }
 
       { // set field actions
-        const auto f_actions = field::set_up_field_actions<DGrid,R,RJ>();
+        // auto f_actions = field::set_up_field_actions<DGrid,R,RJ>();
+        auto f_actions = set_up_field_actions();
         _field_actions.resize(f_actions.size());
         for ( int i = 0; i < f_actions.size(); ++i ) {
           _field_actions[i].reset(f_actions[i]->Clone());
@@ -113,7 +114,8 @@ namespace pic {
       }
 
       { // set particle actions
-        const auto p_actions = particle::set_up_particle_actions<DGrid,R,S,ShapeF,RJ>();
+        // auto p_actions = particle::set_up_particle_actions<DGrid,R,S,ShapeF,RJ>();
+        auto p_actions = set_up_particle_actions();
         _ptc_actions.resize(p_actions.size());
         for ( int i = 0; i < p_actions.size(); ++i ) {
           _ptc_actions[i].reset(p_actions[i]->Clone());
@@ -122,7 +124,7 @@ namespace pic {
       }
 
       { // init runtime data
-        RTD<R,DGrid>::init( _properties, _grid );
+        RTD::data().init( _properties, _grid );
       }
 
       if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
@@ -164,7 +166,7 @@ namespace pic {
           bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
         }
         // FIXME : should include upper boundary ???
-        auto range = apt::make_range({}, bulk_dims, field::myguard);
+        auto range = apt::make_range({}, bulk_dims, myguard);
         _E = {range};
         _B = {range};
         _J = {range};
@@ -190,13 +192,13 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, RTD<R,DGrid>::N_scat );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, RTD::data().N_scat );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
         // FIXME a temporary fix, which may crash under the edge case in which initially many particles are created.
         if (_cart_opt) {
-          auto ic = pic::set_up_initial_conditions<DGrid,R,RJ,S>();
+          auto ic = set_up_initial_conditions();
           taylor(ic);
           ic(_grid, _E, _B, _J, _particles);
           field::copy_sync_guard_cells(_E, *_cart_opt);
@@ -215,7 +217,7 @@ namespace pic {
             if ( ptc.is(particle::flag::exist) ) num += ptc.frac();
           }
           vital::num_ptcs_prev.push_back(num);
-          vital::num_scat_prev.push_back(RTD<R,DGrid>::N_scat[sp]);
+          vital::num_scat_prev.push_back(RTD::data().N_scat[sp]);
         }
       }
       { // initialize trace_counters to ensure unique trace serial numbers across runs
@@ -225,7 +227,7 @@ namespace pic {
             if ( ptc.is(particle::flag::traced) )
               n = std::max<unsigned int>( n, ptc.template get<particle::serial_number>() );
 
-          RTD<R,DGrid>::trace_counter.insert( sp, n+1 );
+          RTD::data().trace_counter.insert( sp, n+1 );
         }
       }
       return init_ts;
@@ -388,22 +390,22 @@ namespace pic {
 
       if ( pic::export_data_mr.is_do(timestep) && _ens_opt ) {
         TIMING("ExportData", START {
-            io::export_prior_hook( _grid, *_ens_opt );
+            export_prior_hook( _particles, _properties, _E, _B, _J, _grid, *_ens_opt, dt, timestep );
 
-            auto fexps = io::set_up_field_export<real_export_t,DGrid,R,real_j_t>();
-            auto pexps = io::set_up_particle_export<real_export_t,DGrid,R,particle::Specs>();
+            auto fexps = set_up_field_export();
+            auto pexps = set_up_particle_export();
 
-            io::set_is_collinear_mesh(io::is_collinear_mesh); // TODO
+            io::set_is_collinear_mesh(is_collinear_mesh); // TODO
 
             io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, _properties, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
             for ( auto ptr : pexps ) delete ptr;
 
-            io::export_post_hook<R,DGrid>();
+            export_post_hook();
           });
       }
 
-      auto& Ns = RTD<R,DGrid>::N_scat;
+      auto& Ns = RTD::data().N_scat;
       if ( pic::dlb_mr.is_do(timestep) ) {
         TIMING("DynamicLoadBalance", START {
             if ( _ens_opt ) { // first reduce N_scat to avoid data loss

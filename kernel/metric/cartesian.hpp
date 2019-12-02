@@ -34,7 +34,7 @@ namespace metric {
 #include "field/yee.hpp"
 
 namespace field {
-  template < int DGrid, typename T >
+  template < typename T >
   constexpr T diff_one( T , T , T ) noexcept {
     return 1.0;
   }

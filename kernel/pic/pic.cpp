@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
                            } );
     lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
-    auto properties = particle::set_up<pic::real_t>();
+    auto properties = pic::set_up_particle_properties();
 
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t >
       sim( pic::supergrid, cart_opt, properties );

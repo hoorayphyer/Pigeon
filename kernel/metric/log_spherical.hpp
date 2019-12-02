@@ -39,12 +39,13 @@ namespace field {
   constexpr T diff_zero( const T& f, T lnr, T theta, const apt::Grid<T,DGrid>& g, const apt::Index<DGrid+1>& s ) noexcept {
     return 0.0;
   }
+
+  template < typename T >
+  constexpr T diff_one( T , T , T ) noexcept {
+    return 1.0;
+  }
 }
 
-template < int DGrid, typename T >
-constexpr T diff_one( T , T , T ) noexcept {
-  return 1.0;
-}
 
 #include "field/yee.hpp"
 #include "field/field.hpp"

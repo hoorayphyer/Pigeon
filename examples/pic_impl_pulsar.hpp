@@ -1,30 +1,20 @@
 #ifndef _PIC_IMPL_HPP_
 #define _PIC_IMPL_HPP_
 
+#include "../examples/pic_prior_impl.hpp"
+
 #include "apt/numeric.hpp"
-#include "apt/index.hpp"
-#include "apt/grid.hpp"
 
 #include "pic/module_range.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
+
 #include "metric/log_spherical.hpp"
 
-#include "field/field.hpp"
-
 #include "field/old_field_solver/updater.hpp" // FIXME
-#include "field/haugbolle_solver/updater.hpp"
-
-#include "particle/properties.hpp"
-#include "particle/map.hpp"
-#include "particle/array.hpp"
-#include "particle/particle.hpp"
-
-#include "dye/ensemble.hpp"
 
 #include "io/exportee_by_function.hpp"
 
-#include "pic.hpp"
 
 namespace pic {
   using Metric = metric::LogSpherical<real_t>;
@@ -38,7 +28,7 @@ namespace pic {
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
   inline constexpr real_t dt = 0.01;
 
-  constexpr apt::Grid<real_t,DGrid> supergrid
+  constexpr Grid supergrid
   = {{ { 0.0, std::log(30.0), 64 }, { 0.0, PI, 64 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
@@ -46,7 +36,7 @@ namespace pic {
 
   inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 2000;
+  inline constexpr int total_timesteps = 100;
 
   constexpr real_t classic_electron_radius () noexcept {
     real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
@@ -58,7 +48,7 @@ namespace pic {
 namespace pic {
   inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
 
-  inline constexpr ModuleRange export_data_mr { true, 0, 50 };
+  inline constexpr ModuleRange export_data_mr { true, 0, 200 };
   inline constexpr int pmpio_num_files = 1;
   inline constexpr int downsample_ratio = 1;
 
@@ -71,8 +61,8 @@ namespace pic {
   inline constexpr std::optional<int (*) ( int )> dlb_init_replica_deploy {}; // take in ensemble label and return the intended number of replicas in that ensemble
   inline constexpr std::size_t dlb_target_load = 100000;
 
-  inline constexpr ModuleRange msperf_mr { true, 0, 10 };
-  inline constexpr std::optional<int> msperf_max_entries {};
+  inline constexpr ModuleRange msperf_mr { true, 0, 100 };
+  inline constexpr std::optional<int> msperf_max_entries {100};
   inline constexpr auto msperf_qualified =
     []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
 
@@ -84,27 +74,9 @@ namespace pic {
   inline constexpr int num_tracing_parts = 4;
 }
 
-namespace field {
-  template < int DGrid, typename T >
-  void axissymmetrize( field::Component<T,DGrid,false> comp, // TODOL semantics on comp
-                       void (*f)( decltype(comp[0])& val_guard, decltype(comp[0])& val_bulk ),
-                       apt::Index<DGrid> Ib, apt::Index<DGrid> Ie, bool is_upper ) {
-    static_assert(DGrid==2);
-    constexpr int AxisDir = 1;
+namespace pic {
+  constexpr bool use_new_field_solver = false;
 
-    int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
-    mirror_sum += is_upper ? 2 * Ib[AxisDir] : 2 * (Ie[AxisDir] - 1);
-
-    for ( const auto& trI : apt::project_out(AxisDir,Ib,Ie) ) {
-      for ( apt::Longidx n (AxisDir, Ib[AxisDir]); n < Ie[AxisDir]; ++n ) {
-        f( comp(trI + n), comp(trI + (mirror_sum - n)) );
-      }
-    }
-  }
-}
-
-namespace field {
-  using pic::real_t;
   inline constexpr real_t Omega = 1.0 / 6.0;
 
   constexpr int star_interior = 5;
@@ -114,8 +86,7 @@ namespace field {
   static_assert( order_precision % 2 == 0 );
   constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
 
-  // FIXME NOTE the 1 + 
-  constexpr int myguard = std::max(1 + order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
+  constexpr int myguard = std::max(1 + use_new_field_solver * order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
@@ -141,20 +112,82 @@ namespace field {
     return 0;
   }
 
-  real_t (*damping_profile)( real_t q ) = nullptr;
+  template < typename T, typename F >
+  void axissymmetrize( ::field::Component<T,DGrid,false> comp, // TODOL semantics on comp
+                       const F& f, // has interface: void (*f)( real_t& val_guard, real_t& val_bulk ),
+                       Index Ib, Index Ie, bool is_upper ) {
+    static_assert(DGrid==2);
+    constexpr int AxisDir = 1;
 
+    int mirror_sum = (comp.offset()[AxisDir] == MIDWAY ) ? -1 : 0;
+    mirror_sum += is_upper ? 2 * Ib[AxisDir] : 2 * (Ie[AxisDir] - 1);
+
+    for ( const auto& trI : apt::project_out(AxisDir,Ib,Ie) ) {
+      for ( apt::Longidx n (AxisDir, Ib[AxisDir]); n < Ie[AxisDir]; ++n ) {
+        f( comp(trI + n), comp(trI + (mirror_sum - n)) );
+      }
+    }
+  }
   // TODOL annihilation will affect deposition // NOTE one can deposit in the end
 }
 
-namespace field {
-  constexpr bool use_new = true;
+namespace pic {
+  struct RTD {
+  public:
+    static RTD& data() {
+      static RTD r;
+      return r;
+    }
 
-  template < int DGrid, typename R, typename RJ >
+    map<real_t> N_scat {};
+    Field<1> pc_counter {};
+    real_t pc_cumulative_time {};
+
+    map<unsigned int> trace_counter {};
+
+    map<JField> Jsp {}; // current by species
+    bool is_export_Jsp = false;
+
+    Field<1> skin_depth {};
+
+    void init( const map<Properties>& properties, const Grid& localgrid ) {
+      is_export_Jsp = true;
+      for ( auto sp : properties )
+        N_scat.insert( sp, 0 );
+      if ( is_export_Jsp ) {
+        for ( auto sp : properties )
+          Jsp.insert( sp, {} );
+      }
+
+      Index bulk_dims;
+      for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
+      auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
+      pc_counter = {range};
+    };
+
+  private:
+    RTD() = default;
+    RTD(const RTD&);
+    RTD(RTD&&) noexcept;
+    RTD& operator=( const RTD& );
+    RTD& operator=( RTD&& ) noexcept;
+    ~RTD() = default;
+  };
+}
+
+namespace pic {
+  namespace yee = ::field::yee;
+  template < ::field::offset_t Ftype >
+  constexpr auto Diff = ::field::Diff<DGrid,real_t,Ftype>;
+  constexpr auto HHk = ::field::HHk<real_t>;
+  constexpr auto diff_zero = ::field::diff_zero<DGrid,real_t>;
+  constexpr auto diff_one = ::field::diff_one<real_t>;
+
   auto set_up_old_field_actions() {
-    std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
+    std::vector<std::unique_ptr<FieldAction>> fus;
     namespace range = apt::range;
 
-    OldSolve<R,DGrid,RJ> fu;
+    ::field::OldSolve<real_t,DGrid,real_j_t> fu;
     {
       const int guard = fu.guard();
       fu.setName("OldSolve");
@@ -166,22 +199,23 @@ namespace field {
       fu.set_damping_rate(10.0);
       fu.set_surface_indent(5);
       fu.set_damp_indent(43);
-      fu.set_omega_t(field::omega_spinup);
+      fu.set_omega_t(omega_spinup);
     }
 
-    struct Axissymmetric : public Action<R,DGrid,RJ> {
+    struct Axissymmetric : public FieldAction {
     private:
       bool _is_upper_axis = false;
+
     public:
       auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
       virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
-      virtual void operator() ( Field<R,3,DGrid>& E, Field<R,3,DGrid>& B,
-                                const Field<RJ,3,DGrid>& , const apt::Grid<R,DGrid>& grid,
-                                const mpi::CartComm&, int , R) const override {
+      virtual void operator() ( Field<3>& E, Field<3>& B,
+                                const JField& , const Grid& grid,
+                                const mpi::CartComm&, int , real_t) const override {
         // NOTE Guard cells values are needed when interpolating E and B
         // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
-        auto assign = []( R& v_g, R& v_b ) noexcept { v_g = v_b; };
-        auto neg_assign = []( R& v_g, R& v_b ) noexcept {
+        auto assign = []( real_t& v_g, real_t& v_b ) noexcept { v_g = v_b; };
+        auto neg_assign = []( real_t& v_g, real_t& v_b ) noexcept {
                             v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
                           };
         // MIDWAY in AxisDir
@@ -216,14 +250,13 @@ namespace field {
     return fus;
   }
 
-  template < int DGrid, typename R, typename RJ >
   auto set_up_field_actions() {
-    if constexpr ( !use_new ) return set_up_old_field_actions<DGrid,R,RJ>();
+    if constexpr ( !use_new_field_solver ) return set_up_old_field_actions();
 
-    std::vector<std::unique_ptr<Action<R,DGrid,RJ>>> fus;
+    std::vector<std::unique_ptr<FieldAction>> fus;
     namespace range = apt::range;
 
-    Haugbolle<R,DGrid,RJ> fu_bulk;
+    Haugbolle fu_bulk;
     {
       auto& fu = fu_bulk;
       fu.setName("Bulk");
@@ -236,16 +269,18 @@ namespace field {
       for ( int i = 0; i < 3; ++i ) { // i is coordinate
         for ( int j = 0; j < 3; ++j ) { // j is Fcomp
           if ( i == j ) continue;
-          fu.set_D(yee::Etype,j,i, Diff<DGrid,R,yee::Etype>(j,i) );
-          fu.set_D(yee::Btype,j,i, Diff<DGrid,R,yee::Btype>(j,i) );
+          fu.set_D(yee::Etype,j,i, Diff<yee::Etype>(j,i) );
+          fu.set_D(yee::Btype,j,i, Diff<yee::Btype>(j,i) );
         }
       }
+
       for ( int Ftype = Ftype; Ftype < 2; ++Ftype )
         for ( int i = 0; i < 3; ++i )
-          fu.set_hh( Ftype,i, HHk<R>(i) );
+          fu.set_hh( Ftype,i, HHk(i) );
+
     }
 
-    HaugbolleBdry<R,DGrid,RJ> fu_axis_lo;
+    HaugbolleBdry fu_axis_lo;
     {
       auto& fu = fu_axis_lo;
       fu.setName("LowerAxis");
@@ -255,18 +290,18 @@ namespace field {
 
       fu.init_from(fu_bulk);
 
-      apt::Index<DGrid> I = range::begin(fu);
-      fu.set_D( yee::Etype, 0, 1, diff_zero<DGrid,R>, I ); // zero because E_r is polar vector, it's derivative sits on the axis. So zero.
-      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,false>, I ); // curl E_phi has 1/sin0
-      fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, I ); // not necessary but good to have
-      fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, I );
+      Index I = range::begin(fu);
+      fu.set_D( yee::Etype, 0, 1, diff_zero, I ); // zero because E_r is polar vector, it's derivative sits on the axis. So zero.
+      fu.set_D( yee::Etype, 2, 1, ::field::diff_axis_Ephi_theta<DGrid,real_t,false>, I ); // curl E_phi has 1/sin0
+      fu.set_D( yee::Etype, 1, 0, diff_zero, I ); // not necessary but good to have
+      fu.set_D( yee::Btype, 2, 0, diff_zero, I );
 
-      fu.set_hh( yee::Etype, 0, 1, diff_one<DGrid,R>, I ); // because numerator will be zero
-      fu.set_hh( yee::Etype, 2, 1, diff_one<DGrid,R>, I );
-      fu.set_hh( yee::Btype, 2, 0, diff_one<DGrid,R>, I );
+      fu.set_hh( yee::Etype, 0, 1, diff_one, I ); // because numerator will be zero
+      fu.set_hh( yee::Etype, 2, 1, diff_one, I );
+      fu.set_hh( yee::Btype, 2, 0, diff_one, I );
     }
 
-    HaugbolleBdry<R,DGrid,RJ> fu_axis_hi;
+    HaugbolleBdry fu_axis_hi;
     {
       auto& fu = fu_axis_hi;
       fu.setName("HigherAxis");
@@ -282,20 +317,20 @@ namespace field {
       // bound of a cell that is beyond the axis. The values of derivatives in
       // that cell don't matter unless it's right on the axis. So we first use
       // trivial derivative for all, then only d E_phi / d theta nees a diff_from_left
-      apt::Index<DGrid> I = { fu[0].begin(), fu[1].end() -1 };
+      Index I = { fu[0].begin(), fu[1].end() -1 };
       for ( int Ftype = 0; Ftype < 2; ++Ftype ) {
         for ( int c = 0; c < 3; ++c ) {
-          fu.set_hh( Ftype, c, diff_one<DGrid,R>, I );
+          fu.set_hh( Ftype, c, diff_one, I );
           for ( int i = 0; i < DGrid; ++i ) { // NOTE DGrid is just fine
             if ( c == i ) continue; // only need transverse
-            fu.set_D( Ftype, c, i, diff_zero<DGrid,R>, I );
+            fu.set_D( Ftype, c, i, diff_zero, I );
           }
         }
       }
-      fu.set_D( yee::Etype, 2, 1, diff_axis_Ephi_theta<DGrid,R,true>, I );
+      fu.set_D( yee::Etype, 2, 1, ::field::diff_axis_Ephi_theta<DGrid,real_t,true>, I );
     }
 
-    HaugbolleBdry<R,DGrid,RJ> fu_surf;
+    HaugbolleBdry fu_surf;
     {
       auto& fu = fu_surf;
       fu.setName("ConductingSurface");
@@ -306,15 +341,15 @@ namespace field {
 
       fu.init_from(fu_bulk);
 
-      apt::Index<DGrid> I = range::begin(fu);
-      fu.set_D( yee::Etype, 1, 0, diff_1sided_from_right<DGrid,R,1,0>, I );
-      fu.set_D( yee::Etype, 2, 0, diff_1sided_from_right<DGrid,R,2,0>, I );
+      Index I = range::begin(fu);
+      fu.set_D( yee::Etype, 1, 0, ::field::diff_1sided_from_right<DGrid,real_t,1,0>, I );
+      fu.set_D( yee::Etype, 2, 0, ::field::diff_1sided_from_right<DGrid,real_t,2,0>, I );
     }
 
     auto set_double_bdry =
-      [&fu_bulk]( HaugbolleBdry<R,DGrid,RJ>& fu,
-          const HaugbolleBdry<R,DGrid,RJ>& fu_surf,
-          const HaugbolleBdry<R,DGrid,RJ>& fu_axis ) {
+      [&fu_bulk]( HaugbolleBdry& fu,
+          const HaugbolleBdry& fu_surf,
+          const HaugbolleBdry& fu_axis ) {
 
         fu.setName( fu_surf.name() + fu_axis.name() );
         fu[0] = fu_surf[0];
@@ -342,18 +377,18 @@ namespace field {
       };
 
 
-    HaugbolleBdry<R,DGrid,RJ> fu_surf_axis_lo;
+    HaugbolleBdry fu_surf_axis_lo;
     {
       auto& fu = fu_surf_axis_lo;
       set_double_bdry(fu, fu_surf, fu_axis_lo);
       // for r derivative on the axes, just set them to zero
       for ( int i = range::begin(fu, 0); i < range::end(fu,0); ++i ) {
-        fu.set_D( yee::Etype, 1, 0, diff_zero<DGrid,R>, {i,fu[1].begin()} );
-        fu.set_D( yee::Btype, 2, 0, diff_zero<DGrid,R>, {i,fu[1].begin()} );
+        fu.set_D( yee::Etype, 1, 0, diff_zero, {i,fu[1].begin()} );
+        fu.set_D( yee::Btype, 2, 0, diff_zero, {i,fu[1].begin()} );
       }
     }
 
-    HaugbolleBdry<R,DGrid,RJ> fu_surf_axis_hi;
+    HaugbolleBdry fu_surf_axis_hi;
     {
       auto& fu = fu_surf_axis_hi;
       set_double_bdry(fu, fu_surf, fu_axis_hi);
@@ -362,18 +397,20 @@ namespace field {
         static_assert(order_precision == 2);
         int last_theta = fu[1].end() - 1;
         for ( int i = range::begin(fu, 0); i < range::end(fu,0); ++i ) {
-          fu.set_D(yee::Etype, 1, 0, diff_zero<DGrid,R>, {i,last_theta} );
-          fu.set_D(yee::Etype, 2, 0, diff_zero<DGrid,R>, {i,last_theta} ); // beyond axis
-          fu.set_D(yee::Btype, 2, 0, diff_zero<DGrid,R>, {i,last_theta} );
-          fu.set_D(yee::Btype, 1, 0, diff_zero<DGrid,R>, {i,last_theta} ); // beyond axis
+          fu.set_D(yee::Etype, 1, 0, diff_zero, {i,last_theta} );
+          fu.set_D(yee::Etype, 2, 0, diff_zero, {i,last_theta} ); // beyond axis
+          fu.set_D(yee::Btype, 2, 0, diff_zero, {i,last_theta} );
+          fu.set_D(yee::Btype, 1, 0, diff_zero, {i,last_theta} ); // beyond axis
         }
       }
 
     }
 
+    using R = real_t;
+
     // NOTE only implemented for LOWER boundary
     // NOTE at lower boundary the surface is at the "+" : |---*+--|---*--->
-    struct RotatingConductor : public Action<R,DGrid,RJ> {
+    struct RotatingConductor : public FieldAction {
     private:
       apt::array<R(*)(R,R,R,R t),3> _E_cond;
       apt::array<R(*)(R,R,R,R t),3> _B_cond;
@@ -386,10 +423,10 @@ namespace field {
         _B_cond = B; return *this;
       }
       virtual RotatingConductor* Clone() const { return new RotatingConductor(*this); }
-      virtual void operator() ( Field<R,3,DGrid>& E,
-                                Field<R,3,DGrid>& B,
-                                const Field<RJ,3,DGrid>& ,
-                                const apt::Grid<R,DGrid>& grid,
+      virtual void operator() ( Field<3>& E,
+                                Field<3>& B,
+                                const JField& ,
+                                const Grid& grid,
                                 const mpi::CartComm&,
                                 int timestep,
                                 R dt
@@ -422,7 +459,7 @@ namespace field {
     }
 
     // NOTE only implemented for UPPER boundary
-    struct DampingLayer : public Action<R,DGrid,RJ> {
+    struct DampingLayer : public FieldAction {
     private:
       apt::array<R(*)(R,R,R,R t),3> _E_bg;
       apt::array<R(*)(R,R,R,R t),3> _B_bg;
@@ -439,10 +476,10 @@ namespace field {
 
       virtual DampingLayer* Clone() const { return new DampingLayer(*this); }
 
-      virtual void operator() ( Field<R,3,DGrid>& E,
-                                Field<R,3,DGrid>& B,
-                                const Field<RJ,3,DGrid>&,
-                                const apt::Grid<R,DGrid>& grid,
+      virtual void operator() ( Field<3>& E,
+                                Field<3>& B,
+                                const JField&,
+                                const Grid& grid,
                                 const mpi::CartComm&,
                                 int timestep,
                                 R dt
@@ -477,7 +514,7 @@ namespace field {
       auto& fu = fu_damp;
       constexpr R thickness = 7.0; // in normal spherical radius
       constexpr int nb = ( std::log(std::exp(pic::supergrid[0].upper()) - thickness) - pic::supergrid[0].lower() ) / pic::supergrid[0].delta();
-      damping_profile =
+      auto damping_profile =
         [](R lnr) -> R {
           static R r_damp_b = std::exp( pic::supergrid[0].absc(nb,0) );
           lnr = ( std::exp(lnr) - r_damp_b ) / thickness;
@@ -491,19 +528,19 @@ namespace field {
 
       fu.set_normal_direction(0);
       fu.set_damping_rate(10.0);
-      fu.set_damping_profile(damping_profile); // TODO check if this works
+      fu.set_damping_profile(damping_profile); // FIXME check if this works. Lifetime of damping_profile?
       fu.set_E_background({ E_r_star, E_theta_star, E_phi_star });
       fu.set_B_background({ B_r_star, B_theta_star, B_phi_star });
     }
 
-    struct Axissymmetric : public Action<R,DGrid,RJ> {
+    struct Axissymmetric : public FieldAction {
     private:
       bool _is_upper_axis = false;
     public:
       auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
       virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
-      virtual void operator() ( Field<R,3,DGrid>& E, Field<R,3,DGrid>& B,
-                                const Field<RJ,3,DGrid>& , const apt::Grid<R,DGrid>& grid,
+      virtual void operator() ( Field<3>& E, Field<3>& B,
+                                const JField& , const Grid& grid,
                                 const mpi::CartComm&, int , R) const override {
         // NOTE Guard cells values are needed when interpolating E and B
         // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
@@ -553,443 +590,15 @@ namespace field {
 }
 
 namespace pic {
-  template < int DGrid, typename R, typename RJ, template < typename > class S >
-  auto set_up_initial_conditions() {
-    // local class in a function
-    struct InitialCondition : public apt::ActionBase<DGrid> {
-      InitialCondition* Clone() const override { return new InitialCondition(*this); }
+  constexpr real_t gravity_strength = 0.5;
+  real_t landau0_B_thr = 0.1;
 
-      void operator() ( const apt::Grid<R,DGrid>& grid,
-                        field::Field<R, 3, DGrid>& ,
-                        field::Field<R, 3, DGrid>& B,
-                        field::Field<RJ, 3, DGrid>& ,
-                        particle::map<particle::array<R,S>>&
-                        ) const {
-        for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
-          B[0](I) = field::B_r_star( grid[0].absc(I[0], 0.5 * B[0].offset()[0]), grid[1].absc(I[1], 0.5 * B[0].offset()[1]), 0, 0 );
-          B[1](I) = field::B_theta_star( grid[0].absc(I[0], 0.5 * B[1].offset()[0]), grid[1].absc(I[1], 0.5 * B[1].offset()[1]), 0, 0 );
-        }
-      }
+  constexpr real_t gamma_fd = 20.0;
+  constexpr real_t gamma_off = 15.0;
+  constexpr real_t Ndot_fd = 0.25;
+  constexpr real_t E_ph = 4.0;
 
-    } ic;
-    ic[0] = { 0, supergrid[0].dim() };
-    ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
-
-    return ic;
-  }
-}
-
-// FIXME singleton?
-namespace {
-  template < typename R, int D >
-  struct RTD { // runtime data
-    static particle::map<R> N_scat;
-    static field::Field<R,1,D> pc_counter;
-    static R pc_cumulative_time;
-
-    static particle::map<unsigned int> trace_counter;
-
-    static particle::map<field::Field<pic::real_j_t,3,D>> Jsp; // current by species
-    static bool is_export_Jsp;
-
-    static field::Field<R,1,D> skin_depth;
-
-    static void init( const particle::map<particle::Properties>& properties, const apt::Grid< R, D >& localgrid ) {
-      is_export_Jsp = false;
-      for ( auto sp : properties )
-        N_scat.insert( sp, 0 );
-      if ( is_export_Jsp ) {
-        for ( auto sp : properties )
-          Jsp.insert( sp, {} );
-      }
-
-      apt::Index<D> bulk_dims;
-      for ( int i = 0; i < D; ++i ) bulk_dims[i] = localgrid[i].dim();
-      auto range = apt::make_range({}, bulk_dims, 0);
-      pc_counter = {range};
-    };
-  };
-
-  template < typename R, int D >
-  particle::map<R> RTD<R,D>::N_scat {};
-
-  template < typename R, int D >
-  field::Field<R,1,D> RTD<R,D>::pc_counter {};
-
-  template < typename R, int D >
-  R RTD<R,D>::pc_cumulative_time = 0;
-
-  template < typename R, int D >
-  particle::map<unsigned int> RTD<R,D>::trace_counter {};
-
-  template < typename R, int D >
-  particle::map<field::Field<pic::real_j_t,3,D>> RTD<R,D>::Jsp {};
-
-  template < typename R, int D >
-  bool RTD<R,D>::is_export_Jsp = false;
-
-  template < typename R, int D >
-  field::Field<R,1,D> RTD<R,D>::skin_depth {};
-}
-
-namespace particle {
-  constexpr pic::real_t N_atm_floor = std::exp(1.0) * 2.0 * field::Omega * pic::w_gyro_unitB * std::pow( pic::dt / pic::wdt_pic, 2.0 );
-  constexpr pic::real_t N_atm_x = 1.0; // TODO
-  constexpr pic::real_t v_th = 0.2;
-  constexpr pic::real_t gravity_strength = 0.5;
-
-  template < int DGrid, typename R, template < typename > class S,
-             typename ShapeF, typename RJ >
-  auto set_up_particle_actions() {
-    namespace range = apt::range;
-    std::vector<std::unique_ptr<Action<DGrid,R,S,RJ>>> pus;
-
-    struct Updater_with_J_species: Action<DGrid,R,S,RJ> {
-    private:
-      Updater<DGrid,R,S,ShapeF,RJ> _pu;
-
-    public:
-      void set_updater( Updater<DGrid,R,S,ShapeF,RJ>&& pu) noexcept { _pu = std::move(pu); }
-
-      Updater_with_J_species* Clone() const override { return new Updater_with_J_species(*this); }
-
-      void operator() ( map<array<R,S>>& particles,
-                        field::Field<RJ,3,DGrid>& J,
-                        std::vector<Particle<R,S>>* new_ptc_buf,
-                        const map<Properties>& properties,
-                        const field::Field<R,3,DGrid>& E,
-                        const field::Field<R,3,DGrid>& B,
-                        const apt::Grid< R, DGrid >& grid,
-                        const dye::Ensemble<DGrid>* ens,
-                        R dt, int timestep, util::Rng<R>& rng
-                        ) override {
-        if ( !RTD<R,DGrid>::is_export_Jsp || !pic::export_data_mr.is_do(timestep) ) {
-          _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
-        } else {
-          auto& Jsp = RTD<R,DGrid>::Jsp;
-          // store J by species separately for data export
-          for ( auto sp : particles ) {
-            map<array<R,S>> ptcs_sp;
-            ptcs_sp.insert(sp);
-            std::swap( ptcs_sp[sp], particles[sp] ); // FIXME make sure there is no copying
-            Jsp[sp] = J;
-            Jsp[sp].reset();
-            _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
-            std::swap( ptcs_sp[sp], particles[sp] );
-
-            for ( int C = 0; C < 3; ++C ) {
-              for ( int i = 0; i < J.mesh().linear_size(); ++i )
-                J[C][i] += Jsp[sp][C][i];
-            }
-          }
-        }
-      }
-    } pu;
-    {
-      Updater<DGrid,R,S,ShapeF,RJ> pu0;
-      pu0.set_update_q(pic::Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
-
-      pu.setName("MainUpdate");
-      pu.set_updater(std::move(pu0));
-    }
-
-    Migrator<DGrid,R,S,ShapeF,RJ> migrate;
-    {
-      migrate.setName("MigrateParticles");
-      migrate.set_supergrid(pic::supergrid);
-    }
-
-    struct Atmosphere: Action<DGrid,R,S,RJ> {
-    private:
-      field::Field<R,1,DGrid> _count_n;
-      field::Field<R,1,DGrid> _count_p;
-      int _n = 0; // normal direction
-      species _posion = species::ion;
-      species _negaon = species::electron;
-      R _v_th = 0.0;
-      R _N_atm = 0.0;
-      R _min_frac = 1e-6; // over fracs larger than this will be injected
-      R (*_omega_t) ( R time ) = nullptr;
-
-    public:
-      auto& set_thermal_velocity(R v) { _v_th = v; return *this; }
-      auto& set_number_in_atmosphere(R N) { _N_atm = N; return *this; }
-      auto& set_minimal_fraction( R x ) { _min_frac = x; return *this; }
-      auto& set_normal_direction( int n ) { _n = n; return *this; }
-      auto& set_omega_t(R (*omega_t) ( R )) { _omega_t = omega_t; return *this; }
-      auto& set_positive_charge(species sp) { _posion = sp; return *this; }
-      auto& set_negative_charge(species sp) { _negaon = sp; return *this; }
-
-      Atmosphere* Clone() const override { return new Atmosphere(*this); }
-
-      void operator() ( map<array<R,S>>& particles,
-                        field::Field<RJ,3,DGrid>& J,
-                        std::vector<Particle<R,S>>*,
-                        const map<Properties>& properties,
-                        const field::Field<R,3,DGrid>& E,
-                        const field::Field<R,3,DGrid>& B,
-                        const apt::Grid< R, DGrid >& grid,
-                        const dye::Ensemble<DGrid>* ens,
-                        R dt, int timestep, util::Rng<R>& rng
-                         ) override {
-        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
-        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
-
-        apt::array<R,DGrid> lb;
-        apt::array<R,DGrid> ub;
-        for ( int i = 0; i < DGrid; ++i ) {
-          lb[i] = grid[i].absc( range::begin(*this,i), 0.0 );
-          ub[i] = grid[i].absc( range::end(*this,i), 0.0 );
-        }
-        auto is_in = [&lb,&ub]( const auto& q ) {
-                       for ( int i = 0; i < DGrid; ++i ) {
-                         if ( q[i] < lb[i] || q[i] >= ub[i] ) return false;
-                       }
-                       return true;
-                     };
-
-        auto f_count
-          = [&lb,&ub,&grid,is_in]( auto& count, const auto& ptcs) {
-              count.reset();
-              for ( const auto& x : ptcs ) {
-                if ( !x.is(flag::exist) || !is_in(x.q()) ) continue;
-                apt::Index<DGrid> idx;
-                for ( int i = 0; i < DGrid; ++i )
-                  idx[i] = ( x.q()[i] - lb[i] ) / grid[i].delta();
-                count[0](idx) += x.frac(); // add by fraction
-              }
-            };
-
-        f_count( _count_n, particles[_negaon] );
-        f_count( _count_p, particles[_posion] );
-
-        { // parallelizae TODO optimize
-          int rank_inj = timestep % ens->size();
-          ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_n[0].data().data(), _count_n[0].data().size() );
-          ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_p[0].data().data(), _count_p[0].data().size() );
-          if ( ens->intra.rank() != rank_inj ) return;
-        }
-
-        auto itr_po = std::back_inserter(particles[_posion]);
-        auto itr_ne = std::back_inserter(particles[_negaon]);
-
-        for ( const auto& I : apt::Block(range::begin(*this),range::end(*this)) ) {
-          auto N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
-          apt::Vec<R, S<R>::Dim> q{};
-          for ( int i = 0; i < DGrid; ++i )
-            q[i] = grid[i].absc(I[i], 0.5);
-
-          apt::Vec<R,3> nB;
-          { // make nB centered in the cell
-            const auto& m = B.mesh();
-            auto li = m.linear_index(I);
-            if constexpr (DGrid == 2) {
-                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride()[1]] );
-                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride()[0]] );
-                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
-              } else if (DGrid == 3){
-              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride()[1]] + B[0][li + m.stride()[2]] + B[0][li + m.stride()[1] + m.stride()[2]] );
-              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride()[2]] + B[1][li + m.stride()[0]] + B[1][li + m.stride()[2] + m.stride()[0]] );
-              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
-            }
-            if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
-            else nB /= apt::abs(nB);
-          }
-
-          apt::Vec<R, S<R>::Dim> p{};
-          p[2] = _omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
-
-          // replenish
-          R quota = _N_atm * std::sin(q[1]) - N_pairs;
-          while ( quota > _min_frac ) {
-            auto q_ptc = q;
-            R frac = std::min( (R)1.0, quota );
-            quota -= (R)1.0;
-
-            for ( int i = 0; i < DGrid; ++i ) {
-              if ( _n == i )
-                q_ptc[i] += grid[i].delta() * rng.uniform(-0.5, 0.0); // TODO move this out. This only affects when it is lower
-              else
-                q_ptc[i] += grid[i].delta() * rng.uniform(-0.5, 0.5);
-            }
-            auto p_ptc = p;
-            p_ptc += nB * rng.gaussian( 0.0, _v_th );
-            *(itr_ne++) = Particle<R,S>( q_ptc, p_ptc, frac, _negaon, birthplace(ens->label()) );
-            *(itr_po++) = Particle<R,S>( std::move(q_ptc), std::move(p_ptc), frac, _posion, birthplace(ens->label()) );
-          }
-        }
-      }
-    } atm;
-    {
-      atm.setName("Atmosphere");
-      atm[0] = { field::star_interior, field::star_interior + 1 };
-      atm[1] = { 0, pic::supergrid[1].dim() };
-
-      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(N_atm_x * N_atm_floor);
-      atm.set_positive_charge(species::ion).set_negative_charge(species::electron);
-      atm.set_omega_t(field::omega_spinup).set_normal_direction(0);
-    }
-
-    struct Axissymmetric : public Action<DGrid,R,S,RJ> {
-    private:
-      bool _is_upper_axis = false;
-    public:
-      auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
-      virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
-
-      virtual void operator() ( map<array<R,S>>&,
-                                field::Field<RJ,3,DGrid>& J,
-                                std::vector<Particle<R,S>>*,
-                                const map<Properties>&,
-                                const field::Field<R,3,DGrid>&,
-                                const field::Field<R,3,DGrid>&,
-                                const apt::Grid< R, DGrid >& grid,
-                                const dye::Ensemble<DGrid>* ,
-                                R, int, util::Rng<R>&
-                                ) override {
-        auto add_assign =
-          []( RJ& a, RJ& b ) noexcept {
-            a += b;
-            b = a;
-          };
-
-        auto sub_assign =
-          []( RJ& a, RJ& b ) noexcept {
-            a -= b;
-            b = -a;
-          };
-        // MIDWAY in AxisDir
-        axissymmetrize(J[0], add_assign, range::begin(*this),range::end(*this),_is_upper_axis );
-        axissymmetrize(J[2], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
-        // INSITU in AxisDir
-        axissymmetrize(J[1], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
-      }
-    } asym_lo, asym_hi;
-    {
-      asym_lo.setName("AxissymmetrizeJLower");
-      asym_lo[0] = { 0, pic::supergrid[0].dim() };
-      asym_lo[1] = { -field::myguard, 1 }; // NOTE +1 so as to set values right on axis
-      asym_lo.is_upper_axis(false);
-
-      asym_hi.setName("AxissymmetrizeJHigher");
-      asym_hi[0] = { 0 , pic::supergrid[0].dim() };
-      asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + field::myguard };
-      asym_hi.is_upper_axis(true);
-    }
-
-    struct ScatteringAnalyzer : public Action<DGrid,R,S,RJ> {
-      virtual ScatteringAnalyzer* Clone() const { return new ScatteringAnalyzer(*this); }
-
-      virtual void operator() ( map<array<R,S>>& particles,
-                                field::Field<RJ,3,DGrid>& J,
-                                std::vector<Particle<R,S>>* new_ptc_buf,
-                                const map<Properties>&,
-                                const field::Field<R,3,DGrid>&,
-                                const field::Field<R,3,DGrid>&,
-                                const apt::Grid< R, DGrid >& grid,
-                                const dye::Ensemble<DGrid>* ,
-                                R dt, int, util::Rng<R>& rng
-                                ) override {
-        auto& buf = *new_ptc_buf;
-        // Put particles where they belong after scattering
-        for ( int i = 0; i < buf.size(); ++i ) {
-          auto this_sp = buf[i].template get<species>();
-
-          // log scattering events
-          RTD<R,DGrid>::N_scat[this_sp] += buf[i].frac();
-
-          // log pair creation events
-          if ( species::electron == this_sp and buf[i].is(flag::secondary) ) {
-            apt::Index<DGrid> I; // domain index, not the global index
-            for ( int j = 0; j < DGrid; ++j )
-              I[j] = ( buf[i].q()[j] - grid[j].lower() ) / grid[j].delta();
-            RTD<R,DGrid>::pc_counter[0](I) += buf[i].frac();
-
-            // trace electrons near Y point
-            if ( std::log(6.0) < buf[i].q()[0] and buf[i].q()[0] < std::log(7.0)
-                 and 1.47 < buf[i].q()[1] and buf[i].q()[1] < 1.67
-                 and rng.uniform() < 0.01 ) {
-              buf[i].set(flag::traced);
-              buf[i].set(serial_number(RTD<R,DGrid>::trace_counter[species::electron]++));
-            }
-          }
-
-          particles[this_sp].push_back(std::move(buf[i]));
-        }
-        buf.resize(0);
-        RTD<R,DGrid>::pc_cumulative_time += dt;
-      }
-    } scat_anlz;
-    {
-      scat_anlz.setName("ScatteringAnalysis");
-    }
-
-    struct ExportPrep : public Action<DGrid,R,S,RJ> {
-    public:
-      virtual ExportPrep* Clone() const { return new ExportPrep(*this); }
-
-      virtual void operator() ( map<array<R,S>>& particles,
-                                field::Field<RJ,3,DGrid>& J,
-                                std::vector<Particle<R,S>>*,
-                                const map<Properties>& properties,
-                                const field::Field<R,3,DGrid>& E,
-                                const field::Field<R,3,DGrid>& B,
-                                const apt::Grid< R, DGrid >& grid,
-                                const dye::Ensemble<DGrid>* ens,
-                                R dt, int timestep, util::Rng<R>&
-                                ) override {
-        if ( !pic::export_data_mr.is_do(timestep) ) return;
-        auto& skin_depth = RTD<R,DGrid>::skin_depth;
-        skin_depth = {J.mesh()};
-        skin_depth.reset();
-
-        for ( auto sp : particles ) {
-          auto q2m = std::pow<R>( properties[sp].charge_x, 2.0 ) / R(properties[sp].mass_x);
-          for ( const auto& ptc : particles[sp] ) {
-            if ( !ptc.is(flag::exist) ) continue;
-            apt::Index<DGrid> I;
-            for ( int i = 0; i < DGrid; ++i )
-              I[i] = ( ptc.q()[i] - grid[i].lower() ) / grid[i].delta();
-            skin_depth[0](I) += q2m * ptc.frac();
-          }
-        }
-        ens->reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
-        if ( ens->is_chief() ) {
-          for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
-            R r = grid[0].absc(I[0], 0.5);
-            R theta = grid[1].absc(I[1], 0.5);
-            R h = std::sqrt( pic::Metric::h<2>(r,theta) ) * dt / ( pic::wdt_pic * grid[0].delta() );
-            auto& v = skin_depth[0](I);
-            v = h / v;
-          }
-        }
-
-      }
-    } export_prep;
-    {
-      export_prep.setName("ExportPrep");
-    }
-
-    pus.emplace_back(pu.Clone());
-    pus.emplace_back(atm.Clone());
-    pus.emplace_back(asym_lo.Clone());
-    pus.emplace_back(asym_hi.Clone());
-    pus.emplace_back(scat_anlz.Clone());
-    pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
-    pus.emplace_back(export_prep.Clone());
-
-    return pus;
-  }
-}
-
-namespace particle {
-  constexpr pic::real_t gamma_fd = 20.0;
-  constexpr pic::real_t gamma_off = 15.0;
-  constexpr pic::real_t Ndot_fd = 0.25;
-  constexpr pic::real_t E_ph = 4.0;
-
-  template < typename R >
-  auto set_up() {
+  auto set_up_particle_properties() {
     map<Properties> properties;
     {
       properties.insert(species::electron, {1,-1,"electron","el"});
@@ -998,19 +607,17 @@ namespace particle {
       //properties.insert(species::photon, { 0, 0, "photon","ph" });
     }
 
-    using namespace pic;
     {
-      constexpr auto* lorentz = force::template lorentz<real_t,Specs,vParticle>;
-      constexpr auto* landau0 = force::landau0<real_t,Specs,vParticle>;
-      constexpr auto* gravity = force::gravity<real_t,Specs,vParticle>;
-      real_t landau0_B_thr = 0.1;
+      constexpr auto* lorentz = ::particle::force::template lorentz<real_t,Specs,::particle::vParticle>;
+      constexpr auto* landau0 = ::particle::force::landau0<real_t,Specs,::particle::vParticle>;
+      constexpr auto* gravity = ::particle::force::gravity<real_t,Specs,::particle::vParticle>;
 
       if ( properties.has(species::electron) ) {
         auto sp = species::electron;
-        Force<real_t,Specs> force;
+        Force force;
         const auto& prop = properties[sp];
 
-        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
+        force.add( lorentz, ( w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
@@ -1018,10 +625,10 @@ namespace particle {
       }
       if ( properties.has(species::positron) ) {
         auto sp = species::positron;
-        Force<real_t,Specs> force;
+        Force force;
         const auto& prop = properties[sp];
 
-        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
+        force.add( lorentz, ( w_gyro_unitB * prop.charge_x ) / prop.mass_x );
         force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
@@ -1029,7 +636,7 @@ namespace particle {
       }
       if ( properties.has(species::ion) ) {
         auto sp = species::ion;
-        Force<real_t,Specs> force;
+        Force force;
         const auto& prop = properties[sp];
 
         force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
@@ -1040,9 +647,10 @@ namespace particle {
       }
     }
 
-    using Ptc_t = typename array<real_t,Specs>::particle_type;
+    using Ptc_t = typename PtcArray::particle_type;
+    namespace scat = ::particle::scat;
     {
-      Scat<real_t,Specs> ep_scat;
+      ::particle::Scat<real_t,Specs> ep_scat;
 
       ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q()[0] < std::log(9.0); });
 
@@ -1064,7 +672,7 @@ namespace particle {
     }
 
     if ( properties.has(species::photon) ) {
-      Scat<real_t,Specs> photon_scat;
+      ::particle::Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
       scat::MagneticConvert<real_t,Specs>::B_thr = 0.1;
@@ -1084,43 +692,400 @@ namespace particle {
 
 }
 
+namespace pic {
+  constexpr real_t N_atm_floor = std::exp(1.0) * 2.0 * Omega * w_gyro_unitB * std::pow( dt / wdt_pic, 2.0 );
+  constexpr real_t N_atm_x = 1.0; // TODO
+  constexpr real_t v_th = 0.2;
+
+  using R = real_t;
+
+  auto set_up_particle_actions() {
+    namespace range = apt::range;
+    std::vector<std::unique_ptr<PtcAction>> pus;
+
+    struct Updater_with_J_species: PtcAction {
+    private:
+      PtcUpdater _pu;
+
+    public:
+      void set_updater( PtcUpdater&& pu) noexcept { _pu = std::move(pu); }
+
+      Updater_with_J_species* Clone() const override { return new Updater_with_J_species(*this); }
+
+      void operator() ( map<PtcArray>& particles,
+                        JField& J,
+                        std::vector<Particle>* new_ptc_buf,
+                        const map<Properties>& properties,
+                        const Field<3>& E,
+                        const Field<3>& B,
+                        const Grid& grid,
+                        const Ensemble* ens,
+                        R dt, int timestep, util::Rng<R>& rng
+                        ) override {
+        if ( !RTD::data().is_export_Jsp || !export_data_mr.is_do(timestep) ) {
+          _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
+        } else {
+          auto& Jsp = RTD::data().Jsp;
+          // store J by species separately for data export
+          for ( auto sp : particles ) {
+            map<PtcArray> ptcs_sp;
+            ptcs_sp.insert(sp);
+            std::swap( ptcs_sp[sp], particles[sp] ); // FIXME make sure there is no copying
+            Jsp[sp] = J;
+            Jsp[sp].reset();
+            _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
+            std::swap( ptcs_sp[sp], particles[sp] );
+
+            for ( int C = 0; C < 3; ++C ) {
+              for ( int i = 0; i < J.mesh().linear_size(); ++i )
+                J[C][i] += Jsp[sp][C][i];
+            }
+          }
+        }
+      }
+    } pu;
+    {
+      PtcUpdater pu0;
+      pu0.set_update_q(Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
+
+      pu.setName("MainUpdate");
+      pu.set_updater(std::move(pu0));
+    }
+
+    ::particle::Migrator<DGrid,real_t,Specs,ShapeF,real_j_t> migrate;
+    {
+      migrate.setName("MigrateParticles");
+      migrate.set_supergrid(pic::supergrid);
+    }
+
+    struct Atmosphere: PtcAction {
+    private:
+      Field<1> _count_n;
+      Field<1> _count_p;
+      int _n = 0; // normal direction
+      species _posion = species::ion;
+      species _negaon = species::electron;
+      R _v_th = 0.0;
+      R _N_atm = 0.0;
+      R _min_frac = 1e-6; // over fracs larger than this will be injected
+      R (*_omega_t) ( R time ) = nullptr;
+
+    public:
+      auto& set_thermal_velocity(R v) { _v_th = v; return *this; }
+      auto& set_number_in_atmosphere(R N) { _N_atm = N; return *this; }
+      auto& set_minimal_fraction( R x ) { _min_frac = x; return *this; }
+      auto& set_normal_direction( int n ) { _n = n; return *this; }
+      auto& set_omega_t(R (*omega_t) ( R )) { _omega_t = omega_t; return *this; }
+      auto& set_positive_charge(species sp) { _posion = sp; return *this; }
+      auto& set_negative_charge(species sp) { _negaon = sp; return *this; }
+
+      Atmosphere* Clone() const override { return new Atmosphere(*this); }
+
+      void operator() ( map<PtcArray>& particles,
+                        JField& J,
+                        std::vector<Particle>*,
+                        const map<Properties>& properties,
+                        const Field<3>& E,
+                        const Field<3>& B,
+                        const Grid& grid,
+                        const Ensemble* ens,
+                        R dt, int timestep, util::Rng<R>& rng
+                         ) override {
+        // FIXME again guard cells! gives memory error
+        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),2)} );
+        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),2)} );
+
+        apt::array<R,DGrid> lb;
+        apt::array<R,DGrid> ub;
+        for ( int i = 0; i < DGrid; ++i ) {
+          lb[i] = grid[i].absc( range::begin(*this,i), 0.0 );
+          ub[i] = grid[i].absc( range::end(*this,i), 0.0 );
+        }
+        auto is_in = [&lb,&ub]( const auto& q ) {
+                       for ( int i = 0; i < DGrid; ++i ) {
+                         if ( q[i] < lb[i] || q[i] >= ub[i] ) return false;
+                       }
+                       return true;
+                     };
+
+        auto f_count
+          = [&lb,&ub,&grid,is_in]( auto& count, const auto& ptcs) {
+              count.reset();
+              for ( const auto& x : ptcs ) {
+                if ( !x.is(::particle::flag::exist) || !is_in(x.q()) ) continue;
+                Index idx;
+                for ( int i = 0; i < DGrid; ++i )
+                  idx[i] = ( x.q()[i] - lb[i] ) / grid[i].delta();
+                count[0](idx) += x.frac(); // add by fraction
+              }
+            };
+
+        f_count( _count_n, particles[_negaon] );
+        f_count( _count_p, particles[_posion] );
+
+        { // parallelizae TODO optimize
+          int rank_inj = timestep % ens->size();
+          ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_n[0].data().data(), _count_n[0].data().size() );
+          ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_p[0].data().data(), _count_p[0].data().size() );
+          if ( ens->intra.rank() != rank_inj ) return;
+        }
+
+        auto itr_po = std::back_inserter(particles[_posion]);
+        auto itr_ne = std::back_inserter(particles[_negaon]);
+
+        for ( const auto& I : apt::Block(range::begin(*this),range::end(*this)) ) {
+          auto N_pairs = std::min( _count_n[0](I), _count_p[0](I) );
+          Vec3 q{};
+          for ( int i = 0; i < DGrid; ++i )
+            q[i] = grid[i].absc(I[i], 0.5);
+
+          Vec3 nB {};
+          { // make nB centered in the cell
+            const auto& m = B.mesh();
+            auto li = m.linear_index(I);
+            if constexpr (DGrid == 2) {
+                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride()[1]] );
+                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride()[0]] );
+                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
+              } else if (DGrid == 3){
+              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride()[1]] + B[0][li + m.stride()[2]] + B[0][li + m.stride()[1] + m.stride()[2]] );
+              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride()[2]] + B[1][li + m.stride()[0]] + B[1][li + m.stride()[2] + m.stride()[0]] );
+              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
+            }
+            if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
+            else nB /= apt::abs(nB);
+          }
+
+          Vec3 p{};
+          p[2] = _omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
+
+          // replenish
+          R quota = _N_atm * std::sin(q[1]) - N_pairs;
+          while ( quota > _min_frac ) {
+            auto q_ptc = q;
+            R frac = std::min( (R)1.0, quota );
+            quota -= (R)1.0;
+
+            for ( int i = 0; i < DGrid; ++i ) {
+              if ( _n == i )
+                q_ptc[i] += grid[i].delta() * rng.uniform(-0.5, 0.0); // TODO move this out. This only affects when it is lower
+              else
+                q_ptc[i] += grid[i].delta() * rng.uniform(-0.5, 0.5);
+            }
+            auto p_ptc = p;
+            p_ptc += nB * rng.gaussian( 0.0, _v_th );
+            *(itr_ne++) = Particle( q_ptc, p_ptc, frac, _negaon, ::particle::birthplace(ens->label()) );
+            *(itr_po++) = Particle( std::move(q_ptc), std::move(p_ptc), frac, _posion, ::particle::birthplace(ens->label()) );
+          }
+        }
+      }
+    } atm;
+    {
+      atm.setName("Atmosphere");
+      atm[0] = { star_interior, star_interior + 1 };
+      atm[1] = { 0, supergrid[1].dim() };
+
+      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(N_atm_x * N_atm_floor);
+      atm.set_positive_charge(species::ion).set_negative_charge(species::electron);
+      atm.set_omega_t(omega_spinup).set_normal_direction(0);
+    }
+
+    struct Axissymmetric : public PtcAction {
+    private:
+      bool _is_upper_axis = false;
+    public:
+      auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
+      virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
+
+      virtual void operator() ( map<PtcArray>&, JField& J, std::vector<Particle>*, const map<Properties>&,
+                                const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
+                                R, int, util::Rng<R>&) override {
+        auto add_assign =
+          []( real_j_t& a, real_j_t& b ) noexcept {
+            a += b;
+            b = a;
+          };
+
+        auto sub_assign =
+          []( real_j_t& a, real_j_t& b ) noexcept {
+            a -= b;
+            b = -a;
+          };
+        // MIDWAY in AxisDir
+        axissymmetrize(J[0], add_assign, range::begin(*this),range::end(*this),_is_upper_axis );
+        axissymmetrize(J[2], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
+        // INSITU in AxisDir
+        axissymmetrize(J[1], sub_assign, range::begin(*this),range::end(*this),_is_upper_axis );
+      }
+    } asym_lo, asym_hi;
+    {
+      asym_lo.setName("AxissymmetrizeJLower");
+      asym_lo[0] = { 0, supergrid[0].dim() };
+      asym_lo[1] = { -myguard, 1 }; // NOTE +1 so as to set values right on axis
+      asym_lo.is_upper_axis(false);
+
+      asym_hi.setName("AxissymmetrizeJHigher");
+      asym_hi[0] = { 0 , supergrid[0].dim() };
+      asym_hi[1] = { supergrid[1].dim(), supergrid[1].dim() + myguard };
+      asym_hi.is_upper_axis(true);
+    }
+
+    struct ScatteringAnalyzer : public PtcAction {
+      virtual ScatteringAnalyzer* Clone() const { return new ScatteringAnalyzer(*this); }
+
+      virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
+                                const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
+                                R dt, int, util::Rng<R>& rng) override {
+        auto& buf = *new_ptc_buf;
+        // Put particles where they belong after scattering
+        for ( int i = 0; i < buf.size(); ++i ) {
+          auto this_sp = buf[i].template get<species>();
+
+          // log scattering events
+          RTD::data().N_scat[this_sp] += buf[i].frac();
+
+          // log pair creation events
+          if ( species::electron == this_sp and buf[i].is(::particle::flag::secondary) ) {
+            Index I; // domain index, not the global index
+            for ( int j = 0; j < DGrid; ++j )
+              I[j] = ( buf[i].q()[j] - grid[j].lower() ) / grid[j].delta();
+            RTD::data().pc_counter[0](I) += buf[i].frac();
+
+            // trace electrons near Y point
+            if ( std::log(6.0) < buf[i].q()[0] and buf[i].q()[0] < std::log(7.0)
+                 and 1.47 < buf[i].q()[1] and buf[i].q()[1] < 1.67
+                 and rng.uniform() < 0.01 ) {
+              buf[i].set(::particle::flag::traced);
+              buf[i].set(::particle::serial_number(RTD::data().trace_counter[species::electron]++));
+            }
+          }
+
+          particles[this_sp].push_back(std::move(buf[i]));
+        }
+        buf.resize(0);
+        RTD::data().pc_cumulative_time += dt;
+      }
+    } scat_anlz;
+    {
+      scat_anlz.setName("ScatteringAnalysis");
+    }
+
+    pus.emplace_back(pu.Clone());
+    pus.emplace_back(atm.Clone());
+    pus.emplace_back(asym_lo.Clone());
+    pus.emplace_back(asym_hi.Clone());
+    pus.emplace_back(scat_anlz.Clone());
+    // FIXME migrate need more memory check
+    pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
+
+    return pus;
+  }
+}
+
+namespace pic {
+  auto set_up_initial_conditions() {
+    // local class in a function
+    struct InitialCondition : public apt::ActionBase<DGrid> {
+      InitialCondition* Clone() const override { return new InitialCondition(*this); }
+
+      void operator() ( const Grid& grid,
+                        Field<3>& ,
+                        Field<3>& B,
+                        JField& ,
+                        map<PtcArray>&
+                        ) const {
+        for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
+          B[0](I) = B_r_star( grid[0].absc(I[0], 0.5 * B[0].offset()[0]), grid[1].absc(I[1], 0.5 * B[0].offset()[1]), 0, 0 );
+          B[1](I) = B_theta_star( grid[0].absc(I[0], 0.5 * B[1].offset()[0]), grid[1].absc(I[1], 0.5 * B[1].offset()[1]), 0, 0 );
+        }
+      }
+
+    } ic;
+    ic[0] = { 0, supergrid[0].dim() };
+    ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
+
+    return ic;
+  }
+}
+
 #include "io/exportee.hpp"
 #include "msh/mesh_shape_interplay.hpp"
 #include <cassert>
 
-namespace io {
-  template < typename T, int DGrid >
-  constexpr apt::array<T, DGrid> I2std ( const apt::Index<DGrid>& I ) {
-    apt::array<T, DGrid> res;
+namespace pic {
+  constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
+
+  void export_prior_hook( const map<PtcArray>& particles, const map<Properties>& properties,
+                          const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const Ensemble& ens,
+                          real_t dt, int timestep ) {
+    { // pair creation counter
+      auto& pc = RTD::data().pc_counter;
+      ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
+    }
+
+    { // skin depth
+      auto& skin_depth = RTD::data().skin_depth;
+      skin_depth = {J.mesh()};
+      skin_depth.reset();
+
+      for ( auto sp : particles ) {
+        auto q2m = std::pow<R>( properties[sp].charge_x, 2.0 ) / R(properties[sp].mass_x);
+        for ( const auto& ptc : particles[sp] ) {
+          if ( !ptc.is(::particle::flag::exist) ) continue;
+          Index I;
+          for ( int i = 0; i < DGrid; ++i )
+            I[i] = ( ptc.q()[i] - grid[i].lower() ) / grid[i].delta();
+          skin_depth[0](I) += q2m * ptc.frac();
+        }
+      }
+      ens.reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
+      if ( ens.is_chief() ) {
+        for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
+          R r = grid[0].absc(I[0], 0.5);
+          R theta = grid[1].absc(I[1], 0.5);
+          R h = std::sqrt( Metric::h<2>(r,theta) ) * dt / ( wdt_pic * grid[0].delta() );
+          auto& v = skin_depth[0](I);
+          v = h / v;
+        }
+      }
+
+    }
+  }
+
+}
+
+namespace pic {
+  using RDS = real_export_t;
+  using IOField = ::field::Field<RDS,3,DGrid>;
+  using IOGrid = ::apt::Grid<RDS,DGrid>;
+
+  constexpr auto I2std ( const Index& I ) {
+    apt::array<real_t, DGrid> res;
     for ( int i = 0; i < DGrid; ++i )
       res[i] = I[i] + 0.5; // interpolate to MIDWAY
     return res;
   }
 
-  template < int F, typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> field_self ( apt::Index<DGrid> I,
-                               const apt::Grid<R,DGrid>& grid,
-                               const field::Field<R, 3, DGrid>& E,
-                               const field::Field<R, 3, DGrid>& B,
-                               const field::Field<RJ, 3, DGrid>& J ) {
+  template <int F>
+  apt::array<real_t,3> field_self ( Index I, const Grid& grid, const Field<3>& E,
+                                    const Field<3>& B, const JField& J ) {
     if constexpr ( F == 0 ) {
-        return msh::interpolate( E, I2std<R>(I), ShapeF() );
+        return msh::interpolate( E, I2std(I), ShapeF() );
       } else if ( F == 1 ) {
-      return msh::interpolate( B, I2std<R>(I), ShapeF() );
+      return msh::interpolate( B, I2std(I), ShapeF() );
     } else if ( F == 2 ) {
-      auto x = msh::interpolate( J, I2std<RJ>(I), ShapeF() );
-      for ( int i = 0; i < 3; ++i ) x[i] *= field::PREJ;
+      auto x = msh::interpolate( J, I2std(I), ShapeF() );
+      for ( int i = 0; i < 3; ++i ) x[i] *= PREJ;
       return { x[0], x[1], x[2] };
     } else {
       static_assert(F < 3);
     }
   }
 
-  template < typename RDS, int DGrid >
-  void divide_flux_by_area ( field::Field<RDS,3,DGrid>& fds, const apt::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& ) {
+  void divide_flux_by_area ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& ) {
     using Metric = metric::LogSpherical<RDS>;
     // define a function pointer.
-    RDS(*hh_func)(RDS,RDS,RDS) = nullptr;
+    RDS (*hh_func)(RDS,RDS,RDS) = nullptr;
     apt::array<RDS,3> q {};
 
     for ( int comp = 0; comp < num_comps; ++comp ) {
@@ -1142,49 +1107,36 @@ namespace io {
     }
   }
 
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> EparaB ( apt::Index<DGrid> I,
-                           const apt::Grid<R,DGrid>& grid,
-                           const field::Field<R, 3, DGrid>& E,
-                           const field::Field<R, 3, DGrid>& B,
-                           const field::Field<RJ, 3, DGrid>& J ) {
-    auto B_itpl = msh::interpolate( B, I2std<R>(I), ShapeF() );
+  apt::array<real_t,3> EparaB ( Index I, const Grid& grid, const Field<3>& E,
+                                const Field<3>& B, const JField& J ) {
+    auto B_itpl = msh::interpolate( B, I2std(I), ShapeF() );
     B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
-    return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ), B_itpl ),
+    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ), B_itpl ),
             0.0, 0.0};
   }
 
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> EdotJ ( apt::Index<DGrid> I,
-                          const apt::Grid<R,DGrid>& grid,
-                          const field::Field<R, 3, DGrid>& E,
-                          const field::Field<R, 3, DGrid>& B,
-                          const field::Field<RJ, 3, DGrid>& J ) {
-    return {apt::dot( msh::interpolate( E, I2std<R>(I), ShapeF() ),
-                      msh::interpolate( J, I2std<RJ>(I), ShapeF() ) ),
+  apt::array<real_t,3> EdotJ ( Index I, const Grid& grid, const Field<3>& E,
+                               const Field<3>& B, const JField& J ) {
+    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ),
+                      msh::interpolate( J, I2std(I), ShapeF() ) ),
             0.0, 0.0};
   }
 
   // Poloidal flux function, LogSpherical
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> dFlux_pol ( apt::Index<DGrid> I,
-                              const apt::Grid<R,DGrid>& grid,
-                              const field::Field<R, 3, DGrid>& E,
-                              const field::Field<R, 3, DGrid>& B,
-                              const field::Field<RJ, 3, DGrid>& J ) {
+  apt::array<real_t,3> dFlux_pol ( Index I, const Grid& grid, const Field<3>& E,
+                                   const Field<3>& B, const JField& J ) {
     // F = \int_Br_d\theta, we want F to be all MIDWAY. Since Br is (MIDWAY, INSITU), it is automatically the natural choice
     const auto& Br = B[0];
     return { Br(I) * std::exp( 2.0 * grid[0].absc( I[0], 0.5 ) ) * std::sin( grid[1].absc( I[1], 0.0 ) ), 0.0, 0.0 };
   }
 
-  template < typename RDS, int DGrid >
-  void integrate_dFlux ( field::Field<RDS,3,DGrid>& fds, const apt::Grid<RDS,DGrid>& grid, int num_comps, const mpi::CartComm& cart ) {
+  void integrate_dFlux ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& cart ) {
     // Flux_t - Flux_{t-1} = dFlux_t, can be in-placed
     // integrate in theta direction
     assert(num_comps == 1);
     auto dFlux = fds[0]; // TODOL semantics
     const auto& mesh = fds.mesh();
-    apt::Index<DGrid> ext = apt::range::size(mesh.range());
+    Index ext = apt::range::size(mesh.range());
     std::vector<RDS> buf;
     { // one value from each theta row
       std::size_t size = 1;
@@ -1202,7 +1154,7 @@ namespace io {
       buf.push_back(dFlux(trI + n));
     }
     // do an exclusive scan then add the scanned value back
-    cart.exscan_inplace(buf.data(), buf.size());
+    cart.exscan_inplace(buf.data(), buf.size()); // FIXME memory issue, false positive?
     int idx = 0;
     for ( const auto& trI : apt::project_out( 1, {}, ext ) ) {
       auto val = buf[idx++];
@@ -1210,120 +1162,63 @@ namespace io {
     }
   }
 
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> pair_creation_rate ( apt::Index<DGrid> I,
-                                       const apt::Grid<R,DGrid>& grid,
-                                       const field::Field<R, 3, DGrid>& ,
-                                       const field::Field<R, 3, DGrid>& ,
-                                       const field::Field<RJ, 3, DGrid>&  ) {
-    auto x = msh::interpolate( RTD<R,DGrid>::pc_counter, I2std<R>(I), ShapeF() );
-    return { x[0] / RTD<R,DGrid>::pc_cumulative_time, 0, 0};
+  apt::array<real_t,3> pair_creation_rate ( Index I, const Grid& grid, const Field<3>& ,
+                                            const Field<3>& , const JField&  ) {
+    auto x = msh::interpolate( RTD::data().pc_counter, I2std(I), ShapeF() );
+    return { x[0] / RTD::data().pc_cumulative_time, 0, 0};
   }
 
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> volume_scale ( apt::Index<DGrid> I,
-                                 const apt::Grid<R,DGrid>& grid,
-                                 const field::Field<R, 3, DGrid>& ,
-                                 const field::Field<R, 3, DGrid>& ,
-                                 const field::Field<RJ, 3, DGrid>&  ) {
+  apt::array<real_t,3> volume_scale ( Index I, const Grid& grid, const Field<3>& ,
+                                      const Field<3>& , const JField&  ) {
     return { pic::Metric::hhh(grid[0].absc( I[0],0.5), grid[1].absc( I[1],0.5) ), 0, 0 };
   }
 
-  template < particle::species SP, typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> frac_J_sp ( apt::Index<DGrid> I,
-                              const apt::Grid<R,DGrid>& grid,
-                              const field::Field<R, 3, DGrid>& ,
-                              const field::Field<R, 3, DGrid>& ,
-                              const field::Field<RJ, 3, DGrid>& J ) {
-    auto q = I2std<RJ>(I);
-    auto j_sp = msh::interpolate( RTD<R,DGrid>::Jsp[SP], q, ShapeF() );
+  template < particle::species SP >
+  apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
+                                   const Field<3>& , const JField& J ) {
+    auto q = I2std(I);
+    auto j_sp = msh::interpolate( RTD::data().Jsp[SP], q, ShapeF() );
     auto j = msh::interpolate( J, q, ShapeF() );
     for ( int i = 0; i < 3; ++i ) {
       if ( j[i] == 0 ) j_sp[i] = 0;
       else j_sp[i] /= j[i];
     }
-    return { j_sp[0], j_sp[1], j_sp[2] };
+    return { real_t(j_sp[0]), real_t(j_sp[1]), real_t(j_sp[2]) };
   }
 
-  template < typename R, int DGrid, typename ShapeF, typename RJ >
-  apt::array<R,3> skin_depth ( apt::Index<DGrid> I,
-                               const apt::Grid<R,DGrid>& grid,
-                               const field::Field<R, 3, DGrid>& ,
-                               const field::Field<R, 3, DGrid>& ,
-                               const field::Field<RJ, 3, DGrid>& ) {
-    return { msh::interpolate( RTD<R,DGrid>::skin_depth, I2std<R>(I), ShapeF() )[0], 0, 0  };
+  apt::array<real_t,3> skin_depth ( Index I, const Grid& grid, const Field<3>& ,
+                                    const Field<3>& , const JField& ) {
+    return { msh::interpolate( RTD::data().skin_depth, I2std(I), ShapeF() )[0], 0, 0  };
   }
   // void delE_v_rho();
 
   // void delB();
 
-  template < typename RDS,
-             int DGrid,
-             typename R,
-             typename RJ
-             >
   auto set_up_field_export() {
-    std::vector<FieldExportee<RDS, DGrid, R, RJ>*> fexps;
+    std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
     {
-      using FA = FexpTbyFunction<RDS,DGrid,R,RJ>;
-      using pic::ShapeF;
+      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
 
-      fexps.push_back( new FA ( "E", 3,
-                                field_self<0,R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "B", 3,
-                                field_self<1,R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "J4X", 3,
-                                field_self<2,R, DGrid, ShapeF, RJ>,
-                                divide_flux_by_area<RDS, DGrid>
-                                ) );
-      fexps.push_back( new FA ( "EparaB", 1,
-                                EparaB<R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "EdotJ", 1,
-                                EdotJ<R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "Flux", 1,
-                                dFlux_pol<R, DGrid, ShapeF, RJ>,
-                                integrate_dFlux<RDS, DGrid>
-                                ) );
-      fexps.push_back( new FA ( "PairCreationRate", 1,
-                                pair_creation_rate<R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "VolumeScale", 1,
-                                volume_scale<R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
-      fexps.push_back( new FA ( "SkinDepth", 1,
-                                skin_depth<R, DGrid, ShapeF, RJ>,
-                                nullptr
-                                ) );
+      fexps.push_back( new FA ( "E", 3, field_self<0>, nullptr) );
+      fexps.push_back( new FA ( "B", 3, field_self<1>, nullptr) );
+      fexps.push_back( new FA ( "J4X", 3, field_self<2>, divide_flux_by_area) );
+      fexps.push_back( new FA ( "EparaB", 1, EparaB, nullptr) );
+      fexps.push_back( new FA ( "EdotJ", 1, EdotJ, nullptr) );
+      fexps.push_back( new FA ( "Flux", 1, dFlux_pol, integrate_dFlux) );
+      fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
+      fexps.push_back( new FA ( "VolumeScale", 1, volume_scale, nullptr) );
+      fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, nullptr) );
 
-      if ( RTD<R,DGrid>::is_export_Jsp ) {
+      if ( RTD::data().is_export_Jsp ) {
         using namespace particle;
-        for ( auto sp : RTD<R,DGrid>::Jsp ) {
+        for ( auto sp : RTD::data().Jsp ) {
           switch(sp) {
           case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3,
-                                      frac_J_sp<species::electron,R, DGrid, ShapeF, RJ>,
-                                      divide_flux_by_area<RDS, DGrid>
-                                      ) ); break;
+            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, divide_flux_by_area) ); break;
           case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3,
-                                      frac_J_sp<species::positron,R, DGrid, ShapeF, RJ>,
-                                      divide_flux_by_area<RDS, DGrid>
-                                      ) ); break;
+            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, divide_flux_by_area) ); break;
           case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3,
-                                      frac_J_sp<species::ion,R, DGrid, ShapeF, RJ>,
-                                      divide_flux_by_area<RDS, DGrid>
-                                      ) ); break;
+            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, divide_flux_by_area) ); break;
           default: ;
           }
         }
@@ -1334,24 +1229,20 @@ namespace io {
 
 }
 
-namespace io {
-  template < typename R, template < typename > class S >
-  apt::array<R,3> ptc_num ( const particle::Properties& prop, const typename particle::array<R,S>::const_particle_type& ptc ) {
+namespace pic {
+  apt::array<real_t,3> ptc_num ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
     return { 1.0, 0.0, 0.0 };
   }
 
-  template < typename R, template < typename > class S >
-  apt::array<R,3> ptc_energy ( const particle::Properties& prop, const typename particle::array<R,S>::const_particle_type& ptc ) {
+  apt::array<real_t,3> ptc_energy ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
     return { std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
   }
 
-  template < typename R, template < typename > class S >
-  apt::array<R,3> ptc_momentum ( const particle::Properties& prop, const typename particle::array<R,S>::const_particle_type& ptc ) {
+  apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
     return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
   }
 
-  template < int DGrid, typename RDS, template < typename > class S >
-  void fold_back_at_axis ( field::Field<RDS,3,DGrid>& field, const apt::Grid<RDS,DGrid>& grid, int num_comps ) {
+  void fold_back_at_axis ( IOField& field, const IOGrid& grid, int num_comps ) {
     // NOTE field is assumed to have all-MIDWAY offset
     for ( int i = 0; i < num_comps; ++i ) {
       for ( int dim = 0; dim < DGrid; ++dim )
@@ -1372,70 +1263,47 @@ namespace io {
       auto re = apt::range::end(range);
       rb[axis_dir] = -1;
       re[axis_dir] = 0; // 0 as the end is appropriate because field is MIDWAY
-      axissymmetrize( field[0], add_assign, rb, re, false );
-      for ( int i = 1; i < num_comps; ++i )
-        axissymmetrize( field[0], sub_assign, rb, re, false );
+      // axissymmetrize( field[0], add_assign, rb, re, false );// FIXME gives memory error, invalid read size 4. FIXME export field guard should be deduced rather than hard set
+      // for ( int i = 1; i < num_comps; ++i )
+      //   axissymmetrize( field[0], sub_assign, rb, re, false );
     }
     if ( is_upper ) {
       auto rb = apt::range::begin(range);
       auto re = apt::range::end(range);
-      rb[axis_dir] = re[axis_dir]; // FIXME double check. There are domain indices not global indices
+      rb[axis_dir] = re[axis_dir]; // FIXME double check. These are domain indices not global indices
       re[axis_dir] += 1;
-      axissymmetrize( field[0], add_assign, rb, re, true );
-      for ( int i = 1; i < num_comps; ++i )
-        axissymmetrize( field[0], sub_assign, rb, re, true );
+      // axissymmetrize( field[0], add_assign, rb, re, true );
+      // for ( int i = 1; i < num_comps; ++i )
+      //   axissymmetrize( field[0], sub_assign, rb, re, true );
     }
   }
 
-  template < typename RDS,
-             int DGrid,
-             typename R,
-             template < typename > class S>
   auto set_up_particle_export() {
-    constexpr int DSratio = 1;
-    std::vector<PtcExportee<RDS, DGrid, R, S>*> pexps;
+    std::vector<::io::PtcExportee<real_export_t, DGrid, real_t, Specs>*> pexps;
     {
-      using PA = PexpTbyFunction<RDS,DGrid,R,S,particle::induced_shapef_t<pic::ShapeF,DSratio>>;
-      pexps.push_back( new PA ("Num", 1,
-                               ptc_num<R,S>,
-                               fold_back_at_axis< DGrid, RDS, S >
-                               ) );
+      using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs,particle::induced_shapef_t<ShapeF,downsample_ratio>>;
+      pexps.push_back( new PA ("Num", 1, ptc_num, fold_back_at_axis) );
 
-      pexps.push_back( new PA ("E", 1,
-                               ptc_energy<R,S>,
-                               fold_back_at_axis< DGrid, RDS, S >
-                               ) );
+      pexps.push_back( new PA ("E", 1, ptc_energy, fold_back_at_axis) );
 
-      pexps.push_back( new PA ("P", 3,
-                               ptc_momentum<R,S>,
-                               fold_back_at_axis< DGrid, RDS, S >
-                               ) );
+      pexps.push_back( new PA ("P", 3, ptc_momentum, fold_back_at_axis) );
     }
 
     return pexps;
   }
 }
 
-namespace io {
-  constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
-
-  template < typename R, int DGrid >
-  void export_prior_hook( const apt::Grid< R, DGrid >& grid, const dye::Ensemble<DGrid>& ens ) {
-    auto& pc = RTD<R,DGrid>::pc_counter;
-    ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
-  }
-
-  template < typename R, int DGrid >
+namespace pic {
   void export_post_hook() {
-    auto& pc = RTD<R,DGrid>::pc_counter;
+    auto& pc = RTD::data().pc_counter;
     std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
-    RTD<R,DGrid>::pc_cumulative_time = 0;
-    if ( RTD<R,DGrid>::is_export_Jsp ) {
+    RTD::data().pc_cumulative_time = 0;
+    if ( RTD::data().is_export_Jsp ) {
       // clear Jsp to save some space
-      for ( auto sp : RTD<R,DGrid>::Jsp )
-        RTD<R,DGrid>::Jsp[sp] = {};
+      for ( auto sp : RTD::data().Jsp )
+        RTD::data().Jsp[sp] = {};
     }
-    RTD<R,DGrid>::skin_depth = {};
+    RTD::data().skin_depth = {};
   }
 }
 
@@ -1446,7 +1314,7 @@ namespace pic {
 
   std::string characteristics(std::string indent) {
     std::ostringstream o;
-    auto gamma_0 = std::pow(field::Omega,2.0) * w_gyro_unitB;
+    auto gamma_0 = std::pow(Omega,2.0) * w_gyro_unitB;
     o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
     o << indent << "w_pic dt=" << apt::fmt("%.4f", wdt_pic ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", classic_electron_radius() ) << std::endl;
@@ -1467,7 +1335,7 @@ namespace pic {
       o << ", Ndot_fd=" << apt::fmt("%.2f", Ndot_fd) << std::endl;
 
       o << indent << "    gamma_RRL=" << gamma_fd * std::pow(gamma_fd / E_ph, 0.5);
-      o << ", L_CR/L_sd=" << E_ph * Ndot_fd * field::Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
+      o << ", L_CR/L_sd=" << E_ph * Ndot_fd * Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
     }
     return o.str();
   }

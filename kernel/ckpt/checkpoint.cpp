@@ -26,4 +26,12 @@ namespace ckpt {
                        particle::map<real_t>& N_scat,
                        int target_load
                        );
+
+  template
+  std::string save_tracing( std::string prefix, const int num_parts,
+                            const std::optional<dye::Ensemble<DGrid>>& ens_opt,
+                            int timestep,
+                            const particle::map<particle::array<real_t,particle::Specs>>& particles,
+                            const particle::map<particle::Properties>& properties
+                            );
 }

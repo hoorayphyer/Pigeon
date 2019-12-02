@@ -33,7 +33,7 @@ namespace particle {
                               const apt::Grid< R, DGrid >& grid,
                               const dye::Ensemble<DGrid>* ens,
                               R dt, int timestep, util::Rng<R>& rng
-                              );
+                              ) = 0;
   };
 }
 
