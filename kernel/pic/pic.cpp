@@ -62,9 +62,13 @@ int main(int argc, char** argv) {
     std::cout << "\tRelease" << std::endl;
 #endif
     std::cout << pic::characteristics("\t") << std::endl;
-    if ( resume_dir && !fs::exists(*resume_dir) ) {
-      retcode = 1;
-      std::cout << "\tInvalid checkpoint directory : " << *resume_dir << std::endl;
+    if ( resume_dir  ) {
+      if ( !fs::exists(*resume_dir) ) {
+        retcode = 1;
+        std::cout << "\tInvalid checkpoint directory : " << *resume_dir << std::endl;
+      } else {
+        std::cout << "\tResume from : " << *resume_dir << std::endl;
+      }
     }
 
     return retcode;
