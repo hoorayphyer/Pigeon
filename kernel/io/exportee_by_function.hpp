@@ -2,7 +2,7 @@
 #define _IO_EXPORTEE_BY_FUNCTION_HPP_
 
 #include "io/exportee.hpp"
-#include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with induced shape
+// #include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with induced shape
 #include <cassert>
 
 // FIXME check if downsampled field can use a better mesh. Range may not work because of the scaling
@@ -123,7 +123,15 @@ namespace io {
 
       for ( const auto& ptc : ptcs ) {
         if ( !ptc.is(particle::flag::exist) ) continue;
-        msh::deposit( fds, ptc.frac(), impl( prop, ptc ), msh::to_standard(grid_ds, ptc.q()), sf);
+        // msh::deposit( fds, ptc.frac(), impl( prop, ptc ), msh::to_standard(grid_ds, ptc.q()), sf);
+        // simple nearest-cell policy is used. NOTE to compare with MIDWAY
+        auto val = impl(prop,ptc);
+        apt::Index<DGrid> I;
+        for ( int i = 0; i < DGrid; ++i )
+          I[i] = ( ptc.q(i) - grid_ds[i].lower() ) / grid_ds[i].delta();
+        for ( int i = 0; i < num_comps; ++i )
+          fds[i](I) += val[i] * ptc.frac();
+
       }
 
       if ( post_hook != nullptr ) post_hook( fds, grid_ds, num_comps );

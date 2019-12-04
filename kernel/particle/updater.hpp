@@ -76,7 +76,7 @@ namespace particle {
           if ( !ptc.is(flag::exist) ) continue;
           migrInt<DGrid> mig_dir{};
           for ( int i = 0; i < DGrid; ++i ) {
-            mig_dir += migrate_code( ptc.q()[i], grid[i].lower(), grid[i].upper() ) * apt::pow3(i);
+            mig_dir += migrate_code( ptc.q(i), grid[i].lower(), grid[i].upper() ) * apt::pow3(i);
           }
 
           if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
@@ -100,11 +100,11 @@ namespace particle {
 
             for ( int i = 0; i < DGrid; ++i ) {
               if ( !ens->cart_topos[i].periodic() ) continue;
-              int idx = static_cast<int>( ( ptc.q()[i] - _supergrid[i].lower() ) / _supergrid[i].delta() + 0.5 );
+              int idx = static_cast<int>( ( ptc.q(i) - _supergrid[i].lower() ) / _supergrid[i].delta() + 0.5 );
               if ( idx >= 0 ) idx /= _supergrid[i].dim();
               else idx = - ( (-idx) / _supergrid[i].dim() + 1 );
 
-              ptc.q()[i] -= idx * _supergrid[i].dim() * _supergrid[i].delta();
+              ptc.q(i) -= idx * _supergrid[i].dim() * _supergrid[i].delta();
             }
           }
         }
@@ -118,7 +118,7 @@ namespace particle {
         // apt::array<int,DGrid> mig_co;
         // bool is_OK = true;
         // for ( int i = 0; i < DGrid; ++i ) {
-        //   mig_co[i] = migrate_code( ptc.q()[i], _borders[i][LFT], _borders[i][RGT] );
+        //   mig_co[i] = migrate_code( ptc.q(i), _borders[i][LFT], _borders[i][RGT] );
         //   if ( mig_co[i] != 1 && !_ens_opt->is_at_boundary(i)[(mig_co[i] != 0)] ) //NOTE need to consider boundaries
         //     is_OK = false;
         // }

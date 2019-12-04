@@ -652,7 +652,7 @@ namespace pic {
     {
       ::particle::Scat<real_t,Specs> ep_scat;
 
-      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q()[0] < std::log(9.0); });
+      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q(0) < std::log(9.0); });
 
       scat::CurvatureRadiation<real_t,Specs>::gamma_fd = gamma_fd;
       scat::CurvatureRadiation<real_t,Specs>::gamma_off = gamma_off;
@@ -792,8 +792,8 @@ namespace pic {
                         R dt, int timestep, util::Rng<R>& rng
                          ) override {
         // FIXME again guard cells! gives memory error
-        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),2)} );
-        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),2)} );
+        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),myguard)} );
+        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),myguard)} );
 
         apt::array<R,DGrid> lb;
         apt::array<R,DGrid> ub;
@@ -815,7 +815,7 @@ namespace pic {
                 if ( !x.is(::particle::flag::exist) || !is_in(x.q()) ) continue;
                 Index idx;
                 for ( int i = 0; i < DGrid; ++i )
-                  idx[i] = ( x.q()[i] - lb[i] ) / grid[i].delta();
+                  idx[i] = ( x.q(i) - lb[i] ) / grid[i].delta();
                 count[0](idx) += x.frac(); // add by fraction
               }
             };
@@ -948,12 +948,12 @@ namespace pic {
           if ( species::electron == this_sp and buf[i].is(::particle::flag::secondary) ) {
             Index I; // domain index, not the global index
             for ( int j = 0; j < DGrid; ++j )
-              I[j] = ( buf[i].q()[j] - grid[j].lower() ) / grid[j].delta();
+              I[j] = ( buf[i].q(j) - grid[j].lower() ) / grid[j].delta();
             RTD::data().pc_counter[0](I) += buf[i].frac();
 
             // trace electrons near Y point
-            if ( std::log(6.0) < buf[i].q()[0] and buf[i].q()[0] < std::log(7.0)
-                 and 1.47 < buf[i].q()[1] and buf[i].q()[1] < 1.67
+            if ( std::log(6.0) < buf[i].q(0) and buf[i].q(0) < std::log(7.0)
+                 and 1.47 < buf[i].q(1) and buf[i].q(1) < 1.67
                  and rng.uniform() < 0.01 ) {
               buf[i].set(::particle::flag::traced);
               buf[i].set(::particle::serial_number(RTD::data().trace_counter[species::electron]++));
@@ -1029,12 +1029,12 @@ namespace pic {
       skin_depth.reset();
 
       for ( auto sp : particles ) {
-        auto q2m = std::pow<R>( properties[sp].charge_x, 2.0 ) / R(properties[sp].mass_x);
+        auto q2m = properties[sp].charge_x * properties[sp].charge_x / static_cast<R>(properties[sp].mass_x);
         for ( const auto& ptc : particles[sp] ) {
           if ( !ptc.is(::particle::flag::exist) ) continue;
           Index I;
           for ( int i = 0; i < DGrid; ++i )
-            I[i] = ( ptc.q()[i] - grid[i].lower() ) / grid[i].delta();
+            I[i] = ( ptc.q(i) - grid[i].lower() ) / grid[i].delta();
           skin_depth[0](I) += q2m * ptc.frac();
         }
       }
@@ -1043,9 +1043,9 @@ namespace pic {
         for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
           R r = grid[0].absc(I[0], 0.5);
           R theta = grid[1].absc(I[1], 0.5);
-          R h = std::sqrt( Metric::h<2>(r,theta) ) * dt / ( wdt_pic * grid[0].delta() );
+          R h = Metric::h<2>(r,theta) * dt * dt / ( wdt_pic * wdt_pic * grid[0].delta() * grid[0].delta() );
           auto& v = skin_depth[0](I);
-          v = h / v;
+          v = std::sqrt(h / v);
         }
       }
 
@@ -1239,54 +1239,18 @@ namespace pic {
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
-  }
-
-  void fold_back_at_axis ( IOField& field, const IOGrid& grid, int num_comps ) {
-    // NOTE field is assumed to have all-MIDWAY offset
-    for ( int i = 0; i < num_comps; ++i ) {
-      for ( int dim = 0; dim < DGrid; ++dim )
-        assert( field[i].offset()[dim] == MIDWAY );
-    }
-
-    constexpr int axis_dir = 1;
-    constexpr auto PI = std::acos(-1.0l);
-    bool is_lower = std::abs( grid[axis_dir].lower() - 0.0 ) < grid[axis_dir].delta();
-    bool is_upper = std::abs( grid[axis_dir].upper() - PI ) < grid[axis_dir].delta();
-
-    auto add_assign = []( RDS& a, RDS& b ) noexcept -> void {a += b; b = a;};
-    auto sub_assign = []( RDS& a, RDS& b ) noexcept -> void {a -= b; b = -a;};
-
-    const auto& range = field.mesh().range();
-    if ( is_lower ) {
-      auto rb = apt::range::begin(range);
-      auto re = apt::range::end(range);
-      rb[axis_dir] = -1;
-      re[axis_dir] = 0; // 0 as the end is appropriate because field is MIDWAY
-      // axissymmetrize( field[0], add_assign, rb, re, false );// FIXME gives memory error, invalid read size 4. FIXME export field guard should be deduced rather than hard set
-      // for ( int i = 1; i < num_comps; ++i )
-      //   axissymmetrize( field[0], sub_assign, rb, re, false );
-    }
-    if ( is_upper ) {
-      auto rb = apt::range::begin(range);
-      auto re = apt::range::end(range);
-      rb[axis_dir] = re[axis_dir]; // FIXME double check. These are domain indices not global indices
-      re[axis_dir] += 1;
-      // axissymmetrize( field[0], add_assign, rb, re, true );
-      // for ( int i = 1; i < num_comps; ++i )
-      //   axissymmetrize( field[0], sub_assign, rb, re, true );
-    }
+    return { ptc.p(0), ptc.p(1), ptc.p(2) };
   }
 
   auto set_up_particle_export() {
     std::vector<::io::PtcExportee<real_export_t, DGrid, real_t, Specs>*> pexps;
     {
       using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs,particle::induced_shapef_t<ShapeF,downsample_ratio>>;
-      pexps.push_back( new PA ("Num", 1, ptc_num, fold_back_at_axis) );
+      pexps.push_back( new PA ("Num", 1, ptc_num, nullptr) );
 
-      pexps.push_back( new PA ("E", 1, ptc_energy, fold_back_at_axis) );
+      pexps.push_back( new PA ("E", 1, ptc_energy, nullptr) );
 
-      pexps.push_back( new PA ("P", 3, ptc_momentum, fold_back_at_axis) );
+      pexps.push_back( new PA ("P", 3, ptc_momentum, nullptr) );
     }
 
     return pexps;

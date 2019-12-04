@@ -146,8 +146,8 @@ TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
       if ( mpi::world.rank() == 0 ) {
         ptcs.resize(1000);
         for ( int i = 0; i < ptcs.size(); ++i ) {
-          ptcs[i].q()[0] = 132.0;
-          ptcs[i].p()[0] = -546.0;
+          ptcs[i].q(0) = 132.0;
+          ptcs[i].p(0) = -546.0;
           ptcs[i].set(flag::secondary);
         }
         dye::impl::relinguish_data( ptcs, *itc, MPI_ROOT );
@@ -160,8 +160,8 @@ TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
         dye::impl::relinguish_data( ptcs, *itc, 0 );
         REQUIRE( ptcs.size() == 1000 / intra.size() );
         for ( int i = 0; i < ptcs.size(); ++i ) {
-          REQUIRE( ptcs[i].q()[0] == 132.0 );
-          REQUIRE( ptcs[i].p()[0] == -546.0 );
+          REQUIRE( ptcs[i].q(0) == 132.0 );
+          REQUIRE( ptcs[i].p(0) == -546.0 );
           REQUIRE( ptcs[i].is(flag::secondary) );
         }
       }

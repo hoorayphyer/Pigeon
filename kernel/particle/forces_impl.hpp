@@ -153,12 +153,12 @@ namespace particle::force {
         xB = std::cos(xB);
         xp *= ( static_cast<T>(1.0) - xB );
 
-        dt = ptc.p()[0];
-        q_times_w_gyro_unitB_over_m = ptc.p()[1];
+        dt = ptc.p(0);
+        q_times_w_gyro_unitB_over_m = ptc.p(1);
 
-        ptc.p()[0] = xp * z[0] + xB*dt + xE*(z[1] * ptc.p()[2] - z[2] * q_times_w_gyro_unitB_over_m);
-        ptc.p()[1] = xp * z[1] + xB*q_times_w_gyro_unitB_over_m + xE*(z[2] * dt - z[0] * ptc.p()[2]);
-        ptc.p()[2] = xp * z[2] + xB*ptc.p()[2] + xE*(z[0]*q_times_w_gyro_unitB_over_m - z[1]*dt );
+        ptc.p(0) = xp * z[0] + xB*dt + xE*(z[1] * ptc.p(2) - z[2] * q_times_w_gyro_unitB_over_m);
+        ptc.p(1) = xp * z[1] + xB*q_times_w_gyro_unitB_over_m + xE*(z[2] * dt - z[0] * ptc.p(2));
+        ptc.p(2) = xp * z[2] + xB*ptc.p(2) + xE*(z[0]*q_times_w_gyro_unitB_over_m - z[1]*dt );
       }
 
       // TODO udate delta q

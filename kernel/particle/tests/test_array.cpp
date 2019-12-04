@@ -30,13 +30,13 @@ SCENARIO("array push_back and iterator", "[particle]") {
     REQUIRE( arr.size() == 1 );
     AND_WHEN("by copy") {
       auto ptc = arr[0]; // TODOL semantics NOTE ptc is a proxy hence no ref
-      REQUIRE( ptc.q()[0] == 15 );
-      REQUIRE( ptc.q()[1] == 6 );
-      REQUIRE( ptc.q()[2] == 73 );
+      REQUIRE( ptc.q(0) == 15 );
+      REQUIRE( ptc.q(1) == 6 );
+      REQUIRE( ptc.q(2) == 73 );
 
-      REQUIRE( ptc.p()[0] == 20 );
-      REQUIRE( ptc.p()[1] == -3 );
-      REQUIRE( ptc.p()[2] == -5 );
+      REQUIRE( ptc.p(0) == 20 );
+      REQUIRE( ptc.p(1) == -3 );
+      REQUIRE( ptc.p(2) == -5 );
 
       REQUIRE( ptc.frac() == 0.83 );
 
@@ -50,13 +50,13 @@ SCENARIO("array push_back and iterator", "[particle]") {
     REQUIRE( arr.size() == 2 );
     AND_WHEN("by move") {
       auto ptc = arr[1]; // TODOL semantics NOTE ptc is a proxy hence no ref
-      REQUIRE( ptc.q()[0] == -45 );
-      REQUIRE( ptc.q()[1] == 10 );
-      REQUIRE( ptc.q()[2] == -76 );
+      REQUIRE( ptc.q(0) == -45 );
+      REQUIRE( ptc.q(1) == 10 );
+      REQUIRE( ptc.q(2) == -76 );
 
-      REQUIRE( ptc.p()[0] == -13 );
-      REQUIRE( ptc.p()[1] == -58 );
-      REQUIRE( ptc.p()[2] == 97 );
+      REQUIRE( ptc.p(0) == -13 );
+      REQUIRE( ptc.p(1) == -58 );
+      REQUIRE( ptc.p(2) == 97 );
 
       REQUIRE( ptc.frac() == 0.94 );
 
@@ -75,13 +75,13 @@ SCENARIO("array push_back and iterator", "[particle]") {
     REQUIRE_FALSE( ptc0.is(flag::exist) );
     REQUIRE( arr.size() == 1 );
     auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
-    REQUIRE( ptc.q()[0] == 15 );
-    REQUIRE( ptc.q()[1] == 6 );
-    REQUIRE( ptc.q()[2] == 73 );
+    REQUIRE( ptc.q(0) == 15 );
+    REQUIRE( ptc.q(1) == 6 );
+    REQUIRE( ptc.q(2) == 73 );
 
-    REQUIRE( ptc.p()[0] == 20 );
-    REQUIRE( ptc.p()[1] == -3 );
-    REQUIRE( ptc.p()[2] == -5 );
+    REQUIRE( ptc.p(0) == 20 );
+    REQUIRE( ptc.p(1) == -3 );
+    REQUIRE( ptc.p(2) == -5 );
 
     REQUIRE( ptc.frac() == 0.771 );
 
@@ -97,13 +97,13 @@ SCENARIO("array back inserter", "[particle]") {
   REQUIRE( arr.size() == 1 );
 
   auto ptc = arr[0]; // NOTE ptc is a proxy hence no ref
-  REQUIRE( ptc.q()[0] == 15 );
-  REQUIRE( ptc.q()[1] == 6 );
-  REQUIRE( ptc.q()[2] == 73 );
+  REQUIRE( ptc.q(0) == 15 );
+  REQUIRE( ptc.q(1) == 6 );
+  REQUIRE( ptc.q(2) == 73 );
 
-  REQUIRE( ptc.p()[0] == 20 );
-  REQUIRE( ptc.p()[1] == -3 );
-  REQUIRE( ptc.p()[2] == -5 );
+  REQUIRE( ptc.p(0) == 20 );
+  REQUIRE( ptc.p(1) == -3 );
+  REQUIRE( ptc.p(2) == -5 );
 
   REQUIRE( ptc.frac() == 0.666 );
 

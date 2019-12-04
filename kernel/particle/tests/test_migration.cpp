@@ -24,13 +24,13 @@ SCENARIO("Test swapping particles", "[particle]") {
     a.swap(b);
 
     {
-      REQUIRE( a.q()[0] == static_cast<Real>(-4.7) );
-      REQUIRE( a.q()[1] == static_cast<Real>(-4.7) );
-      REQUIRE( a.q()[2] == static_cast<Real>(-4.7) );
+      REQUIRE( a.q(0) == static_cast<Real>(-4.7) );
+      REQUIRE( a.q(1) == static_cast<Real>(-4.7) );
+      REQUIRE( a.q(2) == static_cast<Real>(-4.7) );
 
-      REQUIRE( a.p()[0] == static_cast<Real>(-2.8) );
-      REQUIRE( a.p()[1] == static_cast<Real>(-2.8) );
-      REQUIRE( a.p()[2] == static_cast<Real>(-2.8) );
+      REQUIRE( a.p(0) == static_cast<Real>(-2.8) );
+      REQUIRE( a.p(1) == static_cast<Real>(-2.8) );
+      REQUIRE( a.p(2) == static_cast<Real>(-2.8) );
 
       REQUIRE( a.frac() == 0.67 );
 
@@ -41,13 +41,13 @@ SCENARIO("Test swapping particles", "[particle]") {
     }
 
     {
-      REQUIRE( b.q()[0] == static_cast<Real>(3.5) );
-      REQUIRE( b.q()[1] == static_cast<Real>(3.5) );
-      REQUIRE( b.q()[2] == static_cast<Real>(3.5) );
+      REQUIRE( b.q(0) == static_cast<Real>(3.5) );
+      REQUIRE( b.q(1) == static_cast<Real>(3.5) );
+      REQUIRE( b.q(2) == static_cast<Real>(3.5) );
 
-      REQUIRE( b.p()[0] == static_cast<Real>(5.9) );
-      REQUIRE( b.p()[1] == static_cast<Real>(5.9) );
-      REQUIRE( b.p()[2] == static_cast<Real>(5.9) );
+      REQUIRE( b.p(0) == static_cast<Real>(5.9) );
+      REQUIRE( b.p(1) == static_cast<Real>(5.9) );
+      REQUIRE( b.p(2) == static_cast<Real>(5.9) );
 
       REQUIRE( b.frac() == 1.0 );
 
@@ -72,13 +72,13 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         Ptc_t ptc;
         mpi::world.recv( 0, 22, &ptc, 1 );
 
-        REQUIRE( ptc.q()[0] == static_cast<Real>(1.1) );
-        REQUIRE( ptc.q()[1] == static_cast<Real>(2.2) );
-        REQUIRE( ptc.q()[2] == static_cast<Real>(3.3) );
+        REQUIRE( ptc.q(0) == static_cast<Real>(1.1) );
+        REQUIRE( ptc.q(1) == static_cast<Real>(2.2) );
+        REQUIRE( ptc.q(2) == static_cast<Real>(3.3) );
 
-        REQUIRE( ptc.p()[0] == static_cast<Real>(4.4) );
-        REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
-        REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
+        REQUIRE( ptc.p(0) == static_cast<Real>(4.4) );
+        REQUIRE( ptc.p(1) == static_cast<Real>(5.5) );
+        REQUIRE( ptc.p(2) == static_cast<Real>(6.6) );
 
         REQUIRE( ptc.frac() == 0.37591 );
 
@@ -99,13 +99,13 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         Ptc_t ptc;
         inter.recv( 0, 22, &ptc, 1 );
 
-        REQUIRE( ptc.q()[0] == static_cast<Real>(1.1) );
-        REQUIRE( ptc.q()[1] == static_cast<Real>(2.2) );
-        REQUIRE( ptc.q()[2] == static_cast<Real>(3.3) );
+        REQUIRE( ptc.q(0) == static_cast<Real>(1.1) );
+        REQUIRE( ptc.q(1) == static_cast<Real>(2.2) );
+        REQUIRE( ptc.q(2) == static_cast<Real>(3.3) );
 
-        REQUIRE( ptc.p()[0] == static_cast<Real>(4.4) );
-        REQUIRE( ptc.p()[1] == static_cast<Real>(5.5) );
-        REQUIRE( ptc.p()[2] == static_cast<Real>(6.6) );
+        REQUIRE( ptc.p(0) == static_cast<Real>(4.4) );
+        REQUIRE( ptc.p(1) == static_cast<Real>(5.5) );
+        REQUIRE( ptc.p(2) == static_cast<Real>(6.6) );
 
         REQUIRE( ptc.frac() == 0.2638 );
 
@@ -164,8 +164,8 @@ SCENARIO("Test sendrecv particle", "[particle][mpi]") {
       const auto& cptc = data[i];
       const auto& ptc = ptc_arr[i];
       for ( int n = 0; n < 3; ++n ) {
-        REQUIRE( cptc.q()[n] == ptc.q()[n] );
-        REQUIRE( cptc.p()[n] == ptc.p()[n] );
+        REQUIRE( cptc.q(n) == ptc.q(n) );
+        REQUIRE( cptc.p(n) == ptc.p(n) );
       }
       REQUIRE( cptc.frac() == ptc.frac() );
       REQUIRE( cptc.state() == ptc.state() );
@@ -273,7 +273,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[particl
       Ptc_t ptc;
       ptc.set(flag::exist);
       for ( int i = 0; i < DGrid; ++i ) {
-        ptc.p()[i] = ens_opt -> cart_coords[i]; // use p for encoding
+        ptc.p(i) = ens_opt -> cart_coords[i]; // use p for encoding
       }
 
       mig_dir.imprint(ptc);
@@ -306,7 +306,7 @@ TEMPLATE_TEST_CASE("Testing particle migration with trivial ensemble", "[particl
     for ( const auto& ptc : mgr_buf ) {
       auto neigh_rel = my_coords;
       for ( int i = 0; i < DGrid; ++i)
-        neigh_rel[i] = std::lround(ptc.p()[i]) - my_coords[i] + 1; // neigh_rel = 0, 1, 2
+        neigh_rel[i] = std::lround(ptc.p(i)) - my_coords[i] + 1; // neigh_rel = 0, 1, 2
 
       ++recv_actual[ neigh_rel[0] + 3 * neigh_rel[1] ];
     }

@@ -319,7 +319,7 @@ namespace pic {
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { ptc.p()[0], ptc.p()[1], ptc.p()[2] };
+    return { ptc.p(0), ptc.p(1), ptc.p(2) };
   }
 
   auto set_up_particle_export() {

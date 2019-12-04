@@ -18,7 +18,7 @@ namespace msh::impl {
         ( []( auto& i_b, auto& s_b, auto l, auto ofs ) {
             l -= (0.5 * ofs); // now l is the native grid index
 
-            static_assert( ShapeF::support() > 1); // TODOL
+            static_assert( ShapeF::support() > 1); // FIXME with induced downsampling shape, does this still work?
 
             auto int_flr =
               []( auto q ) noexcept {

@@ -12,8 +12,8 @@ namespace debug {
     auto is_same =
       []( const auto& ptc1, const auto& ptc2 ) {
         for ( int i = 0; i < S<T>::Dim; ++i ) {
-          if ( ptc1.q()[i] != ptc2.q()[i] ) return false;
-          if ( ptc1.p()[i] != ptc2.p()[i] ) return false;
+          if ( ptc1.q(i) != ptc2.q(i) ) return false;
+          if ( ptc1.p(i) != ptc2.p(i) ) return false;
         }
         if ( ptc1.state() != ptc2.state() ) return false;
         return true;

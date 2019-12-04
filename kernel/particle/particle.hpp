@@ -23,9 +23,13 @@ namespace particle {
 
     constexpr auto& q() noexcept { return _q; }
     constexpr const auto& q() const noexcept { return _q; }
+    constexpr auto& q(int i) noexcept { return _q[i]; }
+    constexpr const auto& q(int i) const noexcept { return _q[i]; }
 
     constexpr auto& p() noexcept { return _p; }
     constexpr const auto& p() const noexcept { return _p; }
+    constexpr auto& p(int i) noexcept { return _p[i]; }
+    constexpr const auto& p(int i) const noexcept { return _p[i]; }
 
     constexpr auto& frac() noexcept { return _frac; }
     constexpr const auto& frac() const noexcept { return _frac; }

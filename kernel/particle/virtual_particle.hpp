@@ -22,9 +22,13 @@ namespace particle {
 
     constexpr auto& q() noexcept { return _q; }
     constexpr const auto& q() const noexcept { return _q; }
+    constexpr auto& q(int i) noexcept { return _q[i]; }
+    constexpr const auto& q(int i) const noexcept { return _q[i]; }
 
     constexpr auto& p() noexcept { return _p; }
     constexpr const auto& p() const noexcept { return _p; }
+    constexpr auto& p(int i) noexcept { return _p[i]; }
+    constexpr const auto& p(int i) const noexcept { return _p[i]; }
 
     constexpr auto& frac() noexcept { return _frac; }
     constexpr const auto& frac() const noexcept { return _frac; }
@@ -55,8 +59,8 @@ namespace particle {
     template < typename E >
     constexpr vParticle& operator= ( PtcExpression<E>&& ptc ) noexcept {
       for ( int i = 0; i < NDim; ++i ) {
-        std::swap( _q[i], ptc.q()[i] );
-        std::swap( _p[i], ptc.p()[i] );
+        std::swap( _q[i], ptc.q(i) );
+        std::swap( _p[i], ptc.p(i) );
       }
       std::swap( _frac, ptc.frac() );
       std::swap( _state, ptc.state() );

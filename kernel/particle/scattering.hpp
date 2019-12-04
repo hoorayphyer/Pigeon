@@ -62,9 +62,9 @@ namespace particle::scat {
         return vv / std::max( std::sqrt( apt::sqabs(a) - va * va / vv ), 1e-6 ); // in case denominator becomes zero
       } else {
         // Dipolar radius of curvature in LogSpherical
-        const auto& theta = ptc.q()[1];
+        const auto& theta = ptc.q(1);
         auto tmp = 2.5 + 1.5 * std::cos( 2 * theta );
-        return std::exp(ptc.q()[0]) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
+        return std::exp(ptc.q(0)) * tmp * std::sqrt(tmp) / ( ( tmp + 2.0 ) * std::sin(theta) );
       }
     }
 

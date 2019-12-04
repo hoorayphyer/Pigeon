@@ -12,9 +12,13 @@ namespace particle {
 
     constexpr Vec& q() noexcept { return static_cast<Ptc&>(*this).q(); }
     constexpr const Vec& q() const noexcept { return static_cast<const Ptc&>(*this).q(); }
+    constexpr T& q(int i) noexcept { return static_cast<Ptc&>(*this).q(i); }
+    constexpr const T& q(int i) const noexcept { return static_cast<const Ptc&>(*this).q(i); }
 
     constexpr Vec& p() noexcept { return static_cast<Ptc&>(*this).p(); }
     constexpr const Vec& p() const noexcept { return static_cast<const Ptc&>(*this).p(); }
+    constexpr T& p(int i) noexcept { return static_cast<Ptc&>(*this).p(i); }
+    constexpr const T& p(int i) const noexcept { return static_cast<const Ptc&>(*this).p(i); }
 
     constexpr T& frac() noexcept { return static_cast<Ptc&>(*this).frac(); }
     constexpr const T& frac() const noexcept { return static_cast<const Ptc&>(*this).frac(); }
