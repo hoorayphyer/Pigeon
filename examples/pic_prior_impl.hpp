@@ -32,6 +32,7 @@ namespace pic {
 
   using ::particle::Specs;
   using ::particle::species;
+  using ::particle::flag;
   using ::particle::map;
   using ::particle::Properties;
   using PtcArray = ::particle::array<real_t,Specs>;

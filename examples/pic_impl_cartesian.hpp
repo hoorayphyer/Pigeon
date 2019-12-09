@@ -241,7 +241,7 @@ namespace pic {
 #include <cassert>
 
 namespace pic {
-  constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
+  constexpr bool is_collinear_mesh = true; // FIXME this is an ad hoc fix
 
   void export_prior_hook( const map<PtcArray>& particles, const map<Properties>& properties,
                           const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const Ensemble& ens,

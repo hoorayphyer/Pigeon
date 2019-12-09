@@ -791,9 +791,8 @@ namespace pic {
                         const Ensemble* ens,
                         R dt, int timestep, util::Rng<R>& rng
                          ) override {
-        // FIXME again guard cells! gives memory error
-        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),myguard)} );
-        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),myguard)} );
+        _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
+        _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
 
         apt::array<R,DGrid> lb;
         apt::array<R,DGrid> ub;
@@ -812,10 +811,10 @@ namespace pic {
           = [&lb,&ub,&grid,is_in]( auto& count, const auto& ptcs) {
               count.reset();
               for ( const auto& x : ptcs ) {
-                if ( !x.is(::particle::flag::exist) || !is_in(x.q()) ) continue;
+                if ( !x.is(flag::exist) || !is_in(x.q()) ) continue;
                 Index idx;
                 for ( int i = 0; i < DGrid; ++i )
-                  idx[i] = ( x.q(i) - lb[i] ) / grid[i].delta();
+                  idx[i] = ( x.q(i) - grid[i].lower() ) / grid[i].delta(); // NOTE used grid.lower instead of lb, important
                 count[0](idx) += x.frac(); // add by fraction
               }
             };
@@ -844,13 +843,13 @@ namespace pic {
             const auto& m = B.mesh();
             auto li = m.linear_index(I);
             if constexpr (DGrid == 2) {
-                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride()[1]] );
-                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride()[0]] );
-                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
+                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride(1)] );
+                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride(0)] );
+                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
               } else if (DGrid == 3){
-              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride()[1]] + B[0][li + m.stride()[2]] + B[0][li + m.stride()[1] + m.stride()[2]] );
-              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride()[2]] + B[1][li + m.stride()[0]] + B[1][li + m.stride()[2] + m.stride()[0]] );
-              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride()[0]] + B[2][li + m.stride()[1]] + B[2][li + m.stride()[0] + m.stride()[1]] );
+              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
+              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
+              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
             }
             if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
             else nB /= apt::abs(nB);
@@ -945,7 +944,7 @@ namespace pic {
           RTD::data().N_scat[this_sp] += buf[i].frac();
 
           // log pair creation events
-          if ( species::electron == this_sp and buf[i].is(::particle::flag::secondary) ) {
+          if ( species::electron == this_sp and buf[i].is(flag::secondary) ) {
             Index I; // domain index, not the global index
             for ( int j = 0; j < DGrid; ++j )
               I[j] = ( buf[i].q(j) - grid[j].lower() ) / grid[j].delta();
@@ -955,7 +954,7 @@ namespace pic {
             if ( std::log(6.0) < buf[i].q(0) and buf[i].q(0) < std::log(7.0)
                  and 1.47 < buf[i].q(1) and buf[i].q(1) < 1.67
                  and rng.uniform() < 0.01 ) {
-              buf[i].set(::particle::flag::traced);
+              buf[i].set(flag::traced);
               buf[i].set(::particle::serial_number(RTD::data().trace_counter[species::electron]++));
             }
           }
@@ -1031,7 +1030,7 @@ namespace pic {
       for ( auto sp : particles ) {
         auto q2m = properties[sp].charge_x * properties[sp].charge_x / static_cast<R>(properties[sp].mass_x);
         for ( const auto& ptc : particles[sp] ) {
-          if ( !ptc.is(::particle::flag::exist) ) continue;
+          if ( !ptc.is(flag::exist) ) continue;
           Index I;
           for ( int i = 0; i < DGrid; ++i )
             I[i] = ( ptc.q(i) - grid[i].lower() ) / grid[i].delta();

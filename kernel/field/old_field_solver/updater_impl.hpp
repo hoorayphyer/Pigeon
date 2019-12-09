@@ -224,7 +224,7 @@ namespace field {
         is_initialized = true;
       }
       convert_from_new( current, Jmesh );
-      fc->SendGuardCells(current);
+      // fc->SendGuardCells(current);
 
       // NOTE differences of new code
       // 1. The new code will evolve Maxwell's equations with 4\pi r_e / w_gyro.
