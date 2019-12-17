@@ -19,7 +19,7 @@
 namespace pic {
   using Metric = metric::LogSpherical<real_t>;
 
-  constexpr long double PI = std::acos(-1.0l);
+  constexpr double PI = std::acos(-1.0);
 
   inline constexpr const char* project_name = "Pulsar64";
   inline constexpr const char* datadir_prefix = "../Data/";
