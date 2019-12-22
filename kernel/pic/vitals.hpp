@@ -3,78 +3,7 @@
 
 #include "particle/properties.hpp"
 #include "timer/timer.hpp"
-// #include "msh/mesh_shape_interplay_impl.hpp" // WeightFinder // FIXME
 #include <fstream>
-
-// FIXME
-// namespace pic {
-//   template < int DGrid,
-//              typename T,
-//              template < typename > class S,
-//              class ShapeF,
-//              class Metric
-//              >
-//   std::optional<field::Field<T,1,DGrid>> skip_depth( const particle::map<particle::Properties>& properties,
-//                                                      const particle::map<particle::array<T,S>>& particles,
-//                                                      const dye::Ensemble<DGrid>& ens,
-//                                                      const std::optional<mpi::CartComm>& cart,
-//                                                      const apt::Grid<T,DGrid>& grid,
-//                                                      T classic_electron_radius
-//                   ) {
-//     field::Field<T,1,DGrid> tmp;
-//     apt::array< field::offset_t, DGrid > ofs;
-//     apt::Index<DGrid> ext;
-//     {
-//       for ( int i = 0; i < DGrid; ++i ) ofs[i] = MIDWAY;
-//       for ( int i = 0; i < DGrid; ++i ) ext[i] = ShapeF::support();
-//       tmp.set_offset(0, ofs);
-//     }
-
-//     // calculate wp^2. Note there is 4\pi re in front
-//     for ( auto sp : particles ) {
-//       if ( properties[sp].charge_x == 0 ) continue;
-
-//       T e2m = properties[sp].charge_x == 0;
-//       e2m = e2m * e2m / properties[sp].mass_x;
-//       e2m *= 4.0 * std::acos(-1.0l) * classic_electron_radius;
-
-//       for ( const auto& ptc : particles[sp] ) {
-//         msh::impl::WeightFinder<T, DGrid,S<T>::Dim, ShapeF> wf(msh::to_standard(grid, ptc.q()), ofs, ShapeF() );
-//         for ( const auto& I : apt::Block(ext) ) {
-//           apt::Index<DGrid> Ids;
-//           for ( int i = 0; i < DGrid; ++i ) Ids[i] = wf.I_b()[i] + I[i];
-//           tmp[0](Ids) += ptc.frac() * e2m * wf.weight(I);
-//         }
-//       }
-//     }
-//     // reduce to ens chief
-//     ens.reduce_to_chief( mpi::by::SUM, tmp[0].data().data(), tmp[0].size() );
-//     if ( !ens.is_chief() ) return {};
-//     field::copy_sync_guard_cells( tmp, *cart );
-//     // turn to skin depth. Include scale factors
-//     auto dV = dV(grid);
-//     for ( const auto& I : apt::Block(ext) ) {
-//       apt::array<T,3> q {0,0,0};
-//       for ( int i = 0; i < DGrid; ++i ) q[i] = grid[i].absc(I[i],ofs[i]);
-
-//       // find the largest hdx
-//       apt::array<T,3> hdx {0,0,0};
-//       hdx[0] = Metric::h<0>( q[0], q[1], q[2] ) * grid[0].delta();
-//       if constexpr ( DGrid > 1 ) {
-//           hdx[1] = Metric::h<1>( q[0], q[1], q[2] ) * grid[1].delta();
-//           if constexpr ( DGrid > 2 ) {
-//               hdx[2] = Metric::h<2>( q[0], q[1], q[2] ) * grid[2].delta();
-//             }
-//         }
-//       for ( int i = 1; i < 3; ++i  )
-//         hdx[0] = std::max(hdx[0], hdx[i]);
-
-//       tmp[0](I) /= (Metric::hhh(q[0], q[1], q[2]) * dV);
-
-//     }
-//     return {tmp};
-//   }
-// }
 
 namespace pic {
   namespace vital {
@@ -95,7 +24,7 @@ namespace pic {
                      const particle::map<T>& N_scat ) {
     using namespace particle;
     static int counter = 0;
-    constexpr int interval = 40;
+    constexpr int interval = 40; // how often to print the table description row
     static tmr::Timestamp stopwatch;
 
     std::vector<double> buffer;

@@ -50,6 +50,8 @@ namespace ckpt {
                             const particle::map<particle::Properties>& properties
                             );
 
+  // template < int DGrid, typename R, template < typename > class S >
+  // void load_tracing( std::string dir, particle::array<R,S>& particles );
 }
 
 #endif

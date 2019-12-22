@@ -98,6 +98,11 @@ namespace ckpt {
       dbfile.cd("..");
     }
 
+    inline const auto& q( const particle::array<T,S>& ptcs, int i ) const noexcept { return ptcs._q[i]; }
+    inline const auto& p( const particle::array<T,S>& ptcs, int i ) const noexcept { return ptcs._p[i]; }
+    inline const auto& frac( const particle::array<T,S>& ptcs ) const noexcept { return ptcs._frac; }
+    inline const auto& state( const particle::array<T,S>& ptcs ) const noexcept { return ptcs._state; }
+
   };
 }
 
@@ -395,12 +400,21 @@ namespace ckpt {
                             const particle::map<particle::array<R,S>>& particles,
                             const particle::map<particle::Properties>& properties
                             ) {
-    bool is_idle = !ens_opt;
+    particle::array<R,S> ptcs_tr {};
+    if ( ens_opt ) {
+      for ( auto sp : particles ) {
+        for ( const auto& ptc : particles[sp] ) {
+          if ( !ptc.is(particle::flag::exist) || !ptc.is(particle::flag::traced) ) continue;
+          ptcs_tr.push_back(ptc);
+        }
+      }
+    }
+    bool is_ignore = !ens_opt || ( ptcs_tr.size() == 0 );
     int key = 0;
-    if ( !is_idle ) key = ens_opt -> label();
+    if ( !is_ignore ) key = ens_opt -> label();
     // use ensemble label to put processes from same ensemble together
-    auto active = mpi::world.split( {is_idle}, key );
-    if ( is_idle ) return "";
+    auto active = mpi::world.split( {is_ignore}, key );
+    if ( is_ignore ) return "";
     const auto& ens = *ens_opt;
 
     char str_ts [10];
@@ -422,13 +436,6 @@ namespace ckpt {
 
     active->barrier();
 
-    std::vector<particle::load_t> loads;
-    loads.reserve(particles.size());
-    for ( auto sp : particles )
-      loads.push_back(particles[sp].size());
-
-    ens.reduce_to_chief( mpi::by::SUM, loads.data(), loads.size() );
-
     pmpio([&]( auto& dbfile )
           {
             // write global data
@@ -442,27 +449,27 @@ namespace ckpt {
               dbfile.write( "/timestep", timestep );
             }
 
-            { // write ensemble-wise data
-              if ( !dbfile.exists("label") ) {
-                dbfile.write( "cartesian_coordinates", ens.cart_coords.begin(), {DGrid} );
-                dbfile.write( "label", ens.label() );
-              }
-            }
-
             dbfile.mkcd( "rank" + std::to_string(ens.intra.rank()) );
+            ParticleArrayCkpt<R, S> p_ckpt;
             { // write process specific data
               int r = ens.intra.rank();
               dbfile.write( "r", r );
-              ParticleArrayCkpt<R, S> ckpt;
-              for ( auto sp : particles ) {
-                particle::array<R,S> traced;
-                for ( const auto& ptc : particles[sp] ) {
-                  if ( !ptc.is(particle::flag::exist) || !ptc.is(particle::flag::traced) ) continue;
-                  traced.push_back(ptc);
+              {
+                const auto& ptcs = ptcs_tr;
+                particle::load_t num = ptcs.size();
+                // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
+                dbfile.write("load", num);
+                if ( num != 0 ) {
+                  constexpr auto DPtc = S<R>::Dim;
+                  for ( int i = 0; i < DPtc; ++i ) {
+                    dbfile.write("q"+std::to_string(i+1), p_ckpt.q(ptcs, i).data(), {p_ckpt.q(ptcs, i).size()} );
+                    dbfile.write("p"+std::to_string(i+1), p_ckpt.p(ptcs, i).data(), {p_ckpt.p(ptcs, i).size()} );
+                  }
+                  dbfile.write( "frac", p_ckpt.frac(ptcs).data(), {p_ckpt.frac(ptcs).size()} );
+                  dbfile.write( "state", p_ckpt.state(ptcs).data(), {p_ckpt.state(ptcs).size()} );
                 }
-
-                ckpt.save( dbfile, properties[sp], traced );
               }
+
             }
             dbfile.cd("..");
           }
@@ -470,4 +477,73 @@ namespace ckpt {
 
     return prefix;
   }
+
+  // template < int DGrid, typename R, template < typename > class S >
+  // int load_tracing( std::string dir, particle::array<R,S>& particles) {
+  //   int timestep = 0;
+  //   using T = std::underlying_type_t<particle::species>;
+
+  //   // rank0 read data
+  //   if ( mpi::world.rank() == 0 ) {
+  //     auto dir_itr = fs::directory_iterator(dir);
+  //     auto dbfile = silo::open(*dir_itr, silo::Mode::Read);
+  //     assert( dbfile.var_exists("/timestep") );
+
+  //     dbfile.read("/timestep", &timestep);
+  //   }
+  //   // rank0 broadcast data
+  //   {
+  //     int buf[1] = {timestep};
+  //     mpi::world.broadcast( 0, buf, 1 );
+  //     if ( mpi::world.rank() != 0 ) {
+  //       timestep = buf[0];
+  //     }
+  //   }
+
+  //   // ----------
+
+  //   const int myrank = ens_opt->intra.rank();
+
+  //   ParticleArrayCkpt<R, S> p_ckpt;
+  //   for ( auto f : fs::directory_iterator(dir) ) {
+  //     auto sf = silo::open(f, silo::Mode::Read);
+  //     for ( const auto& dname : sf.toc_dir() ) {
+  //       if ( dname.find("ensemble") != 0 ) continue;
+  //       sf.cd(dname);
+  //       for ( const auto& rdir : sf.toc_dir() ) {
+  //         if ( rdir.find("rank") != 0 ) continue;
+  //         sf.cd(rdir);
+  //         int r = sf.read1<int>("r");
+
+  //         {
+  //           auto N = dbfile.read1<particle::load_t>("load");
+
+  //           if ( 0 != N ) {
+  //             // auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
+  //             int from = 0;
+  //             auto num = N;
+  //             auto size_old = ptcs.size();
+  //             ptcs.resize(size_old + num);
+
+  //             constexpr auto DPtc = S<T>::Dim;
+  //             apt::array<int, 3> slice { from, num, 1 };
+  //             {
+  //               for ( int i = 0; i < DPtc; ++i ) {
+  //                 dbfile.readslice("q"+std::to_string(i+1), {slice}, particles._q[i].data() + size_old );
+  //                 dbfile.readslice("p"+std::to_string(i+1), {slice}, particles._p[i].data() + size_old );
+  //               }
+  //               dbfile.readslice("frac", {slice}, particles._frac.data() + size_old );
+  //               dbfile.readslice("state", {slice}, particles._state.data() + size_old );
+  //             }
+  //           }
+  //         }
+
+  //         sf.cd("..");
+  //       }
+  //       sf.cd("..");
+  //     }
+  //   }
+
+  //   return timestep;
+  // }
 }

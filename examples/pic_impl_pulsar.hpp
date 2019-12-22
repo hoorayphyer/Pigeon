@@ -143,7 +143,7 @@ namespace pic {
     Field<1> pc_counter {};
     real_t pc_cumulative_time {};
 
-    map<unsigned int> trace_counter {};
+    map<unsigned int> trace_counter {}; // for assigning serial numbers to traced particles
 
     map<JField> Jsp {}; // current by species
     bool is_export_Jsp = false;
