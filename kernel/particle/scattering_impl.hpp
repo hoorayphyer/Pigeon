@@ -30,6 +30,7 @@ namespace particle::scat {
                                  ptc.p() * ( E_ph / apt::abs(ptc.p()) ),
                                  ptc.frac(),
                                  species::photon,
+                                 flag::secondary,
                                  ptc.template get<birthplace>()
                                  );
     }

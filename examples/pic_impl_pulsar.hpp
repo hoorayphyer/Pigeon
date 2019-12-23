@@ -143,8 +143,6 @@ namespace pic {
     Field<1> pc_counter {};
     real_t pc_cumulative_time {};
 
-    map<unsigned int> trace_counter {}; // for assigning serial numbers to traced particles
-
     map<JField> Jsp {}; // current by species
     bool is_export_Jsp = false;
 
@@ -790,7 +788,7 @@ namespace pic {
                         const Grid& grid,
                         const Ensemble* ens,
                         R dt, int timestep, util::Rng<R>& rng
-                         ) override {
+                        ) override {
         _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
         _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
 
@@ -929,51 +927,70 @@ namespace pic {
       asym_hi.is_upper_axis(true);
     }
 
-    struct ScatteringAnalyzer : public PtcAction {
-      virtual ScatteringAnalyzer* Clone() const { return new ScatteringAnalyzer(*this); }
+    struct NewPtcAnalyzer : public PtcAction {
+      virtual NewPtcAnalyzer* Clone() const { return new NewPtcAnalyzer(*this); }
 
       virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
                                 const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
-                                R dt, int, util::Rng<R>& rng) override {
-        auto& buf = *new_ptc_buf;
+                                R dt, int timestep, util::Rng<R>& rng) override {
         // Put particles where they belong after scattering
-        for ( int i = 0; i < buf.size(); ++i ) {
-          auto this_sp = buf[i].template get<species>();
+        assert(new_ptc_buf != nullptr);
 
-          // log scattering events
-          RTD::data().N_scat[this_sp] += buf[i].frac();
+        bool is_trace_new = ( timestep > 0 and ( timestep % 100 ) == 0 );
 
-          // log pair creation events
-          if ( species::electron == this_sp and buf[i].is(flag::secondary) ) {
-            Index I; // domain index, not the global index
-            for ( int j = 0; j < DGrid; ++j )
-              I[j] = ( buf[i].q(j) - grid[j].lower() ) / grid[j].delta();
-            RTD::data().pc_counter[0](I) += buf[i].frac();
+        for ( auto& ptc : *new_ptc_buf ) {
+          if ( not ptc.is(flag::exist) ) continue;
+          const auto this_sp = ptc.template get<species>();
 
-            // trace electrons near Y point
-            if ( std::log(6.0) < buf[i].q(0) and buf[i].q(0) < std::log(7.0)
-                 and 1.47 < buf[i].q(1) and buf[i].q(1) < 1.67
-                 and rng.uniform() < 0.01 ) {
-              buf[i].set(flag::traced);
-              buf[i].set(::particle::serial_number(RTD::data().trace_counter[species::electron]++));
+          if ( ptc.is(flag::secondary) ) {
+            // log scattering events
+            RTD::data().N_scat[this_sp] += ptc.frac();
+
+            // log pair creation events
+            if ( species::electron == this_sp ) {
+              Index I; // domain index, not the global index
+              for ( int j = 0; j < DGrid; ++j )
+                I[j] = ( ptc.q(j) - grid[j].lower() ) / grid[j].delta();
+              RTD::data().pc_counter[0](I) += ptc.frac();
+
+              // trace electrons near Y point
+              if ( is_trace_new
+                   and std::log(6.0) < ptc.q(0) and ptc.q(0) < std::log(7.0)
+                   and 1.47 < ptc.q(1) and ptc.q(1) < 1.67
+                   and rng.uniform() < 0.01 ) {
+                Tracer::trace(ptc);
+              }
             }
           }
 
-          particles[this_sp].push_back(std::move(buf[i]));
+          particles[this_sp].push_back(std::move(ptc));
         }
-        buf.resize(0);
+        new_ptc_buf->resize(0);
         RTD::data().pc_cumulative_time += dt;
+
+        if ( is_trace_new) {
+          // trace primary electrons near foot of upper separatrix.
+          for ( auto ptc : particles[species::electron] ) { // TODOL semantics
+            if ( not ptc.is(flag::exist) ) continue;
+
+            if ( std::log(1.0) < ptc.q(0)
+                 and (35.0*PI / 180.0) < ptc.q(1) and ptc.q(1) < (45.0*PI/180.0)
+                 and rng.uniform() < 0.01 ) {
+              Tracer::trace(ptc);
+            }
+          }
+        }
       }
-    } scat_anlz;
+    } analyzer;
     {
-      scat_anlz.setName("ScatteringAnalysis");
+      analyzer.setName("NewPtcAnalysis");
     }
 
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());
     pus.emplace_back(asym_lo.Clone());
     pus.emplace_back(asym_hi.Clone());
-    pus.emplace_back(scat_anlz.Clone());
+    pus.emplace_back(analyzer.Clone());
     // FIXME migrate need more memory check
     pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
 
@@ -1213,11 +1230,11 @@ namespace pic {
         for ( auto sp : RTD::data().Jsp ) {
           switch(sp) {
           case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, divide_flux_by_area) ); break;
+            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, nullptr) ); break;
           case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, divide_flux_by_area) ); break;
+            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, nullptr) ); break;
           case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, divide_flux_by_area) ); break;
+            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, nullptr) ); break;
           default: ;
           }
         }

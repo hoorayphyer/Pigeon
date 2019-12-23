@@ -40,6 +40,45 @@ namespace pic {
   using PtcUpdater = ::particle::Updater<DGrid,real_t,Specs,ShapeF,real_j_t>;
   using Particle = ::particle::Particle<real_t,Specs>;
   using Force = ::particle::Force<real_t,Specs>;
+
+  struct Tracer {
+  public:
+    static void init( const map<Properties>& properties,
+                      const map<PtcArray>& particles ) {
+      // initialize trace_counters to ensure unique trace serial numbers across runs
+      for ( auto sp : properties ) {
+        unsigned int n = 0;
+        for ( const auto& ptc : particles[sp] )
+          if ( ptc.is(flag::traced) )
+            n = std::max<unsigned int>( n, ptc.template get<::particle::serial_number>() );
+
+        data().trace_counter.insert( sp, n+1 );
+      }
+    }
+
+    template < typename P >
+    inline static void trace( P&& ptc ) {
+      if ( not ptc.is(flag::traced) ) {
+        ptc.set(flag::traced);
+        ptc.set(::particle::serial_number(data().trace_counter[ptc.template get<species>()]++));
+      }
+    }
+
+  private:
+    map<unsigned int> trace_counter {}; // for assigning serial numbers to traced particles
+
+    static Tracer& data() {
+      static Tracer r;
+      return r;
+    }
+
+    Tracer() = default;
+    Tracer(const Tracer&);
+    Tracer(Tracer&&) noexcept;
+    Tracer& operator=( const Tracer& );
+    Tracer& operator=( Tracer&& ) noexcept;
+    ~Tracer() = default;
+  };
 }
 
 

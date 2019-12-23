@@ -220,16 +220,9 @@ namespace pic {
           vital::num_scat_prev.push_back(RTD::data().N_scat[sp]);
         }
       }
-      { // initialize trace_counters to ensure unique trace serial numbers across runs
-        for ( auto sp : _properties ) {
-          unsigned int n = 0;
-          for ( const auto& ptc : _particles[sp] )
-            if ( ptc.is(particle::flag::traced) )
-              n = std::max<unsigned int>( n, ptc.template get<particle::serial_number>() );
+      // initialize trace_counters to ensure unique trace serial numbers across runs
+      Tracer::init(_properties, _particles);
 
-          RTD::data().trace_counter.insert( sp, n+1 );
-        }
-      }
       return init_ts;
     }
 
@@ -458,13 +451,10 @@ namespace pic {
 
       if ( pic::tracing_mr.is_do(timestep) ) {
         TIMING("SaveTracing", START {
-            auto dir = ckpt::save_tracing( this_run_dir, num_tracing_parts, _ens_opt, timestep, _particles, _properties );
+            auto dir = ckpt::save_tracing( this_run_dir, num_tracing_parts, _ens_opt, timestep, _particles );
           });
       }
 
-      // TODOL
-      // if (false)
-      //   save_tracing();
       if ( stamp_all ) {
         lgr::file.indent_reset();
         lgr::file << "  Total Lapse = " << stamp_all->lapse().in_units_of("ms") << std::endl;
