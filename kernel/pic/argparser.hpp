@@ -6,7 +6,7 @@ namespace pic {
     // std::string journal_file = "journal.txt";
     std::optional<std::string> parameters_file{};
     std::optional<std::string> checkpoint_dir {};
-    bool is_screen = false;
+    bool is_dry_run = false;
   };
 
   auto parse_args( int argc, char** argv ) {
@@ -24,8 +24,8 @@ namespace pic {
       //   res.journal_file = args[i + 1];
       //   i += 2;
       // } else
-      if ( "--screen" == args[i] ) {
-        res.is_screen = true;
+      if ( "--dry-run" == args[i] ) {
+        res.is_dry_run = true;
         ++i;
         // ignore the rest of it
         break;

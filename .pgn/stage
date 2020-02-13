@@ -1,9 +1,8 @@
 #! /bin/bash
-# screening
-bin/pic --screen
+bin/pic --dry-run
 ret=$?
 if [[ $ret != 0 ]]; then
-    echo "Screening Failed. Run not staged."
+    echo "Dry run failed. Run not staged."
     exit $ret
 fi
 
@@ -61,7 +60,7 @@ if [[ -f job.sh ]]; then
 fi
 
 cd $stage_dir/$tnow
-local_jobID="local.$(hostname)"
+local_jobID="local.job"
 exec 5>&1 # save stdout of current session to fd5
 if [ -x "$(command -v qsub)" ]; then # PBS scheduler
     jobID=$(qsub -o $oe_dir -e $oe_dir -N ${project_name}-${tnow} $@ job.sh |tee >(cat - >&5))
@@ -79,7 +78,7 @@ printf "%s\n" \
        "JobID := $jobID"\
        > $journal_file
 
-bin/pic --screen >> $journal_file
+bin/pic --dry-run >> $journal_file
 
 if [ "${jobID}" = $local_jobID ]; then
     bin/pic

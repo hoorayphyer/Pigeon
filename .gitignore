@@ -1,17 +1,11 @@
 /*
 
 !.gitignore
-!newlab
-!delrun
-!stage
-!jnl
-!comment
-!vw
-!pick
-!diskusage
+!pgn
 !README.md
 !LICENSE
 
+!/.pgn
 !/kernel
 !/infrastructure
 !/examples

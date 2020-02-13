@@ -1,0 +1,69 @@
+#!/bin/bash
+root=$(git rev-parse --show-toplevel) # the top dir of Pigeon
+buick=$root/.subtrees/Buick/buick
+#TODO check infrastructure/ build
+
+case "$1" in
+    "--clean")
+        $buick --clean
+        ;;
+    "c") # do cmake
+        $buick . "${@:2}"
+        ;;
+    "b") # do make
+        $buick
+        ;;
+    "r")
+        if [[ "$2" == "--dry-run" ]]; then
+            bin/pic "--dry-run"
+        else
+            $root/.pgn/stage "${@:2}"
+        fi
+        ;;
+    "cb")
+        $0 c "${@:2}" | tee tmp
+        # check if cmake was successful
+        if grep -q "Configuring done" "tmp"\
+                && grep -q "Generating done" "tmp"\
+                && grep -q "Build files have been written to" "tmp" ; then
+            rm tmp
+            ./$0 b
+        else
+            rm tmp
+            echo "It seems that cmake failed."
+            exit 1
+        fi
+        ;;
+    "br")
+        $0 b && $0 r "${@:2}"
+        ;;
+    "cbr")
+        $0 cb "${@:2}" && $0 r
+        ;;
+    "new")
+        if [ ./ -ef $root ]; then
+            $root/.pgn/newlab "${@:2}"
+        else
+            echo "Error: lab can only be created at the git root level"
+            exit 1
+        fi
+        ;;
+    "del")
+        $root/.pgn/delrun "${@:2}"
+        ;;
+    "-h"|"--help")
+        echo "Help doc to be added"
+        ;;
+    #TODO the following need better interface
+    "jnl") # TODO jnl and comment can be put into a file explorer
+        $root/.pgn/jnl "${@:2}"
+        ;;
+    "comment")
+        $root/.pgn/comment "${@:2}"
+        ;;
+    "vw") # TODO queue results for scp
+        $root/.pgn/vw "${@:2}"
+        ;;
+    *)
+        ;;
+esac

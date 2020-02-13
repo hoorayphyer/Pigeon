@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   std::optional<std::string> resume_dir;
   pic::set_resume_dir(resume_dir);
 
-  if ( cli_args.is_screen ) {
+  if ( cli_args.is_dry_run ) {
     int retcode = 0;
     std::cout << "Characteristics :=" << std::endl;
 #ifdef PIC_DEBUG

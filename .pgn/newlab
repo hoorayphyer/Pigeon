@@ -17,6 +17,7 @@ top_dir=$(pwd)
 cd $name
 
 # create default stuff
+ln -s $top_dir/pgn $(pwd)/pgn
 ln -s $top_dir/stage $(pwd)/stage
 ln -s $top_dir/delrun $(pwd)/delrun
 ln -s $top_dir/jnl $(pwd)/jnl
