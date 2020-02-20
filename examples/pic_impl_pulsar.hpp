@@ -1091,7 +1091,6 @@ namespace pic {
       return msh::interpolate( B, I2std(I), ShapeF() );
     } else if ( F == 2 ) {
       auto x = msh::interpolate( J, I2std(I), ShapeF() );
-      for ( int i = 0; i < 3; ++i ) x[i] *= PREJ;
       return { x[0], x[1], x[2] };
     } else {
       static_assert(F < 3);
@@ -1123,70 +1122,10 @@ namespace pic {
     }
   }
 
-  apt::array<real_t,3> EparaB ( Index I, const Grid& grid, const Field<3>& E,
-                                const Field<3>& B, const JField& J ) {
-    auto B_itpl = msh::interpolate( B, I2std(I), ShapeF() );
-    B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
-    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ), B_itpl ),
-            0.0, 0.0};
-  }
-
-  apt::array<real_t,3> EdotJ ( Index I, const Grid& grid, const Field<3>& E,
-                               const Field<3>& B, const JField& J ) {
-    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ),
-                      msh::interpolate( J, I2std(I), ShapeF() ) ),
-            0.0, 0.0};
-  }
-
-  // Poloidal flux function, LogSpherical
-  apt::array<real_t,3> dFlux_pol ( Index I, const Grid& grid, const Field<3>& E,
-                                   const Field<3>& B, const JField& J ) {
-    // F = \int_Br_d\theta, we want F to be all MIDWAY. Since Br is (MIDWAY, INSITU), it is automatically the natural choice
-    const auto& Br = B[0];
-    return { Br(I) * std::exp( 2.0 * grid[0].absc( I[0], 0.5 ) ) * std::sin( grid[1].absc( I[1], 0.0 ) ), 0.0, 0.0 };
-  }
-
-  void integrate_dFlux ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& cart ) {
-    // Flux_t - Flux_{t-1} = dFlux_t, can be in-placed
-    // integrate in theta direction
-    assert(num_comps == 1);
-    auto dFlux = fds[0]; // TODOL semantics
-    const auto& mesh = fds.mesh();
-    Index ext = apt::range::size(mesh.range());
-    std::vector<RDS> buf;
-    { // one value from each theta row
-      std::size_t size = 1;
-      for ( int i = 0; i < DGrid; ++i ) size *= ext[i];
-      size /= ext[1];
-      buf.reserve(size);
-    }
-    for ( const auto& trI : apt::project_out( 1, {}, ext ) ) {
-      apt::Longidx n (1,-1);
-      dFlux(trI + n) = 0.0;
-      for ( ++n; n < ext[1]; ++n ) {
-        dFlux(trI + n) += dFlux(trI + (n-1));
-      }
-      n = ext[1] - 1;
-      buf.push_back(dFlux(trI + n));
-    }
-    // do an exclusive scan then add the scanned value back
-    cart.exscan_inplace(buf.data(), buf.size()); // FIXME memory issue, false positive?
-    int idx = 0;
-    for ( const auto& trI : apt::project_out( 1, {}, ext ) ) {
-      auto val = buf[idx++];
-      for ( apt::Longidx n (1,0); n < ext[1]; ++n ) dFlux(trI + n) += val;
-    }
-  }
-
   apt::array<real_t,3> pair_creation_rate ( Index I, const Grid& grid, const Field<3>& ,
                                             const Field<3>& , const JField&  ) {
     auto x = msh::interpolate( RTD::data().pc_counter, I2std(I), ShapeF() );
     return { x[0] / RTD::data().pc_cumulative_time, 0, 0};
-  }
-
-  apt::array<real_t,3> volume_scale ( Index I, const Grid& grid, const Field<3>& ,
-                                      const Field<3>& , const JField&  ) {
-    return { pic::Metric::hhh(grid[0].absc( I[0],0.5), grid[1].absc( I[1],0.5) ), 0, 0 };
   }
 
   template < particle::species SP >
@@ -1206,9 +1145,6 @@ namespace pic {
                                     const Field<3>& , const JField& ) {
     return { msh::interpolate( RTD::data().skin_depth, I2std(I), ShapeF() )[0], 0, 0  };
   }
-  // void delE_v_rho();
-
-  // void delB();
 
   auto set_up_field_export() {
     std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
@@ -1217,12 +1153,8 @@ namespace pic {
 
       fexps.push_back( new FA ( "E", 3, field_self<0>, nullptr) );
       fexps.push_back( new FA ( "B", 3, field_self<1>, nullptr) );
-      fexps.push_back( new FA ( "J4X", 3, field_self<2>, divide_flux_by_area) );
-      fexps.push_back( new FA ( "EparaB", 1, EparaB, nullptr) );
-      fexps.push_back( new FA ( "EdotJ", 1, EdotJ, nullptr) );
-      fexps.push_back( new FA ( "Flux", 1, dFlux_pol, integrate_dFlux) );
+      fexps.push_back( new FA ( "J", 3, field_self<2>, divide_flux_by_area) );
       fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "VolumeScale", 1, volume_scale, nullptr) );
       fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, nullptr) );
 
       if ( RTD::data().is_export_Jsp ) {
