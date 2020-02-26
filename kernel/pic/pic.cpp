@@ -46,16 +46,17 @@ std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, 
   return cart_opt;
 }
 
-
 int main(int argc, char** argv) {
   auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
 
   std::optional<std::string> resume_dir;
-  pic::set_resume_dir(resume_dir);
+  if ( cli_args.resume_dir ) {
+    resume_dir.emplace(fs::absolute(*cli_args.resume_dir));
+  }
 
   if ( cli_args.is_dry_run ) {
     int retcode = 0;
-    std::cout << "Characteristics :=" << std::endl;
+    std::cout << "Dry Run Checks :=" << std::endl;
 #ifdef PIC_DEBUG
     std::cout << "\tDebug" << std::endl;
 #else
@@ -65,7 +66,7 @@ int main(int argc, char** argv) {
     if ( resume_dir  ) {
       if ( !fs::exists(*resume_dir) ) {
         retcode = 1;
-        std::cout << "\tInvalid checkpoint directory : " << *resume_dir << std::endl;
+        std::cout << "\tInvalid resume directory : " << *resume_dir << std::endl;
       } else {
         std::cout << "\tResume from : " << *resume_dir << std::endl;
       }

@@ -18,13 +18,6 @@ cd $name
 
 # create default stuff
 ln -s $top_dir/pgn $(pwd)/pgn
-ln -s $top_dir/stage $(pwd)/stage
-ln -s $top_dir/delrun $(pwd)/delrun
-ln -s $top_dir/jnl $(pwd)/jnl
-ln -s $top_dir/comment $(pwd)/comment
-ln -s $top_dir/vw $(pwd)/vw
-ln -s $top_dir/diskusage $(pwd)/diskusage
-ln -s $top_dir/.subtrees/Buick/buick $(pwd)/buick
 cp $top_dir/examples/CMakeLists.txt $top_dir/examples/pic.hpp $(pwd)/
 sed -i "s/project(.*)/project(\"$1\")/" $(pwd)/CMakeLists.txt # this line sets the project name in CMakeLists.txt
 

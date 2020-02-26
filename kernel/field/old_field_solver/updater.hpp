@@ -12,6 +12,7 @@ namespace field {
   struct OldSolve : public Action<R,DGrid,RJ> {
   private:
     R _fourpi {};
+    R _mu = 1.0;
     const int _guard = 1; // just use this number
     int _magnetic_pole = 2; // 1 for mono-, 2 for di-
     int _surface_indent = 5;
@@ -25,6 +26,11 @@ namespace field {
   public:
     constexpr OldSolve& set_fourpi( R x ) noexcept {
       _fourpi = x;
+      return *this;
+    }
+
+    constexpr OldSolve& set_mu( R x ) noexcept {
+      _mu = x;
       return *this;
     }
 

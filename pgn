@@ -2,6 +2,8 @@
 root=$(git rev-parse --show-toplevel) # the top dir of Pigeon
 buick=$root/.subtrees/Buick/buick
 #TODO check infrastructure/ build
+#TODO when resume, copy previous message to current.
+#TODO download a chain of resumed runs at once, by tracing backwards
 
 case "$1" in
     "--clean")
@@ -14,9 +16,18 @@ case "$1" in
         $buick
         ;;
     "r")
-        if [[ "$2" == "--dry-run" ]]; then
-            bin/pic "--dry-run"
+        is_dry_run="no"
+        for var in "${@:2}"
+        do
+            if [[ "$var" == "--dry-run" ]]; then
+                is_dry_run="yes"
+                break
+            fi
+        done
+        if [[ "$is_dry_run" == "yes" ]]; then
+            bin/pic "${@:2}"
         else
+            #TODO update certain stage( change bin/pic etc)
             $root/.pgn/stage "${@:2}"
         fi
         ;;
@@ -27,7 +38,7 @@ case "$1" in
                 && grep -q "Generating done" "tmp"\
                 && grep -q "Build files have been written to" "tmp" ; then
             rm tmp
-            ./$0 b
+            $0 b
         else
             rm tmp
             echo "It seems that cmake failed."

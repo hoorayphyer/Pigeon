@@ -1,5 +1,7 @@
 #! /bin/bash
-journal=$(../pick $1)
+
+root=$(git rev-parse --show-toplevel) # the top dir of Pigeon
+journal=$($root/.pgn/pick $1)
 ret=$?
 if [[ $ret != 0 ]]; then # check return code
     exit $ret

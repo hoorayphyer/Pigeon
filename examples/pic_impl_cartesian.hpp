@@ -24,7 +24,6 @@ namespace pic {
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
   inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
 
-  inline void set_resume_dir( std::optional<std::string>& dir ) {}
   inline constexpr int initial_timestep = 0;
   inline constexpr int total_timesteps = 100;
 

@@ -40,10 +40,10 @@ namespace particle::force {
 // TODO optimize use of intermediate variables
 namespace particle::force {
   template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
-  void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T,S<T>::Dim>& E, const apt::Vec<T,S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
+  void lorentz( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T,S<T>::Dim>& E, const apt::Vec<T,S<T>::Dim>& B, T q_over_m  ) {
     using Vec = apt::Vec<T,S<T>::Dim>;
-    // lambda = 0.5 * w_gyro_unitB * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
-    dt *= 0.5 * q_times_w_gyro_unitB_over_m; // repurpose dt for lambda
+    // lambda = 0.5 * dt * (charge_x unit_q) / (mass_x unit_m) NOTE this is actually rescaling Lorentz force
+    dt *= 0.5 * q_over_m; // repurpose dt for lambda
 
     const auto& p = ptc.p();
     Vec u_halfstep = p + E * dt + apt::cross(p, B) * ( dt / std::sqrt( 1.0 + apt::sqabs(p) ) );
@@ -67,10 +67,10 @@ namespace particle::force {
   }
 
   template < typename T, template < typename > class S, template < typename, template < typename > class > class Ptc_t >
-  void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_times_w_gyro_unitB_over_m  ) {
+  void lorentz_exact( Ptc_t<T,S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E, const apt::Vec<T, S<T>::Dim>& B, T q_over_m  ) {
     using Vec = apt::Vec<T,S<T>::Dim>;
     using vVec = apt::vVec<T,S<T>::Dim>;
-    dt *= q_times_w_gyro_unitB_over_m;
+    dt *= q_over_m;
 
     // get drift velocity
     T xE = apt::sqabs(B) - apt::sqabs(E); // calculate B^2 - E^2
@@ -154,11 +154,11 @@ namespace particle::force {
         xp *= ( static_cast<T>(1.0) - xB );
 
         dt = ptc.p(0);
-        q_times_w_gyro_unitB_over_m = ptc.p(1);
+        q_over_m = ptc.p(1);
 
-        ptc.p(0) = xp * z[0] + xB*dt + xE*(z[1] * ptc.p(2) - z[2] * q_times_w_gyro_unitB_over_m);
-        ptc.p(1) = xp * z[1] + xB*q_times_w_gyro_unitB_over_m + xE*(z[2] * dt - z[0] * ptc.p(2));
-        ptc.p(2) = xp * z[2] + xB*ptc.p(2) + xE*(z[0]*q_times_w_gyro_unitB_over_m - z[1]*dt );
+        ptc.p(0) = xp * z[0] + xB*dt + xE*(z[1] * ptc.p(2) - z[2] * q_over_m);
+        ptc.p(1) = xp * z[1] + xB*q_over_m + xE*(z[2] * dt - z[0] * ptc.p(2));
+        ptc.p(2) = xp * z[2] + xB*ptc.p(2) + xE*(z[0]*q_over_m - z[1]*dt );
       }
 
       // TODO udate delta q

@@ -149,14 +149,16 @@ SCENARIO("Test against old Vay Pusher", "[particle]") {
     p *= 10.0;
 
     double dt = 0.01;
-    double w_gyro_unitB = 10000.0;
     double q_over_m = 1.0;
+    double field_strength = 10000.0;
+    E *= field_strength;
+    B *= field_strength;
 
-    auto p_old = old_vay::lorentz( q_over_m * dt * w_gyro_unitB, p, E, B );
+    auto p_old = old_vay::lorentz( q_over_m * dt, p, E, B );
 
     Particle<double,aio::Specs> ptc;
     ptc.p() = p;
-    force::lorentz( ptc, dt, E, B, q_over_m * w_gyro_unitB );
+    force::lorentz( ptc, dt, E, B, q_over_m );
     for ( int i = 0; i < 3; ++i ) {
       REQUIRE( p_old[i] == Approx(ptc.p()[i]) );
     }

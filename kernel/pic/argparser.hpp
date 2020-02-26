@@ -5,7 +5,7 @@ namespace pic {
   struct CLIArgs {
     // std::string journal_file = "journal.txt";
     std::optional<std::string> parameters_file{};
-    std::optional<std::string> checkpoint_dir {};
+    std::optional<std::string> resume_dir {};
     bool is_dry_run = false;
   };
 
@@ -27,15 +27,13 @@ namespace pic {
       if ( "--dry-run" == args[i] ) {
         res.is_dry_run = true;
         ++i;
-        // ignore the rest of it
-        break;
       }
       else if ( "--params" == args[i] ) {
         res.parameters_file.emplace( args[i + 1] );
         i += 2;
       }
-      else if ( "--checkpoint" == args[i] ) {
-        res.checkpoint_dir.emplace( args[i + 1] );
+      else if ( "--resume" == args[i] ) {
+        res.resume_dir.emplace( args[i + 1] );
         i += 2;
       }
     }

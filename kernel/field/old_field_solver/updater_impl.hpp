@@ -229,9 +229,10 @@ namespace field {
       // NOTE differences of new code
       // 1. The new code will evolve Maxwell's equations with 4\pi r_e / w_gyro.
       // 2. the new code passes in Jmesh, so conversion to real space current is needed
+      auto preJ = _fourpi / _mu;
       for ( int c = 0; c < 3; ++c )
         for ( int i = 0; i < current.gridSize(); ++i )
-          current.ptr(c)[i] *= _fourpi;
+          current.ptr(c)[i] *= preJ;
 
       RestoreJToRealSpace(current, fugrid);
       fc->SendGuardCells(current);
@@ -241,7 +242,7 @@ namespace field {
       fu -> Update( Efield, Bfield, current, dt, timestep );
     }
 
-    {// convert from old back to new
+    {// convert from old back to new. Note to multiply by _mu
       auto convert_to_new =
         [&]( const auto& old_f, auto& new_f ) {
           const auto& grid = fuparams.grid;
@@ -261,6 +262,11 @@ namespace field {
       convert_to_new( Bfield, B );
       field::copy_sync_guard_cells( E, cart );
       field::copy_sync_guard_cells( B, cart );
+
+      for ( int c = 0; c < 3; ++c) {
+        for ( auto& x : E[c].data() ) x *= _mu;
+        for ( auto& x : B[c].data() ) x *= _mu;
+      }
     }
   }
 }
