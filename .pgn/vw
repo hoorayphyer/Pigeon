@@ -1,5 +1,4 @@
 #! /bin/bash
-
 root=$(git rev-parse --show-toplevel) # the top dir of Pigeon
 journal=$($root/.pgn/pick $1)
 ret=$?
@@ -17,6 +16,10 @@ jobid=$(echo $jobid |
   END { print maxline }')
 
 datadir=$(grep "DataDir := " $journal -r)
+if [[ -z "$datadir" ]];then # -z checks if string has zero length
+    echo "ERROR : No Data Directory Found! Make sure the run has started!"
+    exit 0
+fi
 datadir=${datadir:$(expr length "DataDir := ")} # substring ${substr:position:length}
 
 # open files in different tabs in ReadOnly mode

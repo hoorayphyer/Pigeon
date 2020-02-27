@@ -84,10 +84,22 @@ int main(int argc, char** argv) {
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
     // journaling
-    fs::mpido( mpi::world, [&](){
-                             if ( !fs::exists("journal.txt") ) return;
+    fs::mpido( mpi::world, [&]() {
+                             const std::string official_jnl (pic::this_run_dir+"/journal.txt");
+                             std::string jnl;
+                             if ( cli_args.journal_file ) {
+                               // a journal file is specified
+                               jnl = fs::absolute(*cli_args.journal_file);
+                               if ( !fs::exists(jnl) ) {
+                                 std::cout << "Specified journal doesn't exist. Using default journal instead." << std::endl;
+                                 jnl = official_jnl;
+                               }
+                             } else {
+                               // if a journal file is not specified, create one
+                               jnl = official_jnl;
+                             }
                              std::ofstream out;
-                             out.open("journal.txt", std::ios_base::app);
+                             out.open(jnl, std::ios_base::app); // NOTE app creates new file when jnl doesn't exist
 #ifdef PIC_DEBUG
                              out << "BuildType := Debug" << std::endl;
 #else
@@ -97,8 +109,10 @@ int main(int argc, char** argv) {
                              if ( resume_dir )
                                out << "Resume := " << *resume_dir << std::endl;
                              out.close();
-                             // NOTE fs::rename doesn't work on some platforms because of cross-device link.
-                             fs::copy_file( "journal.txt", pic::this_run_dir+"/journal.txt" );
+                             if ( !fs::equivalent(jnl, official_jnl) ) {
+                               // NOTE fs::rename doesn't work on some platforms because of cross-device link.
+                               fs::copy_file( jnl, official_jnl );
+                             }
                            } );
 
     fs::mpido( mpi::world, [&](){

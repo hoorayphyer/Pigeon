@@ -75,6 +75,10 @@ namespace fs {
   void rename( std::string old_path, std::string new_path ) {
     filesystem::rename({old_path}, {new_path});
   }
+
+  bool equivalent( std::string p1, std::string p2 ) {
+    return filesystem::equivalent({p1}, {p2});
+  }
 }
 
 namespace fs {

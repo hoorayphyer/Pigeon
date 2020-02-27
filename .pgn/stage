@@ -1,22 +1,35 @@
 #! /bin/bash
 sche_args=()
-pic_args=()
+other_args=()
 for var in "$@"
 do
     if [[ "$var" == "--scheduler-args="* ]]; then
         sche_args+=(${var:17})
     else
-        pic_args+=($var)
+        other_args+=($var)
     fi
 done
 
+pic_args=()
 passed_dry_run="no"
-for var in "${pic_args[@]}"
+
+for ((i=0; i < ${#other_args[@]}; i++)) # NOTE bash array index starts at 0
 do
-    if [[ "$var" == "--dry-run" ]]; then
-        passed_dry_run="yes"
-        break
-    fi
+    var=${other_args[i]}
+    echo $var
+    case "$var" in
+        "--dry-run")
+            passed_dry_run="yes"
+            pic_args+=($var)
+            ;;
+        "--journal")
+            echo "WARNING: user specified journal file will be ignored in pgn"
+            ((i++)) # skip next argument
+            ;;
+        *)
+            pic_args+=($var)
+            ;;
+    esac
 done
 
 bin/pic --dry-run ${pic_args[@]} # Anyhow, perform a dry run
@@ -83,8 +96,10 @@ if [[ -f job.sh ]]; then
     cp job.sh $this_dir/
 fi
 
+journal_file=$this_dir/"journal.txt"
+
 function join_by { local IFS="$1"; shift; echo "$*"; } # copied from https://stackoverflow.com/questions/1527049/how-can-i-join-elements-of-an-array-in-bash
-pic_cmd="$this_dir/bin/pic $(join_by " " ${pic_args[@]})"
+pic_cmd="$this_dir/bin/pic $(join_by " " ${pic_args[@]}) --journal $journal_file"
 
 local_jobID="local.job"
 exec 5>&1 # save stdout of current session to fd5
@@ -97,14 +112,13 @@ else # run locally
     jobID=$local_jobID
 fi
 
-journal_file=$this_dir/"journal.txt"
 printf "%s\n" \
        "Project := $project_name"\
        "Message := $message"\
        "JobID := $jobID"\
        > $journal_file
 
-eval $pic_cmd --dry-run >> $journal_file
+eval $pic_cmd --dry-run >> $journal_file # NOTE --dry-run will ignore journal_file
 
 if [ "${jobID}" = $local_jobID ]; then
     eval $pic_cmd
