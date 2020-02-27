@@ -18,7 +18,7 @@ jobid=$(echo $jobid |
 datadir=$(grep "DataDir := " $journal -r)
 if [[ -z "$datadir" ]];then # -z checks if string has zero length
     echo "ERROR : No Data Directory Found! Make sure the run has started!"
-    exit 0
+    exit 1
 fi
 datadir=${datadir:$(expr length "DataDir := ")} # substring ${substr:position:length}
 
