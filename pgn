@@ -16,20 +16,8 @@ case "$1" in
         $buick
         ;;
     "r")
-        is_dry_run="no"
-        for var in "${@:2}"
-        do
-            if [[ "$var" == "--dry-run" ]]; then
-                is_dry_run="yes"
-                break
-            fi
-        done
-        if [[ "$is_dry_run" == "yes" ]]; then
-            bin/pic "${@:2}"
-        else
-            #TODO update certain stage( change bin/pic etc)
-            $root/.pgn/stage "${@:2}"
-        fi
+        #TODO update certain stage( update bin/pic, pic_impl.hpp etc )
+        $root/.pgn/stage "${@:2}"
         ;;
     "cb")
         $0 c "${@:2}" | tee tmp

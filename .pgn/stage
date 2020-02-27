@@ -1,9 +1,33 @@
 #! /bin/bash
-bin/pic --dry-run
+sche_args=()
+pic_args=()
+for var in "$@"
+do
+    if [[ "$var" == "--scheduler-args="* ]]; then
+        sche_args+=(${var:17})
+    else
+        pic_args+=($var)
+    fi
+done
+
+passed_dry_run="no"
+for var in "${pic_args[@]}"
+do
+    if [[ "$var" == "--dry-run" ]]; then
+        passed_dry_run="yes"
+        break
+    fi
+done
+
+bin/pic --dry-run ${pic_args[@]} # Anyhow, perform a dry run
 ret=$?
 if [[ $ret != 0 ]]; then
     echo "Dry run failed. Run not staged."
     exit $ret
+fi
+
+if [[ "$passed_dry_run" == "yes" ]]; then
+    exit 0 # the dry run was already finished above
 fi
 
 tnow=`date +%F-%H-%M-%S`
@@ -50,36 +74,38 @@ if [[ ! -d $oe_dir ]]; then
     mkdir $oe_dir
 fi
 
-mkdir $stage_dir/$tnow
-mkdir $stage_dir/$tnow/bin
-cp -H CMakeLists.txt pic.hpp pic_impl.hpp $stage_dir/$tnow/ # -H to copy contents of symlinks to the target file
-cp bin/pic $stage_dir/$tnow/bin/
+this_dir=$stage_dir/$tnow
+mkdir $this_dir/bin -p
+cp -H CMakeLists.txt pic.hpp pic_impl.hpp $this_dir/ # -H to copy contents of symlinks to the target file
+cp bin/pic $this_dir/bin/
 
 if [[ -f job.sh ]]; then
-    cp job.sh $stage_dir/$tnow/
+    cp job.sh $this_dir/
 fi
 
-cd $stage_dir/$tnow
+function join_by { local IFS="$1"; shift; echo "$*"; } # copied from https://stackoverflow.com/questions/1527049/how-can-i-join-elements-of-an-array-in-bash
+pic_cmd="$this_dir/bin/pic $(join_by " " ${pic_args[@]})"
+
 local_jobID="local.job"
 exec 5>&1 # save stdout of current session to fd5
 if [ -x "$(command -v qsub)" ]; then # PBS scheduler
-    jobID=$(qsub -o $oe_dir -e $oe_dir -N ${project_name}-${tnow} $@ job.sh |tee >(cat - >&5))
-elif [ -x "$(command -v sbatch)" ]; then # SLURM scheduler
-    jobID=$(sbatch -o $oe_dir/slurm-%j.%x.OU -e $oe_dir/slurm-%j.%x.ER -J ${project_name}-${tnow} $@ job.sh |tee >(cat - >&5))
+    jobID=$(qsub -o $oe_dir -e $oe_dir -N ${project_name}-${tnow} "${sche_args[@]}" -v pic_command="$pic_cmd" $this_dir/job.sh |tee >(cat - >&5))
+#TODO make it work for SLURM
+#elif [ -x "$(command -v sbatch)" ]; then # SLURM scheduler
+#    jobID=$(sbatch -o $oe_dir/slurm-%j.%x.OU -e $oe_dir/slurm-%j.%x.ER -J ${project_name}-${tnow} ${sche_args[@]} -v PICARGS=${pic_args[@]} job.sh |tee >(cat - >&5))
 else # run locally
     jobID=$local_jobID
 fi
 
-journal_file="journal.txt"
+journal_file=$this_dir/"journal.txt"
 printf "%s\n" \
        "Project := $project_name"\
-       "StageTime := $tnow"\
        "Message := $message"\
        "JobID := $jobID"\
        > $journal_file
 
-bin/pic --dry-run >> $journal_file
+eval $pic_cmd --dry-run >> $journal_file
 
 if [ "${jobID}" = $local_jobID ]; then
-    bin/pic
+    eval $pic_cmd
 fi
