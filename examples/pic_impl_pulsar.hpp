@@ -77,10 +77,6 @@ namespace pic {
 
   constexpr int star_interior = 5;
 
-  constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
-  constexpr int number_iteration = 4; // number of iterations in inverting the operator in Haugbolle
-  static_assert( order_precision % 2 == 0 );
-
   constexpr int myguard = std::max(1, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   constexpr real_t omega_spinup ( real_t time ) noexcept {

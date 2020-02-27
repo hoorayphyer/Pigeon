@@ -221,6 +221,10 @@ namespace field {
         fc->SendGuardCells(Efield);
         convert_from_new( Bfield, B );
         fc->SendGuardCells(Bfield);
+        // NOTE old field solver uses _mu as unit of field
+        Efield.multiplyBy(1 / _mu);
+        Bfield.multiplyBy(1 / _mu);
+
         is_initialized = true;
       }
       convert_from_new( current, Jmesh );

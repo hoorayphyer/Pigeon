@@ -6,6 +6,7 @@
 
 #include "multiarray/MultiArrayHelpers.h"
 #include "multiarray/Op.h"
+#include <stdexcept>
 
 template <typename It>
 void check_bounds(const It& iterator, const Extent& extent) {
