@@ -66,7 +66,11 @@ int main(int argc, char** argv) {
     if ( resume_dir  ) {
       if ( !fs::exists(*resume_dir) ) {
         retcode = 1;
-        std::cout << "\tInvalid resume directory : " << *resume_dir << std::endl;
+        std::cout << "ERROR : Invalid resume directory : " << *resume_dir << std::endl;
+      } else if(resume_dir->find("checkpoints/timestep") == std::string::npos ){
+        // if the directory exists but is not one of the checkpoints
+        retcode = 1;
+        std::cout << "ERROR : Invalid resume directory : " << *resume_dir << ". Specify which checkpoint!" << std::endl;
       } else {
         std::cout << "\tResume from : " << *resume_dir << std::endl;
       }

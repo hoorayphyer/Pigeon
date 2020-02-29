@@ -12,6 +12,7 @@ namespace ckpt {
 }
 
 namespace particle {
+  // dependees of array structure: checkpoints, sorter
   template < typename T, template < typename > class Specs >
   struct array {
   private:

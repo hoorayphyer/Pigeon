@@ -16,7 +16,6 @@ passed_dry_run="no"
 for ((i=0; i < ${#other_args[@]}; i++)) # NOTE bash array index starts at 0
 do
     var=${other_args[i]}
-    echo $var
     case "$var" in
         "--dry-run")
             passed_dry_run="yes"

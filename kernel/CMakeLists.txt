@@ -32,6 +32,14 @@ target_link_directories(mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructur
 target_link_libraries(mpi INTERFACE ${MPI_CXX_LIBRARIES})
 target_link_libraries(mpi INTERFACE -lmpipp)
 
+add_library(testfw INTERFACE)
+target_link_directories(testfw INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
+target_link_libraries(testfw INTERFACE -ltestfw)
+
+add_library(testfw_mpi INTERFACE)
+target_link_directories(testfw_mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
+target_link_libraries(testfw_mpi INTERFACE -ltestfw_mpi)
+
 
 function(test_gen category name)
   set(test_target "test_${category}_${name}")

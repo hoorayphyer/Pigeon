@@ -277,7 +277,7 @@ namespace pic {
 
         if ( pic::sort_particles_mr.is_do(timestep) ) {
           TIMING("SortParticles", START {
-              for ( auto sp : _particles ) particle::sort( _particles[sp] );
+              for ( auto sp : _particles ) particle::sort( _particles[sp], _grid );
             });
         }
 
