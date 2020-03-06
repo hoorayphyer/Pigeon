@@ -8,13 +8,6 @@
 // FIXME check if downsampled field can use a better mesh. Range may not work because of the scaling
 
 namespace io {
-  constexpr int POW( int B, int E ) {
-    if ( E == 0 ) return 1;
-    else return B * POW(B,E-1);
-  };
-}
-
-namespace io {
   template < typename RealDS,
              int DGrid,
              typename Real,
@@ -67,12 +60,6 @@ namespace io {
 
           for ( int comp = 0; comp < num_comps; ++comp )
             fds[comp](Ids) += val[comp];
-        }
-      }
-      {
-        int factor = POW(ds_ratio, DGrid);
-        for ( int i = 0; i < num_comps; ++i ) {
-          for ( auto& x : fds[i].data() ) x /= factor;
         }
       }
 

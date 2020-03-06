@@ -17,7 +17,6 @@ top_dir=$(pwd)
 cd $name
 
 # create default stuff
-ln -s $top_dir/pgn $(pwd)/pgn
 cp $top_dir/examples/CMakeLists.txt $top_dir/examples/pic.hpp $(pwd)/
 sed -i "s/project(.*)/project(\"$1\")/" $(pwd)/CMakeLists.txt # this line sets the project name in CMakeLists.txt
 

@@ -751,7 +751,21 @@ namespace pic {
     }
   }
 
-  void divide_flux_by_area ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& ) {
+  constexpr int POW( int B, int E ) {
+    if ( E == 0 ) return 1;
+    else return B * POW(B,E-1);
+  }
+
+  void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
+    constexpr int factor = POW(pic::downsample_ratio, pic::DGrid);
+    for ( int i = 0; i < num_comps; ++i ) {
+      for ( auto& x : fds[i].data() ) x /= factor;
+    }
+  }
+
+  void average_and_divide_flux_by_area ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& cart ) {
+    average_when_downsampled(fds, grid, num_comps, cart);
+
     using Metric = metric::LogSpherical<RDS>;
     // define a function pointer.
     RDS (*hh_func)(RDS,RDS,RDS) = nullptr;
@@ -805,22 +819,22 @@ namespace pic {
     {
       using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
 
-      fexps.push_back( new FA ( "E", 3, field_self<0>, nullptr) );
-      fexps.push_back( new FA ( "B", 3, field_self<1>, nullptr) );
-      fexps.push_back( new FA ( "J", 3, field_self<2>, divide_flux_by_area) );
+      fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
+      fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
+      fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
       fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, nullptr) );
+      fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, average_when_downsampled) );
 
       if ( RTD::data().is_export_Jsp ) {
         using namespace particle;
         for ( auto sp : RTD::data().Jsp ) {
           switch(sp) {
           case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, nullptr) ); break;
+            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, average_when_downsampled) ); break;
           case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, nullptr) ); break;
+            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, average_when_downsampled) ); break;
           case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, nullptr) ); break;
+            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, average_when_downsampled) ); break;
           default: ;
           }
         }
