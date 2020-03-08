@@ -84,20 +84,20 @@ namespace pic {
   }
 
   constexpr real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
+    return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
   }
   constexpr real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return std::sin(theta) * std::exp(-3.0 * lnr);
+    return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
   }
   constexpr real_t B_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
   }
 
   constexpr real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return omega_spinup(time) * std::exp(- 2 * lnr) * std::sin( theta ) * std::sin(theta);
+    return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * std::sin( theta ) * std::sin(theta);
   }
   constexpr real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return - omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
+    return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
   }
   constexpr real_t E_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
