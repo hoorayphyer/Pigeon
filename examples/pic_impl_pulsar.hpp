@@ -591,8 +591,6 @@ namespace pic {
         // Put particles where they belong after scattering
         assert(new_ptc_buf != nullptr);
 
-        bool is_trace_new = ( timestep > 0 and ( timestep % 100 ) == 0 );
-
         for ( auto& ptc : *new_ptc_buf ) {
           if ( not ptc.is(flag::exist) ) continue;
           const auto this_sp = ptc.template get<species>();
@@ -607,14 +605,6 @@ namespace pic {
               for ( int j = 0; j < DGrid; ++j )
                 I[j] = ( ptc.q(j) - grid[j].lower() ) / grid[j].delta();
               RTD::data().pc_counter[0](I) += ptc.frac();
-
-              // trace electrons near Y point
-              if ( is_trace_new
-                   and std::log(6.0) < ptc.q(0) and ptc.q(0) < std::log(7.0)
-                   and 1.47 < ptc.q(1) and ptc.q(1) < 1.67
-                   and rng.uniform() < 0.01 ) {
-                Tracer::trace(ptc);
-              }
             }
           }
 
@@ -623,18 +613,6 @@ namespace pic {
         new_ptc_buf->resize(0);
         RTD::data().pc_cumulative_time += dt;
 
-        if ( is_trace_new) {
-          // trace primary electrons near foot of upper separatrix.
-          for ( auto ptc : particles[species::electron] ) { // TODOL semantics
-            if ( not ptc.is(flag::exist) ) continue;
-
-            if ( std::log(1.0) < ptc.q(0)
-                 and (35.0*PI / 180.0) < ptc.q(1) and ptc.q(1) < (45.0*PI/180.0)
-                 and rng.uniform() < 0.01 ) {
-              Tracer::trace(ptc);
-            }
-          }
-        }
       }
     } analyzer;
     {
