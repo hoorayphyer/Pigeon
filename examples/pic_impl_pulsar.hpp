@@ -876,7 +876,7 @@ namespace pic {
     o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
     o << indent << "w_pic dt=" << apt::fmt("%.4f", wdt_pic ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", classic_electron_radius() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 2 * PI * classic_electron_radius() ) ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * classic_electron_radius() ) * std::sqrt(1 - Omega) ) << std::endl;
 
     {
       using namespace particle;
