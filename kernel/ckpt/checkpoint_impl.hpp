@@ -115,8 +115,7 @@ namespace ckpt {
                                const field::Field<R, 3, DGrid>& E,
                                const field::Field<R, 3, DGrid>& B,
                                const particle::map<particle::array<R,S>>& particles,
-                               const particle::map<particle::Properties>& properties,
-                               const particle::map<R>& N_scat
+                               const particle::map<particle::Properties>& properties
                                ) {
     bool is_idle = !ens_opt;
     int key = 0;
@@ -181,13 +180,6 @@ namespace ckpt {
 
                 ckpt.save(dbfile, "E", E);
                 ckpt.save(dbfile, "B", B);
-
-                { // write N_scat
-                  std::vector<int> buffer;
-                  for ( auto sp : N_scat ) buffer.push_back(static_cast<int>(sp));
-                  dbfile.write( "N_scat_sp", buffer );
-                  dbfile.write( "N_scat_data", N_scat.data() );
-                }
               }
             }
 
@@ -216,7 +208,6 @@ namespace ckpt {
                        field::Field<R, 3, DGrid>& B,
                        particle::map<particle::array<R,S>>& particles,
                        const particle::map<particle::Properties>& properties,
-                       particle::map<R>& N_scat,
                        int target_load
                        ) {
     int checkpoint_ts = 0;
@@ -350,26 +341,6 @@ namespace ckpt {
         if ( 0 == myrank && sf.var_exists("rank0") ) { // NOTE: ranks of one ensemble may exist across files
           f_ckpt.load( sf, "E", E );
           f_ckpt.load( sf, "B", B );
-          {
-            assert( sf.var_exists("N_scat_sp") );
-            assert( sf.var_exists("N_scat_data") );
-
-            const auto buf_sp = sf.read1d<int>("N_scat_sp");
-#ifdef PIC_DEBUG
-            lgr::file << "LDCKPT N_scat_sp, size = " << sf.var_length("N_scat_sp") << ", data = (";
-            for ( auto x : buf_sp ) lgr::file << x << ", ";
-            lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
-#endif
-
-            const auto buf_data = sf.read1d<double>("N_scat_data");
-#ifdef PIC_DEBUG
-            lgr::file << "LDCKPT N_scat_data, size = " << sf.var_length("N_scat_data") << ", data = (";
-            for ( auto x : buf_data ) lgr::file << x << ", ";
-            lgr::file << ")" << std::endl << silo::errmsg() << std::endl;
-#endif
-            for ( int i = 0; i < buf_sp.size(); ++i )
-              N_scat[static_cast<particle::species>(buf_sp[i])] = buf_data[i];
-          }
         }
         for ( const auto& rdir : sf.toc_dir() ) {
           if ( rdir.find("rank") != 0 ) continue;

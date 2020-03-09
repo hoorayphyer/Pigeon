@@ -6,13 +6,6 @@
 #include <fstream>
 
 namespace pic {
-  namespace vital {
-    // significant only on world rank 0
-    std::vector<double> num_ptcs_prev;
-    std::vector<double> num_scat_prev;
-    double t_phys_prev = 0;
-  }
-
   template < int DGrid,
              typename T,
              template < typename > class S
@@ -46,13 +39,18 @@ namespace pic {
 
     if ( cart->rank() != 0 ) return;
 
+    // significant only on world rank 0
+    static double t_phys_prev = -1e-6;
+    static std::vector<double> num_ptcs_prev (particles.size(), 0);
+    static std::vector<double> num_scat_prev (particles.size(), 0);
+
     auto* p1 = buffer.data();
     auto* p2 = buffer.data() + particles.size();
 
     {
       std::ofstream out(filename, std::ios_base::app);
       if ( counter % interval == 0 ) {
-        out << "t_phys|\tnprocs|\tlapse/hr|\tTotal load(rate)|\tcumulative new ptcs from scattering(rate)" << std::endl;
+        out << "t_phys|\tnprocs|\tlapse/hr|\tTotal load(rate)|\tscattering creation rate" << std::endl;
         out << "species ordering : ";
         for ( auto sp : N_scat )
           out << properties[sp].nickname << " ";
@@ -62,18 +60,18 @@ namespace pic {
       ++counter;
       out << apt::fmt("%.2f",t_phys) << "|\t" << buffer.back() << "|\t" << apt::fmt("%8.2f", stopwatch.lapse().in_units_of("s").val() / 3600.0) <<  "|\t";
       for ( int i = 0; i < particles.size(); ++ i ) {
-        out << apt::fmt("%.2e", p1[i]) << "(" << apt::fmt( "%.2e", (p1[i] - vital::num_ptcs_prev[i]) / (t_phys- vital::t_phys_prev) ) << ") ";
-        vital::num_ptcs_prev[i] = p1[i];
+        out << apt::fmt("%.2e", p1[i]) << "(" << apt::fmt( "%.2e", (p1[i] - num_ptcs_prev[i]) / (t_phys- t_phys_prev) ) << ") ";
+        num_ptcs_prev[i] = p1[i];
       }
       out << "|\t";
       for ( int i = 0; i < N_scat.size(); ++i ) {
-        out << apt::fmt("%.2e", p2[i]) << "(" << apt::fmt( "%.2e", (p2[i] - vital::num_scat_prev[i]) / (t_phys- vital::t_phys_prev) ) <<  ") ";
-        vital::num_scat_prev[i] = p2[i];
+        out <<  apt::fmt( "%.2e", (p2[i] - num_scat_prev[i]) / (t_phys- t_phys_prev) ) << " ";
+        num_scat_prev[i] = p2[i];
       }
       out << std::endl;
       out.close();
 
-      vital::t_phys_prev = t_phys;
+      t_phys_prev = t_phys;
     }
 
     return;

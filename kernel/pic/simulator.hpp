@@ -192,7 +192,7 @@ namespace pic {
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = pic::initial_timestep;
       if ( checkpoint_dir ) {
-        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties, RTD::data().N_scat );
+        init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties );
         ++init_ts; // checkpoint is saved at the end of a timestep
         if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
@@ -208,18 +208,7 @@ namespace pic {
       }
       // broadcast to ensure uniformity
       mpi::world.broadcast( 0, &init_ts, 1 );
-      // set up vitals
-      if ( mpi::world.rank() == 0 ) {
-        vital::t_phys_prev = ( init_ts - 1 ) * pic::dt; // NOTE the -1
-        for ( auto sp : _particles ) {
-          double num = 0.0;
-          for ( const auto& ptc : _particles[sp] ) {
-            if ( ptc.is(particle::flag::exist) ) num += ptc.frac();
-          }
-          vital::num_ptcs_prev.push_back(num);
-          vital::num_scat_prev.push_back(RTD::data().N_scat[sp]);
-        }
-      }
+
       // initialize trace_counters to ensure unique trace serial numbers across runs
       Tracer::init(_properties, _particles);
 
@@ -398,16 +387,8 @@ namespace pic {
           });
       }
 
-      auto& Ns = RTD::data().N_scat;
       if ( pic::dlb_mr.is_do(timestep) ) {
         TIMING("DynamicLoadBalance", START {
-            if ( _ens_opt ) { // first reduce N_scat to avoid data loss
-              const auto& ens = *_ens_opt;
-              ens.reduce_to_chief( mpi::by::SUM, Ns.data().data(), Ns.data().size() );
-              if ( !ens.is_chief() ) {
-                for ( auto& x : Ns.data() ) x = 0;
-              }
-            }
             // TODO has a few hyper parameters
             // TODO touch create is not multinode safe even buffer is used
             std::optional<int> old_label;
@@ -425,7 +406,7 @@ namespace pic {
 
       if (_ens_opt && pic::vitals_mr.is_do(timestep) ) {
         TIMING("Statistics", START {
-            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, Ns );
+            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, RTD::data().N_scat );
           });
       }
 
@@ -434,14 +415,7 @@ namespace pic {
            || ( pic::checkpoint_autosave_hourly &&
                 autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
         TIMING("SaveCheckpoint", START {
-            if ( _ens_opt ) { // first reduce N_scat to avoid data loss
-              const auto& ens = *_ens_opt;
-              ens.reduce_to_chief( mpi::by::SUM, Ns.data().data(), Ns.data().size() );
-              if ( !ens.is_chief() ) {
-                for ( auto& x : Ns.data() ) x = 0;
-              }
-            }
-            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties, Ns );
+            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties );
             if ( mpi::world.rank() == 0 ) {
               auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
               if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);

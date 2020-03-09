@@ -24,8 +24,7 @@ namespace ckpt {
                                const field::Field<R, 3, DGrid>& E,
                                const field::Field<R, 3, DGrid>& B,
                                const particle::map<particle::array<R,S>>& particles,
-                               const particle::map<particle::Properties>& properties,
-                               const particle::map<R>& N_scat
+                               const particle::map<particle::Properties>& properties
                                );
 
   template < int DGrid,
@@ -38,7 +37,6 @@ namespace ckpt {
                        field::Field<R, 3, DGrid>& B,
                        particle::map<particle::array<R,S>>& particles,
                        const particle::map<particle::Properties>& properties,
-                       particle::map<R>& N_scat,
                        int target_load = 0
                        );
 
