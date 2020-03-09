@@ -244,7 +244,7 @@ namespace pic {
 
 namespace pic {
   constexpr real_t gravity_strength = 0.5;
-  real_t landau0_B_thr = 0.1;
+  constexpr real_t landau0_B_thr = 0.1 * pic::mu;
 
   constexpr real_t gamma_fd = 20.0;
   constexpr real_t gamma_off = 15.0;
@@ -254,9 +254,9 @@ namespace pic {
   auto set_up_particle_properties() {
     map<Properties> properties;
     {
-      properties.insert(species::electron, {1,-1,"electron","el"});
-      //properties.insert(species::positron, {1,1,"positron","po"});
-      properties.insert(species::ion, { 5, 1, "ion","io"});
+      properties.insert(species::electron, {1.0,-1.0,"electron","el"});
+      //properties.insert(species::positron, {1.0,1.0,"positron","po"});
+      properties.insert(species::ion, { 5.0, 1.0, "ion","io"});
       //properties.insert(species::photon, { 0, 0, "photon","ph" });
     }
 
@@ -328,7 +328,7 @@ namespace pic {
       ::particle::Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
-      scat::MagneticConvert<real_t,Specs>::B_thr = 0.1;
+      scat::MagneticConvert<real_t,Specs>::B_thr = 0.1 * pic::mu;
       scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
@@ -678,7 +678,7 @@ namespace pic {
       skin_depth.reset();
 
       for ( auto sp : particles ) {
-        auto q2m = properties[sp].charge_x * properties[sp].charge_x / static_cast<R>(properties[sp].mass_x);
+        auto q2m = properties[sp].charge_x * properties[sp].charge_x / properties[sp].mass_x;
         for ( const auto& ptc : particles[sp] ) {
           if ( !ptc.is(flag::exist) ) continue;
           Index I;
@@ -829,7 +829,7 @@ namespace pic {
   }
 
   apt::array<real_t,3> ptc_energy ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
+    return { std::sqrt( (prop.mass_x > 0.01) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {

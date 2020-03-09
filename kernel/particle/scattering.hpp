@@ -48,12 +48,12 @@ namespace particle::scat {
 
       // qB / (\gamma m c) * dt < 2 \pi / 10
       bool is_gyration_resolved =
-        std::sqrt( apt::sqabs(B) / ( (props.mass_x != 0) + apt::sqabs(ptc.p()) ) ) * std::abs(props.charge_x) * dt / props.mass_x < (2 * std::acos(-1) / 10.0);
+        std::sqrt( apt::sqabs(B) / ( (props.mass_x > 0.01) + apt::sqabs(ptc.p()) ) ) * std::abs(props.charge_x) * dt / props.mass_x < (2 * std::acos(-1) / 10.0);
 
       if ( is_gyration_resolved ) {
         // find momentum at half time step
         auto phalf = ptc.p() - dp * 0.5; // NOTE ptc.p() is already the updated p
-        auto v = phalf / std::sqrt( (props.mass_x != 0) + apt::sqabs(phalf) );
+        auto v = phalf / std::sqrt( (props.mass_x > 0.01) + apt::sqabs(phalf) );
         auto vv = apt::sqabs(v);
         Vec a = dp / dt; // a is for now force, will be converted to dv/dt
         // convert a to dv/dt
@@ -80,7 +80,7 @@ namespace particle::scat {
     static constexpr std::optional<T> test ( const Ptc_t<T,S>& ptc, const Properties& props, const Vec& dp, T dt,
                                              const Vec& B, util::Rng<T>& rng ) noexcept {
       T Rc = calc_Rc( ptc, props, dp, dt, B );
-      T gamma = std::sqrt( (props.mass_x != 0) + apt::sqabs(ptc.p()) );
+      T gamma = std::sqrt( (props.mass_x > 0.01) + apt::sqabs(ptc.p()) );
 
       if (gamma > gamma_off && gamma > gamma_fd *  std::cbrt(Rc) && rng.uniform() < Ndot_fd * dt * gamma  / Rc ) {
         // return { std::min<T>( sample_E_ph(), gamma - 1.0 ) };

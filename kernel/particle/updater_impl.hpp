@@ -64,7 +64,7 @@ namespace particle {
             };
 
           constexpr auto shapef = ShapeF();
-          auto charge_over_dt = static_cast<R>(prop.charge_x) / dt;
+          auto charge_over_dt = prop.charge_x / dt;
 
           for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
             if( !ptc.is(flag::exist) ) continue;
@@ -121,7 +121,7 @@ namespace particle {
 #endif
 
             // NOTE q is updated, starting from here, particles may be in the guard cells.
-            auto dq = _update_q( ptc.q(), ptc.p(), dt, (prop.mass_x != 0) );
+            auto dq = _update_q( ptc.q(), ptc.p(), dt, (prop.mass_x > 0.01) );
 #ifdef PIC_DEBUG
             if(debug::has_nan(ptc)) {
               lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
@@ -131,7 +131,7 @@ namespace particle {
             }
 #endif
             // FIXME pusher handle boundary condition. Is it needed?
-            if ( prop.charge_x != 0 ) {
+            if ( std::abs(prop.charge_x) > 0.01 ) {
               // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()
               for ( int i = 0; i < DGrid; ++i ) {
                 dq[i] /= grid[i].delta();

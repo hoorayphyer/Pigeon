@@ -22,7 +22,7 @@ namespace pic {
   = {{ { 0.0, 1.0, 64 }, { 0.0, 1.0, 64 } }};
 
   inline constexpr real_t wdt_pic = 1.0 / 30.0;
-  inline constexpr real_t w_gyro_unitB = 3750; // set the impact of unit field strength on particle
+  inline constexpr real_t B0 = 3750; // set the impact of unit field strength on particle
 
   inline constexpr int initial_timestep = 0;
   inline constexpr int total_timesteps = 100;
@@ -67,7 +67,7 @@ namespace pic {
   constexpr int order_precision = 2; // order precision of update scheme, this means error is O(x^(order + 1));
   constexpr int number_iteration = 4; // number of iterations in inverting the operator in Haugbolle
   static_assert( order_precision % 2 == 0 );
-  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius() / pic::w_gyro_unitB;
+  constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius();
 
   constexpr int myguard = std::max(1 + order_precision * (1+number_iteration) / 2, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 }
@@ -156,8 +156,8 @@ namespace pic {
   auto set_up_particle_properties() {
     map<Properties> properties;
     {
-      properties.insert(species::electron, {1,-1,"electron","el"});
-      properties.insert(species::ion, { 5, 1, "ion","io"});
+      properties.insert(species::electron, {1.0,-1.0,"electron","el"});
+      properties.insert(species::ion, { 5.0, 1.0, "ion","io"});
     }
 
     {
@@ -168,7 +168,7 @@ namespace pic {
         Force force;
         const auto& prop = properties[sp];
 
-        force.add( lorentz, ( w_gyro_unitB * prop.charge_x ) / prop.mass_x );
+        force.add( lorentz, prop.charge_x / prop.mass_x );
 
         force.Register(sp);
       }
@@ -177,7 +177,7 @@ namespace pic {
         Force force;
         const auto& prop = properties[sp];
 
-        force.add( lorentz, ( pic::w_gyro_unitB * prop.charge_x ) / prop.mass_x );
+        force.add( lorentz, prop.charge_x / prop.mass_x );
 
         force.Register(sp);
       }
@@ -266,40 +266,27 @@ namespace pic {
       } else if ( F == 1 ) {
       return msh::interpolate( B, I2std(I), ShapeF() );
     } else if ( F == 2 ) {
-      auto x = msh::interpolate( J, I2std(I), ShapeF() );
-      for ( int i = 0; i < 3; ++i ) x[i] *= PREJ;
-      return { x[0], x[1], x[2] };
+      return msh::interpolate( J, I2std(I), ShapeF() );
     } else {
       static_assert(F < 3);
     }
   }
 
-  apt::array<real_t,3> EparaB ( Index I, const Grid& grid, const Field<3>& E,
-                                const Field<3>& B, const JField& J ) {
-    auto B_itpl = msh::interpolate( B, I2std(I), ShapeF() );
-    B_itpl /= ( apt::abs(B_itpl) + 1e-16 );
-    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ), B_itpl ),
-            0.0, 0.0};
+  void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
+    constexpr int factor = POW(pic::downsample_ratio, pic::DGrid);
+    for ( int i = 0; i < num_comps; ++i ) {
+      for ( auto& x : fds[i].data() ) x /= factor;
+    }
   }
-
-  apt::array<real_t,3> EdotJ ( Index I, const Grid& grid, const Field<3>& E,
-                               const Field<3>& B, const JField& J ) {
-    return {apt::dot( msh::interpolate( E, I2std(I), ShapeF() ),
-                      msh::interpolate( J, I2std(I), ShapeF() ) ),
-            0.0, 0.0};
-  }
-
 
   auto set_up_field_export() {
     std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
     {
       using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
 
-      fexps.push_back( new FA ( "E", 3, field_self<0>, nullptr) );
-      fexps.push_back( new FA ( "B", 3, field_self<1>, nullptr) );
-      fexps.push_back( new FA ( "J4X", 3, field_self<2>, nullptr) );
-      fexps.push_back( new FA ( "EparaB", 1, EparaB, nullptr) );
-      fexps.push_back( new FA ( "EdotJ", 1, EdotJ, nullptr) );
+      fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
+      fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
+      fexps.push_back( new FA ( "J", 3, field_self<2>, average_when_downsampled) );
     }
     return fexps;
   }
@@ -312,7 +299,7 @@ namespace pic {
   }
 
   apt::array<real_t,3> ptc_energy ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { std::sqrt( (prop.mass_x != 0) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
+    return { std::sqrt( (prop.mass_x > 0.01) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {

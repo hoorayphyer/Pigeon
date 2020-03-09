@@ -44,7 +44,7 @@ SCENARIO("Time particle updater", "[particle]") {
     Force<Real,PtcSpecs> force;
     const auto& prop = properties[sp];
 
-    force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
+    force.add( lorentz, prop.charge_x / prop.mass_x );
     // force.add( gravity, gravity_strength );
     // force.add( landau0, landau0_B_thr );
 
@@ -55,7 +55,7 @@ SCENARIO("Time particle updater", "[particle]") {
   //   Force force;
   //   const auto& prop = properties.at(sp);
 
-  //   force.add( lorentz, static_cast<Real>(prop.charge_x) / prop.mass_x );
+  //   force.add( lorentz, prop.charge_x / prop.mass_x );
   //   // force.add( gravity, gravity_strength );
   //   // force.add( landau0, landau0_B_thr );
 
