@@ -28,6 +28,19 @@ namespace silo {
     DBtoc* toc = DBGetToc( _dbfile() );
     return toc_impl(toc->nvar, toc->var_names);
   }
+
+  template < typename file_t >
+  std::vector<std::string> Toc<file_t>::toc_multimesh() {
+    DBtoc* toc = DBGetToc( _dbfile() );
+    return toc_impl(toc->nmultimesh, toc->multimesh_names);
+  }
+
+  template < typename file_t >
+  std::vector<std::string> Toc<file_t>::toc_multivar() {
+    DBtoc* toc = DBGetToc( _dbfile() );
+    return toc_impl(toc->nmultivar, toc->multivar_names);
+  }
+
 }
 
 #include "silopp/silo++.hpp"

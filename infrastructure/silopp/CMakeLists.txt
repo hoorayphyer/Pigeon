@@ -45,6 +45,11 @@ add_executable(dbtoc "dbtoc.cpp")
 target_include_directories(dbtoc PRIVATE "${SILO_ROOT}/include" ${PROJECT_SOURCE_DIR})
 target_link_libraries( dbtoc PRIVATE silopp )
 
+## FIXME may have problem with parallel hdf5?
+add_executable(combine_silos "combine_silos.cpp")
+target_include_directories(combine_silos PRIVATE "${SILO_ROOT}/include" ${PROJECT_SOURCE_DIR}) ## FIXME silo not needed, use correct hdf5
+target_link_libraries( combine_silos PRIVATE filesys ${HDF5_LIBRARIES})
+
 if (${ENABLE_TESTS})
   test_gen(silopp silo++ mpipp silopp filesys)
 endif()

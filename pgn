@@ -4,15 +4,20 @@ buick=$root/.subtrees/Buick/buick
 #TODO check infrastructure/ build
 #TODO when resume, copy previous message to current.
 #TODO download a chain of resumed runs at once, by tracing backwards
+#TODO when resume, check if the resumed-from run is still in progress. Print status when pgn jnl
 
 case "$1" in
     "--clean")
         $buick --clean
         ;;
+    "--combine")
+        $root/infrastructure/bin/combine_silos "${@:2}"
+        ;;
     "c") # do cmake
         $buick . "${@:2}"
         ;;
     "b") # do make
+        # TODO advice using cb if b failed
         $buick
         ;;
     "r")

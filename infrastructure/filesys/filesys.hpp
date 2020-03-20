@@ -6,24 +6,21 @@
 
 namespace fs {
   std::string absolute( std::string dir );
-
   std::string& append_slash( std::string& dir );
-
   std::string& remove_slash( std::string& dir );
-
   void create_directories(std::string dir);
-
   bool exists( std::string dir );
-
+  void remove( std::string file );
   void remove_all( std::string dir );
-
   void create_directory_symlink( std::string to, std::string new_link );
-
   void copy_file( std::string target, std::string dest );
-
   void rename( std::string old_path, std::string new_path );
-
   bool equivalent( std::string p1, std::string p2 );
+}
+
+namespace fs {
+  bool is_directory( std::string dir );
+  bool is_regular_file( std::string dir );
 }
 
 namespace fs {

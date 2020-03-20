@@ -46,6 +46,11 @@ namespace fs {
     return filesystem::exists( p );
   }
 
+  void remove( std::string file ) {
+    filesystem::path p(file);
+    filesystem::remove( p );
+  }
+
   void remove_all( std::string dir ) {
     filesystem::path p(dir);
     filesystem::remove_all( p );
@@ -78,6 +83,16 @@ namespace fs {
 
   bool equivalent( std::string p1, std::string p2 ) {
     return filesystem::equivalent({p1}, {p2});
+  }
+}
+
+namespace fs {
+  bool is_directory( std::string dir ) {
+    return filesystem::is_directory({dir});
+  }
+
+  bool is_regular_file( std::string dir ) {
+    return filesystem::is_regular_file({dir});
   }
 }
 
