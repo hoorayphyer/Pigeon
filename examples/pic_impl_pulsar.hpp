@@ -29,7 +29,7 @@ namespace pic {
   real_t Omega = 1.0 / 6.0;
   real_t dt;
   real_t mu;
-  real_t wpic;
+  real_t wpic2;
 
   real_t gamma_fd;
   real_t E_ph;
@@ -51,7 +51,7 @@ namespace pic {
   void load_configuration(const ConfFile_t& conf) {
     safe_set(dt, conf["dt"]);
     safe_set(mu, conf["gamma0"]); mu /= std::pow(Omega,2.0);
-    safe_set(wpic, conf["wpic_dt"]); wpic /= dt;
+    safe_set(wpic2, conf["Np"]); wpic2 = 2 * Omega * mu / wpic2;
 
     safe_set(gamma_fd,conf["pairs"]["gamma_fd"]);
     safe_set(E_ph, conf["pairs"]["E_ph"]);
@@ -113,7 +113,7 @@ namespace pic {
   }
 
   real_t r_e() {
-    real_t res = std::pow(wpic, 2) / ( 4.0 * std::acos(-1.0l));
+    real_t res = wpic2 / ( 4.0 * std::acos(-1.0l));
     res *= apt::dV(supergrid);
     return res;
   }
@@ -378,7 +378,9 @@ namespace pic {
 }
 
 namespace pic {
-  real_t N_atm_floor = std::exp(1.0) * 2.0 * Omega * mu * std::pow( wpic, -2.0 );
+  real_t N_atm_floor() {
+    return std::exp(1.0) * 2.0 * Omega * mu / wpic2;
+  }
 
   using R = real_t;
 
@@ -569,7 +571,7 @@ namespace pic {
       atm[0] = { star_interior, star_interior + 1 };
       atm[1] = { 0, supergrid[1].dim() };
 
-      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(atm_x * N_atm_floor);
+      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(atm_x * N_atm_floor());
       atm.set_positive_charge(species::ion).set_negative_charge(species::electron);
       atm.set_omega_t(omega_spinup).set_normal_direction(0);
     }
@@ -758,7 +760,7 @@ namespace pic {
         for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
           R r = grid[0].absc(I[0], 0.5);
           R theta = grid[1].absc(I[1], 0.5);
-          R h = Metric::h<2>(r,theta) * std::pow( wpic * grid[0].delta(), -2.0);
+          R h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
           auto& v = skin_depth[0](I);
           v = std::sqrt(h / v);
         }
@@ -939,13 +941,14 @@ namespace pic {
     std::ostringstream o;
     real_t gamma_0 = Omega * Omega * mu;
     o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
-    o << indent << "w_pic dt=" << apt::fmt("%.4f", wpic * dt ) << std::endl;
+    o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
+    o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
     o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * r_e() ) ) << std::endl;
 
     {
       using namespace particle;
-      o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor);
+      o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor());
       o << ", atm_x=" << apt::fmt("%.1f", atm_x);
       o << ", v_th=" << apt::fmt("%.2f", v_th)
         << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;

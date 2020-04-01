@@ -1,7 +1,7 @@
 project_name = "Pulsar64"
 datadir_prefix = "../Data/"
 dt = 0.01
-wpic_dt = 0.03333333333
+Np = 2
 gamma0 = 100
 total_timesteps = 100
 
