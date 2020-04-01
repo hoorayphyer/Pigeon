@@ -1,0 +1,119 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="..\include\toml++\toml.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_array.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_common.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_date_time.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_default_formatter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_formatter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_json_formatter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_node.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_node_view.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_parser.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_print_to_stream.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_table.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_utf8.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_utf8_generated.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_value.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_version.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_node_impl.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_array_impl.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_table_impl.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_parser_impl.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\toml++\toml_instantiations.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tests\catch2.h">
+      <Filter>tests</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.editorconfig" />
+    <None Include="..\README.md" />
+    <None Include="..\python\ci_single_header_check.py">
+      <Filter>python</Filter>
+    </None>
+    <None Include="..\python\generate_documentation.py">
+      <Filter>python</Filter>
+    </None>
+    <None Include="..\python\generate_single_header.py">
+      <Filter>python</Filter>
+    </None>
+    <None Include="..\python\generate_unicode_functions.py">
+      <Filter>python</Filter>
+    </None>
+    <None Include="..\docs\Doxyfile">
+      <Filter>doc</Filter>
+    </None>
+    <None Include="..\docs\Doxyfile-mcss">
+      <Filter>doc</Filter>
+    </None>
+    <None Include="..\docs\tomlplusplus.css">
+      <Filter>doc</Filter>
+    </None>
+    <None Include="..\docs\tomlplusplus.js">
+      <Filter>doc</Filter>
+    </None>
+    <None Include="..\CONTRIBUTING.md" />
+    <None Include="..\meson.build" />
+    <None Include="..\tests\meson.build">
+      <Filter>tests</Filter>
+    </None>
+    <None Include="toml++.props" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{98f8e2f6-ce87-435a-bd9a-4f02b8ac66e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="python">
+      <UniqueIdentifier>{5ba46476-31a3-484e-aee7-f840dd2202b1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="doc">
+      <UniqueIdentifier>{5ed0949f-6855-4664-ad86-2b38ceeb400b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tests">
+      <UniqueIdentifier>{b838dba3-02f6-446f-840e-6b4c62d2fb0c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
