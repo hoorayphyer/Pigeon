@@ -19,7 +19,7 @@ std::string data_dirname() {
     strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
     snprintf(subDir, sizeof(subDir), "%s", myTime);
   }
-  return std::string(pic::project_name) + "-" + subDir;
+  return pic::project_name + "-" + subDir;
 }
 
 std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, const apt::array<bool,pic::DGrid> periodic ) {
@@ -47,12 +47,27 @@ std::optional<mpi::CartComm> make_cart( const apt::array<int,pic::DGrid>& dims, 
 }
 
 int main(int argc, char** argv) {
-  auto cli_args = pic::parse_args(argc, argv); // NOTE currently it's not playing any role
+  auto cli_args = pic::parse_args(argc, argv);
 
   std::optional<std::string> resume_dir;
   if ( cli_args.resume_dir ) {
     resume_dir.emplace(fs::absolute(*cli_args.resume_dir));
   }
+
+  pic::ConfFile_t conf;
+  if ( cli_args.config_file ) {
+    try {
+      conf = toml::parse_file(*cli_args.config_file);
+    } catch (const toml::parse_error& err) {
+      std::cerr
+        << "Error parsing file '"sv << *err.source().path
+        << "':\n"sv << err.description()
+        << "\n  ("sv << err.source().begin << ")"sv
+        << std::endl;
+      return 1;
+    }
+  }
+  pic::load_configuration(conf);
 
   if ( cli_args.is_dry_run ) {
     int retcode = 0;
@@ -62,7 +77,7 @@ int main(int argc, char** argv) {
 #else
     std::cout << "\tRelease" << std::endl;
 #endif
-    std::cout << pic::characteristics("\t") << std::endl;
+    std::cout << pic::proofread("\t") << std::endl;
     if ( resume_dir  ) {
       if ( !fs::exists(*resume_dir) ) {
         retcode = 1;

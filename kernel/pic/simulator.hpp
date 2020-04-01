@@ -70,7 +70,7 @@ namespace pic {
          Ie_global -= shift;
          // now Ib_ and Ie_global are with respect to the current local grid
 
-         // Extend to infinity on true boundaries to
+         // Extend to infinity on true boundaries
          // NOTE there may be actions done completely in the guard cells, such as assigining values
          int lb_local = 0;
          int ub_local = localgrid.dim();
@@ -127,14 +127,14 @@ namespace pic {
         RTD::data().init( _properties, _grid );
       }
 
-      if ( pic::msperf_qualified(_ens_opt) ) lgr::file.open(std::ios_base::app);
+      if ( mod_profiling.is_qualified() ) lgr::file.open(std::ios_base::app);
     }
 
   public:
     Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, const particle::map<particle::Properties>& props )
       : _supergrid(supergrid), _cart_opt(cart_opt), _properties(props) {
       _grid = supergrid;
-      if ( pic::dlb_init_replica_deploy ) {
+      if ( pic::init_replica_deploy ) {
         std::optional<int> label{};
         if ( _cart_opt )
           label.emplace( _cart_opt->rank() );
@@ -145,7 +145,7 @@ namespace pic {
           int my_rank = mpi::world.rank();
           int count = num_ens;
           for ( int i = 0; i < num_ens; ++i ) {
-            int num_replicas = (*pic::dlb_init_replica_deploy)(i);
+            int num_replicas = (*pic::init_replica_deploy)(i);
             if ( my_rank >= count && my_rank < count + num_replicas ) {
               label.emplace(i);
               break;
@@ -190,7 +190,7 @@ namespace pic {
     }
 
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
-      int init_ts = pic::initial_timestep;
+      int init_ts = 0;
       if ( checkpoint_dir ) {
         init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties );
         ++init_ts; // checkpoint is saved at the end of a timestep
@@ -219,7 +219,7 @@ namespace pic {
 
     // NOTE we choose to do particle update before field update so that in saving snapshots we don't need to save _J
     void evolve( int timestep, R dt ) {
-      if ( timestep % pic::cout_ts_interval == 0 && mpi::world.rank() == 0 )
+      if ( timestep % print_timestep_to_stdout_interval == 0 && mpi::world.rank() == 0 )
         std::cout << "==== Timestep " << timestep << " ====" << std::endl;
 
 #ifdef PIC_DEBUG
@@ -230,11 +230,10 @@ namespace pic {
 
       std::optional<tmr::Timestamp> stamp_all;
       std::optional<tmr::Timestamp> stamp;
-      if ( pic::msperf_mr.is_do(timestep) && pic::msperf_qualified(_ens_opt) ) {
+      if ( mod_profiling.is_do(timestep) and mod_profiling.is_qualified() ) {
         stamp_all.emplace();
         stamp.emplace();
-        if ( msperf_max_entries &&
-             ( timestep - msperf_mr.init_ts > *msperf_max_entries * msperf_mr.interval )  ) lgr::file.clear();
+        if ( mod_profiling.is_reached_max_entries(timestep) ) lgr::file.clear();
         lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
         lgr::file.indent_append("\t");
       }
@@ -264,7 +263,7 @@ namespace pic {
 
         _J.reset();
 
-        if ( pic::sort_particles_mr.is_do(timestep) ) {
+        if ( mod_sort_ptcs.is_do(timestep) ) {
           TIMING("SortParticles", START {
               for ( auto sp : _particles ) particle::sort( _particles[sp], _grid );
             });
@@ -370,7 +369,7 @@ namespace pic {
         }
       }
 
-      if ( pic::export_data_mr.is_do(timestep) && _ens_opt ) {
+      if ( mod_export.is_do(timestep) and _ens_opt ) {
         TIMING("ExportData", START {
             export_prior_hook( _particles, _properties, _E, _B, _J, _grid, *_ens_opt, dt, timestep );
 
@@ -379,7 +378,11 @@ namespace pic {
 
             io::set_is_collinear_mesh(is_collinear_mesh); // TODO
 
-            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt, pic::pmpio_num_files, pic::downsample_ratio, _cart_opt, *_ens_opt, _grid, _E, _B, _J, _particles, _properties, fexps, pexps );
+            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt,
+                                                 mod_export.num_files,
+                                                 mod_export.downsample_ratio,
+                                                 _cart_opt, *_ens_opt, _grid, _E, _B, _J,
+                                                 _particles, _properties, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
             for ( auto ptr : pexps ) delete ptr;
 
@@ -387,14 +390,14 @@ namespace pic {
           });
       }
 
-      if ( pic::dlb_mr.is_do(timestep) ) {
+      if ( mod_load_balance.is_do(timestep) ) {
         TIMING("DynamicLoadBalance", START {
             // TODO has a few hyper parameters
             // TODO touch create is not multinode safe even buffer is used
             std::optional<int> old_label;
             if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
-            dynamic_load_balance( _particles, _ens_opt, _cart_opt, pic::dlb_target_load );
+            dynamic_load_balance( _particles, _ens_opt, _cart_opt, mod_load_balance.target_load );
 
             std::optional<int> new_label;
             if ( _ens_opt ) new_label.emplace(_ens_opt->label());
@@ -404,28 +407,26 @@ namespace pic {
           });
       }
 
-      if (_ens_opt && pic::vitals_mr.is_do(timestep) ) {
+      if (_ens_opt and mod_vitals.is_do(timestep) ) {
         TIMING("Statistics", START {
             pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, RTD::data().N_scat );
           });
       }
 
       static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0
-      if ( pic::checkpoint_mr.is_do(timestep)
-           || ( pic::checkpoint_autosave_hourly &&
-                autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) ) ) {
+      if ( mod_checkpoint.is_do(timestep) ) {
         TIMING("SaveCheckpoint", START {
-            auto dir = ckpt::save_checkpoint( this_run_dir, num_checkpoint_parts, _ens_opt, timestep, _E, _B, _particles, _properties );
+            auto dir = ckpt::save_checkpoint( this_run_dir, mod_checkpoint.num_files, _ens_opt, timestep, _E, _B, _particles, _properties );
             if ( mpi::world.rank() == 0 ) {
-              auto obsolete_ckpt = autosave.add_checkpoint(dir, pic::max_num_ckpts);
+              auto obsolete_ckpt = autosave.add_checkpoint(dir, mod_checkpoint.max_num_checkpoints);
               if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
             }
           });
       }
 
-      if ( pic::tracing_mr.is_do(timestep) ) {
+      if ( mod_tracing.is_do(timestep) ) {
         TIMING("SaveTracing", START {
-            auto dir = ckpt::save_tracing( this_run_dir, num_tracing_parts, _ens_opt, timestep, _particles );
+            auto dir = ckpt::save_tracing( this_run_dir, mod_tracing.num_files, _ens_opt, timestep, _particles );
           });
       }
 

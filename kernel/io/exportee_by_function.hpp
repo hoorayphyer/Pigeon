@@ -75,8 +75,7 @@ namespace io {
   template < typename RealDS,
              int DGrid,
              typename Real,
-             template < typename > class S,
-             typename ShapeF
+             template < typename > class S
              >
   struct PexpTbyFunction : public PtcExportee < RealDS, DGrid, Real, S > {
     using F = apt::array<Real,3> (*) ( const particle::Properties& prop, const typename particle::array<Real,S>::const_particle_type& ptc);
@@ -100,7 +99,7 @@ namespace io {
       if ( num_comps < 1 ) return {};
       assert( impl != nullptr );
 
-      ShapeF sf;
+      // ShapeF sf;
 
       field::Field<RealDS,3,DGrid> fds{ apt::make_range( {}, apt::dims(grid_ds), guard_ds ) };
       for ( int i = 0; i < num_comps; ++i ) {

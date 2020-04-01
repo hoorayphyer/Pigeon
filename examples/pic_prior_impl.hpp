@@ -81,5 +81,26 @@ namespace pic {
   };
 }
 
+#include "toml++/toml.h"
+using namespace std::string_view_literals;
+namespace pic {
+  using ConfFile_t = toml::table;
+
+  template < typename T, typename N>
+  void safe_set_from_conf( T& a, const N& node, const std::string& a_str ) {
+    using U =
+      std::conditional_t<std::is_same_v<T, bool>, bool,
+                         std::conditional_t<std::is_floating_point_v<T>, double,
+                                            std::conditional_t<std::is_integral_v<T>, int64_t, T>>>;
+    auto x = node.template value<U>();
+    if (!x) {
+      throw std::runtime_error("ERROR : setting "+a_str+" with non-existent value in config file");
+    }
+    a = *x;
+  }
+
+}
+
+#define safe_set(var,conf) safe_set_from_conf(var,conf,#var)
 
 #endif

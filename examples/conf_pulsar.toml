@@ -1,0 +1,45 @@
+project_name = "Pulsar64"
+datadir_prefix = "../Data/"
+dt = 0.01
+wpic_dt = 0.03333333333
+gamma0 = 100
+total_timesteps = 100
+
+[damping]
+layer = 43
+rate = 10.0
+
+[forces]
+gravity = 0.5
+landau0_ratio = 0.1
+
+[pairs]
+gamma_fd = 20.0
+E_ph = 4.0
+
+[pairs.photon]
+magnetic_convert_ratio = 0.1
+mfp = [0.2, 5.0]
+
+[atmosphere]
+multiplicity = 1.0
+v_th = 0.2
+
+[mods]
+sort = { on = true, start = 0, interval = 100 }
+
+export = { on = true, start = 0, interval = 200,
+           num_files = 1, downsample_ratio = 1 }
+
+checkpoint = { on = false, start = 1, interval = 10000,
+               num_files = 1, max_num_checkpoints = 1 }
+
+load_balance = { on = true, start = 1, interval = 1000, target_load = 100000 }
+
+profiling = { on = true, start = 0, interval = 100, max_entries = 100 }
+
+vitals = { on = true, start = 0, interval = 100 }
+
+print_timestep_to_stdout_interval = 100
+
+tracing = { on = false, start = 0, interval = 1000, num_files = 1 }

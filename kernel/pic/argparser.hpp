@@ -4,7 +4,7 @@
 namespace pic {
   struct CLIArgs {
     std::optional<std::string> journal_file{};
-    std::optional<std::string> parameters_file{};
+    std::optional<std::string> config_file{};
     std::optional<std::string> resume_dir {};
     bool is_dry_run = false;
   };
@@ -24,8 +24,8 @@ namespace pic {
         res.is_dry_run = true;
         ++i;
       }
-      else if ( "--params" == args[i] ) {
-        res.parameters_file.emplace( args[i + 1] );
+      else if ( "--config" == args[i] or "-c"  == args[i] ) {
+        res.config_file.emplace( args[i + 1] );
         i += 2;
       }
       else if ( "--resume" == args[i] ) {

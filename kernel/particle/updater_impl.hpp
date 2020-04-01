@@ -90,35 +90,38 @@ namespace particle {
 #endif
 
             auto q0_std = msh::to_standard( grid, ptc.q() );
-            auto E_itpl = msh::interpolate( E, q0_std, shapef );
-            auto B_itpl = msh::interpolate( B, q0_std, shapef );
 
-            apt::Vec<R,S<R>::Dim> dp = -ptc.p();
-            update_p( ptc, dt, E_itpl, B_itpl );
+            if ( not ptc.is(flag::ignore_force) ) {
+              auto E_itpl = msh::interpolate( E, q0_std, shapef );
+              auto B_itpl = msh::interpolate( B, q0_std, shapef );
+
+              apt::Vec<R,S<R>::Dim> dp = -ptc.p();
+              update_p( ptc, dt, E_itpl, B_itpl );
 #ifdef PIC_DEBUG
-            if(debug::has_nan(ptc)) {
-              lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-              lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
-              show_ptc(ptc);
-              lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
+              if(debug::has_nan(ptc)) {
+                lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+                lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
+                show_ptc(ptc);
+                lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
 #ifdef LORENTZ
-              lgr::file << force::ostr.str() << std::endl;
+                lgr::file << force::ostr.str() << std::endl;
 #endif
-              debug::throw_error("NANUPDATEP");
-            }
+                debug::throw_error("NANUPDATEP");
+              }
 #endif
 
-            dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
-            scatter( ptc, *new_ptc_buf, prop, dp, dt, B_itpl, rng ); // FIXME new_ptc_buf may be null?
+              dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
+              scatter( ptc, *new_ptc_buf, prop, dp, dt, B_itpl, rng ); // FIXME new_ptc_buf may be null?
 #ifdef PIC_DEBUG
-            if(debug::has_nan(ptc)) {
-              lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-              lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
-              show_ptc(ptc);
-              lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
-              debug::throw_error("NANSCAT");
-            }
+              if(debug::has_nan(ptc)) {
+                lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
+                lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
+                show_ptc(ptc);
+                lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
+                debug::throw_error("NANSCAT");
+              }
 #endif
+            }
 
             // NOTE q is updated, starting from here, particles may be in the guard cells.
             auto dq = _update_q( ptc.q(), ptc.p(), dt, (prop.mass_x > 0.01) );

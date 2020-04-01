@@ -5,7 +5,7 @@
 
 #include "apt/numeric.hpp"
 
-#include "pic/module_range.hpp"
+#include "pic/modules.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
 
@@ -20,83 +20,128 @@ namespace pic {
 
   constexpr double PI = std::acos(-1.0);
 
-  inline constexpr const char* project_name = "Pulsar64";
-  inline constexpr const char* datadir_prefix = "../Data/";
-
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
-  inline constexpr real_t dt = 0.01;
 
   constexpr Grid supergrid
   = {{ { 0.0, std::log(30.0), 64 }, { 0.0, PI, 64 } }};
 
-  inline constexpr real_t wdt_pic = 1.0 / 30.0;
-  inline constexpr real_t mu = 3750; // set the impact of field strength on particle
+  real_t Omega = 1.0 / 6.0;
+  real_t dt;
+  real_t mu;
+  real_t wpic;
 
-  inline constexpr int initial_timestep = 0;
-  inline constexpr int total_timesteps = 100;
+  real_t gamma_fd;
+  real_t E_ph;
+  real_t gravity_strength;
+  real_t landau0_B_thr;
+  real_t magnetic_convert_B_thr;
+  std::array<real_t,2> mfp;
+  real_t atm_x;
+  real_t v_th;
 
-  constexpr real_t classic_electron_radius () noexcept {
-    real_t res = wdt_pic * wdt_pic / ( 4.0 * std::acos(-1.0l) * dt * dt);
-    apt::foreach<0,DGrid>( [&res](const auto& g) { res *= g.delta(); }, supergrid );
+  int damping_layer;
+  real_t damping_rate;
+
+  std::string project_name;
+  std::string datadir_prefix;
+  int total_timesteps;
+
+
+  void load_configuration(const ConfFile_t& conf) {
+    safe_set(dt, conf["dt"]);
+    safe_set(mu, conf["gamma0"]); mu /= std::pow(Omega,2.0);
+    safe_set(wpic, conf["wpic_dt"]); wpic /= dt;
+
+    safe_set(gamma_fd,conf["pairs"]["gamma_fd"]);
+    safe_set(E_ph, conf["pairs"]["E_ph"]);
+    safe_set(gravity_strength, conf["forces"]["gravity"]);
+    safe_set(landau0_B_thr, conf["forces"]["landau0_ratio"]); landau0_B_thr *= pic::mu;
+
+    safe_set(magnetic_convert_B_thr, conf["pairs"]["photon"]["magnetic_convert_ratio"]); magnetic_convert_B_thr *= pic::mu;
+    safe_set(mfp[0], conf["pairs"]["photon"]["mfp"][0]);
+    safe_set(mfp[1], conf["pairs"]["photon"]["mfp"][1]);
+
+    safe_set(v_th, conf["atmosphere"]["v_th"]);
+    safe_set(atm_x, conf["atmosphere"]["multiplicity"]);
+
+    safe_set(damping_layer, conf["damping"]["layer"]);
+    safe_set(damping_rate, conf["damping"]["rate"]);
+
+    project_name = conf["project_name"].value_or("Unnamed"sv);
+    datadir_prefix = conf["datadir_prefix"].value_or("../Data/"sv);
+    total_timesteps = conf["total_timesteps"].value_or(100);
+
+    print_timestep_to_stdout_interval = conf["mods"]["print_timestep_to_stdout_interval"].value_or(100);
+
+    mod_sort_ptcs.on = conf["mods"]["sort"]["on"].value_or(true);
+    mod_sort_ptcs.start = conf["mods"]["sort"]["start"].value_or(0);
+    safe_set(mod_sort_ptcs.interval, conf["mods"]["sort"]["interval"]);
+
+    mod_export.on = conf["mods"]["export"]["on"].value_or(true);
+    mod_export.start = conf["mods"]["export"]["start"].value_or(0);
+    safe_set(mod_export.interval, conf["mods"]["export"]["interval"]);
+    mod_export.num_files = conf["mods"]["export"]["num_files"].value_or(1);
+    mod_export.downsample_ratio = conf["mods"]["export"]["downsample_ratio"].value_or(1);
+
+    mod_checkpoint.on = conf["mods"]["checkpoint"]["on"].value_or(false);
+    mod_checkpoint.start = conf["mods"]["checkpoint"]["start"].value_or(1);
+    safe_set(mod_checkpoint.interval, conf["mods"]["checkpoint"]["interval"]);
+    mod_checkpoint.num_files = conf["mods"]["checkpoint"]["num_files"].value_or(1);
+    mod_checkpoint.max_num_checkpoints = conf["mods"]["checkpoint"]["max_num_checkpoints"].value_or(1);
+
+    mod_load_balance.on = conf["mods"]["load_balance"]["on"].value_or(true);
+    mod_load_balance.start = conf["mods"]["load_balance"]["start"].value_or(0);
+    safe_set(mod_load_balance.interval, conf["mods"]["load_balance"]["interval"]);
+    mod_load_balance.target_load = conf["mods"]["load_balance"]["target_load"].value_or(100000);
+
+    mod_profiling.on = conf["mods"]["profiling"]["on"].value_or(false);
+    mod_profiling.start = conf["mods"]["profiling"]["start"].value_or(0);
+    safe_set(mod_profiling.interval, conf["mods"]["profiling"]["interval"]);
+    if ( auto n = conf["mods"]["profiling"]["max_entries"].value<int64_t>() ) {
+      mod_profiling.max_entries = {*n};
+    }
+
+    mod_vitals.on = conf["mods"]["vitals"]["on"].value_or(true);
+    mod_vitals.start = conf["mods"]["vitals"]["start"].value_or(0);
+    safe_set(mod_vitals.interval, conf["mods"]["vitals"]["interval"]);
+
+    mod_tracing.on = conf["mods"]["tracing"]["on"].value_or(false);
+    mod_tracing.start = conf["mods"]["tracing"]["start"].value_or(0);
+    safe_set(mod_tracing.interval, conf["mods"]["tracing"]["interval"]);
+    mod_tracing.num_files = conf["mods"]["tracing"]["num_files"].value_or(1);
+  }
+
+  real_t r_e() {
+    real_t res = std::pow(wpic, 2) / ( 4.0 * std::acos(-1.0l));
+    res *= apt::dV(supergrid);
     return res;
   }
 }
 
 namespace pic {
-  inline constexpr ModuleRange sort_particles_mr { true, 0, 100 };
-
-  inline constexpr ModuleRange export_data_mr { true, 0, 200 };
-  inline constexpr int pmpio_num_files = 1;
-  inline constexpr int downsample_ratio = 1;
-
-  inline constexpr ModuleRange checkpoint_mr { false, 1, 10000 };
-  inline constexpr int num_checkpoint_parts = 4;
-  inline constexpr int max_num_ckpts = 2;
-  inline constexpr std::optional<float> checkpoint_autosave_hourly;
-
-  inline constexpr ModuleRange dlb_mr { false, 1, 1000 };
-  inline constexpr std::optional<int (*) ( int )> dlb_init_replica_deploy {}; // take in ensemble label and return the intended number of replicas in that ensemble
-  inline constexpr std::size_t dlb_target_load = 100000;
-
-  inline constexpr ModuleRange msperf_mr { true, 0, 100 };
-  inline constexpr std::optional<int> msperf_max_entries {100};
-  inline constexpr auto msperf_qualified =
-    []( const std::optional<dye::Ensemble<DGrid>>& ens_opt ) -> bool { return true; };
-
-  inline constexpr ModuleRange vitals_mr { true, 0, 100 };
-
-  inline constexpr int cout_ts_interval = 100;
-
-  inline constexpr ModuleRange tracing_mr { false, 1, 1000 };
-  inline constexpr int num_tracing_parts = 4;
-}
-
-namespace pic {
-  inline constexpr real_t Omega = 1.0 / 6.0;
-
   constexpr int star_interior = 5;
 
   constexpr int myguard = std::max(1, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
-  constexpr real_t omega_spinup ( real_t time ) noexcept {
+  real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
   }
 
-  constexpr real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
   }
-  constexpr real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
   }
   constexpr real_t B_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
   }
 
-  constexpr real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * std::sin( theta ) * std::sin(theta);
   }
-  constexpr real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
   }
   constexpr real_t E_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
@@ -165,13 +210,6 @@ namespace pic {
 }
 
 namespace pic {
-  namespace yee = ::field::yee;
-  template < ::field::offset_t Ftype >
-  constexpr auto Diff = ::field::Diff<DGrid,real_t,Ftype>;
-  constexpr auto HHk = ::field::HHk<real_t>;
-  constexpr auto diff_zero = ::field::diff_zero<DGrid,real_t>;
-  constexpr auto diff_one = ::field::diff_one<real_t>;
-
   auto set_up_field_actions() {
     std::vector<std::unique_ptr<FieldAction>> fus;
     namespace range = apt::range;
@@ -183,13 +221,12 @@ namespace pic {
       fu[0] = { 0, pic::supergrid[0].dim(), guard };
       fu[1] = { 0, pic::supergrid[1].dim(), guard };
 
-      constexpr auto PREJ = 4.0 * std::acos(-1.0l) * pic::classic_electron_radius();
-      fu.set_fourpi(PREJ);
+      fu.set_fourpi( 4.0 * std::acos(-1.0l) * pic::r_e() );
       fu.set_mu(pic::mu);
       fu.set_magnetic_pole(2);
-      fu.set_damping_rate(10.0);
+      fu.set_damping_rate(damping_rate);
       fu.set_surface_indent(5);
-      fu.set_damp_indent(43);
+      fu.set_damp_indent(damping_layer);
       fu.set_omega_t(omega_spinup);
     }
 
@@ -243,21 +280,16 @@ namespace pic {
 }
 
 namespace pic {
-  constexpr real_t gravity_strength = 0.5;
-  constexpr real_t landau0_B_thr = 0.1 * pic::mu;
-
-  constexpr real_t gamma_fd = 20.0;
   constexpr real_t gamma_off = 15.0;
   constexpr real_t Ndot_fd = 0.25;
-  constexpr real_t E_ph = 4.0;
 
   auto set_up_particle_properties() {
     map<Properties> properties;
     {
       properties.insert(species::electron, {1.0,-1.0,"electron","el"});
-      //properties.insert(species::positron, {1.0,1.0,"positron","po"});
+      properties.insert(species::positron, {1.0,1.0,"positron","po"});
       properties.insert(species::ion, { 5.0, 1.0, "ion","io"});
-      //properties.insert(species::photon, { 0, 0, "photon","ph" });
+      properties.insert(species::photon, { 0, 0, "photon","ph" });
     }
 
     {
@@ -272,7 +304,7 @@ namespace pic {
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
         force.add( gravity, gravity_strength );
-        // force.add( landau0, landau0_B_thr );
+        force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -283,7 +315,7 @@ namespace pic {
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
         force.add( gravity, gravity_strength );
-        // force.add( landau0, landau0_B_thr );
+        force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -319,8 +351,8 @@ namespace pic {
         ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
       if ( properties.has(species::electron) && properties.has(species::positron) ) {
-        // ep_scat.Register( species::electron );
-        // ep_scat.Register( species::positron );
+        ep_scat.Register( species::electron );
+        ep_scat.Register( species::positron );
       }
     }
 
@@ -328,11 +360,11 @@ namespace pic {
       ::particle::Scat<real_t,Specs> photon_scat;
       // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
-      scat::MagneticConvert<real_t,Specs>::B_thr = 0.1 * pic::mu;
-      scat::MagneticConvert<real_t,Specs>::mfp = 0.2;
+      scat::MagneticConvert<real_t,Specs>::B_thr = magnetic_convert_B_thr;
+      scat::MagneticConvert<real_t,Specs>::mfp = mfp[0];
       photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
 
-      scat::TwoPhotonCollide<real_t,Specs>::mfp = 5.0;
+      scat::TwoPhotonCollide<real_t,Specs>::mfp = mfp[1];
       photon_scat.channels.push_back( scat::TwoPhotonCollide<real_t,Specs>::test );
 
       photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
@@ -346,9 +378,7 @@ namespace pic {
 }
 
 namespace pic {
-  constexpr real_t N_atm_floor = std::exp(1.0) * 2.0 * Omega * mu * std::pow( dt / wdt_pic, 2.0 );
-  constexpr real_t N_atm_x = 1.0; // TODO
-  constexpr real_t v_th = 0.2;
+  real_t N_atm_floor = std::exp(1.0) * 2.0 * Omega * mu * std::pow( wpic, -2.0 );
 
   using R = real_t;
 
@@ -375,7 +405,7 @@ namespace pic {
                         const Ensemble* ens,
                         R dt, int timestep, util::Rng<R>& rng
                         ) override {
-        if ( !RTD::data().is_export_Jsp || !export_data_mr.is_do(timestep) ) {
+        if ( !RTD::data().is_export_Jsp || !mod_export.is_do(timestep) ) {
           _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
         } else {
           auto& Jsp = RTD::data().Jsp;
@@ -444,6 +474,8 @@ namespace pic {
                         const Ensemble* ens,
                         R dt, int timestep, util::Rng<R>& rng
                         ) override {
+        if( range::end(*this,_n) <= range::begin(*this,_n) ) return;
+
         _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
         _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
 
@@ -475,7 +507,7 @@ namespace pic {
         f_count( _count_n, particles[_negaon] );
         f_count( _count_p, particles[_posion] );
 
-        { // parallelizae TODO optimize
+        { // parallelize TODO optimize
           int rank_inj = timestep % ens->size();
           ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_n[0].data().data(), _count_n[0].data().size() );
           ens->intra.template reduce<true>(mpi::by::SUM, rank_inj, _count_p[0].data().data(), _count_p[0].data().size() );
@@ -537,7 +569,7 @@ namespace pic {
       atm[0] = { star_interior, star_interior + 1 };
       atm[1] = { 0, supergrid[1].dim() };
 
-      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(N_atm_x * N_atm_floor);
+      atm.set_thermal_velocity(v_th).set_number_in_atmosphere(atm_x * N_atm_floor);
       atm.set_positive_charge(species::ion).set_negative_charge(species::electron);
       atm.set_omega_t(omega_spinup).set_normal_direction(0);
     }
@@ -619,6 +651,40 @@ namespace pic {
       analyzer.setName("NewPtcAnalysis");
     }
 
+    struct Escaping : public PtcAction {
+    private:
+      int _n = 0; // normal direction
+
+    public:
+      virtual Escaping* Clone() const { return new Escaping(*this); }
+
+      virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
+                                const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
+                                R dt, int timestep, util::Rng<R>& rng) override {
+        if( range::end(*this,_n) <= range::begin(*this,_n) ) return;
+
+        for ( auto sp : particles ) {
+          for ( auto ptc : particles[sp] ) { // TODOL semantics
+            if ( ptc.q(_n) >= grid[_n].absc(range::begin(*this,_n)) and ptc.q(_n) < grid[_n].absc(range::end(*this,_n)) ) {
+              // turn momentum to radial
+              auto p = apt::sqabs(ptc.p());
+              ptc.p(1) = 0;
+              ptc.p(2) = 0;
+              ptc.p(_n) = p;
+              ptc.set(flag::ignore_force);
+            }
+          }
+        }
+      }
+    } escape;
+    {
+      escape.setName("Escaping");
+      escape[0] = { supergrid[0].dim() - pic::damping_layer, supergrid[0].dim() + myguard };
+      escape[1] = { 0, supergrid[1].dim() };
+    }
+
+
+    pus.emplace_back(escape.Clone());
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());
     pus.emplace_back(asym_lo.Clone());
@@ -692,7 +758,7 @@ namespace pic {
         for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
           R r = grid[0].absc(I[0], 0.5);
           R theta = grid[1].absc(I[1], 0.5);
-          R h = Metric::h<2>(r,theta) * dt * dt / ( wdt_pic * wdt_pic * grid[0].delta() * grid[0].delta() );
+          R h = Metric::h<2>(r,theta) * std::pow( wpic * grid[0].delta(), -2.0);
           auto& v = skin_depth[0](I);
           v = std::sqrt(h / v);
         }
@@ -735,7 +801,7 @@ namespace pic {
   }
 
   void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
-    constexpr int factor = POW(pic::downsample_ratio, pic::DGrid);
+    int factor = POW(mod_export.downsample_ratio, pic::DGrid); // FIXME test mods.export
     for ( int i = 0; i < num_comps; ++i ) {
       for ( auto& x : fds[i].data() ) x /= factor;
     }
@@ -839,7 +905,7 @@ namespace pic {
   auto set_up_particle_export() {
     std::vector<::io::PtcExportee<real_export_t, DGrid, real_t, Specs>*> pexps;
     {
-      using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs,particle::induced_shapef_t<ShapeF,downsample_ratio>>;
+      using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs>;
       pexps.push_back( new PA ("Num", 1, ptc_num, nullptr) );
 
       pexps.push_back( new PA ("E", 1, ptc_energy, nullptr) );
@@ -869,31 +935,29 @@ namespace pic {
 #include "apt/print.hpp"
 
 namespace pic {
-
-  std::string characteristics(std::string indent) {
+  std::string proofread(std::string indent) {
     std::ostringstream o;
-    auto gamma_0 = std::pow(Omega,2.0) * mu;
+    real_t gamma_0 = Omega * Omega * mu;
     o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
-    o << indent << "w_pic dt=" << apt::fmt("%.4f", wdt_pic ) << std::endl;
-    o << indent << "re=" << apt::fmt("%.4f", classic_electron_radius() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * classic_electron_radius() ) * std::sqrt(1 - Omega) ) << std::endl;
+    o << indent << "w_pic dt=" << apt::fmt("%.4f", wpic * dt ) << std::endl;
+    o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * r_e() ) ) << std::endl;
 
     {
       using namespace particle;
       o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor);
-      o << ", multiplicity=" << apt::fmt("%.1f", N_atm_x);
-      o << ", v_th=" << apt::fmt("%.2f", v_th) << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
+      o << ", atm_x=" << apt::fmt("%.1f", atm_x);
+      o << ", v_th=" << apt::fmt("%.2f", v_th)
+        << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
     }
 
     {
       using namespace particle;
       o << indent << "PC: gamma_fd=" << apt::fmt("%.0f", gamma_fd);
-      o << ", gamma_off=" << apt::fmt("%.0f", gamma_off);
       o << ", E_ph=" << apt::fmt("%.0f", E_ph);
-      o << ", Ndot_fd=" << apt::fmt("%.2f", Ndot_fd) << std::endl;
 
       o << indent << "    gamma_RRL=" << gamma_fd * std::pow(gamma_fd / E_ph, 0.5);
-      o << ", L_CR/L_sd=" << E_ph * Ndot_fd * Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
+      // o << ", L_CR/L_sd=" << E_ph * Ndot_fd * Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
     }
     return o.str();
   }
