@@ -141,6 +141,9 @@ int main(int argc, char** argv) {
                              fs::copy_file("CMakeLists.txt", pic::this_run_dir + "/pigeon/CMakeLists.txt" );
                              fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp" );
                              fs::copy_file("pic_impl.hpp", pic::this_run_dir + "/pigeon/pic_impl.hpp" );
+                             if ( cli_args.config_file ) {
+                               fs::copy_file(*cli_args.config_file, pic::this_run_dir + "/pigeon/conf.toml" );
+                             }
                            } );
     lgr::file.set_filename( pic::this_run_dir + "/logs/rank" + std::to_string(mpi::world.rank()) + ".log" );
 
