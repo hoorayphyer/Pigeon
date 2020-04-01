@@ -12,6 +12,7 @@ done
 
 pic_args=()
 passed_dry_run="no"
+pic_conf=""
 
 for ((i=0; i < ${#other_args[@]}; i++)) # NOTE bash array index starts at 0
 do
@@ -20,6 +21,10 @@ do
         "--dry-run")
             passed_dry_run="yes"
             pic_args+=($var)
+            ;;
+        "--config"|"-c")
+            ((i++))
+            pic_conf="${other_args[i]}"
             ;;
         "--journal")
             echo "WARNING: user specified journal file will be ignored in pgn"
@@ -31,7 +36,14 @@ do
     esac
 done
 
-bin/pic --dry-run ${pic_args[@]} # Anyhow, perform a dry run
+# Anyhow, perform a dry run
+if [[ "$pic_conf" == "" ]]; then
+    echo "This dry run doesn't load config file."
+    bin/pic --dry-run ${pic_args[@]}
+else
+    echo "This dry run loads config from $pic_conf."
+    bin/pic --dry-run ${pic_args[@]} --config "$pic_conf"
+fi
 ret=$?
 if [[ $ret != 0 ]]; then
     echo "Dry run failed. Run not staged."
@@ -95,10 +107,17 @@ if [[ -f job.sh ]]; then
     cp job.sh $this_dir/
 fi
 
+if [[ "$pic_conf" != "" ]]; then
+    cp "$pic_conf" $this_dir/"conf.toml"
+fi
+
 journal_file=$this_dir/"journal.txt"
 
 function join_by { local IFS="$1"; shift; echo "$*"; } # copied from https://stackoverflow.com/questions/1527049/how-can-i-join-elements-of-an-array-in-bash
 pic_cmd="$this_dir/bin/pic $(join_by " " ${pic_args[@]}) --journal $journal_file"
+if [[ "$pic_conf" != "" ]]; then
+    pic_cmd+=" --config $this_dir/conf.toml"
+fi
 
 local_jobID="local.job"
 exec 5>&1 # save stdout of current session to fd5
