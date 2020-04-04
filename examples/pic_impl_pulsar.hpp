@@ -42,6 +42,7 @@ namespace pic {
 
   int damping_layer;
   real_t damping_rate;
+  real_t spinup_time;
 
   std::string project_name;
   std::string datadir_prefix;
@@ -67,6 +68,7 @@ namespace pic {
 
     safe_set(damping_layer, conf["damping"]["layer"]);
     safe_set(damping_rate, conf["damping"]["rate"]);
+    safe_set(spinup_time, conf["spinup_time"]);
 
     project_name = conf["project_name"].value_or("Unnamed"sv);
     datadir_prefix = conf["datadir_prefix"].value_or("../Data/"sv);
@@ -125,7 +127,7 @@ namespace pic {
   constexpr int myguard = std::max(1, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   real_t omega_spinup ( real_t time ) noexcept {
-    return std::min<real_t>( time / 4.0, 1.0 ) * Omega;
+    return std::min<real_t>( time / spinup_time, 1.0 ) * Omega;
   }
 
   real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
@@ -382,8 +384,6 @@ namespace pic {
     return std::exp(1.0) * 2.0 * Omega * mu / wpic2;
   }
 
-  using R = real_t;
-
   auto set_up_particle_actions() {
     namespace range = apt::range;
     std::vector<std::unique_ptr<PtcAction>> pus;
@@ -405,7 +405,7 @@ namespace pic {
                         const Field<3>& B,
                         const Grid& grid,
                         const Ensemble* ens,
-                        R dt, int timestep, util::Rng<R>& rng
+                        real_t dt, int timestep, util::Rng<real_t>& rng
                         ) override {
         if ( !RTD::data().is_export_Jsp || !mod_export.is_do(timestep) ) {
           _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
@@ -431,7 +431,7 @@ namespace pic {
     } pu;
     {
       PtcUpdater pu0;
-      pu0.set_update_q(Metric::geodesic_move<apt::vVec<R,3>, apt::vVec<R,3>>);
+      pu0.set_update_q(Metric::geodesic_move<apt::vVec<real_t,3>, apt::vVec<real_t,3>>);
 
       pu.setName("MainUpdate");
       pu.set_updater(std::move(pu0));
@@ -450,17 +450,17 @@ namespace pic {
       int _n = 0; // normal direction
       species _posion = species::ion;
       species _negaon = species::electron;
-      R _v_th = 0.0;
-      R _N_atm = 0.0;
-      R _min_frac = 1e-6; // over fracs larger than this will be injected
-      R (*_omega_t) ( R time ) = nullptr;
+      real_t _v_th = 0.0;
+      real_t _N_atm = 0.0;
+      real_t _min_frac = 1e-6; // over fracs larger than this will be injected
+      real_t (*_omega_t) ( real_t time ) = nullptr;
 
     public:
-      auto& set_thermal_velocity(R v) { _v_th = v; return *this; }
-      auto& set_number_in_atmosphere(R N) { _N_atm = N; return *this; }
-      auto& set_minimal_fraction( R x ) { _min_frac = x; return *this; }
+      auto& set_thermal_velocity(real_t v) { _v_th = v; return *this; }
+      auto& set_number_in_atmosphere(real_t N) { _N_atm = N; return *this; }
+      auto& set_minimal_fraction( real_t x ) { _min_frac = x; return *this; }
       auto& set_normal_direction( int n ) { _n = n; return *this; }
-      auto& set_omega_t(R (*omega_t) ( R )) { _omega_t = omega_t; return *this; }
+      auto& set_omega_t(real_t (*omega_t) ( real_t )) { _omega_t = omega_t; return *this; }
       auto& set_positive_charge(species sp) { _posion = sp; return *this; }
       auto& set_negative_charge(species sp) { _negaon = sp; return *this; }
 
@@ -474,15 +474,15 @@ namespace pic {
                         const Field<3>& B,
                         const Grid& grid,
                         const Ensemble* ens,
-                        R dt, int timestep, util::Rng<R>& rng
+                        real_t dt, int timestep, util::Rng<real_t>& rng
                         ) override {
         if( range::end(*this,_n) <= range::begin(*this,_n) ) return;
 
         _count_n.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
         _count_p.resize( {apt::make_range(range::begin(*this),range::end(*this),0)} );
 
-        apt::array<R,DGrid> lb;
-        apt::array<R,DGrid> ub;
+        apt::array<real_t,DGrid> lb;
+        apt::array<real_t,DGrid> ub;
         for ( int i = 0; i < DGrid; ++i ) {
           lb[i] = grid[i].absc( range::begin(*this,i), 0.0 );
           ub[i] = grid[i].absc( range::end(*this,i), 0.0 );
@@ -546,11 +546,11 @@ namespace pic {
           p[2] = _omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
 
           // replenish
-          R quota = _N_atm * std::sin(q[1]) - N_pairs;
+          real_t quota = _N_atm * std::sin(q[1]) - N_pairs;
           while ( quota > _min_frac ) {
             auto q_ptc = q;
-            R frac = std::min( (R)1.0, quota );
-            quota -= (R)1.0;
+            real_t frac = std::min( (real_t)1.0, quota );
+            quota -= (real_t)1.0;
 
             for ( int i = 0; i < DGrid; ++i ) {
               if ( _n == i )
@@ -585,7 +585,7 @@ namespace pic {
 
       virtual void operator() ( map<PtcArray>&, JField& J, std::vector<Particle>*, const map<Properties>&,
                                 const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
-                                R, int, util::Rng<R>&) override {
+                                real_t, int, util::Rng<real_t>&) override {
         auto add_assign =
           []( real_j_t& a, real_j_t& b ) noexcept {
             a += b;
@@ -621,7 +621,7 @@ namespace pic {
 
       virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
                                 const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
-                                R dt, int timestep, util::Rng<R>& rng) override {
+                                real_t dt, int timestep, util::Rng<real_t>& rng) override {
         // Put particles where they belong after scattering
         assert(new_ptc_buf != nullptr);
 
@@ -662,7 +662,7 @@ namespace pic {
 
       virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
                                 const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
-                                R dt, int timestep, util::Rng<R>& rng) override {
+                                real_t dt, int timestep, util::Rng<real_t>& rng) override {
         if( range::end(*this,_n) <= range::begin(*this,_n) ) return;
 
         for ( auto sp : particles ) {
@@ -758,9 +758,9 @@ namespace pic {
       ens.reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
       if ( ens.is_chief() ) {
         for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
-          R r = grid[0].absc(I[0], 0.5);
-          R theta = grid[1].absc(I[1], 0.5);
-          R h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
+          real_t r = grid[0].absc(I[0], 0.5);
+          real_t theta = grid[1].absc(I[1], 0.5);
+          real_t h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
           auto& v = skin_depth[0](I);
           v = std::sqrt(h / v);
         }

@@ -40,6 +40,9 @@ add_library(testfw_mpi INTERFACE)
 target_link_directories(testfw_mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
 target_link_libraries(testfw_mpi INTERFACE -ltestfw_mpi)
 
+add_library(logger INTERFACE)
+target_link_directories(logger INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
+target_link_libraries(logger INTERFACE -llogger)
 
 function(test_gen category name)
   set(test_target "test_${category}_${name}")

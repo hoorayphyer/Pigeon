@@ -38,7 +38,13 @@ namespace pic {
     bool (*is_qualified) () = [](){return true;};
 
     bool is_reached_max_entries( int timestep ) const noexcept {
-      return max_entries and ( timestep > start + *max_entries * interval );
+      if ( !max_entries ) return false;
+      static int last = timestep;
+      if ( timestep >= last + *max_entries * interval ) {
+        last = timestep;
+        return true;
+      }
+      return false;
     }
   } mod_profiling;
 
