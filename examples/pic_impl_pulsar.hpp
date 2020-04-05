@@ -667,13 +667,16 @@ namespace pic {
 
         for ( auto sp : particles ) {
           for ( auto ptc : particles[sp] ) { // TODOL semantics
+            // NOTE: this implementation assumes that there is never particles traveling backwards. If not, the flag::ignore_force must be unset when such particles leave the layer, and one must be careful that the ignore_force delimiter must not coincide with the lower bound of a patch.
             if ( ptc.q(_n) >= grid[_n].absc(range::begin(*this,_n)) and ptc.q(_n) < grid[_n].absc(range::end(*this,_n)) ) {
-              // turn momentum to radial
-              auto p = apt::sqabs(ptc.p());
-              ptc.p(1) = 0;
-              ptc.p(2) = 0;
-              ptc.p(_n) = p;
-              ptc.set(flag::ignore_force);
+              if ( not ptc.is(flag::ignore_force) ) {
+                // turn momentum to radial
+                auto p = apt::abs(ptc.p());
+                ptc.p(1) = 0;
+                ptc.p(2) = 0;
+                ptc.p(_n) = p;
+                ptc.set(flag::ignore_force);
+              }
             }
           }
         }
@@ -684,7 +687,6 @@ namespace pic {
       escape[0] = { supergrid[0].dim() - pic::damping_layer, supergrid[0].dim() + myguard };
       escape[1] = { 0, supergrid[1].dim() };
     }
-
 
     pus.emplace_back(escape.Clone());
     pus.emplace_back(pu.Clone());

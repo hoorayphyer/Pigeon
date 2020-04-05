@@ -2,7 +2,7 @@ project_name = "Pulsar64"
 datadir_prefix = "../Data/"
 dt = 0.01
 Np = 2
-gamma0 = 100
+gamma0 = 100.0
 total_timesteps = 100
 spinup_time = 5.0
 
