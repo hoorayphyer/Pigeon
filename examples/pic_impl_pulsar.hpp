@@ -187,7 +187,7 @@ namespace pic {
     Field<1> skin_depth {};
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
-      is_export_Jsp = true;
+      is_export_Jsp = false;
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
       if ( is_export_Jsp ) {
