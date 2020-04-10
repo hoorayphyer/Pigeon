@@ -184,8 +184,14 @@ namespace mpi {
 
   template < typename Comm >
   template < typename T >
-  void Collective_Comm<Comm>::exscan_inplace( T* send_buf, int count ) const {
-    MPI_Exscan( MPI_IN_PLACE, send_buf, count, datatype(send_buf), MPI_SUM, _comm() );
+  void Collective_Comm<Comm>::exscan_inplace( by op, T* send_buf, int count ) const {
+    MPI_Exscan( MPI_IN_PLACE, send_buf, count, datatype(send_buf), mpi_op(op), _comm() );
+  }
+
+  template < typename Comm >
+  template < typename T >
+  void Collective_Comm<Comm>::inscan_inplace( by op, T* send_buf, int count ) const {
+    MPI_Scan( MPI_IN_PLACE, send_buf, count, datatype(send_buf), mpi_op(op), _comm() );
   }
 }
 
@@ -200,10 +206,11 @@ namespace mpi {
   template std::vector<_TYPE_> Collective_Comm<_COMM_>::allgather( const _TYPE_*, int ) const; \
   template std::optional<std::vector<_TYPE_>>                           \
   Collective_Comm<_COMM_>::gather( const int, const _TYPE_ *, int ) const; \
-  template void Collective_Comm<_COMM_>::scatter( int, _TYPE_*, int ) const; \
-  template void Collective_Comm<_COMM_>::exscan_inplace( _TYPE_*, int ) const
+  template void Collective_Comm<_COMM_>::scatter( int, _TYPE_*, int ) const
 
 #define INSTANTIATE_MPI_COLLECTIVE(_TYPE_)                \
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(Comm, _TYPE_);      \
+  template void Collective_Comm<Comm>::exscan_inplace(by, _TYPE_*, int ) const; \
+  template void Collective_Comm<Comm>::inscan_inplace(by, _TYPE_*, int ) const; \
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(InterComm, _TYPE_)
 }

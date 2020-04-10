@@ -21,6 +21,10 @@ add_library( particle_migration SHARED migration.cpp )
 target_include_directories(particle_migration PUBLIC ${KERNEL_DIR} PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(particle_migration PRIVATE mpi mpi_particle pic_rc)
 
+add_library( particle_annihilation SHARED annihilation.cpp )
+target_include_directories(particle_annihilation PUBLIC ${KERNEL_DIR} PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(particle_migration PRIVATE mpi pic_rc msh_current_deposition)
+
 if (${ENABLE_TESTS})
   test_gen(particle state)
   # test_gen(particle particle) # TODO some tests on this are in particle_array
@@ -30,6 +34,7 @@ if (${ENABLE_TESTS})
   test_gen(particle forces)
   test_gen(particle sorter)
   test_gen(particle migration mpi) # TODO add test on buffer has size 0 and nonzero capacity
+  test_gen(particle annihilation mpi)
 
   msperf_gen( particle updater )
 endif()

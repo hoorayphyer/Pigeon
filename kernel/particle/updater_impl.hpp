@@ -152,20 +152,6 @@ namespace particle {
       update_species(sp);
     }
 
-    { // NOTE rescale Jmesh back to real grid delta
-      R dV = 1.0;
-      for ( int i = 0; i < DGrid; ++i ) dV *= grid[i].delta();
-
-      for ( int i = 0; i < DGrid; ++i ) {
-        R tmp = grid[i].delta() / dV;
-        for ( auto& elm : J[i].data() ) elm *= tmp;
-      }
-
-      for ( int i = DGrid; i < 3; ++i ) {
-        for ( auto& elm : J[i].data() ) elm /= dV;
-      }
-    }
-
   }
 
 }

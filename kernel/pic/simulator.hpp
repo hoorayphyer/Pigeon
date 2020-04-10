@@ -287,6 +287,19 @@ namespace pic {
             }
           });
 
+        { // NOTE rescale Jmesh back to real grid delta
+          auto dV = apt::dV(_grid);
+
+          for ( int i = 0; i < DGrid; ++i ) {
+            R tmp = _grid[i].delta() / dV;
+            for ( auto& elm : _J[i].data() ) elm *= tmp;
+          }
+
+          for ( int i = DGrid; i < 3; ++i ) {
+            for ( auto& elm : _J[i].data() ) elm /= dV;
+          }
+        }
+
         // ----- Before this line _J is local on each cpu --- //
         TIMING("ReduceJmesh", START {
             // TODOL reduce number of communications?

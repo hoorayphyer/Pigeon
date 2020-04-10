@@ -1,4 +1,4 @@
-#include "migration_impl.hpp"
+#include "particle/migration_impl.hpp"
 #include "pic.hpp"
 
 using namespace pic;
