@@ -1,5 +1,7 @@
 #include "particle/annihilation.hpp"
 #include "msh/mesh_shape_interplay.hpp"
+#include "mpipp/mpi++.hpp"
+#include <cmath>
 
 namespace particle {
   template < int DGrid, typename R, template < typename > class S, typename ShapeF, typename RJ >

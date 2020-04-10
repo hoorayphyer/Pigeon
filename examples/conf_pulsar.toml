@@ -44,3 +44,5 @@ vitals = { on = true, start = 0, interval = 100 }
 print_timestep_to_stdout_interval = 100
 
 tracing = { on = false, start = 0, interval = 1000, num_files = 1 }
+
+annihilation = { on = true, start = 0, interval = 1000 }

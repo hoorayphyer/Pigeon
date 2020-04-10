@@ -50,6 +50,7 @@ namespace pic {
   std::string datadir_prefix;
   int total_timesteps;
 
+  ModuleBase mod_annih {};
 
   void load_configuration(const ConfFile_t& conf) {
     safe_set(dt, conf["dt"]);
@@ -114,6 +115,10 @@ namespace pic {
     mod_tracing.start = conf["mods"]["tracing"]["start"].value_or(0);
     safe_set(mod_tracing.interval, conf["mods"]["tracing"]["interval"]);
     mod_tracing.num_files = conf["mods"]["tracing"]["num_files"].value_or(1);
+
+    mod_annih.on = conf["mods"]["annihilation"]["on"].value_or(false);
+    mod_annih.start = conf["mods"]["annihilation"]["start"].value_or(0);
+    safe_set(mod_annih.interval, conf["mods"]["annihilation"]["interval"]);
   }
 
   real_t r_e() {
@@ -690,19 +695,49 @@ namespace pic {
       escape[1] = { 0, supergrid[1].dim() };
     }
 
-    ::particle::Annihilator<DGrid,real_t,Specs,ShapeF,real_j_t> annih;
+    class Annihilator : public PtcAction {
+    private:
+      // policy returns number of pairs to be annihilated
+      real_t(*_policy)(real_t num_electron_in_a_cell, real_t num_positron_in_a_cell) = nullptr;
+
+    public:
+      Annihilator* Clone() const override { return new Annihilator(*this); }
+
+      Annihilator& set_policy( real_t(*policy)(real_t,real_t) ) noexcept { _policy = policy; return *this; }
+
+      void operator() ( map<PtcArray>& particles, JField& J,
+                        std::vector<Particle>* ,
+                        const map<Properties>& properties,
+                        const Field<3>&, const Field<3>&,
+                        const Grid& grid, const Ensemble* ens,
+                        real_t dt, int timestep, util::Rng<real_t>& ) override {
+        if ( apt::range::is_empty(*this) ) return;
+
+        if ( mod_annih.is_do(timestep) ) {
+          assert( ens != nullptr );
+          assert( _policy != nullptr );
+
+          particle::annihilate(particles[species::electron],particles[species::positron],J,
+                               properties[species::electron].charge_x,properties[species::positron].charge_x,
+                               grid, ens->intra, dt, ShapeF(), _policy);
+        }
+      }
+
+    } annih;
+
     {
       annih.setName("Annihilation");
+      annih[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
+      int half_width = ( PI / 12 ) / supergrid[1].delta();
+      annih[1] = { i_equator - half_width, i_equator + half_width };
+
       auto policy =
         []( real_t num_e, real_t num_p ) noexcept {
           return std::min(num_e, num_p) / 2;
         };
 
       annih.set_policy(policy);
-      annih[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
-      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( PI / 12 ) / supergrid[1].delta();
-      annih[1] = { i_equator - half_width, i_equator + half_width };
     }
 
     pus.emplace_back(annih.Clone());
