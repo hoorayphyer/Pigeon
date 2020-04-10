@@ -176,6 +176,16 @@ namespace apt::range {
   template < int D >
   constexpr int full_size( const array<Range,D>& range, int i ) noexcept { return range[i].full_size(); }
 
+  // test empty. A range is empty when it's bulk is empty
+  constexpr bool is_empty( const Range& range ) noexcept {
+    return range.size() <= 0;
+  }
+  template < int D >
+  constexpr bool is_empty( const array<Range,D>& range ) noexcept {
+    for ( int i = 0; i < D; ++i )
+      if ( is_empty(range[i]) ) return true;
+    return false;
+  }
 }
 
 #endif

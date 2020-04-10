@@ -5,6 +5,8 @@
 
 #include "apt/numeric.hpp"
 
+#include "particle/annihilation.hpp"
+
 #include "pic/modules.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
@@ -663,7 +665,7 @@ namespace pic {
       virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
                                 const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
                                 real_t dt, int timestep, util::Rng<real_t>& rng) override {
-        if( range::end(*this,_n) <= range::begin(*this,_n) ) return;
+        if ( apt::range::is_empty(*this) ) return;
 
         for ( auto sp : particles ) {
           for ( auto ptc : particles[sp] ) { // TODOL semantics
@@ -688,6 +690,22 @@ namespace pic {
       escape[1] = { 0, supergrid[1].dim() };
     }
 
+    ::particle::Annihilator<DGrid,real_t,Specs,ShapeF,real_j_t> annih;
+    {
+      annih.setName("Annihilation");
+      auto policy =
+        []( real_t num_e, real_t num_p ) noexcept {
+          return std::min(num_e, num_p) / 2;
+        };
+
+      annih.set_policy(policy);
+      annih[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
+      int half_width = ( PI / 12 ) / supergrid[1].delta();
+      annih[1] = { i_equator - half_width, i_equator + half_width };
+    }
+
+    pus.emplace_back(annih.Clone());
     pus.emplace_back(escape.Clone());
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());

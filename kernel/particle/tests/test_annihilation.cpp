@@ -66,7 +66,9 @@ SCENARIO("Test Annihilation" , "[particle][mpi]") {
 
     using ShapeF = shapef_t<shape::Cloud_In_Cell>;
 
-    annihilate(el,po,J,R(-1.0),R(1.0),grid,*rwld_opt,dt,ShapeF());
+    auto policy = []( auto n_e, auto n_p ) { return std::min(n_e,n_p); };
+
+    annihilate(el,po,J,R(-1.0),R(1.0),grid,*rwld_opt,dt,ShapeF(), policy);
 
     auto count =
       [&mesh,&grid]( const auto& ptcs, bool ignore_frac = false ) {

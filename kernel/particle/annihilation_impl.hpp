@@ -1,8 +1,5 @@
 #include "particle/annihilation.hpp"
-#include <cassert>
 #include "msh/mesh_shape_interplay.hpp"
-#include "mpipp/mpi++.hpp"
-#include "dye/ensemble.hpp"
 
 namespace particle {
   template < int DGrid, typename R, template < typename > class S, typename ShapeF, typename RJ >
@@ -11,7 +8,8 @@ namespace particle {
                    R charge_el, R charge_po,
                    const apt::Grid< R, DGrid >& grid,
                    const mpi::Comm& intra,
-                   R dt, const ShapeF& ) {
+                   R dt, const ShapeF&,
+                   R(*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell) ) {
     const auto& mesh = J.mesh();
     const auto size = mesh.linear_size();
     std::vector<R> buf (2 * size, 0);
@@ -42,7 +40,7 @@ namespace particle {
 
       if ( intra.rank() == intra.size() - 1 ) {
         for ( auto i = decltype(size){0}; i < size; ++i ) {
-          annih[i] = std::min(buf[i], buf[size+i]);
+          annih[i] = policy( buf[i], buf[size+i]  );
         }
       }
 
@@ -95,22 +93,4 @@ namespace particle {
     }
   }
 
-
-  template < int DGrid, typename R, template < typename > class S, typename ShapeF, typename RJ >
-  void Annihilator<DGrid,R,S,ShapeF,RJ>::operator() ( map<array<R,S>>& particles,
-                                                      field::Field<RJ,3,DGrid>& J,
-                                                      std::vector<Particle<R,S>>* new_ptc_buf,
-                                                      const map<Properties>& properties,
-                                                      const field::Field<R,3,DGrid>& E,
-                                                      const field::Field<R,3,DGrid>& B,
-                                                      const apt::Grid< R, DGrid >& grid,
-                                                      const dye::Ensemble<DGrid>* ens,
-                                                      R dt, int timestep, util::Rng<R>& rng
-                                                      ) {
-    assert( ens != nullptr );
-
-    annihilate(particles[species::electron],particles[species::positron],J,
-               properties[species::electron].charge_x,properties[species::positron].charge_x,
-               grid, ens->intra, dt, ShapeF());
-  }
 }
