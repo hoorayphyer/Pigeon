@@ -11,8 +11,23 @@ namespace particle {
                    const apt::Grid< R, DGrid >& grid,
                    const mpi::Comm& intra,
                    R dt, const ShapeF&,
-                   R(*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell) ) {
+                   R(*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell),
+                   const apt::array<apt::array<R,2>,DGrid>& bounds ) {
     const auto& mesh = J.mesh();
+    { // check if bounds is applicable
+      apt::array<apt::Range,DGrid> range;
+      for ( int i = 0; i < DGrid; ++i ) {
+        range[i].begin() = ( bounds[i][0] - grid[i].lower() ) / grid[i].delta();
+        range[i].end() = ( bounds[i][1] - grid[i].lower() ) / grid[i].delta();
+
+        // NOTE far_begin/end are used
+        range[i].begin() = std::max( range[i].begin(), mesh.range(i).far_begin() );
+        range[i].end() = std::min( range[i].end(), mesh.range(i).far_end() );
+      }
+
+      if ( apt::range::is_empty(range) ) return;
+    }
+
     const auto size = mesh.linear_size();
     std::vector<R> buf (2 * size, 0);
 
@@ -24,13 +39,22 @@ namespace particle {
         return mesh.linear_index(I);
       };
 
+    auto eligible =
+      [&bounds] ( const auto& q ) noexcept {
+        for ( int i = 0; i < DGrid; ++i ) {
+          if ( q[i] < bounds[i][0] or q[i] >= bounds[i][1] )
+            return false;
+        }
+        return true;
+      };
+
     {
       std::vector<R> annih (size, 0);
 
       auto f =
         [&] (const auto& ptcs, auto* ptr) {
           for ( const auto& x : ptcs) {
-            if ( not x.is(flag::exist) ) continue;
+            if ( not x.is(flag::exist) or not eligible(x.q()) ) continue;
             ptr[get_idx(x)] += x.frac();
           }
         };
@@ -61,7 +85,7 @@ namespace particle {
       auto f =
         [&] (auto& ptcs, auto* ptr, auto charge_over_dt) {
           for ( auto x : ptcs) { // TODOL semantics
-            if ( not x.is(flag::exist) ) continue;
+            if ( not x.is(flag::exist) or not eligible(x.q()) ) continue;
             auto& exempt = ptr[get_idx(x)];
             if ( exempt > x.frac() ) {
               exempt -= x.frac();

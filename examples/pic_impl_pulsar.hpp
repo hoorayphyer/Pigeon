@@ -717,9 +717,16 @@ namespace pic {
           assert( ens != nullptr );
           assert( _policy != nullptr );
 
+          apt::array<apt::array<real_t,2>,DGrid> bounds;
+          for ( int i = 0; i < DGrid; ++i ) {
+            // NOTE guard cells or margins of range not included.
+            bounds[i][0] = grid[i].absc( range::begin(*this,i) );
+            bounds[i][1] = grid[i].absc( range::end(*this,i) );
+          }
+
           particle::annihilate(particles[species::electron],particles[species::positron],J,
                                properties[species::electron].charge_x,properties[species::positron].charge_x,
-                               grid, ens->intra, dt, ShapeF(), _policy);
+                               grid, ens->intra, dt, ShapeF(), _policy, bounds);
         }
       }
 

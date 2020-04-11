@@ -15,7 +15,8 @@ namespace particle {
                    const apt::Grid< R, DGrid >& grid,
                    const mpi::Comm& intra,
                    R dt, const ShapeF&,
-                   R(*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell) );
+                   R(*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell),
+                   const apt::array<apt::array<R,2>,DGrid>& bounds );
 }
 
 #endif

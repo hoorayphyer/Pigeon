@@ -11,5 +11,6 @@ namespace particle {
     const apt::Grid< real_t, DGrid >& grid,
     const mpi::Comm& intra,
     real_t dt, const ShapeF&,
-    real_t(*)(real_t, real_t) );
+    real_t(*)(real_t, real_t),
+    const apt::array<apt::array<real_t,2>,DGrid>&);
 }
