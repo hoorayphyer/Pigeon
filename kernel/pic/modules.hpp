@@ -10,7 +10,7 @@ namespace pic {
     int interval = 100;
 
     virtual bool is_do( int timestep ) const noexcept {
-      return on and timestep >= start and timestep < end and (timestep % interval == 0 );
+      return on and timestep >= start and timestep < end and ( (timestep - start) % interval == 0 );
     }
   };
 
