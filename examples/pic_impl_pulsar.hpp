@@ -747,6 +747,57 @@ namespace pic {
       annih.set_policy(policy);
     }
 
+    class NoPhotonZone : public PtcAction {
+    private:
+      int _interval = 100;
+
+    public:
+      NoPhotonZone* Clone() const override { return new NoPhotonZone(*this); }
+      NoPhotonZone& set_interval( int interval ) noexcept { _interval = interval; return *this; }
+
+      void operator() ( map<PtcArray>& particles, JField& ,
+                        std::vector<Particle>* ,
+                        const map<Properties>& ,
+                        const Field<3>&, const Field<3>&,
+                        const Grid& grid, const Ensemble* ,
+                        real_t , int timestep, util::Rng<real_t>& ) override {
+        if ( (timestep % _interval != 0) or apt::range::is_empty(*this) ) return;
+
+        apt::array< apt::array<real_t,2>,DGrid> bounds;
+        for ( int i = 0; i < DGrid; ++i ) {
+          bounds[i][0] = grid[i].absc(range::begin(*this,i));
+          bounds[i][1] = grid[i].absc(range::end(*this,i));
+        }
+
+        auto in_zone =
+          [&bounds] ( const auto& q ) noexcept {
+            for ( int i = 0; i < DGrid; ++i ) {
+              if ( q[i] < bounds[i][0] or q[i] >= bounds[i][1] )
+                return false;
+            }
+            return true;
+          };
+
+        for ( auto ptc : particles[species::photon] ) { // TODOL semantics
+          if ( ptc.is(flag::exist) and in_zone(ptc.q()) ) {
+            ptc.reset(flag::exist);
+          }
+        }
+      }
+
+    } no_ph;
+
+    {
+      no_ph.setName("NoPhotonZone");
+      no_ph[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
+      int half_width = ( PI / 12 ) / supergrid[1].delta();
+      no_ph[1] = { i_equator - half_width, i_equator + half_width };
+
+      no_ph.set_interval(100);
+    }
+
+    pus.emplace_back(no_ph.Clone());
     pus.emplace_back(annih.Clone());
     pus.emplace_back(escape.Clone());
     pus.emplace_back(pu.Clone());
