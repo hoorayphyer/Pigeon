@@ -127,7 +127,7 @@ namespace pic {
         RTD::data().init( _properties, _grid );
       }
 
-      if ( mod_profiling.is_qualified() ) lgr::file.open(std::ios_base::app);
+      if ( mod_profiling.on and mod_profiling.is_qualified() ) lgr::file.open(std::ios_base::app);
     }
 
   public:
