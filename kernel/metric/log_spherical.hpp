@@ -139,6 +139,8 @@ namespace metric {
   template < class X, class P >
   auto LogSpherical<T>::geodesic_move( X& x, P& p, T dt, bool is_massive ) noexcept {
     apt::array<T, P::NDim> dx;
+    dx[0] = apt::sqabs(p);
+    if ( dx[0] == static_cast<T>(0) ) return dx; // NOTE dx == {} in this case
 
     // TODOL: in implementing this, we assumed no crossing through center
 

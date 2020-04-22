@@ -46,6 +46,21 @@ namespace debug {
     if ( std::isnan(ptc.state() )) res |= ( 1u << (2 * DPtc) );
     return res;
   }
+
+  template <int I, class Logger, typename T, typename... U >
+  inline bool check_nan_impl( Logger& log, const T& a, const U&... args ) {
+    bool is = std::isnan(a);
+    if ( is ) {
+      log << "!!! Found NAN at I=" << I << std::endl;
+    }
+    if constexpr (sizeof...(args) == 0) return is;
+    else return ( is or check_nan_impl<I+1,Logger>(log,args...) );
+  }
+
+  template <class Logger, typename T, typename... U >
+  inline bool check_nan( Logger& log, const T& a, const U&... args ) {
+    return check_nan_impl<0>(log, a, args...);
+  }
 }
 
 #endif

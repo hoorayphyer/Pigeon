@@ -69,8 +69,8 @@ namespace particle {
           for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
             if( !ptc.is(flag::exist) ) continue;
 #ifdef PIC_DEBUG
-            apt::Vec<R,S<R>::Dim> q0 = ptc.q();
-            apt::Vec<R,S<R>::Dim> p0 = ptc.p();
+            apt::Vec<R,S<R>::Dim> q_prev = ptc.q();
+            apt::Vec<R,S<R>::Dim> p_prev = ptc.p();
 
             auto show_ptc =
               [&](const auto& ptc) {
@@ -78,7 +78,7 @@ namespace particle {
                 lgr::file << "frac = " << ptc.frac() << std::endl;
                 lgr::file << "sp = " << static_cast<int>(ptc.template get<species>()) << ", bp = " << static_cast<int>(ptc.template get<birthplace>()) << ", is_sec = " << ptc.is(flag::secondary) << std::endl;
 
-                lgr::file << "ptc q0 = " << q0 << ", ptc p0 = " << p0 << std::endl;
+                lgr::file << "ptc q_prev = " << q_prev << ", ptc p_prev = " << p_prev << std::endl;
               };
 
             if(debug::has_nan(ptc)) {
@@ -107,6 +107,9 @@ namespace particle {
                 lgr::file << force::ostr.str() << std::endl;
 #endif
                 debug::throw_error("NANUPDATEP");
+              } else {
+                q_prev = ptc.q();
+                p_prev = ptc.p();
               }
 #endif
 
@@ -119,6 +122,9 @@ namespace particle {
                 show_ptc(ptc);
                 lgr::file << "E_itpl = " << E_itpl << ", B_itpl = " << B_itpl << std::endl;
                 debug::throw_error("NANSCAT");
+              } else {
+                q_prev = ptc.q();
+                p_prev = ptc.p();
               }
 #endif
             }
@@ -131,6 +137,9 @@ namespace particle {
               lgr::file << "NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;
               show_ptc(ptc);
               debug::throw_error("NANUPDATEQ");
+            } else {
+              q_prev = ptc.q();
+              p_prev = ptc.p();
             }
 #endif
             // FIXME pusher handle boundary condition. Is it needed?
