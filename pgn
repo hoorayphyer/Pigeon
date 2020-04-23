@@ -80,6 +80,9 @@ case "$1" in
                     echo "  mkdir failed : $f"
                     exit $ret
                 fi
+                if [[ -f "$sf" ]]; then
+                    cp $sf ${sf}.`date +%F-%H-%M-%S` # make a copy of existing one
+                fi
                 cp $f $sf
                 ret=$?
                 if [[ $ret != 0 ]]; then
