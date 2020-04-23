@@ -68,6 +68,34 @@ case "$1" in
     "vw") # TODO queue results for scp
         $root/.pgn/vw "${@:2}"
         ;;
+    "shadow")
+        did_shadow=0
+        for f in "${@:2}"
+        do
+            if [[ -f "$f" ]]; then
+                sf="shadows/"${f:`expr index "$f" kernel`+`expr length "kernel/"`-1}
+                mkdir -p `dirname $sf`
+                ret=$?
+                if [[ $ret != 0 ]]; then
+                    echo "  mkdir failed : $f"
+                    exit $ret
+                fi
+                cp $f $sf
+                ret=$?
+                if [[ $ret != 0 ]]; then
+                    echo "  cp failed : $f"
+                    exit $ret
+                fi
+                did_shadow=1
+            else
+                echo "  No such file exists : $f"
+            fi
+        done
+        if [ $did_shadow -eq 1 ]; then
+            $0 --clean
+            echo -e "Successful! pgn has cleaned existing build for shadows to work. Run \e[1mpgn cb\e[0m to rebuild."
+        fi
+        ;;
     *)
         ;;
 esac

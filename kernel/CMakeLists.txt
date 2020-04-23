@@ -6,7 +6,7 @@ if(NOT WIN32)
   set(Yellow      "${Esc}[33m")
 endif()
 
-set(KERNEL_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(KERNEL_DIR ${SHADOW_DIR} ${CMAKE_CURRENT_LIST_DIR})
 
 if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
@@ -48,7 +48,7 @@ function(test_gen category name)
   set(test_target "test_${category}_${name}")
   add_executable( ${test_target} "tests/test_${name}.cpp")
   target_include_directories(${test_target} PRIVATE ${KERNEL_DIR})
-  target_include_directories(${test_target} PRIVATE ${KERNEL_DIR}/../.subtrees/Catch2/single_include) # NOTE
+  target_include_directories(${test_target} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../.subtrees/Catch2/single_include) # NOTE
   target_compile_options( ${test_target} PRIVATE -O0 ) # -Wmissing-braces
 
   set(link_testfw testfw)
