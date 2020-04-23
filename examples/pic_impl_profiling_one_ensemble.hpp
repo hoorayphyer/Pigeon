@@ -187,27 +187,10 @@ namespace pic {
     }
 
     map<real_t> N_scat {};
-    Field<1> pc_counter {};
-    real_t pc_cumulative_time {};
-
-    map<JField> Jsp {}; // current by species
-    bool is_export_Jsp = false;
-
-    Field<1> skin_depth {};
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
-      is_export_Jsp = false;
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
-      if ( is_export_Jsp ) {
-        for ( auto sp : properties )
-          Jsp.insert( sp, {} );
-      }
-
-      Index bulk_dims;
-      for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
-      auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
-      pc_counter = {range};
     };
 
   private:
@@ -314,8 +297,8 @@ namespace pic {
         const auto& prop = properties[sp];
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
-        force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
+        // force.add( gravity, gravity_strength );
+        // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -325,8 +308,8 @@ namespace pic {
         const auto& prop = properties[sp];
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
-        force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
+        // force.add( gravity, gravity_strength );
+        // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -336,7 +319,7 @@ namespace pic {
         const auto& prop = properties[sp];
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
-        force.add( gravity, gravity_strength );
+        // force.add( gravity, gravity_strength );
         // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
@@ -362,8 +345,8 @@ namespace pic {
         ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
 
       if ( properties.has(species::electron) && properties.has(species::positron) ) {
-        ep_scat.Register( species::electron );
-        ep_scat.Register( species::positron );
+        // ep_scat.Register( species::electron );
+        // ep_scat.Register( species::positron );
       }
     }
 
@@ -380,7 +363,7 @@ namespace pic {
 
       photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
 
-      photon_scat.Register( species::photon );
+      // photon_scat.Register( species::photon );
     }
 
     return properties;
@@ -416,26 +399,7 @@ namespace pic {
                         const Ensemble* ens,
                         real_t dt, int timestep, util::Rng<real_t>& rng
                         ) override {
-        if ( !RTD::data().is_export_Jsp || !mod_export.is_do(timestep) ) {
-          _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
-        } else {
-          auto& Jsp = RTD::data().Jsp;
-          // store J by species separately for data export
-          for ( auto sp : particles ) {
-            map<PtcArray> ptcs_sp;
-            ptcs_sp.insert(sp);
-            std::swap( ptcs_sp[sp], particles[sp] ); // FIXME make sure there is no copying
-            Jsp[sp] = J;
-            Jsp[sp].reset();
-            _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
-            std::swap( ptcs_sp[sp], particles[sp] );
-
-            for ( int C = 0; C < 3; ++C ) {
-              for ( int i = 0; i < J.mesh().linear_size(); ++i )
-                J[C][i] += Jsp[sp][C][i];
-            }
-          }
-        }
+        _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
       }
     } pu;
     {
@@ -641,20 +605,11 @@ namespace pic {
           if ( ptc.is(flag::secondary) ) {
             // log scattering events
             RTD::data().N_scat[this_sp] += ptc.frac();
-
-            // log pair creation events
-            if ( species::electron == this_sp ) {
-              Index I; // domain index, not the global index
-              for ( int j = 0; j < DGrid; ++j )
-                I[j] = ( ptc.q(j) - grid[j].lower() ) / grid[j].delta();
-              RTD::data().pc_counter[0](I) += ptc.frac();
-            }
           }
 
           particles[this_sp].push_back(std::move(ptc));
         }
         new_ptc_buf->resize(0);
-        RTD::data().pc_cumulative_time += dt;
 
       }
     } analyzer;
@@ -736,7 +691,7 @@ namespace pic {
 
     {
       annih.setName("Annihilation");
-      annih[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      annih[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
       int half_width = ( PI / 12 ) / supergrid[1].delta();
       annih[1] = { i_equator - half_width, i_equator + half_width };
@@ -791,7 +746,7 @@ namespace pic {
 
     {
       no_ph.setName("NoPhotonZone");
-      no_ph[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      no_ph[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
       int half_width = ( PI / 12 ) / supergrid[1].delta();
       no_ph[1] = { i_equator - half_width, i_equator + half_width };
@@ -861,40 +816,7 @@ namespace pic {
 
   void export_prior_hook( const map<PtcArray>& particles, const map<Properties>& properties,
                           const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const Ensemble& ens,
-                          real_t dt, int timestep ) {
-    { // pair creation counter
-      auto& pc = RTD::data().pc_counter;
-      ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
-    }
-
-    { // skin depth
-      auto& skin_depth = RTD::data().skin_depth;
-      skin_depth = {J.mesh()};
-      skin_depth.reset();
-
-      for ( auto sp : particles ) {
-        auto q2m = properties[sp].charge_x * properties[sp].charge_x / properties[sp].mass_x;
-        for ( const auto& ptc : particles[sp] ) {
-          if ( !ptc.is(flag::exist) ) continue;
-          Index I;
-          for ( int i = 0; i < DGrid; ++i )
-            I[i] = ( ptc.q(i) - grid[i].lower() ) / grid[i].delta();
-          skin_depth[0](I) += q2m * ptc.frac();
-        }
-      }
-      ens.reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
-      if ( ens.is_chief() ) {
-        for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
-          real_t r = grid[0].absc(I[0], 0.5);
-          real_t theta = grid[1].absc(I[1], 0.5);
-          real_t h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
-          auto& v = skin_depth[0](I);
-          v = std::sqrt(h / v);
-        }
-      }
-
-    }
-  }
+                          real_t dt, int timestep ) {}
 
 }
 
@@ -963,30 +885,6 @@ namespace pic {
     }
   }
 
-  apt::array<real_t,3> pair_creation_rate ( Index I, const Grid& grid, const Field<3>& ,
-                                            const Field<3>& , const JField&  ) {
-    auto x = msh::interpolate( RTD::data().pc_counter, I2std(I), ShapeF() );
-    return { x[0] / RTD::data().pc_cumulative_time, 0, 0};
-  }
-
-  template < particle::species SP >
-  apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
-                                   const Field<3>& , const JField& J ) {
-    auto q = I2std(I);
-    auto j_sp = msh::interpolate( RTD::data().Jsp[SP], q, ShapeF() );
-    auto j = msh::interpolate( J, q, ShapeF() );
-    for ( int i = 0; i < 3; ++i ) {
-      if ( j[i] == 0 ) j_sp[i] = 0;
-      else j_sp[i] /= j[i];
-    }
-    return { real_t(j_sp[0]), real_t(j_sp[1]), real_t(j_sp[2]) };
-  }
-
-  apt::array<real_t,3> skin_depth ( Index I, const Grid& grid, const Field<3>& ,
-                                    const Field<3>& , const JField& ) {
-    return { msh::interpolate( RTD::data().skin_depth, I2std(I), ShapeF() )[0], 0, 0  };
-  }
-
   auto set_up_field_export() {
     std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
     {
@@ -995,23 +893,6 @@ namespace pic {
       fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
-      fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, average_when_downsampled) );
-
-      if ( RTD::data().is_export_Jsp ) {
-        using namespace particle;
-        for ( auto sp : RTD::data().Jsp ) {
-          switch(sp) {
-          case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, average_when_downsampled) ); break;
-          case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, average_when_downsampled) ); break;
-          case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, average_when_downsampled) ); break;
-          default: ;
-          }
-        }
-      }
     }
     return fexps;
   }
@@ -1047,49 +928,12 @@ namespace pic {
 }
 
 namespace pic {
-  void export_post_hook() {
-    auto& pc = RTD::data().pc_counter;
-    std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
-    RTD::data().pc_cumulative_time = 0;
-    if ( RTD::data().is_export_Jsp ) {
-      // clear Jsp to save some space
-      for ( auto sp : RTD::data().Jsp )
-        RTD::data().Jsp[sp] = {};
-    }
-    RTD::data().skin_depth = {};
-  }
+  void export_post_hook() {}
 }
-
-#include <sstream>
-#include "apt/print.hpp"
 
 namespace pic {
   std::string proofread(std::string indent) {
-    std::ostringstream o;
-    real_t gamma_0 = Omega * Omega * mu;
-    o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
-    o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
-    o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
-    o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * r_e() ) ) << std::endl;
-
-    {
-      using namespace particle;
-      o << indent << "ATM: N_atm_floor=" << apt::fmt("%.1f", N_atm_floor());
-      o << ", atm_x=" << apt::fmt("%.1f", atm_x);
-      o << ", v_th=" << apt::fmt("%.2f", v_th)
-        << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
-    }
-
-    {
-      using namespace particle;
-      o << indent << "PC: gamma_fd=" << apt::fmt("%.0f", gamma_fd);
-      o << ", E_ph=" << apt::fmt("%.0f", E_ph);
-
-      o << indent << "    gamma_RRL=" << gamma_fd * std::pow(gamma_fd / E_ph, 0.5);
-      // o << ", L_CR/L_sd=" << E_ph * Ndot_fd * Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
-    }
-    return o.str();
+    return {};
   }
 }
 

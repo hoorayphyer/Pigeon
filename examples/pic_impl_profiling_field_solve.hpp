@@ -181,27 +181,10 @@ namespace pic {
     }
 
     map<real_t> N_scat {};
-    Field<1> pc_counter {};
-    real_t pc_cumulative_time {};
-
-    map<JField> Jsp {}; // current by species
-    bool is_export_Jsp = false;
-
-    Field<1> skin_depth {};
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
-      is_export_Jsp = false;
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
-      if ( is_export_Jsp ) {
-        for ( auto sp : properties )
-          Jsp.insert( sp, {} );
-      }
-
-      Index bulk_dims;
-      for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
-      auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
-      pc_counter = {range};
     };
 
   private:
@@ -403,19 +386,6 @@ namespace pic {
     }
   }
 
-  template < particle::species SP >
-  apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
-                                   const Field<3>& , const JField& J ) {
-    auto q = I2std(I);
-    auto j_sp = msh::interpolate( RTD::data().Jsp[SP], q, ShapeF() );
-    auto j = msh::interpolate( J, q, ShapeF() );
-    for ( int i = 0; i < 3; ++i ) {
-      if ( j[i] == 0 ) j_sp[i] = 0;
-      else j_sp[i] /= j[i];
-    }
-    return { real_t(j_sp[0]), real_t(j_sp[1]), real_t(j_sp[2]) };
-  }
-
   auto set_up_field_export() {
     std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
     {
@@ -424,21 +394,6 @@ namespace pic {
       fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
-
-      if ( RTD::data().is_export_Jsp ) {
-        using namespace particle;
-        for ( auto sp : RTD::data().Jsp ) {
-          switch(sp) {
-          case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, average_when_downsampled) ); break;
-          case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, average_when_downsampled) ); break;
-          case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, average_when_downsampled) ); break;
-          default: ;
-          }
-        }
-      }
     }
     return fexps;
   }

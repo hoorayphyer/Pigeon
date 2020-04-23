@@ -734,7 +734,7 @@ namespace pic {
 
     {
       annih.setName("Annihilation");
-      annih[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      annih[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
       int half_width = ( PI / 12 ) / supergrid[1].delta();
       annih[1] = { i_equator - half_width, i_equator + half_width };
@@ -789,7 +789,7 @@ namespace pic {
 
     {
       no_ph.setName("NoPhotonZone");
-      no_ph[0] = { (std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta(), supergrid[0].dim() + myguard };
+      no_ph[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
       int half_width = ( PI / 12 ) / supergrid[1].delta();
       no_ph[1] = { i_equator - half_width, i_equator + half_width };
