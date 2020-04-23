@@ -33,8 +33,6 @@ fi
 if echo "$@" | grep -q "\--clean"; then
     if [[ -d ${LINES[$BUILD_DIR]} ]]; then
         rm -rf ${LINES[$BUILD_DIR]}
-    else
-        echo "no such directory to clean: "${LINES[$BUILD_DIR]}
     fi
     exit 0
 fi
