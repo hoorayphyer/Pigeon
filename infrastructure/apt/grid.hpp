@@ -112,6 +112,24 @@ namespace apt {
   }
 
   template < typename T, int DGrid >
+  constexpr array<T,DGrid> abscs(const Grid<T,DGrid>& grid, const array<int,DGrid>& I, const array<T,DGrid>& shift = {} ) noexcept {
+    array<T,DGrid> res;
+    for ( int i = 0; i < DGrid; ++i )
+      res[i] = grid[i].absc(I[i], shift[i]);
+    return res;
+  }
+
+  // promote the dimension
+  template < int D, typename T, int DGrid >
+  constexpr array<T,D> abscs(const Grid<T,DGrid>& grid, const array<int,DGrid>& I, const array<T,DGrid>& shift = {} ) noexcept {
+    static_assert(D >= DGrid);
+    array<T,D> res {};
+    for ( int i = 0; i < DGrid; ++i )
+      res[i] = grid[i].absc(I[i], shift[i]);
+    return res;
+  }
+
+  template < typename T, int DGrid >
   constexpr T dV(const Grid<T,DGrid>& grid) noexcept {
     T res = 1.0;
     for ( const auto& g : grid ) res *= g.delta();

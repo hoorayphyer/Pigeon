@@ -201,6 +201,11 @@ namespace pic {
           auto ic = set_up_initial_conditions();
           taylor(ic);
           ic(_grid, _E, _B, _J, _particles);
+          for ( auto sp : _particles ) {
+            for ( auto ptc : _particles[sp] ) { // TODOL semantics
+              ptc.set(sp);
+            }
+          }
           field::copy_sync_guard_cells(_E, *_cart_opt);
           field::copy_sync_guard_cells(_B, *_cart_opt);
           field::copy_sync_guard_cells(_J, *_cart_opt);
