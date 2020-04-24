@@ -1,4 +1,4 @@
-#include "forces_impl.hpp"
+#include "particle/forces_impl.hpp"
 #include "pic.hpp"
 
 using namespace pic;
