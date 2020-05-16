@@ -41,7 +41,7 @@ namespace pic {
   using Particle = ::particle::Particle<real_t,Specs>;
   using Force = ::particle::Force<real_t,Specs>;
 
-  struct Tracer {
+  struct ParticleTracing {
   public:
     static void init( const map<Properties>& properties,
                       const map<PtcArray>& particles ) {
@@ -52,33 +52,36 @@ namespace pic {
           if ( ptc.is(flag::traced) )
             n = std::max<unsigned int>( n, ptc.template get<::particle::serial_number>() );
 
-        data().trace_counter.insert( sp, n+1 );
+        _data()._trace_counter.insert( sp, n+1 );
       }
     }
-
     template < typename P >
-    inline static void trace( P&& ptc ) {
-      if ( not ptc.is(flag::traced) ) {
-        ptc.set(flag::traced);
-        ptc.set(::particle::serial_number(data().trace_counter[ptc.template get<species>()]++));
-      }
-    }
+    friend void trace( P&& ptc );
 
   private:
-    map<unsigned int> trace_counter {}; // for assigning serial numbers to traced particles
+    map<unsigned int> _trace_counter {}; // for assigning serial numbers to traced particles
 
-    static Tracer& data() {
-      static Tracer r;
+    static ParticleTracing& _data() {
+      static ParticleTracing r;
       return r;
     }
 
-    Tracer() = default;
-    Tracer(const Tracer&);
-    Tracer(Tracer&&) noexcept;
-    Tracer& operator=( const Tracer& );
-    Tracer& operator=( Tracer&& ) noexcept;
-    ~Tracer() = default;
+    ParticleTracing() = default;
+    ParticleTracing(const ParticleTracing&);
+    ParticleTracing(ParticleTracing&&) noexcept;
+    ParticleTracing& operator=( const ParticleTracing& );
+    ParticleTracing& operator=( ParticleTracing&& ) noexcept;
+    ~ParticleTracing() = default;
   };
+
+  template < typename P >
+  void trace( P&& ptc ) {
+    if ( not ptc.is(flag::traced) ) {
+      ptc.set(flag::traced);
+      ptc.set(::particle::serial_number(ParticleTracing::_data()._trace_counter[ptc.template get<species>()]++));
+    }
+  }
+
 }
 
 #include "toml++/toml.h"

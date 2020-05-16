@@ -1,39 +1,39 @@
-#ifndef _PIC_MODULES_
-#define _PIC_MODULES_
+#ifndef _PIC_PLANS_HPP_
+#define _PIC_PLANS_HPP_
 #include <limits>
 
 namespace pic {
-  struct ModuleBase {
+  struct Plan {
     bool on = false;
     int start = 0;
-    int end = std::numeric_limits<int>::max();
     int interval = 100;
+    int end = std::numeric_limits<int>::max();
 
     virtual bool is_do( int timestep ) const noexcept {
       return on and timestep >= start and timestep < end and ( (timestep - start) % interval == 0 );
     }
   };
 
-  ModuleBase mod_sort_ptcs, mod_vitals;
+  Plan sort_ptcs_plan, vitals_plan;
 
-  struct ExportModule : public ModuleBase {
+  struct ExportPlan : public Plan {
     int num_files = 1;
     int downsample_ratio = 1;
-  } mod_export;
+  } export_plan;
 
-  struct CheckpointModule : public ModuleBase {
+  struct CheckpointPlan : public Plan {
     int num_files = 1;
     int max_num_checkpoints = 1;
     // TODO hourly autosave
     // or ( pic::checkpoint_autosave_hourly &&
     //      autosave.is_save({*pic::checkpoint_autosave_hourly * 3600, "s"}) )
-  } mod_checkpoint;
+  } checkpoint_plan;
 
-  struct DynamicLoadBalanceModule : public ModuleBase {
+  struct DynamicLoadBalancePlan : public Plan {
     std::size_t target_load = 100000;
-  } mod_load_balance;
+  } load_balance_plan;
 
-  struct ProfilingModule : public ModuleBase {
+  struct ProfilingPlan : public Plan {
     std::optional<int> max_entries {100};
     bool (*is_qualified) () = [](){return true;};
 
@@ -46,11 +46,11 @@ namespace pic {
       }
       return false;
     }
-  } mod_profiling;
+  } profiling_plan;
 
-  struct TracingModule : public ModuleBase {
+  struct SaveTracingPlan : public Plan { // FIXME
     int num_files = 1;
-  } mod_tracing;
+  } save_tracing_plan;
 
   int print_timestep_to_stdout_interval = 100;
 

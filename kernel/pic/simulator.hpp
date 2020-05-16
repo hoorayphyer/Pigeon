@@ -127,7 +127,7 @@ namespace pic {
         RTD::data().init( _properties, _grid );
       }
 
-      if ( mod_profiling.on and mod_profiling.is_qualified() ) lgr::file.open(std::ios_base::app);
+      if ( profiling_plan.on and profiling_plan.is_qualified() ) lgr::file.open(std::ios_base::app);
     }
 
   public:
@@ -215,7 +215,7 @@ namespace pic {
       mpi::world.broadcast( 0, &init_ts, 1 );
 
       // initialize trace_counters to ensure unique trace serial numbers across runs
-      Tracer::init(_properties, _particles);
+      ParticleTracing::init(_properties, _particles);
 
       return init_ts;
     }
@@ -235,10 +235,10 @@ namespace pic {
 
       std::optional<tmr::Timestamp> stamp_all;
       std::optional<tmr::Timestamp> stamp;
-      if ( mod_profiling.is_do(timestep) and mod_profiling.is_qualified() ) {
+      if ( profiling_plan.is_do(timestep) and profiling_plan.is_qualified() ) {
         stamp_all.emplace();
         stamp.emplace();
-        if ( mod_profiling.is_reached_max_entries(timestep) ) lgr::file.clear();
+        if ( profiling_plan.is_reached_max_entries(timestep) ) lgr::file.clear();
         lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
         lgr::file.indent_append("\t");
       }
@@ -268,7 +268,7 @@ namespace pic {
 
         _J.reset();
 
-        if ( mod_sort_ptcs.is_do(timestep) ) {
+        if ( sort_ptcs_plan.is_do(timestep) ) {
           TIMING("SortParticles", START {
               for ( auto sp : _particles ) particle::sort( _particles[sp], _grid );
             });
@@ -281,16 +281,16 @@ namespace pic {
         }
 
         // ----- before this line particles are all within borders --- //
-        TIMING("ParticleActions", START {
-            for ( int i = 0; i < _ptc_actions.size(); ++i ) {
-              if ( !_ptc_actions[i] ) continue;
-              if ( stamp ) {
-                lgr::file % "--" << _ptc_actions[i]->name() << std::endl;
-              }
-              auto& act = *_ptc_actions[i];
-              act( _particles, _J, &_ptc_buffer, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
-            }
+        if ( stamp ) {
+          lgr::file % "* ParticleActions" << std::endl;
+        }
+        for ( int i = 0; i < _ptc_actions.size(); ++i ) {
+          if ( !_ptc_actions[i] ) continue;
+          TIMING(" -- " + _ptc_actions[i]->name(), START {
+            auto& act = *_ptc_actions[i];
+            act( _particles, _J, &_ptc_buffer, _properties, _E, _B, _grid, &ens, dt, timestep, _rng );
           });
+        }
 
         { // NOTE rescale Jmesh back to real grid delta
           auto dV = apt::dV(_grid);
@@ -313,81 +313,30 @@ namespace pic {
           });
 
         if ( _cart_opt ) {
-          TIMING("FieldUpdate", START {
+          if ( stamp ) {
+            lgr::file % "* FieldActions" << std::endl;
+          }
+          TIMING(" -- MergeSyncJ", START {
               field::merge_sync_guard_cells( _J, *_cart_opt );
-
-              std::unordered_map<int,field::Field<R, 3, DGrid>> E_old_patch;
-              std::unordered_map<int,field::Field<R, 3, DGrid>> B_old_patch;
-              int i_max = -1; // action index with the largest range
-              {
-                int full_size_max = 0;
-                for ( int i = 0; i < _field_actions.size(); ++i ) {
-                  if ( !_field_actions[i] or !_field_actions[i] -> require_original_EB() ) continue;
-                  const auto& act = *_field_actions[i];
-                  int full_size = 1;
-                  for ( int j = 0; j < act.size(); ++j )
-                    full_size *= act[j].full_size();
-
-                  int i_to_be_cached = 0;
-                  if ( full_size > full_size_max ) {
-                    i_to_be_cached = i_max;
-                    i_max = i;
-                    full_size_max = full_size;
-                  } else
-                    i_to_be_cached = i;
-                  if ( -1 == i_to_be_cached  ) continue;
-
-                  const auto& a = *_field_actions[i_to_be_cached];
-                  E_old_patch.insert( {i_to_be_cached, {a}} );
-                  B_old_patch.insert( {i_to_be_cached, {a}} );
-                  for ( int C = 0; C < 3; ++ C ) {
-                    for ( const auto& I : apt::Block(apt::range::far_begin(a), apt::range::far_end(a)) ) {
-                      E_old_patch.at(i_to_be_cached)[C](I) = _E[C](I);
-                      B_old_patch.at(i_to_be_cached)[C](I) = _B[C](I);
-                    }
-                  }
-                }
-              }
-
-              // FIXME: i_max must go first in this category
-              if ( -1 != i_max ) {
-                if ( stamp ) {
-                  lgr::file % "--" << _field_actions[i_max]->name() << std::endl;
-                }
-                (*_field_actions[i_max])(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
-              }
-
-              for ( int i = 0; i < _field_actions.size(); ++i ) {
-                if ( !_field_actions[i] or i_max == i ) continue; // FIXME NOTE the i_max
-                if ( stamp ) {
-                  lgr::file % "--" << _field_actions[i]->name() << std::endl;
-                }
-                const auto& act = *_field_actions[i];
-
-                if ( E_old_patch.find(i) != E_old_patch.end() ) {
-                  auto& E_old = E_old_patch.at(i);
-                  auto& B_old = B_old_patch.at(i);
-                  act(E_old, B_old, _J, _grid, *_cart_opt, timestep, dt);
-                  for ( const auto& I : apt::Block(apt::range::begin(act), apt::range::end(act)) ) {
-                    for ( int C = 0; C < 3; ++C ) {
-                      _E[C](I) = E_old[C](I);
-                      _B[C](I) = B_old[C](I);
-                    }
-                  }
-
-                } else
-                  act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
-              }
             });
 
+          for ( int i = 0; i < _field_actions.size(); ++i ) {
+            if ( !_field_actions[i] ) continue;
+            TIMING(" -- " + _field_actions[i]->name(), START {
+              const auto& act = *_field_actions[i];
+              act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
+            });
+          }
 
-          // NOTE sub_range same as domain_range FIXME rethink domain and sub range
-          copy_sync_guard_cells(_E, *_cart_opt );
-          copy_sync_guard_cells(_B, *_cart_opt );
+          TIMING(" -- CopySyncEB", START {
+              // NOTE sub_range same as domain_range FIXME rethink domain and sub range
+              field::copy_sync_guard_cells(_E, *_cart_opt );
+              field::copy_sync_guard_cells(_B, *_cart_opt );
+            });
         }
       }
 
-      if ( mod_export.is_do(timestep) and _ens_opt ) {
+      if ( export_plan.is_do(timestep) and _ens_opt ) {
         TIMING("ExportData", START {
             export_prior_hook( _particles, _properties, _E, _B, _J, _grid, *_ens_opt, dt, timestep );
 
@@ -397,8 +346,8 @@ namespace pic {
             io::set_is_collinear_mesh(is_collinear_mesh); // TODO
 
             io::export_data<pic::real_export_t>( this_run_dir, timestep, dt,
-                                                 mod_export.num_files,
-                                                 mod_export.downsample_ratio,
+                                                 export_plan.num_files,
+                                                 export_plan.downsample_ratio,
                                                  _cart_opt, *_ens_opt, _grid, _E, _B, _J,
                                                  _particles, _properties, fexps, pexps );
             for ( auto ptr : fexps ) delete ptr;
@@ -408,14 +357,14 @@ namespace pic {
           });
       }
 
-      if ( mod_load_balance.is_do(timestep) ) {
+      if ( load_balance_plan.is_do(timestep) ) {
         TIMING("DynamicLoadBalance", START {
             // TODO has a few hyper parameters
             // TODO touch create is not multinode safe even buffer is used
             std::optional<int> old_label;
             if ( _ens_opt ) old_label.emplace(_ens_opt->label());
 
-            dynamic_load_balance( _particles, _ens_opt, _cart_opt, mod_load_balance.target_load );
+            dynamic_load_balance( _particles, _ens_opt, _cart_opt, load_balance_plan.target_load );
 
             std::optional<int> new_label;
             if ( _ens_opt ) new_label.emplace(_ens_opt->label());
@@ -425,26 +374,26 @@ namespace pic {
           });
       }
 
-      if (_ens_opt and mod_vitals.is_do(timestep) ) {
+      if (_ens_opt and vitals_plan.is_do(timestep) ) {
         TIMING("Statistics", START {
             pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, RTD::data().N_scat );
           });
       }
 
       static ckpt::Autosave autosave; // significant only on mpi::world.rank() == 0
-      if ( mod_checkpoint.is_do(timestep) ) {
+      if ( checkpoint_plan.is_do(timestep) ) {
         TIMING("SaveCheckpoint", START {
-            auto dir = ckpt::save_checkpoint( this_run_dir, mod_checkpoint.num_files, _ens_opt, timestep, _E, _B, _particles, _properties );
+            auto dir = ckpt::save_checkpoint( this_run_dir, checkpoint_plan.num_files, _ens_opt, timestep, _E, _B, _particles, _properties );
             if ( mpi::world.rank() == 0 ) {
-              auto obsolete_ckpt = autosave.add_checkpoint(dir, mod_checkpoint.max_num_checkpoints);
+              auto obsolete_ckpt = autosave.add_checkpoint(dir, checkpoint_plan.max_num_checkpoints);
               if ( obsolete_ckpt ) fs::remove_all(*obsolete_ckpt);
             }
           });
       }
 
-      if ( mod_tracing.is_do(timestep) ) {
+      if ( save_tracing_plan.is_do(timestep) ) { // FIXME
         TIMING("SaveTracing", START {
-            auto dir = ckpt::save_tracing( this_run_dir, mod_tracing.num_files, _ens_opt, timestep, _particles );
+            auto dir = ckpt::save_tracing( this_run_dir, save_tracing_plan.num_files, _ens_opt, timestep, _particles );
           });
       }
 

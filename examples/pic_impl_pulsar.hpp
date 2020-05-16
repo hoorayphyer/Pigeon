@@ -7,7 +7,7 @@
 
 #include "particle/annihilation.hpp"
 
-#include "pic/modules.hpp"
+#include "pic/plans.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
 
@@ -50,7 +50,7 @@ namespace pic {
   std::string datadir_prefix;
   int total_timesteps;
 
-  ModuleBase mod_annih {};
+  Plan annih_plan {};
 
   void load_configuration(const ConfFile_t& conf) {
     safe_set(dt, conf["dt"]);
@@ -77,48 +77,49 @@ namespace pic {
     datadir_prefix = conf["datadir_prefix"].value_or("../Data/"sv);
     total_timesteps = conf["total_timesteps"].value_or(100);
 
-    print_timestep_to_stdout_interval = conf["mods"]["print_timestep_to_stdout_interval"].value_or(100);
+    print_timestep_to_stdout_interval = conf["plans"]["print_timestep_to_stdout_interval"].value_or(100);
 
-    mod_sort_ptcs.on = conf["mods"]["sort"]["on"].value_or(true);
-    mod_sort_ptcs.start = conf["mods"]["sort"]["start"].value_or(0);
-    safe_set(mod_sort_ptcs.interval, conf["mods"]["sort"]["interval"]);
+    sort_ptcs_plan.on = conf["plans"]["sort"]["on"].value_or(true);
+    sort_ptcs_plan.start = conf["plans"]["sort"]["start"].value_or(0);
+    safe_set(sort_ptcs_plan.interval, conf["plans"]["sort"]["interval"]);
 
-    mod_export.on = conf["mods"]["export"]["on"].value_or(true);
-    mod_export.start = conf["mods"]["export"]["start"].value_or(0);
-    safe_set(mod_export.interval, conf["mods"]["export"]["interval"]);
-    mod_export.num_files = conf["mods"]["export"]["num_files"].value_or(1);
-    mod_export.downsample_ratio = conf["mods"]["export"]["downsample_ratio"].value_or(1);
+    export_plan.on = conf["plans"]["export"]["on"].value_or(true);
+    export_plan.start = conf["plans"]["export"]["start"].value_or(0);
+    safe_set(export_plan.interval, conf["plans"]["export"]["interval"]);
+    export_plan.num_files = conf["plans"]["export"]["num_files"].value_or(1);
+    export_plan.downsample_ratio = conf["plans"]["export"]["downsample_ratio"].value_or(1);
 
-    mod_checkpoint.on = conf["mods"]["checkpoint"]["on"].value_or(false);
-    mod_checkpoint.start = conf["mods"]["checkpoint"]["start"].value_or(1);
-    safe_set(mod_checkpoint.interval, conf["mods"]["checkpoint"]["interval"]);
-    mod_checkpoint.num_files = conf["mods"]["checkpoint"]["num_files"].value_or(1);
-    mod_checkpoint.max_num_checkpoints = conf["mods"]["checkpoint"]["max_num_checkpoints"].value_or(1);
+    checkpoint_plan.on = conf["plans"]["checkpoint"]["on"].value_or(false);
+    checkpoint_plan.start = conf["plans"]["checkpoint"]["start"].value_or(1);
+    safe_set(checkpoint_plan.interval, conf["plans"]["checkpoint"]["interval"]);
+    checkpoint_plan.num_files = conf["plans"]["checkpoint"]["num_files"].value_or(1);
+    checkpoint_plan.max_num_checkpoints = conf["plans"]["checkpoint"]["max_num_checkpoints"].value_or(1);
 
-    mod_load_balance.on = conf["mods"]["load_balance"]["on"].value_or(true);
-    mod_load_balance.start = conf["mods"]["load_balance"]["start"].value_or(0);
-    safe_set(mod_load_balance.interval, conf["mods"]["load_balance"]["interval"]);
-    mod_load_balance.target_load = conf["mods"]["load_balance"]["target_load"].value_or(100000);
+    load_balance_plan.on = conf["plans"]["load_balance"]["on"].value_or(true);
+    load_balance_plan.start = conf["plans"]["load_balance"]["start"].value_or(0);
+    safe_set(load_balance_plan.interval, conf["plans"]["load_balance"]["interval"]);
+    load_balance_plan.target_load = conf["plans"]["load_balance"]["target_load"].value_or(100000);
 
-    mod_profiling.on = conf["mods"]["profiling"]["on"].value_or(false);
-    mod_profiling.start = conf["mods"]["profiling"]["start"].value_or(0);
-    safe_set(mod_profiling.interval, conf["mods"]["profiling"]["interval"]);
-    if ( auto n = conf["mods"]["profiling"]["max_entries"].value<int64_t>() ) {
-      mod_profiling.max_entries = {*n};
+    profiling_plan.on = conf["plans"]["profiling"]["on"].value_or(false);
+    profiling_plan.start = conf["plans"]["profiling"]["start"].value_or(0);
+    safe_set(profiling_plan.interval, conf["plans"]["profiling"]["interval"]);
+    if ( auto n = conf["plans"]["profiling"]["max_entries"].value<int64_t>() ) {
+      profiling_plan.max_entries = {*n};
     }
 
-    mod_vitals.on = conf["mods"]["vitals"]["on"].value_or(true);
-    mod_vitals.start = conf["mods"]["vitals"]["start"].value_or(0);
-    safe_set(mod_vitals.interval, conf["mods"]["vitals"]["interval"]);
+    vitals_plan.on = conf["plans"]["vitals"]["on"].value_or(true);
+    vitals_plan.start = conf["plans"]["vitals"]["start"].value_or(0);
+    safe_set(vitals_plan.interval, conf["plans"]["vitals"]["interval"]);
 
-    mod_tracing.on = conf["mods"]["tracing"]["on"].value_or(false);
-    mod_tracing.start = conf["mods"]["tracing"]["start"].value_or(0);
-    safe_set(mod_tracing.interval, conf["mods"]["tracing"]["interval"]);
-    mod_tracing.num_files = conf["mods"]["tracing"]["num_files"].value_or(1);
+    // FIXME
+    save_tracing_plan.on = conf["plans"]["tracing"]["on"].value_or(false);
+    save_tracing_plan.start = conf["plans"]["tracing"]["start"].value_or(0);
+    safe_set(save_tracing_plan.interval, conf["plans"]["tracing"]["interval"]);
+    save_tracing_plan.num_files = conf["plans"]["tracing"]["num_files"].value_or(1);
 
-    mod_annih.on = conf["mods"]["annihilation"]["on"].value_or(false);
-    mod_annih.start = conf["mods"]["annihilation"]["start"].value_or(0);
-    safe_set(mod_annih.interval, conf["mods"]["annihilation"]["interval"]);
+    annih_plan.on = conf["plans"]["annihilation"]["on"].value_or(false);
+    annih_plan.start = conf["plans"]["annihilation"]["start"].value_or(0);
+    safe_set(annih_plan.interval, conf["plans"]["annihilation"]["interval"]);
   }
 
   real_t r_e() {
@@ -177,7 +178,7 @@ namespace pic {
 }
 
 namespace pic {
-  struct RTD {
+  struct RTD { // runtime data
   public:
     static RTD& data() {
       static RTD r;
@@ -414,7 +415,7 @@ namespace pic {
                         const Ensemble* ens,
                         real_t dt, int timestep, util::Rng<real_t>& rng
                         ) override {
-        if ( !RTD::data().is_export_Jsp || !mod_export.is_do(timestep) ) {
+        if ( !RTD::data().is_export_Jsp || !export_plan.is_do(timestep) ) {
           _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
         } else {
           auto& Jsp = RTD::data().Jsp;
@@ -713,7 +714,7 @@ namespace pic {
                         real_t dt, int timestep, util::Rng<real_t>& ) override {
         if ( apt::range::is_empty(*this) ) return;
 
-        if ( mod_annih.is_do(timestep) ) {
+        if ( annih_plan.is_do(timestep) ) {
           assert( ens != nullptr );
           assert( _policy != nullptr );
 
@@ -916,7 +917,7 @@ namespace pic {
   }
 
   void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
-    int factor = POW(mod_export.downsample_ratio, pic::DGrid); // FIXME test mods.export
+    int factor = POW(export_plan.downsample_ratio, pic::DGrid);
     for ( int i = 0; i < num_comps; ++i ) {
       for ( auto& x : fds[i].data() ) x /= factor;
     }
