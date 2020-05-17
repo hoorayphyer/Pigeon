@@ -149,12 +149,19 @@ int main(int argc, char** argv) {
 
     auto properties = pic::set_up_particle_properties();
 
+    if (mpi::world.rank() == 0)
+      std::cout << "Initializing simulator..." << std::endl;
+
     pic::Simulator< pic::DGrid, pic::real_t, particle::Specs, pic::ShapeF, pic::real_j_t >
       sim( pic::supergrid, cart_opt, properties );
 
+    if (mpi::world.rank() == 0)
+      std::cout << "Loading initial condition..." << std::endl;
     int init_timestep = sim.load_initial_condition( resume_dir );
     sim.set_rng_seed( init_timestep + mpi::world.rank() );
 
+    if (mpi::world.rank() == 0)
+      std::cout << "Launch" << std::endl;
     for ( int ts = init_timestep; ts < init_timestep + pic::total_timesteps; ++ts ) {
       sim.evolve( ts, pic::dt );
     }
