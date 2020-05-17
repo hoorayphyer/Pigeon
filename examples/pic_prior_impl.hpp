@@ -56,7 +56,7 @@ namespace pic {
       }
     }
     template < typename P >
-    friend void trace( P&& ptc );
+    friend void trace( P& ptc );
 
   private:
     map<unsigned int> _trace_counter {}; // for assigning serial numbers to traced particles
@@ -75,13 +75,30 @@ namespace pic {
   };
 
   template < typename P >
-  void trace( P&& ptc ) {
+  void trace( P& ptc ) {
     if ( not ptc.is(flag::traced) ) {
+      using sn = ::particle::serial_number;
       ptc.set(flag::traced);
-      ptc.set(::particle::serial_number(ParticleTracing::_data()._trace_counter[ptc.template get<species>()]++));
+      if ( ptc.template get<sn>() == 0 ) {
+        ptc.set(sn(ParticleTracing::_data()._trace_counter[ptc.template get<species>()]++));
+      }
     }
   }
 
+  template < typename P >
+  void untrace( P& ptc ) {
+    ptc.reset(flag::traced);
+  }
+
+}
+
+/// define convenient literal operators
+constexpr pic::real_t operator"" _deg ( long double x ) noexcept {
+  return static_cast<pic::real_t>(x * 3.14159265358979323846264L / 180);
+}
+
+constexpr pic::real_t operator"" _r ( long double x ) noexcept {
+  return static_cast<pic::real_t>(x);
 }
 
 #include "toml++/toml.h"

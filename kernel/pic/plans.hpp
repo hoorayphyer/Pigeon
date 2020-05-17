@@ -48,7 +48,7 @@ namespace pic {
     }
   } profiling_plan;
 
-  struct SaveTracingPlan : public Plan { // FIXME
+  struct SaveTracingPlan : public Plan {
     int num_files = 1;
   } save_tracing_plan;
 

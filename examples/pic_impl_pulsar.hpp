@@ -20,13 +20,11 @@
 namespace pic {
   using Metric = metric::LogSpherical<real_t>;
 
-  constexpr double PI = std::acos(-1.0);
-
   inline constexpr apt::array<int,DGrid> dims = { 1, 1 };
   inline constexpr apt::array<bool,DGrid> periodic = {false,false};
 
   constexpr Grid supergrid
-  = {{ { 0.0, std::log(30.0), 64 }, { 0.0, PI, 64 } }};
+  = {{ { 0.0, std::log(30.0), 64 }, { 0.0, 180.0_deg, 64 } }};
 
   real_t Omega = 1.0 / 6.0;
   real_t dt;
@@ -111,7 +109,6 @@ namespace pic {
     vitals_plan.start = conf["plans"]["vitals"]["start"].value_or(0);
     safe_set(vitals_plan.interval, conf["plans"]["vitals"]["interval"]);
 
-    // FIXME
     save_tracing_plan.on = conf["plans"]["tracing"]["on"].value_or(false);
     save_tracing_plan.start = conf["plans"]["tracing"]["start"].value_or(0);
     safe_set(save_tracing_plan.interval, conf["plans"]["tracing"]["interval"]);
@@ -135,24 +132,24 @@ namespace pic {
   constexpr int myguard = std::max(1, ( pic::ShapeF::support() + 3 ) / 2 ); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   real_t omega_spinup ( real_t time ) noexcept {
-    return std::min<real_t>( time / spinup_time, 1.0 ) * Omega;
+    return std::min<real_t>( time / spinup_time, 1.0_r ) * Omega;
   }
 
   real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
+    return pic::mu * 2.0_r * std::cos(theta) * std::exp(-3.0_r * lnr);
   }
   real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
+    return pic::mu * std::sin(theta) * std::exp(-3.0_r * lnr);
   }
   constexpr real_t B_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
   }
 
   real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * std::sin( theta ) * std::sin(theta);
+    return pic::mu * omega_spinup(time) * std::exp(- 2.0_r * lnr) * std::sin( theta ) * std::sin(theta);
   }
   real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
+    return - pic::mu * omega_spinup(time) * std::exp(- 2.0_r * lnr ) * std::sin( 2.0_r*theta );
   }
   constexpr real_t E_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
@@ -254,7 +251,7 @@ namespace pic {
         // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
         auto assign = []( real_t& v_g, real_t& v_b ) noexcept { v_g = v_b; };
         auto neg_assign = []( real_t& v_g, real_t& v_b ) noexcept {
-                            v_g = ( &v_g == &v_b ) ? 0.0 : - v_b;
+                            v_g = ( &v_g == &v_b ) ? 0.0_r : - v_b;
                           };
         // MIDWAY in AxisDir
         axissymmetrize(E[0], assign, range::begin(*this), range::end(*this), _is_upper_axis );
@@ -347,7 +344,7 @@ namespace pic {
     {
       ::particle::Scat<real_t,Specs> ep_scat;
 
-      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q(0) < std::log(9.0); });
+      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q(0) < std::log(9.0_r); });
 
       scat::CurvatureRadiation<real_t,Specs>::gamma_fd = gamma_fd;
       scat::CurvatureRadiation<real_t,Specs>::gamma_off = gamma_off;
@@ -423,7 +420,7 @@ namespace pic {
           for ( auto sp : particles ) {
             map<PtcArray> ptcs_sp;
             ptcs_sp.insert(sp);
-            std::swap( ptcs_sp[sp], particles[sp] ); // FIXME make sure there is no copying
+            std::swap( ptcs_sp[sp], particles[sp] );
             Jsp[sp] = J;
             Jsp[sp].reset();
             _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
@@ -509,7 +506,7 @@ namespace pic {
                 if ( !x.is(flag::exist) || !is_in(x.q()) ) continue;
                 Index idx;
                 for ( int i = 0; i < DGrid; ++i )
-                  idx[i] = ( x.q(i) - grid[i].lower() ) / grid[i].delta(); // NOTE used grid.lower instead of lb, important
+                  idx[i] = grid[i].csba(x.q(i)); // NOTE used grid.lower instead of lb, important
                 count[0](idx) += x.frac(); // add by fraction
               }
             };
@@ -538,15 +535,15 @@ namespace pic {
             const auto& m = B.mesh();
             auto li = m.linear_index(I);
             if constexpr (DGrid == 2) {
-                nB[0] = 0.5 * ( B[0][li] + B[0][li + m.stride(1)] );
-                nB[1] = 0.5 * ( B[1][li] + B[1][li + m.stride(0)] );
-                nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+                nB[0] = 0.5_r * ( B[0][li] + B[0][li + m.stride(1)] );
+                nB[1] = 0.5_r * ( B[1][li] + B[1][li + m.stride(0)] );
+                nB[2] = 0.25_r * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
               } else if (DGrid == 3){
-              nB[0] = 0.25 * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
-              nB[1] = 0.25 * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
-              nB[2] = 0.25 * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
+              nB[0] = 0.25_r * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
+              nB[1] = 0.25_r * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
+              nB[2] = 0.25_r * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
             }
-            if ( apt::abs(nB) == 0.0 ) nB = {1.0, 0.0, 0.0}; // use radial direction as default
+            if ( apt::abs(nB) == 0.0_r ) nB = {1.0_r, 0.0_r, 0.0_r}; // use radial direction as default
             else nB /= apt::abs(nB);
           }
 
@@ -557,8 +554,8 @@ namespace pic {
           real_t quota = _N_atm * std::sin(q[1]) - N_pairs;
           while ( quota > _min_frac ) {
             auto q_ptc = q;
-            real_t frac = std::min( (real_t)1.0, quota );
-            quota -= (real_t)1.0;
+            real_t frac = std::min( 1.0_r, quota );
+            quota -= 1.0_r;
 
             for ( int i = 0; i < DGrid; ++i ) {
               if ( _n == i )
@@ -645,7 +642,7 @@ namespace pic {
             if ( species::electron == this_sp ) {
               Index I; // domain index, not the global index
               for ( int j = 0; j < DGrid; ++j )
-                I[j] = ( ptc.q(j) - grid[j].lower() ) / grid[j].delta();
+                I[j] = grid[j].csba( ptc.q(j) );
               RTD::data().pc_counter[0](I) += ptc.frac();
             }
           }
@@ -735,9 +732,9 @@ namespace pic {
 
     {
       annih.setName("Annihilation");
-      annih[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
+      annih[0] = { supergrid[0].csba(std::log(9.0)), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( PI / 12 ) / supergrid[1].delta();
+      int half_width = ( 15.0_deg ) / supergrid[1].delta();
       annih[1] = { i_equator - half_width, i_equator + half_width };
 
       auto policy =
@@ -790,13 +787,210 @@ namespace pic {
 
     {
       no_ph.setName("NoPhotonZone");
-      no_ph[0] = { static_cast<int>((std::log(9.0) - supergrid[0].lower()) / supergrid[0].delta()), supergrid[0].dim() + myguard };
+      no_ph[0] = { supergrid[0].csba(std::log(9.0)), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( PI / 12 ) / supergrid[1].delta();
+      int half_width = ( 15.0_deg ) / supergrid[1].delta();
       no_ph[1] = { i_equator - half_width, i_equator + half_width };
 
       no_ph.set_interval(100);
     }
+
+    struct Tracer : public PtcAction {
+    private:
+      real_t _prob = 1.0_r;
+      std::vector<::particle::species> _sps;
+
+      bool _is_check_within_range = true;
+
+      bool _is_within_range(const PtcArray::particle_type::vec_type& q,
+                            const apt::array<apt::array<real_t,2>,DGrid>& bds ) {
+        for ( int i = 0; i < DGrid; ++i ) {
+          if ( q[i] < bds[i][0] or q[i] >= bds[i][1] ) return false;
+        }
+        return true;
+      }
+
+      using FCond_t = bool(*)(const PtcArray::particle_type& ptc);
+      FCond_t _conditional = nullptr;
+
+      Plan _plan{};
+
+      using FMark_t = void(*)(PtcArray::particle_type& ptc);
+      FMark_t _marker = nullptr;
+
+    public:
+      Tracer* Clone() const override {return new auto(*this);}
+
+      auto& set_probability( real_t prob ) noexcept { _prob = prob; return *this;}
+      auto& set_marker( FMark_t f ) noexcept { _marker = f; return *this;}
+      auto& set_species(const std::vector<::particle::species>& sps) noexcept {
+        _sps = sps; return *this;
+      }
+      auto& set_is_check_within_range( bool a ) noexcept {_is_check_within_range=a; return *this;}
+      auto& set_conditional( FCond_t cond) noexcept {_conditional = cond; return *this;}
+      auto& set_plan( const Plan& p ) noexcept { _plan = p; return *this; }
+
+      void operator() ( map<PtcArray>& particles, JField& ,
+                        std::vector<Particle>* ,
+                        const map<Properties>& ,
+                        const Field<3>&, const Field<3>&,
+                        const Grid& grid, const Ensemble* ,
+                        real_t , int timestep, util::Rng<real_t>& rng) override {
+        if ( !_plan.is_do(timestep) or apt::range::is_empty(*this) or !_marker ) return;
+
+        apt::array< apt::array<real_t,2>, DGrid > bds;
+        for ( int i = 0; i < DGrid; ++i ) {
+          bds[i][0] = grid[i].absc( apt::range::begin(*this,i) );
+          bds[i][1] = grid[i].absc( apt::range::end(*this,i) );
+        }
+
+        for ( auto sp : _sps ) {
+          for ( auto ptc : particles[sp] ) { // TODOL semantics
+            if ( !ptc.is(flag::exist)
+                 or (_is_check_within_range and !_is_within_range(ptc.q(), bds) )
+                 or ( _conditional and !_conditional(ptc) )
+                 or ( _prob < 1.0_r and rng.uniform() > _prob )
+                 ) continue;
+            _marker(ptc);
+          }
+        }
+      }
+    };
+
+    Tracer sep_ftp;
+    {
+      auto& tr = sep_ftp;
+      tr.setName("Separatrix Footpoint Tracer");
+      tr[0] = { supergrid[0].csba(std::log(1.20)), supergrid[0].csba(std::log(1.40)) };
+      tr[1] = { supergrid[1].csba(0.595), supergrid[1].csba(0.638) };
+    }
+
+    Tracer ycloud;
+    {
+      auto& tr = ycloud;
+      tr.setName("Y Cloud Tracer");
+      tr[0] = { supergrid[0].csba(std::log(4.6)), supergrid[0].csba(std::log(5.2)) };
+      tr[1] = { supergrid[1].csba( 90.0_deg - 0.04), supergrid[1].csba(90.0_deg + 0.04) };
+    }
+
+    Tracer two_small_plasmoids;
+    {
+      auto& tr = two_small_plasmoids;
+      tr.setName("Two Small Plasmoids Tracer");
+      tr[0] = { supergrid[0].csba(std::log(6.6)), supergrid[0].csba(std::log(7.8)) };
+      tr[1] = { supergrid[1].csba( 90.0_deg - 0.028), supergrid[1].csba(90.0_deg + 0.028) };
+    }
+
+    Tracer one_big_plasmoid;
+    {
+      auto& tr = one_big_plasmoid;
+      tr.setName("One Big Plasmoid Tracer");
+      tr[0] = { supergrid[0].csba(std::log(9.6)), supergrid[0].csba(std::log(10.2)) };
+      tr[1] = { supergrid[1].csba( 90.0_deg - 0.06), supergrid[1].csba(90.0_deg + 0.06) };
+    }
+
+    Tracer black_region;
+    {
+      auto& tr = black_region;
+      tr.setName("Black Region Tracer");
+      tr[0] = { supergrid[0].csba(std::log(9.6)), supergrid[0].csba(std::log(10.2)) };
+      tr[1] = { supergrid[1].csba(0.582), supergrid[1].csba(0.810) };
+
+      tr.set_is_check_within_range(false);
+      tr.set_conditional
+        ([](const auto& ptc){
+           constexpr apt::array<apt::array<real_t,2>, 4> vs
+             = {{ {{0.975,1.478}}, {{1.104,1.280}}, {{1.576,1.500}}, {{1.436, 1.750}} }}; // vertices in x,z cartesian coordinates
+           // if a point is inside this polygon, the cross product should all have positive sign
+           real_t x = std::exp(ptc.q(0));
+           real_t z = x * std::cos(ptc.q(1));
+           x = std::sqrt(x*x - z*z);
+           for ( int i = 0; i < 4; ++i ) {
+             if ( (vs[i][0]-x)*(vs[(i+1)%4][1]-vs[i][1])
+                  - (vs[i][1]-z)*(vs[(i+1)%4][0]-vs[i][0]) < 0 )
+               return false;
+           }
+           return true;
+         });
+    }
+
+    Tracer backflow;
+    {
+      auto& tr = backflow;
+      tr.setName("Backflow Tracer");
+      tr[0] = { supergrid[0].csba(std::log(6.0)), supergrid[0].csba(std::log(30)) };
+      tr[1] = { supergrid[1].csba(90.0_deg - 0.139), supergrid[1].csba(90.0_deg + 0.139) };
+    }
+    Tracer grand_tot;
+    {
+      auto& tr = grand_tot;
+      tr.setName("Grand Total");
+      tr[0] = { 0, supergrid[0].dim() };
+      tr[1] = { 0, supergrid[1].dim() + 1 };
+    }
+
+
+    Plan p_onetime;
+    p_onetime.on = true; p_onetime.start = save_tracing_plan.start, p_onetime.interval = 100000;
+    Plan p_always;
+    p_always.on = true; p_always.start = 0, p_always.interval = 1;
+
+    sep_ftp
+      .set_species({EL,PO,IO})
+      .set_probability(0.1)
+      .set_plan(p_onetime)
+      .set_marker([](auto& p){p.set(flag::_5);});
+    ycloud
+      .set_species({EL,PO,IO})
+      .set_probability(0.1)
+      .set_plan(p_onetime)
+      .set_marker([](auto& p){p.set(flag::_6);});
+    two_small_plasmoids
+      .set_species({EL,PO,IO})
+      .set_probability(0.1)
+      .set_plan(p_onetime)
+      .set_marker([](auto& p){p.set(flag::_7);});
+    one_big_plasmoid
+      .set_species({EL,PO,IO})
+      .set_probability(0.1)
+      .set_plan(p_onetime)
+      .set_marker([](auto& p){p.set(flag::_8);});
+    black_region
+      .set_species({EL,PO})
+      .set_probability(0.1)
+      .set_plan(p_onetime)
+      .set_marker([](auto& p){p.set(flag::_9);});
+    backflow
+      .set_species({EL})
+      .set_probability(1.01)
+      .set_plan(p_always)
+      .set_marker
+      ([](auto&p) {
+         constexpr auto f // encoding of radius
+           = [](real_t r) {
+               return static_cast<int>( std::min( (r-6.0_r)*0.5_r, 0.001_r ) );
+             };
+         // use one bit to flag, use three bits to encode farthest distance traveled
+         int r = f(std::exp(p.q(0)));
+         int r_max = p.is(flag::_11) + p.is(flag::_12)*2 + p.is(flag::_13)*4;
+         (r < r_max and r < f(12.01_r)) ? p.set(flag::_10) : p.reset(flag::_10);
+         r_max = std::max(r_max,r);
+         (r_max & 1) ? p.set(flag::_11) : p.reset(flag::_11);
+         (r_max & 2) ? p.set(flag::_12) : p.reset(flag::_12);
+         (r_max & 4) ? p.set(flag::_13) : p.reset(flag::_13);
+       });
+    grand_tot.set_species({EL,PO,IO})
+      .set_probability(1.01)
+      .set_plan(save_tracing_plan)
+      .set_marker
+      ([](auto&p) {
+         if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7)
+              or p.is(flag::_8) or p.is(flag::_9) or p.is(flag::_10) ) {
+           pic::trace(p);
+         } else {
+           pic::untrace(p);
+         }
+       });
 
     pus.emplace_back(no_ph.Clone());
     pus.emplace_back(annih.Clone());
@@ -808,6 +1002,16 @@ namespace pic {
     pus.emplace_back(analyzer.Clone());
     // FIXME migrate need more memory check
     pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
+
+    if ( save_tracing_plan.on ) {
+      pus.emplace_back(sep_ftp.Clone());
+      pus.emplace_back(ycloud.Clone());
+      pus.emplace_back(two_small_plasmoids.Clone());
+      pus.emplace_back(one_big_plasmoid.Clone());
+      pus.emplace_back(black_region.Clone());
+      pus.emplace_back(backflow.Clone());
+      pus.emplace_back(grand_tot.Clone());
+    }
 
     return pus;
   }
@@ -865,7 +1069,7 @@ namespace pic {
           if ( !ptc.is(flag::exist) ) continue;
           Index I;
           for ( int i = 0; i < DGrid; ++i )
-            I[i] = ( ptc.q(i) - grid[i].lower() ) / grid[i].delta();
+            I[i] = grid[i].csba( ptc.q(i) );
           skin_depth[0](I) += q2m * ptc.frac();
         }
       }
@@ -1058,7 +1262,7 @@ namespace pic {
     o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
     o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( PI * r_e() ) ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180 * r_e() ) ) << std::endl;
 
     {
       using namespace particle;

@@ -84,6 +84,11 @@ namespace apt {
       return  _lower + delta() * ( i + shift_from_lb );
     }
 
+    // reverse abscissa, find index from abscissa
+    constexpr int csba( T x ) const noexcept {
+      return static_cast<int>( (x - _lower) / delta() );
+    }
+
     constexpr void clip( int i_start, int extent ) noexcept {
       _lower = absc( i_start );
       _dim = extent;
