@@ -1262,7 +1262,7 @@ namespace pic {
     o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
     o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180 * r_e() ) ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180_deg * r_e() ) ) << std::endl;
 
     {
       using namespace particle;
