@@ -5,6 +5,7 @@
 #include <array>
 #include <optional>
 #include <vector>
+#include <stdexcept>
 
 namespace particle {
   // NOTE this data structure map is to achieve the following

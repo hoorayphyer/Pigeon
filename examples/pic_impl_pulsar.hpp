@@ -1214,6 +1214,7 @@ namespace pic {
     return { 1.0, 0.0, 0.0 };
   }
 
+  // FIXME energy should factor in mass
   apt::array<real_t,3> ptc_energy ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
     return { std::sqrt( (prop.mass_x > 0.01) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
   }
@@ -1262,7 +1263,7 @@ namespace pic {
     o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
     o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180_deg * r_e() ) ) << std::endl;
+    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180.0_deg * r_e() ) ) << std::endl;
 
     {
       using namespace particle;

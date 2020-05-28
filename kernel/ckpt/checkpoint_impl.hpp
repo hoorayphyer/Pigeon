@@ -195,6 +195,7 @@ namespace ckpt {
             dbfile.cd("..");
           }
       );
+    active->barrier(); // ensure the checkpoint is fully saved before any other actions
 
     return prefix;
 

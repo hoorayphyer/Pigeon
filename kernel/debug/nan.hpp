@@ -4,6 +4,7 @@
 #include "apt/block.hpp"
 #include "apt/range.hpp"
 #include <cmath>
+#include <iostream>
 
 namespace debug {
   template < typename T, int DField, int DGrid, template < typename, int, int > class Field >
