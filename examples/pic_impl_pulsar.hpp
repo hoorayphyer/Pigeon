@@ -968,7 +968,7 @@ namespace pic {
       ([](auto&p) {
          constexpr auto f // encoding of radius
            = [](real_t r) {
-               return static_cast<int>( std::min( (r-6.0_r)*0.5_r, 0.001_r ) );
+               return static_cast<int>( std::max( (r-6.0_r)*0.5_r, 0.001_r ) );
              };
          // use one bit to flag, use three bits to encode farthest distance traveled
          int r = f(std::exp(p.q(0)));
