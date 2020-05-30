@@ -7,7 +7,6 @@
 
 #include "particle/annihilation.hpp"
 
-#include "pic/plans.hpp"
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
 
@@ -290,6 +289,8 @@ namespace pic {
   constexpr real_t gamma_off = 15.0;
   constexpr real_t Ndot_fd = 0.25;
 
+  constexpr particle::flag backflow_fl = particle::flag::_8;
+
   auto set_up_particle_properties() {
     map<Properties> properties;
     {
@@ -341,6 +342,13 @@ namespace pic {
 
     using Ptc_t = typename PtcArray::particle_type;
     namespace scat = ::particle::scat;
+
+    static auto flagger = [](particle::flagbits parent_bits, species) {
+      parent_bits[flag::secondary] = true;
+      parent_bits[backflow_fl] = false; // backflow tracing mark doesn't pass down
+      return parent_bits;
+    };
+
     {
       ::particle::Scat<real_t,Specs> ep_scat;
 
@@ -353,9 +361,15 @@ namespace pic {
       ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
 
       if ( properties.has(species::photon) )
-        ep_scat.impl = scat::RadiationFromCharges<false,real_t,Specs>;
+        ep_scat.impl =
+          [](auto itr, auto &p, real_t t) {
+            return scat::RadiationFromCharges<false, real_t, Specs>(itr, p, t, flagger);
+        };
       else
-        ep_scat.impl = scat::RadiationFromCharges<true,real_t,Specs>;
+        ep_scat.impl =
+          [](auto itr, auto &p, real_t t) {
+            return scat::RadiationFromCharges<true, real_t, Specs>(itr, p, t, flagger);
+          };
 
       if ( properties.has(species::electron) && properties.has(species::positron) ) {
         ep_scat.Register( species::electron );
@@ -365,7 +379,6 @@ namespace pic {
 
     if ( properties.has(species::photon) ) {
       ::particle::Scat<real_t,Specs> photon_scat;
-      // Photons are free to roam across all domain. They may produce pairs outside light cylinder
       photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
       scat::MagneticConvert<real_t,Specs>::B_thr = magnetic_convert_B_thr;
       scat::MagneticConvert<real_t,Specs>::mfp = mfp[0];
@@ -374,7 +387,10 @@ namespace pic {
       scat::TwoPhotonCollide<real_t,Specs>::mfp = mfp[1];
       photon_scat.channels.push_back( scat::TwoPhotonCollide<real_t,Specs>::test );
 
-      photon_scat.impl = scat::PhotonPairProduction<real_t,Specs>;
+      photon_scat.impl =
+        [](auto itr, auto &p, real_t t) {
+          return scat::PhotonPairProduction<real_t, Specs>(itr, p, t, flagger);
+        };
 
       photon_scat.Register( species::photon );
     }
@@ -795,131 +811,12 @@ namespace pic {
       no_ph.set_interval(100);
     }
 
-    struct Tracer : public PtcAction {
-    private:
-      real_t _prob = 1.0_r;
-      std::vector<::particle::species> _sps;
-
-      bool _is_check_within_range = true;
-
-      bool _is_within_range(const PtcArray::particle_type::vec_type& q,
-                            const apt::array<apt::array<real_t,2>,DGrid>& bds ) {
-        for ( int i = 0; i < DGrid; ++i ) {
-          if ( q[i] < bds[i][0] or q[i] >= bds[i][1] ) return false;
-        }
-        return true;
-      }
-
-      using FCond_t = bool(*)(const PtcArray::particle_type& ptc);
-      FCond_t _conditional = nullptr;
-
-      Plan _plan{};
-
-      using FMark_t = void(*)(PtcArray::particle_type& ptc);
-      FMark_t _marker = nullptr;
-
-    public:
-      Tracer* Clone() const override {return new auto(*this);}
-
-      auto& set_probability( real_t prob ) noexcept { _prob = prob; return *this;}
-      auto& set_marker( FMark_t f ) noexcept { _marker = f; return *this;}
-      auto& set_species(const std::vector<::particle::species>& sps) noexcept {
-        _sps = sps; return *this;
-      }
-      auto& set_is_check_within_range( bool a ) noexcept {_is_check_within_range=a; return *this;}
-      auto& set_conditional( FCond_t cond) noexcept {_conditional = cond; return *this;}
-      auto& set_plan( const Plan& p ) noexcept { _plan = p; return *this; }
-
-      void operator() ( map<PtcArray>& particles, JField& ,
-                        std::vector<Particle>* ,
-                        const map<Properties>& ,
-                        const Field<3>&, const Field<3>&,
-                        const Grid& grid, const Ensemble* ,
-                        real_t , int timestep, util::Rng<real_t>& rng) override {
-        if ( !_plan.is_do(timestep) or apt::range::is_empty(*this) or !_marker ) return;
-
-        apt::array< apt::array<real_t,2>, DGrid > bds;
-        for ( int i = 0; i < DGrid; ++i ) {
-          bds[i][0] = grid[i].absc( apt::range::begin(*this,i) );
-          bds[i][1] = grid[i].absc( apt::range::end(*this,i) );
-        }
-
-        for ( auto sp : _sps ) {
-          for ( auto ptc : particles[sp] ) { // TODOL semantics
-            if ( !ptc.is(flag::exist)
-                 or (_is_check_within_range and !_is_within_range(ptc.q(), bds) )
-                 or ( _conditional and !_conditional(ptc) )
-                 or ( _prob < 1.0_r and rng.uniform() > _prob )
-                 ) continue;
-            _marker(ptc);
-          }
-        }
-      }
-    };
-
-    Tracer sep_ftp;
-    {
-      auto& tr = sep_ftp;
-      tr.setName("Separatrix Footpoint Tracer");
-      tr[0] = { supergrid[0].csba(std::log(1.20)), supergrid[0].csba(std::log(1.40)) };
-      tr[1] = { supergrid[1].csba(0.595), supergrid[1].csba(0.638) };
-    }
-
-    Tracer ycloud;
-    {
-      auto& tr = ycloud;
-      tr.setName("Y Cloud Tracer");
-      tr[0] = { supergrid[0].csba(std::log(4.6)), supergrid[0].csba(std::log(5.2)) };
-      tr[1] = { supergrid[1].csba( 90.0_deg - 0.04), supergrid[1].csba(90.0_deg + 0.04) };
-    }
-
-    Tracer two_small_plasmoids;
-    {
-      auto& tr = two_small_plasmoids;
-      tr.setName("Two Small Plasmoids Tracer");
-      tr[0] = { supergrid[0].csba(std::log(6.6)), supergrid[0].csba(std::log(7.8)) };
-      tr[1] = { supergrid[1].csba( 90.0_deg - 0.028), supergrid[1].csba(90.0_deg + 0.028) };
-    }
-
-    Tracer one_big_plasmoid;
-    {
-      auto& tr = one_big_plasmoid;
-      tr.setName("One Big Plasmoid Tracer");
-      tr[0] = { supergrid[0].csba(std::log(9.6)), supergrid[0].csba(std::log(10.2)) };
-      tr[1] = { supergrid[1].csba( 90.0_deg - 0.06), supergrid[1].csba(90.0_deg + 0.06) };
-    }
-
-    Tracer black_region;
-    {
-      auto& tr = black_region;
-      tr.setName("Black Region Tracer");
-      tr[0] = { supergrid[0].csba(std::log(9.6)), supergrid[0].csba(std::log(10.2)) };
-      tr[1] = { supergrid[1].csba(0.582), supergrid[1].csba(0.810) };
-
-      tr.set_is_check_within_range(false);
-      tr.set_conditional
-        ([](const auto& ptc){
-           constexpr apt::array<apt::array<real_t,2>, 4> vs
-             = {{ {{0.975,1.478}}, {{1.104,1.280}}, {{1.576,1.500}}, {{1.436, 1.750}} }}; // vertices in x,z cartesian coordinates
-           // if a point is inside this polygon, the cross product should all have positive sign
-           real_t x = std::exp(ptc.q(0));
-           real_t z = x * std::cos(ptc.q(1));
-           x = std::sqrt(x*x - z*z);
-           for ( int i = 0; i < 4; ++i ) {
-             if ( (vs[i][0]-x)*(vs[(i+1)%4][1]-vs[i][1])
-                  - (vs[i][1]-z)*(vs[(i+1)%4][0]-vs[i][0]) < 0 )
-               return false;
-           }
-           return true;
-         });
-    }
-
     Tracer backflow;
     {
       auto& tr = backflow;
       tr.setName("Backflow Tracer");
       tr[0] = { supergrid[0].csba(std::log(6.0)), supergrid[0].csba(std::log(30)) };
-      tr[1] = { supergrid[1].csba(90.0_deg - 0.139), supergrid[1].csba(90.0_deg + 0.139) };
+      tr[1] = { supergrid[1].csba(90.0_deg - 0.139), supergrid[1].csba(90.0_deg) };
     }
     Tracer grand_tot;
     {
@@ -929,40 +826,13 @@ namespace pic {
       tr[1] = { 0, supergrid[1].dim() + 1 };
     }
 
-
-    Plan p_onetime;
-    p_onetime.on = true; p_onetime.start = save_tracing_plan.start, p_onetime.interval = 100000;
     Plan p_always;
-    p_always.on = true; p_always.start = 0, p_always.interval = 1;
+    p_always.on = true; p_always.start = 0, p_always.interval = 100;
+    float prob = 0.01;
 
-    sep_ftp
-      .set_species({EL,PO,IO})
-      .set_probability(0.1)
-      .set_plan(p_onetime)
-      .set_marker([](auto& p){p.set(flag::_5);});
-    ycloud
-      .set_species({EL,PO,IO})
-      .set_probability(0.1)
-      .set_plan(p_onetime)
-      .set_marker([](auto& p){p.set(flag::_6);});
-    two_small_plasmoids
-      .set_species({EL,PO,IO})
-      .set_probability(0.1)
-      .set_plan(p_onetime)
-      .set_marker([](auto& p){p.set(flag::_7);});
-    one_big_plasmoid
-      .set_species({EL,PO,IO})
-      .set_probability(0.1)
-      .set_plan(p_onetime)
-      .set_marker([](auto& p){p.set(flag::_8);});
-    black_region
-      .set_species({EL,PO})
-      .set_probability(0.1)
-      .set_plan(p_onetime)
-      .set_marker([](auto& p){p.set(flag::_9);});
     backflow
       .set_species({EL})
-      .set_probability(1.01)
+      .set_probability(prob)
       .set_plan(p_always)
       .set_marker
       ([](auto&p) {
@@ -972,20 +842,19 @@ namespace pic {
              };
          // use one bit to flag, use three bits to encode farthest distance traveled
          int r = f(std::exp(p.q(0)));
-         int r_max = p.is(flag::_11) + p.is(flag::_12)*2 + p.is(flag::_13)*4;
-         (r < r_max and r < f(12.01_r)) ? p.set(flag::_10) : p.reset(flag::_10);
+         int r_max = p.is(flag::_9) + p.is(flag::_10)*2 + p.is(flag::_11)*4;
+         (r < r_max and r < f(12.01_r)) ? p.set(backflow_fl) : p.reset(backflow_fl);
          r_max = std::max(r_max,r);
-         (r_max & 1) ? p.set(flag::_11) : p.reset(flag::_11);
-         (r_max & 2) ? p.set(flag::_12) : p.reset(flag::_12);
-         (r_max & 4) ? p.set(flag::_13) : p.reset(flag::_13);
+         (r_max & 1) ? p.set(flag::_9) : p.reset(flag::_9);
+         (r_max & 2) ? p.set(flag::_10) : p.reset(flag::_10);
+         (r_max & 4) ? p.set(flag::_11) : p.reset(flag::_11);
        });
-    grand_tot.set_species({EL,PO,IO})
+    grand_tot.set_species({EL,PO,IO,PH})
       .set_probability(1.01)
       .set_plan(save_tracing_plan)
       .set_marker
       ([](auto&p) {
-         if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7)
-              or p.is(flag::_8) or p.is(flag::_9) or p.is(flag::_10) ) {
+         if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7) or p.is(backflow_fl) ) {
            pic::trace(p);
          } else {
            pic::untrace(p);
@@ -1004,11 +873,6 @@ namespace pic {
     pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
 
     if ( save_tracing_plan.on ) {
-      pus.emplace_back(sep_ftp.Clone());
-      pus.emplace_back(ycloud.Clone());
-      pus.emplace_back(two_small_plasmoids.Clone());
-      pus.emplace_back(one_big_plasmoid.Clone());
-      pus.emplace_back(black_region.Clone());
       pus.emplace_back(backflow.Clone());
       pus.emplace_back(grand_tot.Clone());
     }
@@ -1040,6 +904,156 @@ namespace pic {
     ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
 
     return ic;
+  }
+
+  auto set_up_post_resume_actions() {
+    struct PostResume : public apt::ActionBase<DGrid> {
+      PostResume *Clone() const override {return new PostResume(*this);}
+
+      void
+      operator()(const Grid &grid, Field<3> &E, Field<3> &B, JField &J,
+                 map<PtcArray> &particles,
+                 const std::optional<Ensemble> & ens_opt,
+                 int resumed_timestep,
+                 std::string this_run_dir) const {
+        if ( resumed_timestep != 304000 or apt::range::is_empty(*this) or !save_tracing_plan.on ) return;
+
+        { // clear previous tracing and untrace all of them
+          for (auto sp : particles) {
+            for ( auto ptc : particles[sp] ) { // TODOL semantics
+              untrace(ptc);
+              for ( int i = 5; i < 16; ++i )
+                ptc.reset(static_cast<flag>(i));
+            }
+          }
+        }
+
+        Tracer sep_ftp;
+        {
+          auto& tr = sep_ftp;
+          tr.setName("Separatrix Footpoint Tracer");
+          tr[0] = (*this)[0];
+          tr[1] = (*this)[1];
+          tr.set_conditional
+            ([](const PtcArray::particle_type &ptc) {
+               return Tracer::is_within_bounds
+                 (ptc.q(),
+                  {std::log(1.07), std::log(1.50), 0.54, 0.72});
+             });
+          tr.set_is_check_within_range(false);
+        }
+
+        Tracer ypoint;
+        {
+          auto& tr = ypoint;
+          tr.setName("Y Point Tracer");
+          tr[0] = (*this)[0];
+          tr[1] = (*this)[1];
+          tr.set_conditional([](const PtcArray::particle_type &ptc) {
+            return Tracer::is_within_bounds
+              (ptc.q(),
+               {std::log(4.7), std::log(5.2), 90.0_deg - 0.1/4.7, 90.0_deg});
+          });
+          tr.set_is_check_within_range(false);
+        }
+
+        Tracer two_small_plasmoids;
+        {
+          auto& tr = two_small_plasmoids;
+          tr.setName("Two Small Plasmoids Tracer");
+          tr[0] = (*this)[0];
+          tr[1] = (*this)[1];
+          tr.set_conditional([](const PtcArray::particle_type &ptc) {
+            return Tracer::is_within_bounds(
+                ptc.q(),
+                {std::log(5.21), std::log(5.8), 90.0_deg - 0.1/5.21, 90.0_deg});
+          });
+          tr.set_is_check_within_range(false);
+        }
+
+        Tracer one_big_plasmoid;
+        {
+          auto& tr = one_big_plasmoid;
+          tr.setName("One Big Plasmoid Tracer");
+          tr[0] = (*this)[0];
+          tr[1] = (*this)[1];
+          tr.set_conditional([](const PtcArray::particle_type &ptc) {
+            return Tracer::is_within_bounds(
+                ptc.q(),
+                {std::log(6.4), std::log(6.8), 90.0_deg - 0.2 / 6.4, 90.0_deg});
+          });
+          tr.set_is_check_within_range(false);
+        }
+
+        Tracer inner_cloud;
+        {
+          auto &tr = inner_cloud;
+          tr.setName("Inner Cloud Tracer");
+          tr[0] = (*this)[0];
+          tr[1] = (*this)[1];
+          tr.set_conditional([](const PtcArray::particle_type &ptc) {
+            return Tracer::is_within_bounds(
+                ptc.q(),
+                {std::log(4.2), std::log(4.6), 90.0_deg - 0.1/4.2, 90.0_deg});
+          });
+          tr.set_is_check_within_range(false);
+        }
+
+        Plan p_onetime;
+        p_onetime.on = true; p_onetime.start = 0, p_onetime.interval = 1;
+        float prob = 0.01;
+
+        static auto set_group =
+          [](auto &p, int g) {
+            assert(g > 0); // g = 0 reserved for no tracing
+            (g & 1) ? p.set(flag::_5) : p.reset(flag::_5);
+            (g & 2) ? p.set(flag::_6) : p.reset(flag::_6);
+            (g & 4) ? p.set(flag::_7) : p.reset(flag::_7);
+          };
+
+        sep_ftp.set_species({EL, PO, IO})
+            .set_probability(prob)
+            .set_plan(p_onetime)
+            .set_marker([](auto &p) { set_group(p, 1); });
+
+        ypoint.set_species({EL, PO, IO, PH})
+            .set_probability(prob)
+            .set_plan(p_onetime)
+            .set_marker([](auto &p) {set_group(p, 2);});
+
+        inner_cloud.set_species({EL, PO, IO})
+            .set_probability(prob)
+            .set_plan(p_onetime)
+            .set_marker([](auto &p) { set_group(p, 3); });
+
+        two_small_plasmoids.set_species({EL, PO})
+            .set_probability(prob)
+            .set_plan(p_onetime)
+            .set_marker([](auto &p) { set_group(p, 4); });
+
+        one_big_plasmoid.set_species({EL, PO, PH})
+            .set_probability(prob)
+            .set_plan(p_onetime)
+            .set_marker([](auto &p) { set_group(p, 5); });
+
+        util::Rng<real_t> rng;
+        rng.set_seed(resumed_timestep + mpi::world.rank());
+
+        std::vector<PtcAction*> acts {&sep_ftp, &ypoint, &inner_cloud, &two_small_plasmoids, &one_big_plasmoid};
+        const Ensemble* ptr = ens_opt ? &(*ens_opt) : nullptr;
+        for ( auto* a : acts ) {
+          (*a)(particles, J, nullptr, {}, E, B, grid, ptr, {}, resumed_timestep, rng);
+        }
+
+        auto dir = ckpt::save_tracing(this_run_dir, save_tracing_plan.num_files,
+                                      ens_opt, resumed_timestep, particles);
+      }
+
+    } pr;
+    pr[0] = {0, supergrid[0].dim()};
+    pr[1] = {0, supergrid[1].dim() + 1}; // NOTE +1 to include upper boundary
+
+    return pr;
   }
 }
 

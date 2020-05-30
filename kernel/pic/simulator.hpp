@@ -127,13 +127,18 @@ namespace pic {
         RTD::data().init( _properties, _grid );
       }
 
-      if ( profiling_plan.on and profiling_plan.is_qualified() ) lgr::file.open(std::ios_base::app);
     }
 
   public:
     Simulator( const apt::Grid< R, DGrid >& supergrid, const std::optional<mpi::CartComm>& cart_opt, const particle::map<particle::Properties>& props )
       : _supergrid(supergrid), _cart_opt(cart_opt), _properties(props) {
       _grid = supergrid;
+
+      if ( profiling_plan.on and profiling_plan.is_qualified() ) {
+        lgr::file.open(std::ios_base::app);
+        lgr::file << "--- Initializing Simulator..." << std::endl;
+      }
+
       if ( pic::init_replica_deploy ) {
         std::optional<int> label{};
         if ( _cart_opt )
@@ -165,7 +170,6 @@ namespace pic {
         for ( int i = 0; i < DGrid; ++i ) {
           bulk_dims[i] = _supergrid[i].dim() / pic::dims[i];
         }
-        // FIXME : should include upper boundary ???
         auto range = apt::make_range({}, bulk_dims, myguard);
         _E = {range};
         _B = {range};
@@ -187,14 +191,27 @@ namespace pic {
         _particles.insert( sp, particle::array<R, S>() );
 
       if ( _ens_opt ) update_parts(*_ens_opt);
+
+      if ( profiling_plan.on and profiling_plan.is_qualified() ) {
+        lgr::file << "--- Done." << std::endl;
+      }
     }
 
     int load_initial_condition( std::optional<std::string> checkpoint_dir ) {
       int init_ts = 0;
+      if ( profiling_plan.on and profiling_plan.is_qualified() ) {
+        lgr::file << "--- Loading Initial Condition..." << std::endl;
+      }
+
       if ( checkpoint_dir ) {
         init_ts = ckpt::load_checkpoint( *checkpoint_dir, _ens_opt, _cart_opt, _E, _B, _particles, _properties );
+        if ( _ens_opt ) {
+          update_parts(*_ens_opt);
+          auto pr = pic::set_up_post_resume_actions();
+          taylor(pr);
+          pr(_grid, _E, _B, _J, _particles, _ens_opt, init_ts, this_run_dir);
+        }
         ++init_ts; // checkpoint is saved at the end of a timestep
-        if ( _ens_opt ) update_parts(*_ens_opt);
       } else {
         // FIXME a temporary fix, which may crash under the edge case in which initially many particles are created.
         if (_cart_opt) {
@@ -216,6 +233,10 @@ namespace pic {
 
       // initialize trace_counters to ensure unique trace serial numbers across runs
       ParticleTracing::init(_properties, _particles);
+
+      if ( profiling_plan.on and profiling_plan.is_qualified() ) {
+        lgr::file << "--- Done." << std::endl;
+      }
 
       return init_ts;
     }

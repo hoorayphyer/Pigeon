@@ -28,7 +28,7 @@ namespace particle {
   struct Scat {
     std::vector<scat::Eligible_t<T,S>> eligs;
     std::vector<scat::Channel_t<T,S>> channels;
-    void (*impl) ( scat::back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T ) = nullptr;
+    void (*impl)(scat::back_insert_iterator_t<T, S> itr, Ptc_t<T, S> &ptc, T) = nullptr;
 
     void Register( species sp ) const;
     static void Unregister( species sp );
@@ -118,11 +118,16 @@ namespace particle::scat {
 
 // Impls
 namespace particle::scat {
-  template < bool Instant, typename T, template < typename > class S >
-  void RadiationFromCharges ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T E_ph );
 
-  template < typename T, template < typename > class S >
-  void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T );
+using flagger_t = flagbits (*)(flagbits, species);
+
+template <bool Instant, typename T, template <typename> class S>
+void RadiationFromCharges(back_insert_iterator_t<T, S> itr, Ptc_t<T, S> &ptc,
+                          T E_ph, flagger_t );
+
+template <typename T, template <typename> class S>
+void PhotonPairProduction(back_insert_iterator_t<T, S> itr, Ptc_t<T, S> &photon,
+                          T, flagger_t );
 }
 
 #endif

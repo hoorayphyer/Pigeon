@@ -3,54 +3,61 @@
 #include "apt/numeric.hpp"
 
 namespace particle::scat {
-  template < bool Instant, typename T, template < typename > class S >
-  void RadiationFromCharges ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& ptc, T E_ph ) {
+  template <bool Instant, typename T, template <typename> class S>
+  void RadiationFromCharges(back_insert_iterator_t<T, S> itr, Ptc_t<T, S> &ptc, T E_ph, flagger_t f) {
     {
-      auto gamma_ptc = std::sqrt( 1.0 + apt::sqabs(ptc.p()) );
+      auto gamma_ptc = std::sqrt(1.0 + apt::sqabs(ptc.p()));
       // primary particle loses energy to gamma rays. ptc.p *= |pf| / |pi|
-      ptc.p() *= std::sqrt( ( 1.0 - E_ph / ( gamma_ptc - 1.0 ) ) * ( 1.0 - E_ph / ( gamma_ptc + 1.0 ) ) );
+      ptc.p() *= std::sqrt((1.0 - E_ph / (gamma_ptc - 1.0)) * (1.0 - E_ph / (gamma_ptc + 1.0)));
     }
 
-    if constexpr ( Instant ) {
+    if constexpr (Instant) {
         // recycle Rc for gamma_sec
         E_ph /= 2.0;
         // append electron and positron
-        Particle<T,S> ptc_sec ( ptc.q(),
-                                ptc.p() * ( std::sqrt( E_ph * E_ph - 1.0 ) / apt::sqabs(ptc.p()) ),
-                                ptc.frac(),
-                                flag::secondary,
-                                ptc.template get<birthplace>() );
+        Particle<T, S> ptc_sec(ptc.q(),
+                               ptc.p() * (std::sqrt(E_ph * E_ph - 1.0) / apt::sqabs(ptc.p())),
+                               ptc.frac(),
+                               ptc.template get<birthplace>());
+
         ptc_sec.set(species::electron);
+        if (f)
+          ptc_sec.set( f(ptc.template get<flagbits>(), species::electron) );
         *(itr++) = ptc_sec;
+
         ptc_sec.set(species::positron);
+        if (f)
+          ptc_sec.set( f(ptc.template get<flagbits>(), species::positron) );
         *(itr++) = std::move(ptc_sec);
 
       } else {
-      *(itr++) = Particle<T,S> ( ptc.q(),
-                                 ptc.p() * ( E_ph / apt::abs(ptc.p()) ),
-                                 ptc.frac(),
-                                 species::photon,
-                                 flag::secondary,
-                                 ptc.template get<birthplace>()
-                                 );
+      *(itr++) = Particle<T, S>(ptc.q(),
+                                ptc.p() * (E_ph / apt::abs(ptc.p())),
+                                ptc.frac(),
+                                species::photon,
+                                f(ptc.template get<flagbits>(), species::photon),
+                                ptc.template get<birthplace>());
     }
   }
 
   template < typename T, template < typename > class S >
-  void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T ) {
+  void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T, flagger_t f ) {
     Particle<T,S> ptc_sec ( photon.q(),
                             photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
                             photon.frac(),
-                            flag::secondary,
                             photon.template get<birthplace>()
                             );
     ptc_sec.set(species::electron);
+    if (f)
+      ptc_sec.set(f(photon.template get<flagbits>(), species::electron));
     *(itr++) = ptc_sec;
+
     ptc_sec.set(species::positron);
+    if (f)
+      ptc_sec.set( f(photon.template get<flagbits>(), species::positron) );
     *(itr++) = std::move(ptc_sec);
 
-    // void this photon
-    photon.reset(flag::exist);
+    photon.reset(flag::exist); // void this photon
   }
 }
 

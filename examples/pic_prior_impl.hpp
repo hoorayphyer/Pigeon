@@ -15,6 +15,7 @@
 #include "dye/ensemble.hpp"
 
 #include "pic.hpp"
+#include "pic/plans.hpp"
 
 namespace pic {
   using Index = ::apt::Index<DGrid>;
@@ -41,6 +42,18 @@ namespace pic {
   using Particle = ::particle::Particle<real_t,Specs>;
   using Force = ::particle::Force<real_t,Specs>;
 
+}
+
+/// define convenient literal operators
+constexpr pic::real_t operator"" _deg(long double x) noexcept {
+  return static_cast<pic::real_t>(x * 3.14159265358979323846264L / 180);
+}
+
+constexpr pic::real_t operator"" _r(long double x) noexcept {
+  return static_cast<pic::real_t>(x);
+}
+
+namespace pic {
   struct ParticleTracing {
   public:
     static void init( const map<Properties>& properties,
@@ -90,15 +103,69 @@ namespace pic {
     ptc.reset(flag::traced);
   }
 
-}
+  struct Tracer : public PtcAction {
+  private:
+    real_t _prob = 1.0_r;
+    std::vector<::particle::species> _sps;
 
-/// define convenient literal operators
-constexpr pic::real_t operator"" _deg ( long double x ) noexcept {
-  return static_cast<pic::real_t>(x * 3.14159265358979323846264L / 180);
-}
+    bool _is_check_within_range = true;
 
-constexpr pic::real_t operator"" _r ( long double x ) noexcept {
-  return static_cast<pic::real_t>(x);
+    using FCond_t = bool(*)(const PtcArray::particle_type& ptc);
+    FCond_t _conditional = nullptr;
+
+    Plan _plan{};
+
+    using FMark_t = void(*)(PtcArray::particle_type& ptc);
+    FMark_t _marker = nullptr;
+
+  public:
+    Tracer* Clone() const override {return new auto(*this);}
+
+    auto& set_probability( real_t prob ) noexcept { _prob = prob; return *this;}
+    auto& set_marker( FMark_t f ) noexcept { _marker = f; return *this;}
+    auto& set_species(const std::vector<::particle::species>& sps) noexcept {
+      _sps = sps; return *this;
+    }
+    auto& set_is_check_within_range( bool a ) noexcept {_is_check_within_range=a; return *this;}
+    auto& set_conditional( FCond_t cond) noexcept {_conditional = cond; return *this;}
+    auto& set_plan( const Plan& p ) noexcept { _plan = p; return *this; }
+
+    static bool is_within_bounds(const PtcArray::particle_type::vec_type &q,
+                                 const apt::array<apt::array<real_t, 2>, DGrid> &bds) {
+      for (int i = 0; i < DGrid; ++i) {
+        if (q[i] < bds[i][0] or q[i] >= bds[i][1])
+          return false;
+      }
+      return true;
+    }
+
+    void operator() ( map<PtcArray>& particles, JField& ,
+                      std::vector<Particle>* ,
+                      const map<Properties>& ,
+                      const Field<3>&, const Field<3>&,
+                      const Grid& grid, const Ensemble* ,
+                      real_t , int timestep, util::Rng<real_t>& rng) override {
+      if ( !_plan.is_do(timestep) or apt::range::is_empty(*this) or !_marker ) return;
+
+      apt::array< apt::array<real_t,2>, DGrid > bds;
+      for ( int i = 0; i < DGrid; ++i ) {
+        bds[i][0] = grid[i].absc( apt::range::begin(*this,i) );
+        bds[i][1] = grid[i].absc( apt::range::end(*this,i) );
+      }
+
+      for ( auto sp : _sps ) {
+        for ( auto ptc : particles[sp] ) { // TODOL semantics
+          if ( !ptc.is(flag::exist)
+               or (_is_check_within_range and !is_within_bounds(ptc.q(), bds) )
+               or ( _conditional and !_conditional(ptc) )
+               or ( _prob < 1.0_r and rng.uniform() > _prob )
+               ) continue;
+          _marker(ptc);
+        }
+      }
+    }
+  };
+
 }
 
 #include "toml++/toml.h"

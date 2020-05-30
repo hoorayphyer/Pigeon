@@ -26,9 +26,9 @@ namespace particle {
 
 
   namespace scat {
-    template void RadiationFromCharges<true>(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t);
-    template void RadiationFromCharges<false>(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t);
-    template void PhotonPairProduction(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t);
+    template void RadiationFromCharges<true>(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t, flagger_t);
+    template void RadiationFromCharges<false>(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t, flagger_t);
+    template void PhotonPairProduction(back_insert_iterator_t<real_t,Specs>, Ptc_t<real_t,Specs>&, real_t, flagger_t);
   }
   template class Scat<real_t, Specs>;
 }
