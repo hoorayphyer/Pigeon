@@ -124,7 +124,7 @@ namespace particle {
     if ( !( topos[I].periodic() && topos[I].dim() == 1 ) ) {
       auto lcr =
         [](const auto& ptc) noexcept {
-          return ( migrInt<DGrid>(ptc) % apt::pow3(I+1) ) / apt::pow3(I);
+          return ( ptc.template get<migrcode,DGrid>() % apt::pow3(I+1) ) / apt::pow3(I);
         };
 
       impl::migrate_1dim( buffer, intercomms[I], lcr, pairing_shift );

@@ -11,21 +11,6 @@ namespace std { template < class > class optional; }
 namespace mpi { struct Topo; struct InterComm; }
 
 namespace particle {
-  template < int DGrid >
-  struct migrInt : public apt::Integer<int,10> {
-    using self_type::Integer;
-
-    template < typename Ptc >
-    constexpr migrInt( const PtcExpression<Ptc>& ptc ) noexcept
-      : self_type( ptc.template get_impl<destination>() + ( apt::pow3(DGrid) - 1 ) / 2 ) {}
-
-    template < typename Ptc >
-    constexpr void imprint ( PtcExpression<Ptc>& ptc ) const noexcept {
-      return ptc.set_impl(destination( *this - ( apt::pow3(DGrid) - 1 ) / 2 ));
-    }
-
-  };
-
   template < typename Real,
              template < typename > class PtcSpecs,
              int DGrid, int I = DGrid-1 >

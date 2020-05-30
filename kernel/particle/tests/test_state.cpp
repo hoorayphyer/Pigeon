@@ -47,7 +47,7 @@ SCENARIO("setting species", "[particle]") {
   REQUIRE( s.get<species>() == species::photon );
 }
 
-SCENARIO("setting flags", "[particle]") {
+SCENARIO("setting individual flags", "[particle]") {
   {
     State s;
     REQUIRE_FALSE( s.is(flag::exist));
@@ -63,22 +63,66 @@ SCENARIO("setting flags", "[particle]") {
       REQUIRE_FALSE( s.is(X));
     };
 
-  for ( std::underlying_type_t<flag> i = 0; i < 8; ++i ) {
+  static_assert(2 * sizeof(flagbits) == 16);
+  for (std::underlying_type_t<flag> i = 0; i < 2 * sizeof(flagbits); ++i) {
     f(static_cast<flag>(i));
   }
 }
 
-SCENARIO("setting birthplace", "[particle]") {
-  State s;
-  using bp_t = std::underlying_type_t<birthplace>;
-  bp_t max = ( static_cast<bp_t>(1) << layout::size<birthplace>() );
+SCENARIO("Test setting individual bits of flagbits", "[particle]") {
+  static_assert(2 * sizeof(flagbits) == 16);
+  for (std::underlying_type_t<flag> i = 0; i < 2 * sizeof(flagbits); ++i) {
+    flagbits x {};
+    x[static_cast<flag>(i)] = true;
+    CHECK( x.to_ulong() == (1u << i) );
+    x[static_cast<flag>(i)] = false;
+    CHECK(x.to_ulong() == 0);
+  }
 
-  for ( bp_t i = 0; i < max; ++i ) {
-    birthplace bp(i);
-    s.set(bp);
-    CAPTURE(i);
-    CHECK(s.get<birthplace>() == i);
+}
+
+TEMPLATE_TEST_CASE("Test setting migrcode", "[particle]"
+                   , (std::integral_constant<int, 1>)
+                   , (std::integral_constant<int, 2>)
+                   , (std::integral_constant<int, 3>)
+                   ) {
+  constexpr int D = TestType::value;
+  const int max = apt::pow3(D);
+
+  State s;
+  for ( int i = 0; i < max; ++i ) {
+    s.set<migrcode,D>(i);
+    CHECK(s.get<migrcode,D>() == i);
+    s.reset<migrcode>();
+    CHECK(s.get<migrcode,D>() == (apt::pow3(D)-1)/2 );
   }
 }
 
-// setting destination is in test_migration
+TEMPLATE_TEST_CASE("Test set and get attributes", "[particle]"
+                   , flagbits
+                   , birthplace
+                   , serial_number // NOTE this may take a few seconds
+                   ) {
+  State s;
+  std::size_t max = (1u << layout::size<TestType>());
+
+  for (std::size_t i = 0; i < max; ++i) {
+    TestType attr(i);
+    s.set(attr);
+    CAPTURE(i);
+    CHECK(s.get<TestType>() == i);
+    s.reset<TestType>();
+    CHECK(s.get<TestType>() == 0);
+  }
+}
+
+SCENARIO("Test setting mixed attributions", "[particle]") {
+  State s;
+  s.set(species::electron, flagbits(147), flag::secondary, birthplace(489), serial_number(7468));
+  s.set<migrcode,2>(17);
+  CHECK(s.get<species>() == species::electron);
+  CHECK(s.get<flagbits>() == (147 | (1 << static_cast<int>(flag::secondary)) ));
+  CHECK(s.get<birthplace>() == 489);
+  CHECK(s.get<serial_number>() == 7468);
+  CHECK(s.get<migrcode,2>() == 17);
+}

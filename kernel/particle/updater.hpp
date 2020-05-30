@@ -66,7 +66,7 @@ namespace particle {
                       R dt, int timestep, util::Rng<R>& rng
                       ) override {
       // bulk range = [lb, ub)
-      constexpr auto migrate_code =
+      constexpr auto migrtrit =
         []( auto q, auto lb, auto ub ) noexcept {
           return ( q >= lb ) + ( q >= ub );
         };
@@ -74,13 +74,13 @@ namespace particle {
       for ( auto sp : particles ) {
         for ( auto ptc : particles[sp] ) { // TODOL semantics
           if ( !ptc.is(flag::exist) ) continue;
-          migrInt<DGrid> mig_dir{};
+          int mig_dir{};
           for ( int i = 0; i < DGrid; ++i ) {
-            mig_dir += migrate_code( ptc.q(i), grid[i].lower(), grid[i].upper() ) * apt::pow3(i);
+            mig_dir += migrtrit( ptc.q(i), grid[i].lower(), grid[i].upper() ) * apt::pow3(i);
           }
 
           if ( mig_dir != ( apt::pow3(DGrid) - 1 ) / 2 ) {
-            mig_dir.imprint(ptc);
+            ptc.template set<migrcode,DGrid>(mig_dir);
             new_ptc_buf->emplace_back(std::move(ptc));
           }
         }
@@ -134,7 +134,7 @@ namespace particle {
         //   debug::throw_error("Received across-ensemble particles!");
         // }
 #endif
-        ptc.template reset<destination>();
+        ptc.template reset<migrcode>();
         particles[sp].push_back( std::move(ptc) );
       }
       new_ptc_buf->resize(0);
