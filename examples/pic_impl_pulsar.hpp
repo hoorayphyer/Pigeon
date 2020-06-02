@@ -185,18 +185,21 @@ namespace pic {
     Field<1> pc_counter {};
     real_t pc_cumulative_time {};
 
-    map<JField> Jsp {}; // current by species
-    bool is_export_Jsp = false;
-
-    Field<1> skin_depth {};
+    std::optional<map<JField>> Jsp; // current by species
+    std::optional<Field<1>> skin_depth;
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
-      is_export_Jsp = false;
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
-      if ( is_export_Jsp ) {
+
+      if (false) {// activate Jsp
+        Jsp.emplace(std::remove_reference_t<decltype(*Jsp)>{});
         for ( auto sp : properties )
-          Jsp.insert( sp, {} );
+          (*Jsp).insert(sp, {});
+      }
+
+      if (false) { // activate skin_depth
+        skin_depth.emplace(std::remove_reference_t<decltype(*skin_depth)>{});
       }
 
       Index bulk_dims;
@@ -343,7 +346,7 @@ namespace pic {
     using Ptc_t = typename PtcArray::particle_type;
     namespace scat = ::particle::scat;
 
-    static auto flagger = [](particle::flagbits parent_bits, species) {
+    static auto flagger = [](particle::flagbits parent_bits, species) noexcept {
       parent_bits[flag::secondary] = true;
       parent_bits[backflow_fl] = false; // backflow tracing mark doesn't pass down
       return parent_bits;
@@ -428,10 +431,10 @@ namespace pic {
                         const Ensemble* ens,
                         real_t dt, int timestep, util::Rng<real_t>& rng
                         ) override {
-        if ( !RTD::data().is_export_Jsp || !export_plan.is_do(timestep) ) {
+        if ( !RTD::data().Jsp || !export_plan.is_do(timestep) ) {
           _pu( particles,J, new_ptc_buf, properties, E, B, grid, ens, dt, timestep, rng );
         } else {
-          auto& Jsp = RTD::data().Jsp;
+          auto &Jsp = *(RTD::data().Jsp);
           // store J by species separately for data export
           for ( auto sp : particles ) {
             map<PtcArray> ptcs_sp;
@@ -1072,10 +1075,10 @@ namespace pic {
       ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
     }
 
-    { // skin depth
-      auto& skin_depth = RTD::data().skin_depth;
-      skin_depth = {J.mesh()};
-      skin_depth.reset();
+    if (RTD::data().skin_depth) { // skin depth
+      auto &skd = *(RTD::data().skin_depth);
+      skd = {J.mesh()};
+      skd.reset();
 
       for ( auto sp : particles ) {
         auto q2m = properties[sp].charge_x * properties[sp].charge_x / properties[sp].mass_x;
@@ -1084,20 +1087,19 @@ namespace pic {
           Index I;
           for ( int i = 0; i < DGrid; ++i )
             I[i] = grid[i].csba( ptc.q(i) );
-          skin_depth[0](I) += q2m * ptc.frac();
+          skd[0](I) += q2m * ptc.frac();
         }
       }
-      ens.reduce_to_chief( mpi::by::SUM, skin_depth[0].data().data(), skin_depth[0].data().size() );
+      ens.reduce_to_chief( mpi::by::SUM, skd[0].data().data(), skd[0].data().size() );
       if ( ens.is_chief() ) {
-        for ( const auto& I : apt::Block(apt::range::begin(skin_depth.mesh().range()), apt::range::end(skin_depth.mesh().range())) ) {
+        for ( const auto& I : apt::Block(apt::range::begin(skd.mesh().range()), apt::range::end(skd.mesh().range())) ) {
           real_t r = grid[0].absc(I[0], 0.5);
           real_t theta = grid[1].absc(I[1], 0.5);
           real_t h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
-          auto& v = skin_depth[0](I);
+          auto& v = skd[0](I);
           v = std::sqrt(h / v);
         }
       }
-
     }
   }
 
@@ -1178,7 +1180,7 @@ namespace pic {
   apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
                                    const Field<3>& , const JField& J ) {
     auto q = I2std(I);
-    auto j_sp = msh::interpolate( RTD::data().Jsp[SP], q, ShapeF() );
+    auto j_sp = msh::interpolate((*RTD::data().Jsp)[SP], q, ShapeF());
     auto j = msh::interpolate( J, q, ShapeF() );
     for ( int i = 0; i < 3; ++i ) {
       if ( j[i] == 0 ) j_sp[i] = 0;
@@ -1189,7 +1191,8 @@ namespace pic {
 
   apt::array<real_t,3> skin_depth ( Index I, const Grid& grid, const Field<3>& ,
                                     const Field<3>& , const JField& ) {
-    return { msh::interpolate( RTD::data().skin_depth, I2std(I), ShapeF() )[0], 0, 0  };
+    return {msh::interpolate(*(RTD::data().skin_depth), I2std(I), ShapeF())[0],
+            0, 0};
   }
 
   auto set_up_field_export() {
@@ -1201,11 +1204,14 @@ namespace pic {
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
       fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "SkinDepth", 1, skin_depth, average_when_downsampled) );
 
-      if ( RTD::data().is_export_Jsp ) {
+      if (RTD::data().skin_depth) {
+        fexps.push_back(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
+      }
+
+      if ( RTD::data().Jsp ) {
         using namespace particle;
-        for ( auto sp : RTD::data().Jsp ) {
+        for (auto sp : *(RTD::data().Jsp)) {
           switch(sp) {
           case species::electron :
             fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, average_when_downsampled) ); break;
@@ -1228,9 +1234,12 @@ namespace pic {
     return { 1.0, 0.0, 0.0 };
   }
 
-  // FIXME energy should factor in mass
+  // NOTE energy should factor in mass
   apt::array<real_t,3> ptc_energy ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { std::sqrt( (prop.mass_x > 0.01) + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
+    if (prop.mass_x > 0.01_r)
+      return { prop.mass_x * std::sqrt( 1.0_r + apt::sqabs(ptc.p()) ), 0.0, 0.0 };
+    else
+      return { apt::abs(ptc.p()), 0.0, 0.0};
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
@@ -1257,12 +1266,13 @@ namespace pic {
     auto& pc = RTD::data().pc_counter;
     std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
     RTD::data().pc_cumulative_time = 0;
-    if ( RTD::data().is_export_Jsp ) {
+    if ( RTD::data().Jsp ) {
       // clear Jsp to save some space
-      for ( auto sp : RTD::data().Jsp )
-        RTD::data().Jsp[sp] = {};
+      for (auto sp : *(RTD::data().Jsp))
+        (*RTD::data().Jsp)[sp] = {};
     }
-    RTD::data().skin_depth = {};
+    if ( RTD::data().skin_depth )
+      *(RTD::data().skin_depth) = {};
   }
 }
 
