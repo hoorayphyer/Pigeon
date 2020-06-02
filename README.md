@@ -2,8 +2,9 @@
 
 When electrons and protons meet a rotating [neutron star](https://en.wikipedia.org/wiki/Neutron_star) possessing a magnetic field literally millions of millions of [Earth's own magnetic field](https://en.wikipedia.org/wiki/Earth%27s_magnetic_field), what does it look like?
 
-<iframe src="https://drive.google.com/file/d/1Sx84V2R3XWCLOb7f9JLNRw1kei9rm0EL/preview" width="640" height="480" allow="autoplay"></iframe>
-<br>(simulation of a pulsar, modeled as a rapidly rotating neutron star surrounded with charged particles. The simulation was done on 1120 cores)
+![Pulsar Demo](examples/pulsar-demo.gif)
+
+(simulation of a pulsar, modeled as a rapidly rotating neutron star surrounded with charged particles. The simulation was done on 1120 cores)
 
 The technique to scientifically (as well as artistically) portrait the above is [Particle-in-Cell](https://en.wikipedia.org/wiki/Particle-in-cell) simulation, or PIC simulation. It is widely used in studies of astrophysical and laboratory plasma phenomena. Pigeon is yet another implementation of this technique. Although born out of a specific research project on [pulsars](https://en.wikipedia.org/wiki/Pulsar), Pigeon is meant to be a general-purpose PIC simulator (whatever that is), and embraces the following:
 * object-oriented programming
