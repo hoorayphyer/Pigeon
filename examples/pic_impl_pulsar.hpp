@@ -187,6 +187,8 @@ namespace pic {
 
     std::optional<map<JField>> Jsp; // current by species
     std::optional<Field<1>> skin_depth;
+    std::optional<Field<1>> pr_p;
+    std::optional<Field<1>> pr_n;
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
       for ( auto sp : properties )
@@ -206,6 +208,11 @@ namespace pic {
       for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
       auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
       pc_counter = {range};
+
+      if (true) { // activate pr_p/n
+        pr_p.emplace(typename decltype(pr_p)::value_type{range});
+        pr_n.emplace(typename decltype(pr_n)::value_type{range});
+      }
     };
 
   private:
@@ -663,6 +670,12 @@ namespace pic {
               for ( int j = 0; j < DGrid; ++j )
                 I[j] = grid[j].csba( ptc.q(j) );
               RTD::data().pc_counter[0](I) += ptc.frac();
+              if (RTD::data().pr_p) {
+                if (ptc.p(0) > 0)
+                  (*RTD::data().pr_p)[0](I) += ptc.frac() * ptc.p(0);
+                else
+                  (*RTD::data().pr_n)[0](I) -= ptc.frac() * ptc.p(0);
+              }
             }
           }
 
@@ -1074,6 +1087,12 @@ namespace pic {
       auto& pc = RTD::data().pc_counter;
       ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
     }
+    if (RTD::data().pr_p) {
+      auto &x = *RTD::data().pr_p;
+      ens.reduce_to_chief(mpi::by::SUM, x[0].data().data(), x[0].data().size());
+      auto &y = *RTD::data().pr_n;
+      ens.reduce_to_chief(mpi::by::SUM, y[0].data().data(), y[0].data().size());
+    }
 
     if (RTD::data().skin_depth) { // skin depth
       auto &skd = *(RTD::data().skin_depth);
@@ -1176,6 +1195,21 @@ namespace pic {
     return { x[0] / RTD::data().pc_cumulative_time, 0, 0};
   }
 
+  apt::array<real_t, 3> accumu_pos_pr_when_pc(Index I, const Grid &grid,
+                                              const Field<3> &, const Field<3> &,
+                                              const JField &) {
+    auto x = msh::interpolate(*RTD::data().pr_p, I2std(I), ShapeF());
+    return {x[0], 0, 0};
+  }
+
+  apt::array<real_t, 3> accumu_neg_pr_when_pc(Index I, const Grid &grid,
+                                              const Field<3> &,
+                                              const Field<3> &,
+                                              const JField &) {
+    auto x = msh::interpolate(*RTD::data().pr_n, I2std(I), ShapeF());
+    return {x[0], 0, 0};
+  }
+
   template < particle::species SP >
   apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
                                    const Field<3>& , const JField& J ) {
@@ -1204,6 +1238,11 @@ namespace pic {
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
       fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
+
+      if(RTD::data().pr_p) {
+        fexps.push_back(new FA("AccumuPosPr", 1, accumu_pos_pr_when_pc, nullptr));
+        fexps.push_back(new FA("AccumuNegPr", 1, accumu_neg_pr_when_pc, nullptr));
+      }
 
       if (RTD::data().skin_depth) {
         fexps.push_back(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
