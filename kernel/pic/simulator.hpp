@@ -262,6 +262,10 @@ namespace pic {
         if ( profiling_plan.is_reached_max_entries(timestep) ) lgr::file.clear();
         lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
         lgr::file.indent_append("\t");
+        if ( _ens_opt )
+          lgr::file % "ensemble label = " << _ens_opt->label() << std::endl;
+        else
+          lgr::file % "ensemble label = NONE" << std::endl;
       }
 
       auto TIMING = [&stamp](std::string message, auto f) {
