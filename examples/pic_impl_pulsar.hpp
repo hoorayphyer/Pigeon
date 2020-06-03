@@ -674,7 +674,7 @@ namespace pic {
                 if (ptc.p(0) > 0)
                   (*RTD::data().pr_p)[0](I) += ptc.frac() * ptc.p(0);
                 else
-                  (*RTD::data().pr_n)[0](I) -= ptc.frac() * ptc.p(0);
+                  (*RTD::data().pr_n)[0](I) += ptc.frac() * ptc.p(0);
               }
             }
           }
@@ -1030,27 +1030,27 @@ namespace pic {
         sep_ftp.set_species({EL, PO, IO})
             .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 1); });
+            .set_marker([](auto &p) {set_group(p, 1); p.set(flag::traced);});
 
         ypoint.set_species({EL, PO, IO, PH})
             .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) {set_group(p, 2);});
+            .set_marker([](auto &p) {set_group(p, 2); p.set(flag::traced);});
 
         inner_cloud.set_species({EL, PO, IO})
             .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 3); });
+            .set_marker([](auto &p) { set_group(p, 3); p.set(flag::traced);});
 
         two_small_plasmoids.set_species({EL, PO})
             .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 4); });
+            .set_marker([](auto &p) { set_group(p, 4); p.set(flag::traced);});
 
         one_big_plasmoid.set_species({EL, PO, PH})
             .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 5); });
+            .set_marker([](auto &p) { set_group(p, 5); p.set(flag::traced);});
 
         util::Rng<real_t> rng;
         rng.set_seed(resumed_timestep + mpi::world.rank());
