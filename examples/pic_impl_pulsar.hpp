@@ -859,11 +859,11 @@ namespace pic {
          // use one bit to flag, use three bits to encode farthest distance traveled
          int r = f(std::exp(p.q(0)));
          int r_max = p.is(flag::_9) + p.is(flag::_10)*2 + p.is(flag::_11)*4;
-         (r < r_max and r < f(12.01_r)) ? p.set(backflow_fl) : p.reset(backflow_fl);
+         p.template assign<backflow_fl>( r < r_max and r < f(12.01_r) );
          r_max = std::max(r_max,r);
-         (r_max & 1) ? p.set(flag::_9) : p.reset(flag::_9);
-         (r_max & 2) ? p.set(flag::_10) : p.reset(flag::_10);
-         (r_max & 4) ? p.set(flag::_11) : p.reset(flag::_11);
+         p.template assign<flag::_9>( r_max & 1);
+         p.template assign<flag::_10>(r_max & 2);
+         p.template assign<flag::_11>(r_max & 4);
        });
     grand_tot.set_species({EL,PO,IO,PH})
       .set_probability(1.01)

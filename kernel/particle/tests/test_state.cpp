@@ -69,6 +69,34 @@ SCENARIO("setting individual flags", "[particle]") {
   }
 }
 
+TEMPLATE_TEST_CASE("Test assigning flags", "[particle]"
+                   , (std::integral_constant<int, 0>)
+                   , (std::integral_constant<int, 1>)
+                   , (std::integral_constant<int, 2>)
+                   , (std::integral_constant<int, 3>)
+                   , (std::integral_constant<int, 4>)
+                   , (std::integral_constant<int, 5>)
+                   , (std::integral_constant<int, 6>)
+                   , (std::integral_constant<int, 7>)
+                   , (std::integral_constant<int, 8>)
+                   , (std::integral_constant<int, 9>)
+                   , (std::integral_constant<int, 10>)
+                   , (std::integral_constant<int, 11>)
+                   , (std::integral_constant<int, 12>)
+                   , (std::integral_constant<int, 13>)
+                   , (std::integral_constant<int, 14>)
+                   , (std::integral_constant<int, 15>)
+                   ) {
+  constexpr auto FLAG = static_cast<flag>(TestType::value);
+
+  State s;
+  CHECK_FALSE(s.is(FLAG));
+  s.assign<FLAG>(true);
+  CHECK(s.is(FLAG));
+  s.assign<FLAG>(false);
+  CHECK_FALSE(s.is(FLAG));
+}
+
 SCENARIO("Test setting individual bits of flagbits", "[particle]") {
   static_assert(2 * sizeof(flagbits) == 16);
   for (std::underlying_type_t<flag> i = 0; i < 2 * sizeof(flagbits); ++i) {

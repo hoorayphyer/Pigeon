@@ -239,7 +239,10 @@ namespace particle {
       return ( state() >> layout::begin<flagbits>() ) & ( static_cast<std::size_t>(1) << x );
     }
 
-
+    template <flag F>
+    inline self_t &assign(bool b) noexcept {
+      return b ? set(F) : reset(F);
+    }
   };
 
 }
