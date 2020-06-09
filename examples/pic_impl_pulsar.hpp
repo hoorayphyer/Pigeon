@@ -722,7 +722,7 @@ namespace pic {
     } escape;
     {
       escape.setName("Escaping");
-      escape[0] = { supergrid[0].dim() - pic::damping_layer, supergrid[0].dim() + myguard };
+      escape[0] = { supergrid[0].dim() - pic::damping_layer/2, supergrid[0].dim() + myguard }; // damping layer / 2 so as to reduce reflection of artifacts
       escape[1] = { 0, supergrid[1].dim() };
     }
 
@@ -765,9 +765,9 @@ namespace pic {
 
     {
       annih.setName("Annihilation");
-      annih[0] = { supergrid[0].csba(std::log(9.0)), supergrid[0].dim() + myguard };
+      annih[0] = { supergrid[0].csba(std::log(18.0)), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( 15.0_deg ) / supergrid[1].delta();
+      int half_width = ( 30.0_deg ) / supergrid[1].delta();
       annih[1] = { i_equator - half_width, i_equator + half_width };
 
       auto policy =
@@ -820,9 +820,9 @@ namespace pic {
 
     {
       no_ph.setName("NoPhotonZone");
-      no_ph[0] = { supergrid[0].csba(std::log(9.0)), supergrid[0].dim() + myguard };
+      no_ph[0] = { supergrid[0].csba(std::log(18.0)), supergrid[0].dim() + myguard };
       int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( 15.0_deg ) / supergrid[1].delta();
+      int half_width = ( 30.0_deg ) / supergrid[1].delta();
       no_ph[1] = { i_equator - half_width, i_equator + half_width };
 
       no_ph.set_interval(100);
@@ -858,26 +858,30 @@ namespace pic {
          // use one bit to flag, use three bits to encode farthest distance traveled
          int r = f(std::exp(p.q(0)));
          int r_max = p.is(flag::_9) + p.is(flag::_10)*2 + p.is(flag::_11)*4;
-         p.template assign<backflow_fl>( r < r_max );
 
-         if (p.is(backflow_fl) and (p.q(0) < std::log(12.0_r)) and rng.uniform() < 0.01) {
-           pic::trace(p);
-           if ( !p.is(was_traced) ) p.q(2) = 0.0; // set phi to zero
-           p.set(was_traced);
+         if ( p.is(backflow_fl) ) { // already a backflowing traced particle
+           if ( r >= r_max ) p.reset(backflow_fl);
+         } else {
+           if ( r < r_max and rng.uniform() < 0.01 ) {
+             p.set(backflow_fl);
+           }
          }
-
-         r_max = std::max(r_max,r);
-         p.template assign<flag::_9>( r_max & 1);
+         r_max = std::max(r_max, r);
+         p.template assign<flag::_9>(r_max & 1);
          p.template assign<flag::_10>(r_max & 2);
          p.template assign<flag::_11>(r_max & 4);
        });
 
     grand_tot.set_species({EL,PO,IO,PH})
-      .set_plan(save_tracing_plan)
+      .set_plan(p_always)
       .set_marker
       ([](auto&p, auto& rng) {
-         if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7) or p.is(backflow_fl) ) {
+         if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7)
+              or ( p.is(backflow_fl) and p.q(0) < std::log(12.0_r) )
+              ) {
            pic::trace(p);
+           if (!p.is(was_traced)) p.q(2) = 0.0; // set phi to zero
+           p.set(was_traced);
          } else {
            pic::untrace(p);
          }
