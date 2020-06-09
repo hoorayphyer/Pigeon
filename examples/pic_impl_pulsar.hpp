@@ -300,6 +300,7 @@ namespace pic {
   constexpr real_t Ndot_fd = 0.25;
 
   constexpr particle::flag backflow_fl = particle::flag::_8;
+  constexpr particle::flag was_traced = particle::flag::_12;
 
   auto set_up_particle_properties() {
     map<Properties> properties;
@@ -844,14 +845,12 @@ namespace pic {
 
     Plan p_always;
     p_always.on = true; p_always.start = 0, p_always.interval = 100;
-    float prob = 0.01;
 
     backflow
       .set_species({EL})
-      .set_probability(prob)
       .set_plan(p_always)
       .set_marker
-      ([](auto&p) {
+      ([](auto&p, auto& rng) {
          constexpr auto f // encoding of radius
            = [](real_t r) {
                return static_cast<int>( std::max( (r-6.0_r)*0.5_r, 0.001_r ) );
@@ -859,17 +858,24 @@ namespace pic {
          // use one bit to flag, use three bits to encode farthest distance traveled
          int r = f(std::exp(p.q(0)));
          int r_max = p.is(flag::_9) + p.is(flag::_10)*2 + p.is(flag::_11)*4;
-         p.template assign<backflow_fl>( r < r_max and r < f(12.01_r) );
+         p.template assign<backflow_fl>( r < r_max );
+
+         if (p.is(backflow_fl) and (p.q(0) < std::log(12.0_r)) and rng.uniform() < 0.01) {
+           pic::trace(p);
+           if ( !p.is(was_traced) ) p.q(2) = 0.0; // set phi to zero
+           p.set(was_traced);
+         }
+
          r_max = std::max(r_max,r);
          p.template assign<flag::_9>( r_max & 1);
          p.template assign<flag::_10>(r_max & 2);
          p.template assign<flag::_11>(r_max & 4);
        });
+
     grand_tot.set_species({EL,PO,IO,PH})
-      .set_probability(1.01)
       .set_plan(save_tracing_plan)
       .set_marker
-      ([](auto&p) {
+      ([](auto&p, auto& rng) {
          if ( p.is(flag::_5) or p.is(flag::_6) or p.is(flag::_7) or p.is(backflow_fl) ) {
            pic::trace(p);
          } else {
@@ -932,13 +938,13 @@ namespace pic {
                  const std::optional<Ensemble> & ens_opt,
                  int resumed_timestep,
                  std::string this_run_dir) const {
-        if ( resumed_timestep != 304000 or apt::range::is_empty(*this) or !save_tracing_plan.on ) return;
+        if ( resumed_timestep != 376000 or apt::range::is_empty(*this) or !save_tracing_plan.on ) return;
 
         { // clear previous tracing and untrace all of them
           for (auto sp : particles) {
             for ( auto ptc : particles[sp] ) { // TODOL semantics
               untrace(ptc);
-              for ( int i = 5; i < 16; ++i )
+              for ( int i = 5; i < 9; ++i )
                 ptc.reset(static_cast<flag>(i));
             }
           }
@@ -950,12 +956,6 @@ namespace pic {
           tr.setName("Separatrix Footpoint Tracer");
           tr[0] = (*this)[0];
           tr[1] = (*this)[1];
-          tr.set_conditional
-            ([](const PtcArray::particle_type &ptc) {
-               return Tracer::is_within_bounds
-                 (ptc.q(),
-                  {std::log(1.07), std::log(1.50), 0.54, 0.72});
-             });
           tr.set_is_check_within_range(false);
         }
 
@@ -965,11 +965,6 @@ namespace pic {
           tr.setName("Y Point Tracer");
           tr[0] = (*this)[0];
           tr[1] = (*this)[1];
-          tr.set_conditional([](const PtcArray::particle_type &ptc) {
-            return Tracer::is_within_bounds
-              (ptc.q(),
-               {std::log(4.7), std::log(5.2), 90.0_deg - 0.1/4.7, 90.0_deg});
-          });
           tr.set_is_check_within_range(false);
         }
 
@@ -979,11 +974,6 @@ namespace pic {
           tr.setName("Two Small Plasmoids Tracer");
           tr[0] = (*this)[0];
           tr[1] = (*this)[1];
-          tr.set_conditional([](const PtcArray::particle_type &ptc) {
-            return Tracer::is_within_bounds(
-                ptc.q(),
-                {std::log(5.21), std::log(5.8), 90.0_deg - 0.1/5.21, 90.0_deg});
-          });
           tr.set_is_check_within_range(false);
         }
 
@@ -993,11 +983,6 @@ namespace pic {
           tr.setName("One Big Plasmoid Tracer");
           tr[0] = (*this)[0];
           tr[1] = (*this)[1];
-          tr.set_conditional([](const PtcArray::particle_type &ptc) {
-            return Tracer::is_within_bounds(
-                ptc.q(),
-                {std::log(6.4), std::log(6.8), 90.0_deg - 0.2 / 6.4, 90.0_deg});
-          });
           tr.set_is_check_within_range(false);
         }
 
@@ -1007,50 +992,80 @@ namespace pic {
           tr.setName("Inner Cloud Tracer");
           tr[0] = (*this)[0];
           tr[1] = (*this)[1];
-          tr.set_conditional([](const PtcArray::particle_type &ptc) {
-            return Tracer::is_within_bounds(
-                ptc.q(),
-                {std::log(4.2), std::log(4.6), 90.0_deg - 0.1/4.2, 90.0_deg});
-          });
           tr.set_is_check_within_range(false);
         }
 
         Plan p_onetime;
         p_onetime.on = true; p_onetime.start = 0, p_onetime.interval = 1;
-        float prob = 0.01;
 
         static auto set_group =
           [](auto &p, int g) {
             assert(g > 0); // g = 0 reserved for no tracing
-            (g & 1) ? p.set(flag::_5) : p.reset(flag::_5);
-            (g & 2) ? p.set(flag::_6) : p.reset(flag::_6);
-            (g & 4) ? p.set(flag::_7) : p.reset(flag::_7);
+            p.template assign<flag::_5>(g & 1);
+            p.template assign<flag::_6>(g & 2);
+            p.template assign<flag::_7>(g & 4);
           };
 
         sep_ftp.set_species({EL, PO, IO})
-            .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) {set_group(p, 1); p.set(flag::traced);});
+            .set_marker
+          ([](auto &p, auto &rng) {
+             bool is_within
+               = Tracer::is_within_bounds(p.q(), {std::log(1.07), std::log(1.50), 0.54, 0.72});
+             if ( !is_within or (rng.uniform() > 0.01)) return;
+
+             set_group(p, 1);
+             p.set(flag::traced, was_traced);
+             p.q(2) = 0.0; // set initial phi to 0
+            });
 
         ypoint.set_species({EL, PO, IO, PH})
-            .set_probability(prob)
             .set_plan(p_onetime)
-            .set_marker([](auto &p) {set_group(p, 2); p.set(flag::traced);});
+            .set_marker
+          ([](auto &p, auto& rng) {
+             bool is_within
+               = Tracer::is_within_bounds(p.q(), {std::log(4.7), std::log(5.2), 90.0_deg - 0.1 / 4.7, 90.0_deg});
+             if ( !is_within or (rng.uniform() > 0.01)) return;
+
+             set_group(p, 2);
+             p.set(flag::traced, was_traced);
+             p.q(2) = 0.0;
+           });
 
         inner_cloud.set_species({EL, PO, IO})
-            .set_probability(prob)
-            .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 3); p.set(flag::traced);});
+          .set_plan(p_onetime)
+          .set_marker
+          ([](auto &p, auto& rng) {
+
+            bool is_within
+              =Tracer::is_within_bounds(p.q(), {std::log(4.2), std::log(4.69), 90.0_deg - 0.1/4.2, 90.0_deg});
+             if ( !is_within or (rng.uniform() > 0.01)) return;
+
+             set_group(p, 3);
+             p.set(flag::traced, was_traced);
+             p.q(2) = 0.0;});
 
         two_small_plasmoids.set_species({EL, PO})
-            .set_probability(prob)
-            .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 4); p.set(flag::traced);});
+          .set_plan(p_onetime)
+          .set_marker
+          ([](auto &p, auto& rng) {
+            bool is_within
+              = Tracer::is_within_bounds(p.q(), {std::log(5.21), std::log(6.79), 90.0_deg - 0.1/5.21, 90.0_deg});
+             if ( !is_within or (rng.uniform() > 0.01)) return;
+             set_group(p, 4);
+             p.set(flag::traced, was_traced);
+             p.q(2) = 0.0;});
 
         one_big_plasmoid.set_species({EL, PO, PH})
-            .set_probability(prob)
-            .set_plan(p_onetime)
-            .set_marker([](auto &p) { set_group(p, 5); p.set(flag::traced);});
+          .set_plan(p_onetime)
+          .set_marker
+          ([](auto &p, auto& rng) {
+             bool is_within
+               = Tracer::is_within_bounds(p.q(), {std::log(6.8), std::log(8.0), 90.0_deg - 0.2 / 6.8, 90.0_deg});
+             if ( !is_within or (rng.uniform() > 0.01)) return;
+             set_group(p, 5);
+             p.set(flag::traced, was_traced);
+             p.q(2) = 0.0;});
 
         util::Rng<real_t> rng;
         rng.set_seed(resumed_timestep + mpi::world.rank());

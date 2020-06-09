@@ -105,29 +105,23 @@ namespace pic {
 
   struct Tracer : public PtcAction {
   private:
-    real_t _prob = 1.0_r;
     std::vector<::particle::species> _sps;
 
     bool _is_check_within_range = true;
 
-    using FCond_t = bool(*)(const PtcArray::particle_type& ptc);
-    FCond_t _conditional = nullptr;
-
     Plan _plan{};
 
-    using FMark_t = void(*)(PtcArray::particle_type& ptc);
+    using FMark_t = void (*)(PtcArray::particle_type &ptc, util::Rng<real_t> &rng);
     FMark_t _marker = nullptr;
 
   public:
     Tracer* Clone() const override {return new auto(*this);}
 
-    auto& set_probability( real_t prob ) noexcept { _prob = prob; return *this;}
     auto& set_marker( FMark_t f ) noexcept { _marker = f; return *this;}
     auto& set_species(const std::vector<::particle::species>& sps) noexcept {
       _sps = sps; return *this;
     }
     auto& set_is_check_within_range( bool a ) noexcept {_is_check_within_range=a; return *this;}
-    auto& set_conditional( FCond_t cond) noexcept {_conditional = cond; return *this;}
     auto& set_plan( const Plan& p ) noexcept { _plan = p; return *this; }
 
     static bool is_within_bounds(const PtcArray::particle_type::vec_type &q,
@@ -157,10 +151,8 @@ namespace pic {
         for ( auto ptc : particles[sp] ) { // TODOL semantics
           if ( !ptc.is(flag::exist)
                or (_is_check_within_range and !is_within_bounds(ptc.q(), bds) )
-               or ( _conditional and !_conditional(ptc) )
-               or ( _prob < 1.0_r and rng.uniform() > _prob )
                ) continue;
-          _marker(ptc);
+          _marker(ptc,rng);
         }
       }
     }
