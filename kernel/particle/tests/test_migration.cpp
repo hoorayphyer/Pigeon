@@ -14,10 +14,10 @@ using Vec_t = apt::Vec<Real,Specs<Real>::Dim>;
 
 SCENARIO("Test swapping particles", "[particle]") {
   if ( mpi::world.rank() == 0 ) {
-    Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, 1.0, flag::secondary, birthplace{3} );
+    Ptc_t a( {3.5,3.5,3.5 }, {5.9, 5.9, 5.9}, 1.0, flag::secondary, serial_number{3} );
     a.set<migrcode,2>(6);
 
-    Ptc_t b( {-4.7, -4.7, -4.7, }, {-2.8, -2.8, -2.8}, 0.67, birthplace{98} );
+    Ptc_t b( {-4.7, -4.7, -4.7, }, {-2.8, -2.8, -2.8}, 0.67, serial_number{98} );
     b.set<migrcode,2>(1);
     b.reset(flag::exist);
 
@@ -36,7 +36,7 @@ SCENARIO("Test swapping particles", "[particle]") {
 
       REQUIRE_FALSE( a.is(flag::exist) );
       REQUIRE_FALSE( a.is(flag::secondary) );
-      REQUIRE( a.get<birthplace>() == 98 );
+      REQUIRE( a.get<serial_number>() == 98 );
       REQUIRE( a.get<migrcode,2>() == 1 );
     }
 
@@ -53,7 +53,7 @@ SCENARIO("Test swapping particles", "[particle]") {
 
       REQUIRE( b.is(flag::exist) );
       REQUIRE( b.is(flag::secondary) );
-      REQUIRE( b.get<birthplace>() == 3 );
+      REQUIRE( b.get<serial_number>() == 3 );
       REQUIRE( b.get<migrcode, 2>() == 6);
     }
 
@@ -66,7 +66,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
     if ( mpi::world.size() >= 2 ) {
       int myrank = mpi::world.rank();
       if ( 0 == myrank ) {
-        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.37591, birthplace{18} );
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.37591, serial_number{18} );
         mpi::world.send( 1, 22, &ptc );
       } else if ( 1 == myrank) {
         Ptc_t ptc;
@@ -83,7 +83,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         REQUIRE( ptc.frac() == 0.37591 );
 
         REQUIRE( ptc.is(flag::exist) );
-        REQUIRE( ptc.get<birthplace>() == 18 );
+        REQUIRE( ptc.get<serial_number>() == 18 );
       }
     }
   }
@@ -93,7 +93,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
       int myrank = mpi::world.rank();
       mpi::InterComm inter( mpi::self, 0, {mpi::world}, 1-myrank, 147 );
       if ( 0 == myrank ) {
-        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.2638, birthplace{18} );
+        Ptc_t ptc( {1.1,2.2,3.3}, {4.4,5.5,6.6}, 0.2638, serial_number{18} );
         inter.send( 0, 22, &ptc );
       } else if ( 1 == myrank) {
         Ptc_t ptc;
@@ -110,7 +110,7 @@ SCENARIO("Test sending particles", "[particle][mpi]") {
         REQUIRE( ptc.frac() == 0.2638 );
 
         REQUIRE( ptc.is(flag::exist) );
-        REQUIRE( ptc.get<birthplace>() == 18 );
+        REQUIRE( ptc.get<serial_number>() == 18 );
       }
     }
   }

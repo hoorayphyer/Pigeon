@@ -128,7 +128,6 @@ TEMPLATE_TEST_CASE("Test setting migrcode", "[particle]"
 
 TEMPLATE_TEST_CASE("Test set and get attributes", "[particle]"
                    , flagbits
-                   , birthplace
                    , serial_number // NOTE this may take a few seconds
                    ) {
   State s;
@@ -146,11 +145,10 @@ TEMPLATE_TEST_CASE("Test set and get attributes", "[particle]"
 
 SCENARIO("Test setting mixed attributions", "[particle]") {
   State s;
-  s.set(species::electron, flagbits(147), flag::secondary, birthplace(489), serial_number(7468));
+  s.set(species::electron, flagbits(147), flag::secondary, serial_number(7468));
   s.set<migrcode,2>(17);
   CHECK(s.get<species>() == species::electron);
   CHECK(s.get<flagbits>() == (147 | (1 << static_cast<int>(flag::secondary)) ));
-  CHECK(s.get<birthplace>() == 489);
   CHECK(s.get<serial_number>() == 7468);
   CHECK(s.get<migrcode,2>() == 17);
 }

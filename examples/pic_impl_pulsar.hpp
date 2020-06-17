@@ -592,8 +592,8 @@ namespace pic {
             }
             auto p_ptc = p;
             p_ptc += nB * rng.gaussian( 0.0, _v_th );
-            *(itr_ne++) = Particle( q_ptc, p_ptc, frac, _negaon, ::particle::birthplace(ens->label()) );
-            *(itr_po++) = Particle( std::move(q_ptc), std::move(p_ptc), frac, _posion, ::particle::birthplace(ens->label()) );
+            *(itr_ne++) = Particle( q_ptc, p_ptc, frac, _negaon );
+            *(itr_po++) = Particle( std::move(q_ptc), std::move(p_ptc), frac, _posion );
           }
         }
       }

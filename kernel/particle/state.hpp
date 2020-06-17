@@ -89,11 +89,11 @@ namespace particle {
     proxy_int_t _data {};
   };
 
-  struct birthplace : public proxy_int {
+  struct freebits : public proxy_int {
     static constexpr int nbits_v = 16;
 
-    constexpr birthplace() = default;
-    constexpr birthplace(proxy_int_t a) noexcept : _data(a) {}
+    constexpr freebits() = default;
+    constexpr freebits(proxy_int_t a) noexcept : _data(a) {}
     constexpr operator proxy_int_t() const noexcept { return _data; }
 
   private:
@@ -136,10 +136,10 @@ namespace particle {
 namespace particle {
   struct layout {
   private:
-    using ordering = std::tuple<species, migrcode, flagbits, birthplace, serial_number>;
+    using ordering = std::tuple<species, migrcode, flagbits, freebits, serial_number>;
     static constexpr auto sizing =
       std::make_tuple(nbits_v<species>, nbits_v<migrcode>, nbits_v<flagbits>,
-                      nbits_v<birthplace>, nbits_v<serial_number>);
+                      nbits_v<freebits>, nbits_v<serial_number>);
 
   public:
     template < typename Attr, std::size_t I = 0 >
@@ -184,7 +184,7 @@ namespace particle {
     set(const Attr &attr, const Attrs &... attrs) noexcept {
       static_assert(std::is_same_v<Attr, species> or
                     std::is_same_v<Attr, flagbits> or
-                    std::is_same_v<Attr, birthplace> or
+                    std::is_same_v<Attr, freebits> or
                     std::is_same_v<Attr, serial_number> or
                     std::is_same_v<Attr, flag>);
 

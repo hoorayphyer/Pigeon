@@ -76,7 +76,7 @@ namespace particle {
               [&](const auto& ptc) {
                 lgr::file << "ptc.q() = " << ptc.q() << ", ptc.p() = " << ptc.p() << std::endl;
                 lgr::file << "frac = " << ptc.frac() << std::endl;
-                lgr::file << "sp = " << static_cast<int>(ptc.template get<species>()) << ", bp = " << static_cast<int>(ptc.template get<birthplace>()) << ", is_sec = " << ptc.is(flag::secondary) << std::endl;
+                lgr::file << "sp = " << static_cast<int>(ptc.template get<species>()) << ", is_sec = " << ptc.is(flag::secondary) << std::endl;
 
                 lgr::file << "ptc q_prev = " << q_prev << ", ptc p_prev = " << p_prev << std::endl;
               };

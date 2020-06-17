@@ -17,8 +17,7 @@ namespace particle::scat {
         // append electron and positron
         Particle<T, S> ptc_sec(ptc.q(),
                                ptc.p() * (std::sqrt(E_ph * E_ph - 1.0) / apt::sqabs(ptc.p())),
-                               ptc.frac(),
-                               ptc.template get<birthplace>());
+                               ptc.frac());
 
         ptc_sec.set(species::electron);
         if (f)
@@ -35,8 +34,7 @@ namespace particle::scat {
                                 ptc.p() * (E_ph / apt::abs(ptc.p())),
                                 ptc.frac(),
                                 species::photon,
-                                f(ptc.template get<flagbits>(), species::photon),
-                                ptc.template get<birthplace>());
+                                f(ptc.template get<flagbits>(), species::photon));
     }
   }
 
@@ -44,9 +42,7 @@ namespace particle::scat {
   void PhotonPairProduction ( back_insert_iterator_t<T,S> itr, Ptc_t<T,S>& photon, T, flagger_t f ) {
     Particle<T,S> ptc_sec ( photon.q(),
                             photon.p() * std::sqrt( 0.25 - 1.0 / apt::sqabs(photon.p()) ),
-                            photon.frac(),
-                            photon.template get<birthplace>()
-                            );
+                            photon.frac());
     ptc_sec.set(species::electron);
     if (f)
       ptc_sec.set(f(photon.template get<flagbits>(), species::electron));

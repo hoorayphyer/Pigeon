@@ -124,7 +124,7 @@ namespace particle {
         // }
         // if ( !is_OK ) {
         //   lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
-        //   lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << ", birth = " << static_cast<int>(ptc.template get<birthplace>()) << std::endl;
+        //   lgr::file << "Received across-ensemble particles! q = " << ptc.q() << ", p = " << ptc.p() << std::endl;
         //   lgr::file << "  mig_dir on new ensemble  = " << mig_co;
         //   // get old mig_co
         //   for ( int i = 0; i < DGrid; ++i ) {
