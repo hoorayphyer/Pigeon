@@ -232,7 +232,7 @@ namespace pic {
       mpi::world.broadcast( 0, &init_ts, 1 );
 
       // initialize trace_counters to ensure unique trace serial numbers across runs
-      ParticleTracing::init(_properties, _particles);
+      particle::TracingManager<R,S>::init(_properties, _particles);
 
       if ( profiling_plan.on and profiling_plan.is_qualified() ) {
         lgr::file << "--- Done." << std::endl;

@@ -15,7 +15,7 @@
 #include "dye/ensemble.hpp"
 
 #include "pic.hpp"
-#include "pic/plans.hpp"
+#include "pic/tracing.hpp"
 
 namespace pic {
   using Index = ::apt::Index<DGrid>;
@@ -41,7 +41,17 @@ namespace pic {
   using PtcUpdater = ::particle::Updater<DGrid,real_t,Specs,ShapeF,real_j_t>;
   using Particle = ::particle::Particle<real_t,Specs>;
   using Force = ::particle::Force<real_t,Specs>;
+  using Tracer = ::particle::Tracer<DGrid, real_t, Specs, real_j_t>;
 
+  template < typename P >
+  void trace( P& ptc ) {
+    return ::particle::TracingManager<real_t,Specs>::trace(ptc);
+  }
+
+  template <typename P>
+  void untrace(P &ptc) {
+    return ::particle::TracingManager<real_t, Specs>::untrace(ptc);
+  }
 }
 
 /// define convenient literal operators
@@ -51,113 +61,6 @@ constexpr pic::real_t operator"" _deg(long double x) noexcept {
 
 constexpr pic::real_t operator"" _r(long double x) noexcept {
   return static_cast<pic::real_t>(x);
-}
-
-namespace pic {
-  struct ParticleTracing {
-  public:
-    static void init( const map<Properties>& properties,
-                      const map<PtcArray>& particles ) {
-      // initialize trace_counters to ensure unique trace serial numbers across runs
-      for ( auto sp : properties ) {
-        unsigned int n = 0;
-        for ( const auto& ptc : particles[sp] )
-          if ( ptc.is(flag::traced) )
-            n = std::max<unsigned int>( n, ptc.template get<::particle::serial_number>() );
-
-        _data()._trace_counter.insert( sp, n+1 );
-      }
-    }
-    template < typename P >
-    friend void trace( P& ptc );
-
-  private:
-    map<unsigned int> _trace_counter {}; // for assigning serial numbers to traced particles
-
-    static ParticleTracing& _data() {
-      static ParticleTracing r;
-      return r;
-    }
-
-    ParticleTracing() = default;
-    ParticleTracing(const ParticleTracing&);
-    ParticleTracing(ParticleTracing&&) noexcept;
-    ParticleTracing& operator=( const ParticleTracing& );
-    ParticleTracing& operator=( ParticleTracing&& ) noexcept;
-    ~ParticleTracing() = default;
-  };
-
-  template < typename P >
-  void trace( P& ptc ) {
-    if ( not ptc.is(flag::traced) ) {
-      using sn = ::particle::serial_number;
-      ptc.set(flag::traced);
-      if ( ptc.template get<sn>() == 0 ) {
-        ptc.set(sn(ParticleTracing::_data()._trace_counter[ptc.template get<species>()]++));
-      }
-    }
-  }
-
-  template < typename P >
-  void untrace( P& ptc ) {
-    ptc.reset(flag::traced);
-  }
-
-  struct Tracer : public PtcAction {
-  private:
-    std::vector<::particle::species> _sps;
-
-    bool _is_check_within_range = true;
-
-    Plan _plan{};
-
-    using FMark_t = void (*)(PtcArray::particle_type &ptc, util::Rng<real_t> &rng);
-    FMark_t _marker = nullptr;
-
-  public:
-    Tracer* Clone() const override {return new auto(*this);}
-
-    auto& set_marker( FMark_t f ) noexcept { _marker = f; return *this;}
-    auto& set_species(const std::vector<::particle::species>& sps) noexcept {
-      _sps = sps; return *this;
-    }
-    auto& set_is_check_within_range( bool a ) noexcept {_is_check_within_range=a; return *this;}
-    auto& set_plan( const Plan& p ) noexcept { _plan = p; return *this; }
-
-    static bool is_within_bounds(const PtcArray::particle_type::vec_type &q,
-                                 const apt::array<apt::array<real_t, 2>, DGrid> &bds) {
-      for (int i = 0; i < DGrid; ++i) {
-        if (q[i] < bds[i][0] or q[i] >= bds[i][1])
-          return false;
-      }
-      return true;
-    }
-
-    void operator() ( map<PtcArray>& particles, JField& ,
-                      std::vector<Particle>* ,
-                      const map<Properties>& ,
-                      const Field<3>&, const Field<3>&,
-                      const Grid& grid, const Ensemble* ,
-                      real_t , int timestep, util::Rng<real_t>& rng) override {
-      if ( !_plan.is_do(timestep) or apt::range::is_empty(*this) or !_marker ) return;
-
-      apt::array< apt::array<real_t,2>, DGrid > bds;
-      for ( int i = 0; i < DGrid; ++i ) {
-        bds[i][0] = grid[i].absc( apt::range::begin(*this,i) );
-        bds[i][1] = grid[i].absc( apt::range::end(*this,i) );
-      }
-
-      for ( auto sp : _sps ) {
-        for ( auto ptc : particles[sp] ) { // TODOL semantics
-          if ( !ptc.is(flag::exist)
-               or (_is_check_within_range and !is_within_bounds(ptc.q(), bds) )
-               ) continue;
-          _marker(ptc,rng);
-        }
-      }
-    }
-  };
-
 }
 
 #include "toml++/toml.h"
