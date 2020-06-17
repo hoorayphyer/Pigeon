@@ -128,7 +128,7 @@ TEMPLATE_TEST_CASE("Test setting migrcode", "[particle]"
 
 TEMPLATE_TEST_CASE("Test set and get attributes", "[particle]"
                    , flagbits
-                   , serial_number // NOTE this may take a few seconds
+                   , pid // NOTE this may take a few seconds
                    ) {
   State s;
   std::size_t max = (1u << layout::size<TestType>());
@@ -145,10 +145,10 @@ TEMPLATE_TEST_CASE("Test set and get attributes", "[particle]"
 
 SCENARIO("Test setting mixed attributions", "[particle]") {
   State s;
-  s.set(species::electron, flagbits(147), flag::secondary, serial_number(7468));
+  s.set(species::electron, flagbits(147), flag::secondary, pid(7468));
   s.set<migrcode,2>(17);
   CHECK(s.get<species>() == species::electron);
   CHECK(s.get<flagbits>() == (147 | (1 << static_cast<int>(flag::secondary)) ));
-  CHECK(s.get<serial_number>() == 7468);
+  CHECK(s.get<pid>() == 7468);
   CHECK(s.get<migrcode,2>() == 17);
 }

@@ -7,6 +7,13 @@
 #include "particle/properties.hpp"
 #include "pic/plans.hpp"
 
+// Tracing Logic
+// 1. a particle is uniquely identified by (sp, wr, sn), which we call id. wr is used in favor of ens_label because wr stays same throughout
+// 2. the id is assigned only when a particle is first time traced.
+// 3. sn begins with 1. sn == 0 is reversed to signal that the particle has never been traced before.
+// 4. there is a flag::traced dedicated to tracing. When tracing, this flag is set, and id must be assigned accordingly. When untracing, simply reset this flag, leaving id untouched so that later another tracing doesn't assign new id to this particle
+// 5. it is considered inconsistent if a particle has flag:traced set yet has sn == 0. Implementation should prevent this. In particular, setting flag::traced through state should be disabled
+
 namespace particle {
   template <typename R, template <typename> class S>
   struct TracingManager {
@@ -18,7 +25,7 @@ namespace particle {
         unsigned int n = 0;
         for ( const auto& ptc : particles[sp] )
           if ( ptc.is(flag::traced) )
-            n = std::max<unsigned int>( n, ptc.template get<serial_number>() );
+            n = std::max<unsigned int>( n, ptc.template get<pid>() );
 
         _data()._trace_counter.insert( sp, n+1 );
       }
@@ -27,9 +34,8 @@ namespace particle {
     template < typename P >
     static void trace( P& ptc ) {
       if (not ptc.is(flag::traced)) {
-        using sn = serial_number;
         ptc.set(flag::traced);
-        if (ptc.template get<sn>() == 0) {
+        if (ptc.template get<pid>() == 0) {
           ptc.set(sn(_data()._trace_counter[ptc.template get<species>()]++));
         }
       }
@@ -39,6 +45,7 @@ namespace particle {
     static void untrace(P &ptc) { ptc.reset(flag::traced); }
 
   private:
+    unsigned int _wr {}; // world rank
     map<unsigned int> _trace_counter {}; // for assigning serial numbers to traced particles
 
     static TracingManager& _data() {
