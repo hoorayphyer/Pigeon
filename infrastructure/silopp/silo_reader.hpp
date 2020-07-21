@@ -2,11 +2,16 @@
 #define  _SILO_READER_HPP_
 #include <string>
 #include <vector>
-#include "apt/array.hpp"
 
 typedef struct DBfile DBfile;
 
 namespace silo {
+  struct Slice {
+    int begin{};
+    int end{};
+    int stride = 1;
+  };
+
   template < typename file_t >
   struct Reader {
   private:
@@ -35,7 +40,7 @@ namespace silo {
       return res;
     }
 
-    void readslice( std::string varname, const std::vector<apt::array<int,3>>& slice, void* var );
+    void readslice( std::string varname, const std::vector<Slice>& slice, void* var );
   };
 }
 
