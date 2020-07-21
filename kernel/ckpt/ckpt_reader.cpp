@@ -1,5 +1,6 @@
 #include "filesys/filesys.hpp"
 #include "silopp/silo++.hpp"
+#include <algorithm>
 
 int main(int argc, char *argv[]) {
   if ( argc != 3 ) {
@@ -43,6 +44,20 @@ int main(int argc, char *argv[]) {
       ens_visited.resize(N,false);
     }
 
+    auto load_subfield = [&guard,&subgrid,&supergrid](auto& sf, const auto& coords, auto comp, auto& superf) {
+      std::vector<float> subf(sf.var_length(comp));
+      sf.read(comp, subf.data());
+
+      for (int j = -guard[1]; j < subgrid[1] + guard[1]; ++j) {
+        int li = (j + guard[1]) * (subgrid[0] + 2 * guard[0]);
+        int Li =
+            (coords[0] * subgrid[0]) + (coords[1] * subgrid[1] + j + guard[1]) *
+                                           (supergrid[0] + 2 * guard[0]);
+        int ext = subgrid[0] + 2 * guard[0];
+        std::copy_n(subf.data() + li, ext, superf.data()+Li);
+      }
+    };
+
     for ( const auto& dname : sf.toc_dir() ) {
       if ( dname.find("ensemble") != 0 ) continue;
 
@@ -54,15 +69,9 @@ int main(int argc, char *argv[]) {
 
       sf.cd(dname);
       if ( sf.var_exists("rank0") ) {
-        for ( int j = -guard[1]; j < subgrid[1] + guard[1]; ++j ) {
-          int li = (j+guard[1])*(subgrid[0]+2*guard[0]);
-          int Li = (coords[0] * subgrid[0] - guard[0]) + (coords[1] * subgrid[1] + j) * (supergrid[0] + 2*guard[0]);
-          int ext = subgrid[0] + 2*guard[0];
-          silo::Slice slice = {li, li+ext, 1};
-          for ( int c = 0; c < 3; ++ c) {
-            sf.readslice("E" + std::to_string(c + 1), {slice},
-                         E[c].data() + Li);
-          }
+        for (int c = 0; c < 3; ++c) {
+          load_subfield(sf, coords, "E" + std::to_string(c + 1), E[c]);
+          load_subfield(sf, coords, "B" + std::to_string(c + 1), B[c]);
         }
 
         ens_visited[l] = true;
