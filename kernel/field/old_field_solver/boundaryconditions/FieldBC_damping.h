@@ -95,7 +95,7 @@ public:
       // InitBackground( Efield_bg, Bfield_bg );
 
     // }
-
+    InitBackground( Efield_bg, Bfield_bg );
   }
 
   ~FieldBC_damping() override = default;
