@@ -65,7 +65,7 @@ namespace field {
 
     virtual void operator() ( Field<R,3,DGrid>& E,
                               Field<R,3,DGrid>& B,
-                              const Field<RJ,3,DGrid>& Jmesh,
+                              Field<RJ,3,DGrid>& Jmesh,
                               const apt::Grid<R,DGrid>& grid,
                               const mpi::CartComm& cart,
                               int timestep,

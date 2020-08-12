@@ -24,7 +24,7 @@ namespace field {
 
     virtual void operator() ( Field<Real,3,DGrid>& E,
                               Field<Real,3,DGrid>& B,
-                              const Field<RealJ,3,DGrid>& Jmesh,
+                              Field<RealJ,3,DGrid>& Jmesh,
                               const apt::Grid<Real,DGrid>& grid,
                               const mpi::CartComm& cart,
                               int timestep,

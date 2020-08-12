@@ -184,7 +184,7 @@ namespace field {
   template < typename R, int DGrid, typename RJ >
   void OldSolve<R,DGrid,RJ>::operator() ( Field<R,3,DGrid>& E,
                                           Field<R,3,DGrid>& B,
-                                          const Field<RJ,3,DGrid>& Jmesh,
+                                          Field<RJ,3,DGrid>& Jmesh,
                                           const apt::Grid<R,DGrid>& grid,
                                           const mpi::CartComm& cart,
                                           int timestep,

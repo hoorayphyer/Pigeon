@@ -254,7 +254,7 @@ namespace pic {
       auto& is_upper_axis( bool x ) { _is_upper_axis = x; return *this; }
       virtual Axissymmetric* Clone() const { return new Axissymmetric(*this); }
       virtual void operator() ( Field<3>& E, Field<3>& B,
-                                const JField& , const Grid& grid,
+                                JField& , const Grid& grid,
                                 const mpi::CartComm&, int , real_t) const override {
         // NOTE Guard cells values are needed when interpolating E and B
         // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
