@@ -2,6 +2,7 @@
 #define  _APT_GRID_HPP_
 
 #include "apt/array.hpp"
+#include <cmath>
 
 // NOTE convention: the zero of all indices exposed to users start at the first cell in BULK. In other words, guard cells have indices outside [0, dim_of_bulk). Guard is important only when converting from vectorial to linear index, which can be encapsulated in a dedicated function
 
@@ -86,7 +87,9 @@ namespace apt {
 
     // reverse abscissa, find index from abscissa
     constexpr int csba( T x ) const noexcept {
-      return static_cast<int>( (x - _lower) / delta() );
+      // TODO optimize it?
+      return (x < _lower) ? -static_cast<int>( std::ceil((_lower - x) / delta()) + 0.5 )
+                          : static_cast<int>((x - _lower) / delta());
     }
 
     constexpr void clip( int i_start, int extent ) noexcept {
