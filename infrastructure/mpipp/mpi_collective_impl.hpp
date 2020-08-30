@@ -68,6 +68,32 @@ namespace mpi {
     return result;
   }
 
+  template < typename Comm >
+  template < bool B, typename T >
+  std::optional<std::vector<T>>
+  Collective_Comm<Comm>::allreduce( by op, T* buffer, int count ) const {
+    std::optional<std::vector<T>> result;
+    static_assert(not(B and impl::is_inter_v<Comm>), "Intercommunicator doesn't support inplace");
+
+    const void *send_buf = nullptr;
+    void* recv_buf = nullptr;
+
+    if constexpr ( !impl::is_inter_v<Comm> and B ) {
+      send_buf = MPI_IN_PLACE;
+      recv_buf = buffer;
+    } else {
+      send_buf = buffer;
+      result.emplace(); // copy construct the recv_buf
+      (*result).reserve(count);
+      (*result).resize(count);
+      recv_buf = (*result).data();
+    }
+
+    MPI_Allreduce( send_buf, recv_buf, count, datatype(buffer), mpi_op(op), _comm() );
+
+    return result;
+  }
+
   // template < typename Comm >
   // template < by Op, bool In_Place, typename T >
   // std::tuple< Request, std::optional<std::vector<T> > >
@@ -201,6 +227,8 @@ namespace mpi {
   Collective_Comm<_COMM_>::reduce<false>( by, int, _TYPE_ *, int ) const; \
   template std::optional<std::vector<_TYPE_>>                           \
   Collective_Comm<_COMM_>::reduce<true>( by, int, _TYPE_ *, int ) const; \
+  template std::optional<std::vector<_TYPE_>>                           \
+  Collective_Comm<_COMM_>::allreduce<false>( by, _TYPE_ *, int ) const; \
   template void Collective_Comm<_COMM_>::broadcast( int, _TYPE_ *, int ) const; \
   template Request Collective_Comm<_COMM_>::Ibroadcast( int, _TYPE_ *, int ) const; \
   template std::vector<_TYPE_> Collective_Comm<_COMM_>::allgather( const _TYPE_*, int ) const; \
@@ -212,5 +240,7 @@ namespace mpi {
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(Comm, _TYPE_);      \
   template void Collective_Comm<Comm>::exscan_inplace(by, _TYPE_*, int ) const; \
   template void Collective_Comm<Comm>::inscan_inplace(by, _TYPE_*, int ) const; \
+  template std::optional<std::vector<_TYPE_>>                           \
+  Collective_Comm<Comm>::allreduce<true>( by, _TYPE_ *, int ) const; \
   INSTANTIATE_MPI_COLLECTIVE_FOR_COMM(InterComm, _TYPE_)
 }

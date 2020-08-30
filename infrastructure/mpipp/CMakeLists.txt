@@ -7,5 +7,5 @@ separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # 
 target_link_options(mpipp PUBLIC ${MPI_CXX_LINK_OPTIONS})
 
 if (${ENABLE_TESTS})
-  test_gen(mpipp mpi++ mpipp) # DONE
+  test_gen(mpipp mpi++ mpipp)
 endif()

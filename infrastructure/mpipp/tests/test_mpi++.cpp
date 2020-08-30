@@ -16,6 +16,7 @@ SCENARIO("World", "[parallel][mpi]") {
       REQUIRE( msg == 147 );
     }
   }
+  world.barrier();
 }
 
 // SCENARIO("Group", "[parallel][mpi]") {
@@ -56,6 +57,7 @@ SCENARIO("Comm", "[parallel][mpi]") {
       REQUIRE( 147 == msg );
     }
   }
+  world.barrier();
 }
 
 // TODOL restore after typelist is installed
@@ -122,12 +124,64 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
           std::vector<Request> reqs(2);
           mpi::waitall(reqs);
         }
+        world.barrier();
       }
     }
   }
 }
 
-// SCENARIO("intra collective communications", "[parallel][mpi]") {}
+SCENARIO("intra collective communications", "[parallel][mpi]") {
+  SECTION("allreduce") {
+    auto rw_opt = aio::reduced_world(4,world);
+    if(rw_opt) {
+      auto& rw = *rw_opt;
+      WHEN("out of place") {
+        std::vector<int> buf(100, rw.rank());
+        auto res = rw.allreduce(mpi::by::SUM, buf.data(), buf.size());
+        REQUIRE(bool(res));
+        for ( auto x : buf )
+          REQUIRE(x == rw.rank());
+        for ( auto x : *res )
+          REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
+      }
+      WHEN("in place") {
+        std::vector<int> buf(100, rw.rank());
+        auto res = rw.allreduce<mpi::IN_PLACE>(mpi::by::SUM, buf.data(), buf.size());
+        REQUIRE(!res);
+        for (auto x : buf)
+          REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
+      }
+    }
+    world.barrier();
+  }
+
+  SECTION("broadcast") {
+    auto rw_opt = aio::reduced_world(4, world);
+    if (rw_opt) {
+      auto &rw = *rw_opt;
+      std::vector<int> buf(100, rw.rank());
+      const int root = 2;
+      rw.broadcast(root, buf.data(), buf.size());
+      for (auto x : buf)
+        REQUIRE(x == root);
+    }
+    world.barrier();
+  }
+
+  SECTION("Ibroadcast") {
+    auto rw_opt = aio::reduced_world(4, world);
+    if (rw_opt) {
+      auto &rw = *rw_opt;
+      std::vector<int> buf(100, rw.rank());
+      const int root = 2;
+      auto req = rw.Ibroadcast(root, buf.data(), buf.size());
+      wait(req);
+      for (auto x : buf)
+        REQUIRE(x == root);
+    }
+    world.barrier();
+  }
+}
 
 SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
   SECTION("each comm has one member") {
@@ -148,15 +202,36 @@ SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
 
 }
 
+// TODO
+// SCENARIO("inter collective communications", "[parallel][mpi]") {
+//   SECTION("allreduce") {
+//     auto rw_opt = aio::reduced_world(4,world);
+//     if(rw_opt) {
+//       auto& rw = *rw_opt;
+//       std::vector<int> buf(100, rw.rank());
+//       auto res = rw.allreduce(mpi::by::SUM, buf.data(), buf.size());
+//       REQUIRE(bool(res));
+//       for ( auto x : buf )
+//         REQUIRE(x == rw.rank());
+//       for ( auto x : *res )
+//         REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
+//     }
+//     world.barrier();
+//   }
+// }
+
 SCENARIO("cartesian communicator", "[parallel][mpi]") {
   WHEN("1x1 and periodic") {
-    CartComm cart( self, {1,1}, {true, true} );
-    for ( int i = 0; i < 2; ++i ) {
-      auto[src_rank, dest_rank] = cart.shift(i,1);
-      REQUIRE(src_rank);
-      REQUIRE(dest_rank);
-      REQUIRE(*src_rank == 0 );
-      REQUIRE(*dest_rank == 0 );
+    if ( world.rank() == 0 ) {
+      CartComm cart(self, {1, 1}, {true, true});
+      for (int i = 0; i < 2; ++i) {
+        auto [src_rank, dest_rank] = cart.shift(i, 1);
+        REQUIRE(src_rank);
+        REQUIRE(dest_rank);
+        REQUIRE(*src_rank == 0);
+        REQUIRE(*dest_rank == 0);
+      }
     }
+    world.barrier();
   }
 }

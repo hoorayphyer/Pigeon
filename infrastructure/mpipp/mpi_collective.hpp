@@ -24,6 +24,11 @@ namespace mpi {
     std::optional<std::vector<T>>
     reduce( by op, int root, T* buffer, int count ) const;
 
+    // B stands for in-place-ness for intra. Only intra can have in-place version
+    template <bool B = false, typename T>
+    std::optional<std::vector<T>>
+    allreduce(by op, T *buffer, int count) const;
+
     // TODO fix this. Returning optional on nonblocking call may not make sense
     // template < by Op, bool In_Place = false, typename T >
     // std::tuple< Request, std::optional<std::vector<T> > >
