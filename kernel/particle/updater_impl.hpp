@@ -65,6 +65,9 @@ namespace particle {
 
           constexpr auto shapef = ShapeF();
           auto charge_over_dt = prop.charge_x / dt;
+          bool is_deposit_current =
+              (_ignore_current.find(sp) == _ignore_current.end()
+               and std::abs(prop.charge_x) > 0.01);
 
           for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
             if( !ptc.is(flag::exist) ) continue;
@@ -143,7 +146,7 @@ namespace particle {
             }
 #endif
             // FIXME pusher handle boundary condition. Is it needed?
-            if ( std::abs(prop.charge_x) > 0.01 ) {
+            if ( is_deposit_current  ) {
               // change dq to q1 in the coordinate space. NOTE it is not necessarily the same as ptc.q()
               for ( int i = 0; i < DGrid; ++i ) {
                 dq[i] /= grid[i].delta();
@@ -161,6 +164,20 @@ namespace particle {
       update_species(sp);
     }
 
+    { // NOTE rescale Jmesh back to real grid delta
+      auto dV = apt::dV(grid);
+
+      for (int i = 0; i < DGrid; ++i) {
+        R tmp = grid[i].delta() / dV;
+        for (auto &elm : J[i].data())
+          elm *= tmp;
+      }
+
+      for (int i = DGrid; i < 3; ++i) {
+        for (auto &elm : J[i].data())
+          elm /= dV;
+      }
+    }
   }
 
 }

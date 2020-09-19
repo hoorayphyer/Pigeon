@@ -41,16 +41,17 @@ namespace pic {
   using PtcUpdater = ::particle::Updater<DGrid,real_t,Specs,ShapeF,real_j_t>;
   using Particle = ::particle::Particle<real_t,Specs>;
   using Force = ::particle::Force<real_t,Specs>;
+  using Traman = ::particle::TracingManager;
   using Tracer = ::particle::Tracer<DGrid, real_t, Specs, real_j_t>;
 
   template < typename P >
   void trace( P& ptc ) {
-    return ::particle::TracingManager<real_t,Specs>::trace(ptc);
+    return Traman::trace(ptc);
   }
 
   template <typename P>
   void untrace(P &ptc) {
-    return ::particle::TracingManager<real_t, Specs>::untrace(ptc);
+    return Traman::untrace(ptc);
   }
 }
 

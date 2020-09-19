@@ -6,6 +6,7 @@
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
 #include "particle/load_type.hpp"
+#include <unordered_set>
 
 namespace dye {
   template < int > struct Ensemble;
@@ -20,10 +21,16 @@ namespace particle {
   class Updater : public Action<DGrid,R,S,RJ> {
   private:
     apt::array<R, S<R>::Dim> (*_update_q)( typename array<R,S>::particle_type::vec_type& x, typename array<R,S>::particle_type::vec_type& p, R dt, bool is_massive );
+    std::unordered_set<species> _ignore_current{};
 
   public:
     Updater* Clone() const override { return new Updater(*this); }
     Updater& set_update_q( apt::array<R, S<R>::Dim> (*update_q)( typename array<R,S>::particle_type::vec_type&, typename array<R,S>::particle_type::vec_type&, R, bool ) ) { _update_q = update_q; return *this; }
+
+    Updater &set_ignore_current( std::unordered_set<species> sps ) {
+      _ignore_current = std::move(sps);
+      return *this;
+    }
 
     void operator() ( map<array<R,S>>& particles,
                       field::Field<RJ,3,DGrid>& J,

@@ -1,11 +1,14 @@
 #ifndef _PIC_TRACING_HPP_
 #define _PIC_TRACING_HPP_
 
+#include "apt/bit_manip.hpp"
 #include "particle/array.hpp"
 #include "particle/map.hpp"
 #include "particle/particle.hpp"
 #include "particle/properties.hpp"
+#include "particle/action.hpp"
 #include "pic/plans.hpp"
+#include <unordered_map>
 
 // Tracing Logic
 // 1. a particle is uniquely identified by (sp, wr, sn), which we call id. wr is used in favor of ens_label because wr stays same throughout
@@ -13,40 +16,84 @@
 // 3. sn begins with 1. sn == 0 is reversed to signal that the particle has never been traced before.
 // 4. there is a flag::traced dedicated to tracing. When tracing, this flag is set, and id must be assigned accordingly. When untracing, simply reset this flag, leaving id untouched so that later another tracing doesn't assign new id to this particle
 // 5. it is considered inconsistent if a particle has flag:traced set yet has sn == 0. Implementation should prevent this. In particular, setting flag::traced through state should be disabled
+// 6. NOTE one problem might be the serial number, once assigned, cannot by recycled. So if in the future, even if user decides to ignore part of the traced set, the counter is determined by the max count remaining. NOTE adding yet another dimension, say batch No., may mitigate this issue, but it has its own limitations, such as limited max number of particles that can be traced within one batch, assuming same number of bits used.
 
 namespace particle {
-  template <typename R, template <typename> class S>
   struct TracingManager {
-  public:
-    static void init( const map<Properties>& properties,
-                      const map<array<R,S>>& particles ) {
-      // initialize trace_counters to ensure unique trace serial numbers across runs
-      for ( auto sp : properties ) {
-        unsigned int n = 0;
-        for ( const auto& ptc : particles[sp] )
-          if ( ptc.is(flag::traced) )
-            n = std::max<unsigned int>( n, ptc.template get<pid>() );
+  private:
+    static constexpr int Nbits_wr = 12;
+    static constexpr int Nbits_sn = 23;
+    static_assert(Nbits_wr > 0 and Nbits_sn > 0);
 
-        _data()._trace_counter.insert( sp, n+1 );
-      }
+  public :
+    static void
+    init(std::size_t wr,
+         std::unordered_map<species, std::size_t> counter) {
+      _data()._wr = wr;
+      _data()._counter = std::move(counter);
     }
 
-    template < typename P >
-    static void trace( P& ptc ) {
-      if (not ptc.is(flag::traced)) {
-        ptc.set(flag::traced);
-        if (ptc.template get<pid>() == 0) {
-          ptc.set(sn(_data()._trace_counter[ptc.template get<species>()]++));
-        }
-      }
+    template <typename R, template <typename> class S>
+    static void init(std::size_t wr, const map<array<R, S>> &particles) {
+      return init(wr, parse_tracing(particles));
     }
 
     template <typename P>
-    static void untrace(P &ptc) { ptc.reset(flag::traced); }
+    static void trace(P &&ptc) { // TODOL sematics, preferably P&
+      std::size_t id = ptc.template get<pid>();
+      if ( apt::getbits<0,1,bool>(id) ) return;
+
+      apt::setbits<0, 1>(id, true);
+      auto sn = apt::getbits<1+Nbits_wr, Nbits_sn>(id);
+      if (sn == 0) {
+        sn = ++ _data()._counter[ptc.template get<species>()];
+        apt::setbits<1, Nbits_wr>(id, _data()._wr);
+        apt::setbits<1 + Nbits_wr, Nbits_sn>(id, sn);
+      }
+      ptc.template set<pid>(id);
+    }
+
+    template <typename P>
+    static void untrace(P &&ptc) { // TODOL sematics, preferably P&
+      std::size_t id = ptc.template get<pid>();
+      apt::setbits<0, 1>(id, false);
+      ptc.template set<pid>(id);
+    }
+
+    template <typename P>
+    static void eliminate_tracing(P &ptc) {
+      // FIXME
+      // std::size_t id = ptc.template get<pid>();
+      // apt::setbits<0, 1>(id, false);
+      // ptc.template set<pid>(id);
+    }
+
+    template <typename P>
+    static bool is_traced(P &ptc) {
+      std::size_t id = ptc.template get<pid>();
+      return apt::getbits<0,1>(id);
+    }
+
+    template <typename P>
+    static bool was_traced(P &ptc) {
+      std::size_t id = ptc.template get<pid>();
+      id = apt::getbits<1 + Nbits_wr, Nbits_sn>(id);
+      return id != 0;
+    }
+
+    template <typename R, template <typename> class S>
+    static std::unordered_map<species, std::size_t>
+    parse_tracing(const map<array<R, S>> &particles);
+
+    template <int DGrid, typename R, template <typename> class S>
+    static std::string save_tracing(std::string prefix, const int num_parts,
+                                    const std::optional<dye::Ensemble<DGrid>> &ens_opt,
+                                    int timestep,
+                                    const particle::map<particle::array<R, S>> &particles);
 
   private:
-    unsigned int _wr {}; // world rank
-    map<unsigned int> _trace_counter {}; // for assigning serial numbers to traced particles
+    std::size_t _wr {}; // world rank
+    std::unordered_map<species, std::size_t> _counter {}; // NOTE new item guaranteed to be zero-initialized
 
     static TracingManager& _data() {
       static TracingManager r;

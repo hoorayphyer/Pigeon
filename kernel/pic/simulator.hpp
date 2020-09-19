@@ -232,7 +232,7 @@ namespace pic {
       mpi::world.broadcast( 0, &init_ts, 1 );
 
       // initialize trace_counters to ensure unique trace serial numbers across runs
-      particle::TracingManager<R,S>::init(_properties, _particles);
+      pic::Traman::init(mpi::world.rank(),_particles);
 
       if ( profiling_plan.on and profiling_plan.is_qualified() ) {
         lgr::file << "--- Done." << std::endl;
@@ -317,19 +317,6 @@ namespace pic {
           });
         }
 
-        { // NOTE rescale Jmesh back to real grid delta
-          auto dV = apt::dV(_grid);
-
-          for ( int i = 0; i < DGrid; ++i ) {
-            R tmp = _grid[i].delta() / dV;
-            for ( auto& elm : _J[i].data() ) elm *= tmp;
-          }
-
-          for ( int i = DGrid; i < 3; ++i ) {
-            for ( auto& elm : _J[i].data() ) elm /= dV;
-          }
-        }
-
         // ----- Before this line _J is local on each cpu --- //
         TIMING("ReduceJmesh", START {
             // TODOL reduce number of communications?
@@ -363,7 +350,7 @@ namespace pic {
 
       if ( export_plan.is_do(timestep) and _ens_opt ) {
         TIMING("ExportData", START {
-            export_prior_hook( _particles, _properties, _E, _B, _J, _grid, *_ens_opt, dt, timestep );
+            export_prior_hook( _particles, _properties, _E, _B, _J, _grid, _cart_opt, *_ens_opt, dt, timestep );
 
             auto fexps = set_up_field_export();
             auto pexps = set_up_particle_export();
@@ -416,9 +403,9 @@ namespace pic {
           });
       }
 
-      if ( save_tracing_plan.is_do(timestep) ) { // FIXME
+      if ( save_tracing_plan.is_do(timestep) ) {
         TIMING("SaveTracing", START {
-            auto dir = ckpt::save_tracing( this_run_dir, save_tracing_plan.num_files, _ens_opt, timestep, _particles );
+            auto dir = pic::Traman::save_tracing( this_run_dir, save_tracing_plan.num_files, _ens_opt, timestep, _particles );
           });
       }
 
