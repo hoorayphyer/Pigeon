@@ -43,11 +43,14 @@ namespace field {
       return res;
     }
 
-    constexpr int linear_index( const apt::Longidx& i ) const noexcept {
+    constexpr int linear_index(int dir, int i) const noexcept {
       // TODO check bounds on i.dir()
-      return _linear_offset + i.val() * _stride[i.dir()];
+      return _linear_offset + i * _stride[dir];
     }
 
+    constexpr int linear_index(const apt::Longidx &i) const noexcept {
+      return linear_index(i.dir(), i.val());
+    }
   };
 }
 

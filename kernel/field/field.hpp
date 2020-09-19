@@ -19,7 +19,12 @@ namespace field {
     constexpr Component( vector_type& data, const Mesh<DGrid>& mesh, const apt::array<offset_t, DGrid>& offset ) noexcept
       : _data(data), _mesh(mesh), _offset(offset) {}
 
-    inline T& operator() ( const apt::Index<DGrid>& i_bulk ) {
+    // allow conversion from non-const to const
+    template <typename U = Component<T, DGrid, not Const>>
+    constexpr Component(const std::enable_if_t<Const, U> &c) noexcept
+      : Component(c.data(), c.mesh(), c.offset()) {}
+
+    inline T &operator()(const apt::Index<DGrid> &i_bulk) {
       return _data [_mesh.linear_index(i_bulk) ];
     }
 

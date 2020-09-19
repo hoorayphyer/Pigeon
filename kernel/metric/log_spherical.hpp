@@ -144,7 +144,7 @@ namespace metric {
 
     // TODOL: in implementing this, we assumed no crossing through center
 
-    dt /= std::sqrt( is_massive + apt::sqabs(p) );
+    dt /= std::sqrt( is_massive + dx[0] );
     for ( int i = 0; i < P::NDim; ++i )
       dx[i] = p[i] * dt;
     // now dx holds displacements under the local cartesian frame
@@ -200,7 +200,7 @@ namespace metric {
       std::swap( dt, x[0] );
 
       std::swap( x[1], dx[1] );
-      dx[1] *= -1;
+      dx[1] = -dx[1];
       dx[1] += is_massive ? ( -x[1] + ( x[1] > PI / 2.0 ) * 2.0 * PI ) : x[1] ;
 
       x[2] += dx[2];
