@@ -120,7 +120,7 @@ namespace particle {
       for ( auto&& ptc : *new_ptc_buf ) {
         if ( !ptc.is(flag::exist) ) continue;
         auto sp = ptc.template get<species>();
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
         // // check if the received ptc trully resides in this ensemble.
         // apt::array<int,DGrid> mig_co;
         // bool is_OK = true;

@@ -1,7 +1,7 @@
 #include "particle/updater.hpp"
 #include "msh/mesh_shape_interplay.hpp"
 
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
 #include "debug/debugger.hpp"
 #include "logger/logger.hpp"
 #endif
@@ -71,7 +71,7 @@ namespace particle {
 
           for ( auto ptc : sp_ptcs ) { // TODOL sematics, check ptc is proxy
             if( !ptc.is(flag::exist) ) continue;
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
             apt::Vec<R,S<R>::Dim> q_prev = ptc.q();
             apt::Vec<R,S<R>::Dim> p_prev = ptc.p();
 
@@ -100,7 +100,7 @@ namespace particle {
 
               apt::Vec<R,S<R>::Dim> dp = -ptc.p();
               update_p( ptc, dt, E_itpl, B_itpl );
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
               if(debug::has_nan(ptc)) {
                 lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
                 lgr::file << "NANUPDATEP, code=" << debug::has_nan(ptc) << std::endl;
@@ -118,7 +118,7 @@ namespace particle {
 
               dp += ptc.p(); // ptc.p() is the updated one but still based on the same location
               scatter( ptc, *new_ptc_buf, prop, dp, dt, B_itpl, rng ); // FIXME new_ptc_buf may be null?
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
               if(debug::has_nan(ptc)) {
                 lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
                 lgr::file << "NANSCAT, code=" << debug::has_nan(ptc) << std::endl;
@@ -134,7 +134,7 @@ namespace particle {
 
             // NOTE q is updated, starting from here, particles may be in the guard cells.
             auto dq = _update_q( ptc.q(), ptc.p(), dt, (prop.mass_x > 0.01) );
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
             if(debug::has_nan(ptc)) {
               lgr::file << "ts=" << debug::timestep << ", wr=" << debug::world_rank << ", el=" << debug::ens_label << std::endl;
               lgr::file << "NANUPDATEQ, code=" << debug::has_nan(ptc) << std::endl;

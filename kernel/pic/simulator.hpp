@@ -21,7 +21,7 @@
 
 #include "pic/vitals.hpp"
 
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
 #include "debug/debugger.hpp"
 #endif
 
@@ -248,7 +248,7 @@ namespace pic {
       if ( timestep % print_timestep_to_stdout_interval == 0 && mpi::world.rank() == 0 )
         std::cout << "==== Timestep " << timestep << " ====" << std::endl;
 
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
       debug::timestep = timestep;
       debug::world_rank = mpi::world.rank();
       if ( _ens_opt ) debug::ens_label = _ens_opt -> label();
@@ -317,56 +317,69 @@ namespace pic {
           });
         }
 
-        // ----- Before this line _J is local on each cpu --- //
-        TIMING("ReduceJmesh", START {
-            // TODOL reduce number of communications?
-            for ( int i = 0; i < 3; ++i )
-              ens.reduce_to_chief( mpi::by::SUM, _J[i].data().data(), _J[i].data().size() );
-          });
+        { // ----- Before this line _J is local on each cpu, assemble it onto primaries --- //
+          TIMING("ReduceJmesh", START {
+                // TODOL reduce number of communications?
+                for (int i = 0; i < 3; ++i)
+                  ens.reduce_to_chief(mpi::by::SUM, _J[i].data().data(),
+                                      _J[i].data().size());
+              });
+          if (_cart_opt) {
+            TIMING(" -- MergeSyncJ",
+                START { field::merge_sync_guard_cells(_J, *_cart_opt); });
+          }
+        }
+
+        // export data before _J is disrupted by field solver
+        if ( export_plan.is_do(timestep)) {
+          TIMING("ExportData", START {
+              export_prior_hook( _particles, _properties, _E, _B, _J, _grid, _cart_opt, ens, dt, timestep );
+
+              auto fexps = set_up_field_export();
+              auto pexps = set_up_particle_export();
+
+              io::set_is_collinear_mesh(is_collinear_mesh); // TODO
+
+              io::export_data<pic::real_export_t>( this_run_dir, timestep, dt,
+                                                   export_plan.num_files,
+                                                   export_plan.downsample_ratio,
+                                                   _cart_opt, ens, _grid, _E, _B, _J,
+                                                   _particles, _properties, fexps, pexps );
+              for ( auto ptr : fexps ) delete ptr;
+              for ( auto ptr : pexps ) delete ptr;
+
+              export_post_hook();
+            });
+        }
+
+        if (vitals_plan.is_do(timestep)) {
+          TIMING("Statistics", START {
+                pic::check_vitals(pic::this_run_dir + "/vitals.txt",
+                                  timestep * dt, ens, _cart_opt,
+                                  _properties, _particles, RTD::data().N_scat);
+              });
+        }
 
         if ( _cart_opt ) {
+          const auto& cart = *_cart_opt;
           if ( stamp ) {
             lgr::file % "* FieldActions" << std::endl;
           }
-          TIMING(" -- MergeSyncJ", START {
-              field::merge_sync_guard_cells( _J, *_cart_opt );
-            });
 
           for ( int i = 0; i < _field_actions.size(); ++i ) {
             if ( !_field_actions[i] ) continue;
             TIMING(" -- " + _field_actions[i]->name(), START {
               const auto& act = *_field_actions[i];
-              act(_E, _B, _J, _grid, *_cart_opt, timestep, dt);
+              act(_E, _B, _J, _grid, cart, timestep, dt);
             });
           }
 
           TIMING(" -- CopySyncEB", START {
               // NOTE sub_range same as domain_range FIXME rethink domain and sub range
-              field::copy_sync_guard_cells(_E, *_cart_opt );
-              field::copy_sync_guard_cells(_B, *_cart_opt );
+              field::copy_sync_guard_cells(_E, cart );
+              field::copy_sync_guard_cells(_B, cart );
             });
         }
-      }
-
-      if ( export_plan.is_do(timestep) and _ens_opt ) {
-        TIMING("ExportData", START {
-            export_prior_hook( _particles, _properties, _E, _B, _J, _grid, _cart_opt, *_ens_opt, dt, timestep );
-
-            auto fexps = set_up_field_export();
-            auto pexps = set_up_particle_export();
-
-            io::set_is_collinear_mesh(is_collinear_mesh); // TODO
-
-            io::export_data<pic::real_export_t>( this_run_dir, timestep, dt,
-                                                 export_plan.num_files,
-                                                 export_plan.downsample_ratio,
-                                                 _cart_opt, *_ens_opt, _grid, _E, _B, _J,
-                                                 _particles, _properties, fexps, pexps );
-            for ( auto ptr : fexps ) delete ptr;
-            for ( auto ptr : pexps ) delete ptr;
-
-            export_post_hook();
-          });
       }
 
       if ( load_balance_plan.is_do(timestep) ) {
@@ -383,12 +396,6 @@ namespace pic {
             if (stamp) lgr::file % "  update parts of simulator..." << std::endl;
             if ( old_label != new_label ) update_parts(*_ens_opt);
             if (stamp) lgr::file % "  Done." << std::endl;
-          });
-      }
-
-      if (_ens_opt and vitals_plan.is_do(timestep) ) {
-        TIMING("Statistics", START {
-            pic::check_vitals( pic::this_run_dir + "/vitals.txt", timestep * dt, *_ens_opt, _cart_opt, _properties, _particles, RTD::data().N_scat );
           });
       }
 

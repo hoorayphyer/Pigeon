@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   if ( cli_args.is_dry_run ) {
     int retcode = 0;
     std::cout << "Dry Run Checks :=" << std::endl;
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
     std::cout << "\tDebug" << std::endl;
 #else
     std::cout << "\tRelease" << std::endl;
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
                              }
                              std::ofstream out;
                              out.open(jnl, std::ios_base::app); // NOTE app creates new file when jnl doesn't exist
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
                              out << "BuildType := Debug" << std::endl;
 #else
                              out << "BuildType := Release" << std::endl;
