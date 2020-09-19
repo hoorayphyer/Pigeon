@@ -332,3 +332,15 @@ SCENARIO("multiputters with namescheme", "[silo][.]") {
   }
   world.barrier();
 }
+
+SCENARIO("write", "[silo]") {
+  // TODOL write sometimes gives warning DBWrite: Invalid argument: ndims
+  if (world.rank() == 0) {
+    auto sf = open("pubg.silo", Mode::Write);
+    std::vector<int> dims {256,256};
+    std::vector<float> data(dims[0]*dims[1]);
+    // sf.write("data", data.data(), dims);
+    sf.write("data", data);
+  }
+  world.barrier();
+}

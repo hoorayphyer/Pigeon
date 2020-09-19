@@ -4,40 +4,32 @@
 #include "particle/species_predef.hpp"
 #include "particle/flags_predef.hpp"
 #include "apt/ternary.hpp"
+#include "apt/bit_manip.hpp"
 #include <type_traits>
 #include <tuple>
 #include <bitset>
 #include <cstdint>
 
 namespace particle {
-  // convention: Pos counts from the right. (Pos+N, Pos].
-  // NOTE bit shift operator << returns of type of the left operand. So if LHS has
-  // fewer bits than RHS, the return result will simply be zero, i.e., information
-  // is lost, hence all the casts
-  template <std::size_t Pos, std::size_t N, typename U, typename T>
-  constexpr U getbits(const T &x) noexcept {
-    return static_cast<U>((x >> Pos) & ~(~static_cast<std::size_t>(0) << N));
-  }
-
-  template <std::size_t Pos, std::size_t N, typename U, typename T>
-  constexpr void setbits(T &x, U y) noexcept {
-    // NOTE assume y has all nonzero bits in the last N bits
-    x &= ~(~(~static_cast<std::size_t>(0) << N) << Pos);
-    x |= ((static_cast<std::size_t>(y) & ~(~static_cast<std::size_t>(0) << N))
-          << Pos);
-  }
-}
-
-namespace particle {
+  template < int N, typename T= std::uint32_t>
   struct proxy_int {
-    using proxy_int_t = std::uint32_t;
+    using proxy_int_t = T;
+    static constexpr int nbits_v = N;
+    static_assert(N <= sizeof(T)*8);
+
+    constexpr proxy_int() = default;
+    constexpr proxy_int(proxy_int_t a) noexcept : _data(a) {}
+    constexpr operator proxy_int_t() const noexcept { return _data; }
+
+  protected:
+    proxy_int_t _data{};
   };
 
-  struct flagbits : public std::bitset<16>,
-                    public proxy_int {
+  struct flagbits : public std::bitset<16> {
   private:
     using base_type = std::bitset<16>;
   public:
+    using proxy_int_t = std::uint32_t;
     static constexpr int nbits_v = 16;
 
     using base_type::bitset;
@@ -58,21 +50,13 @@ namespace particle {
     }
   };
 
-  struct migrcode {
-    using proxy_int_t = std::int32_t;
-    static constexpr int nbits_v = 5;
-
-    constexpr migrcode() = default;
-    constexpr migrcode(proxy_int_t a) noexcept : _data(a) {}
-
-    constexpr operator proxy_int_t() const noexcept {
-      return _data;
-    }
+  struct migrcode : proxy_int<5> {
+    using proxy_int::proxy_int;
 
     template <int D>
     constexpr migrcode& decode() noexcept {
       // fill all leading bits with the value from sign bit. (two's compliment)
-      setbits<nbits_v-1, sizeof(_data)*8-nbits_v+1>(_data, ~(_data >> (nbits_v-1)) + 1 );
+      apt::setbits<nbits_v-1, sizeof(_data)*8-nbits_v+1>(_data, ~(_data >> (nbits_v-1)) + 1 );
       _data += (apt::pow3(D) - 1) / 2;
       return *this;
     }
@@ -84,33 +68,11 @@ namespace particle {
       // still explicitly reset all leading bits, just to be consistent with the result read off from a state object
       _data &= ((1u << nbits_v) - 1);
     }
-
-  private:
-    proxy_int_t _data {};
   };
 
-  struct freebits : public proxy_int {
-    static constexpr int nbits_v = 0;
+  using freebits = proxy_int<0>;
 
-    constexpr freebits() = default;
-    constexpr freebits(proxy_int_t a) noexcept : _data(a) {}
-    constexpr operator proxy_int_t() const noexcept { return _data; }
-
-  private:
-    proxy_int_t _data{};
-  };
-
-  // particle id
-  struct pid : public proxy_int {
-    static constexpr int nbits_v = 1 + 12 + 23;
-
-    constexpr pid() = default;
-    constexpr pid(proxy_int_t a) noexcept : _data(a) {}
-    constexpr operator proxy_int_t() const noexcept { return _data; }
-
-  private:
-    proxy_int_t _data{};
-  };
+  using pid = proxy_int<1+12+23,std::uint64_t>; // particle id
 
   template < typename T >
   struct to_int {
@@ -165,13 +127,13 @@ namespace particle {
   private:
     template < typename Attr >
     inline void set_impl( const Attr& attr ) noexcept {
-      setbits<layout::begin<Attr>(), layout::size<Attr>()>
+      apt::setbits<layout::begin<Attr>(), layout::size<Attr>()>
         (state(), static_cast<to_int_t<Attr>>(attr) );
     }
 
     template < typename Attr >
     inline Attr get_impl() const noexcept {
-      return static_cast<Attr>(getbits<layout::begin<Attr>(), layout::size<Attr>(), to_int_t<Attr>>(state()));
+      return static_cast<Attr>(apt::getbits<layout::begin<Attr>(), layout::size<Attr>()>(state()));
     }
 
   public:

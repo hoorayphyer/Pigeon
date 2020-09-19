@@ -5,7 +5,7 @@ if (${ENABLE_TESTS})
 endif()
 
 if (${ENABLE_DEBUG})
-  add_compile_definitions(PIC_DEBUG)
+  add_compile_definitions(PIC_DEBUG=TRUE)
 endif()
 
 # Set CXX flags

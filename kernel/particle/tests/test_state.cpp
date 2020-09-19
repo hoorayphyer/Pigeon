@@ -14,25 +14,6 @@ public:
   constexpr T state() const noexcept { return _state; }
 };
 
-TEMPLATE_TEST_CASE("Test setbits and getbits", "[particle]"
-                   , char
-                   , short, unsigned short
-                   , int, unsigned int
-                   , long, unsigned long
-                   , long long, unsigned long long
-                   ) {
-  constexpr int Pos = sizeof(T) * 8 - 16;
-  constexpr int Nbits = 16;
-  TestType y = std::numeric_limits<TestType>::max();
-  y &= ~( ~0uLL << Nbits );
-  T s = 0;
-  setbits<Pos,Nbits>( s, y );
-  REQUIRE( s == ( static_cast<T>(y) << Pos ) );
-
-  auto yy = getbits<Pos,Nbits,TestType>(s);
-  REQUIRE( yy == y );
-}
-
 SCENARIO("setting species", "[particle]") {
   State s;
   REQUIRE( s.get<species>() == species::unknown );

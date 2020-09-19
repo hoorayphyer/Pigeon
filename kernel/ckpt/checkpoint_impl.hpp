@@ -1,110 +1,17 @@
 #include "ckpt/checkpoint.hpp"
-#include "mpipp/mpi++.hpp"
-#include "silopp/silo++.hpp"
-#include "silopp/pmpio.hpp"
-#include "filesys/filesys.hpp"
-#include "particle/properties.hpp"
-#include "field/field.hpp"
-#include <cassert>
+#include "ckpt/checkpoint_helper.hpp"
 #include "dye/dynamic_balance.hpp"
-#include "dye/scatter_load.hpp"
+#include "field/field.hpp"
+#include "filesys/filesys.hpp"
+#include "mpipp/mpi++.hpp"
+#include "particle/properties.hpp"
+#include "silopp/pmpio.hpp"
+#include <cassert>
 
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
 #include "debug/debugger.hpp"
 #include "logger/logger.hpp"
 #endif
-
-// auxilliary
-namespace ckpt {
-  template < typename T, int DGrid >
-  struct FieldCkpt {
-    template < int DField >
-    void save( silo::file_t& dbfile, const std::string& name, const field::Field<T,DField,DGrid>& f ) {
-      for ( int comp = 0; comp < DField; ++comp ) {
-        auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
-        dbfile.write( n, f._comps[comp] );
-      }
-    }
-
-    template < int DField >
-    void load( silo::file_t& dbfile, const std::string& name, field::Field<T,DField,DGrid>& f ) {
-      for ( int comp = 0; comp < DField; ++comp ) {
-        auto n = name + ( DField == 1 ? "" : std::to_string(comp+1) );
-#ifdef PIC_DEBUG
-        lgr::file << "LDCKPT Field " << n << ", length of ckpt data = " << dbfile.var_length(n) << ", length of container = " << f._comps[comp].size() << std::endl;
-#endif
-        dbfile.read( n, f._comps[comp].data() );
-#ifdef PIC_DEBUG
-        lgr::file << silo::errmsg() << std::endl;
-#endif
-      }
-    }
-  };
-
-  template < typename T, template < typename > class S >
-  struct ParticleArrayCkpt {
-    void save( silo::file_t& dbfile, const particle::Properties& prop, const particle::array<T,S>& ptcs ) {
-      dbfile.mkcd(prop.name);
-      particle::load_t num = ptcs.size();
-      // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
-      dbfile.write("load", num);
-      if ( num != 0 ) {
-        constexpr auto DPtc = S<T>::Dim;
-        for ( int i = 0; i < DPtc; ++i ) {
-          dbfile.write("q"+std::to_string(i+1), ptcs._q[i].data(), {ptcs._q[i].size()} );
-          dbfile.write("p"+std::to_string(i+1), ptcs._p[i].data(), {ptcs._p[i].size()} );
-        }
-        dbfile.write( "frac", ptcs._frac.data(), {ptcs._frac.size()} );
-        dbfile.write( "state", ptcs._state.data(), {ptcs._state.size()} );
-      }
-      dbfile.cd("..");
-    }
-
-    void load( silo::file_t& dbfile, const particle::Properties& prop, particle::array<T,S>& ptcs, int receiver_idx, int num_receivers ) {
-      dbfile.cd( prop.name );
-      auto N = dbfile.read1<particle::load_t>("load");
-#ifdef PIC_DEBUG
-      lgr::file << "LDCKPT SPECIES " << prop.name << ", Load = " << N << std::endl;
-#endif
-
-      if ( 0 != N ) {
-        auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
-        auto size_old = ptcs.size();
-        ptcs.resize(size_old + num);
-
-        constexpr auto DPtc = S<T>::Dim;
-        apt::array<int, 3> slice { from, num, 1 };
-#ifdef PIC_DEBUG
-        lgr::file << "LDCKPT Slice from = " << from << ", length = " << num << ", stride = " << 1 << std::endl;
-#endif
-        {
-          for ( int i = 0; i < DPtc; ++i ) {
-            dbfile.readslice("q"+std::to_string(i+1), {slice}, ptcs._q[i].data() + size_old );
-#ifdef PIC_DEBUG
-            lgr::file << silo::errmsg() << std::endl;
-#endif
-            dbfile.readslice("p"+std::to_string(i+1), {slice}, ptcs._p[i].data() + size_old );
-#ifdef PIC_DEBUG
-            lgr::file << silo::errmsg() << std::endl;
-#endif
-          }
-          dbfile.readslice("frac", {slice}, ptcs._frac.data() + size_old );
-          dbfile.readslice("state", {slice}, ptcs._state.data() + size_old );
-#ifdef PIC_DEBUG
-          lgr::file << silo::errmsg() << std::endl;
-#endif
-        }
-      }
-      dbfile.cd("..");
-    }
-
-    inline const auto& q( const particle::array<T,S>& ptcs, int i ) const noexcept { return ptcs._q[i]; }
-    inline const auto& p( const particle::array<T,S>& ptcs, int i ) const noexcept { return ptcs._p[i]; }
-    inline const auto& frac( const particle::array<T,S>& ptcs ) const noexcept { return ptcs._frac; }
-    inline const auto& state( const particle::array<T,S>& ptcs ) const noexcept { return ptcs._state; }
-
-  };
-}
 
 namespace ckpt {
   // TODO save random seed
@@ -189,7 +96,7 @@ namespace ckpt {
               dbfile.write( "r", r );
               ParticleArrayCkpt<R, S> ckpt;
               for ( auto sp : particles ) {
-                ckpt.save( dbfile, properties[sp], particles[sp] );
+                ckpt.save( dbfile, properties[sp].name, particles[sp] );
               }
             }
             dbfile.cd("..");
@@ -227,7 +134,7 @@ namespace ckpt {
       assert( dbfile.var_exists("/species") );
 
       dbfile.read("/timestep", &checkpoint_ts);
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
       lgr::file << "LDCKPT timestep = " << checkpoint_ts << std::endl;
       lgr::file << silo::errmsg() << std::endl;
 #endif
@@ -235,7 +142,7 @@ namespace ckpt {
         int ndims = dbfile.var_length("/cartesian_topology");
         std::vector<int> topos(ndims);
         dbfile.read("/cartesian_topology", topos.data());
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
         lgr::file << "LDCKPT cartesian_topology = (";
         for ( auto x : topos ) lgr::file << x << ",";
         lgr::file << ")" << std::endl;
@@ -248,7 +155,7 @@ namespace ckpt {
         num_sps = dbfile.var_length("/species");
         sps.resize( num_sps );
         dbfile.read("/species", sps.data() );
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
         lgr::file << "LDCKPT species = (";
         for ( auto x : sps ) lgr::file << x << ",";
         lgr::file << ")" << std::endl;
@@ -267,7 +174,7 @@ namespace ckpt {
         sps.resize(num_sps);
       }
       mpi::world.broadcast( 0, sps.data(), sps.size() );
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
       if ( mpi::world.rank() != 0 ) {
         lgr::file << "LDCKPT timestep = " << checkpoint_ts << std::endl;
 
@@ -297,7 +204,7 @@ namespace ckpt {
                 assert( sf.var_exists(entry) );
                 myload += sf.read1<particle::load_t>(entry);
               }
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
               lgr::file << "LDCKPT Label = " << mylabel << ", Load = " << myload << std::endl;
               lgr::file << silo::errmsg() << std::endl;
 #endif
@@ -327,7 +234,7 @@ namespace ckpt {
     FieldCkpt<R,DGrid> f_ckpt;
     ParticleArrayCkpt<R, S> p_ckpt;
     for ( auto f : fs::directory_iterator(dir) ) {
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
       lgr::file << "Reading file " << f << std::endl;
 #endif
       auto sf = silo::open(f, silo::Mode::Read);
@@ -335,7 +242,7 @@ namespace ckpt {
         if ( dname.find("ensemble") != 0 ) continue;
         int l = sf.read1<int>(dname+"/label");
         if ( l != mylabel ) continue;
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
         lgr::file << "Reading EB from " << dname << std::endl;
 #endif
         sf.cd(dname);
@@ -347,13 +254,13 @@ namespace ckpt {
           if ( rdir.find("rank") != 0 ) continue;
           sf.cd(rdir);
           int r = sf.read1<int>("r");
-#ifdef PIC_DEBUG
+#if PIC_DEBUG
           lgr::file << "LDCKPT rank = " << r << std::endl;
           lgr::file << silo::errmsg() << std::endl;
 #endif
           for ( auto i : sps ) {
             auto sp = static_cast<particle::species>(i);
-            p_ckpt.load( sf,  properties[sp], particles[sp], myrank + r, ens_size );
+            p_ckpt.load( sf,  properties[sp].name, particles[sp], myrank + r, ens_size );
           }
           sf.cd("..");
         }
@@ -363,158 +270,4 @@ namespace ckpt {
 
     return checkpoint_ts;
   }
-
-
-  template < int DGrid, typename R, template < typename > class S >
-  std::string save_tracing( std::string prefix, const int num_parts,
-                            const std::optional<dye::Ensemble<DGrid>>& ens_opt,
-                            int timestep,
-                            const particle::map<particle::array<R,S>>& particles
-                            ) {
-    particle::array<R,S> ptcs_tr {};
-    if ( ens_opt ) {
-      for ( auto sp : particles ) {
-        for ( const auto& ptc : particles[sp] ) {
-          if ( !ptc.is(particle::flag::exist) || !ptc.is(particle::flag::traced) ) continue;
-          ptcs_tr.push_back(ptc);
-        }
-      }
-    }
-    bool is_ignore = !ens_opt || ( ptcs_tr.size() == 0 );
-    int key = 0;
-    if ( !is_ignore ) key = ens_opt -> label();
-    // use ensemble label to put processes from same ensemble together
-    auto active = mpi::world.split( {is_ignore}, key );
-    if ( is_ignore ) return "";
-    const auto& ens = *ens_opt;
-
-    char str_ts [10];
-    sprintf(str_ts, "%06d\0", timestep);
-
-    prefix = prefix + "/tracing/timestep" + str_ts;
-
-    silo::Pmpio pmpio;
-
-    int num_per_part = active->size() / num_parts + ( active->size() % num_parts != 0 );
-
-    {
-      pmpio.filename = prefix + "/part" + std::to_string( active->rank() / num_per_part ) + ".silo";
-      pmpio.dirname = "/ensemble" + std::to_string(ens.label());
-
-      pmpio.comm = active -> split( active->rank() / num_per_part );
-      fs::mpido(*active, [&](){fs::create_directories(prefix);} );
-    }
-
-    active->barrier();
-
-    pmpio([&]( auto& dbfile )
-          {
-            // write global data
-            if ( !dbfile.exists("/timestep") ) {
-              using T = std::underlying_type_t<particle::species>;
-              std::vector<T> sps;
-              for ( auto sp : particles )
-                sps.push_back( static_cast<T>(sp) );
-              dbfile.write( "/species", sps  );
-
-              dbfile.write( "/timestep", timestep );
-            }
-
-            dbfile.mkcd( "rank" + std::to_string(ens.intra.rank()) );
-            ParticleArrayCkpt<R, S> p_ckpt;
-            { // write process specific data
-              int r = ens.intra.rank();
-              dbfile.write( "r", r );
-              {
-                const auto& ptcs = ptcs_tr;
-                particle::load_t num = ptcs.size();
-                // NOTE: explicitly write load 1) to signal that this species in principle can exist and 2) because in Silo array length has type int so inferring from it might in some extreme case is wrong and hard to debug
-                dbfile.write("load", num);
-                if ( num != 0 ) {
-                  constexpr auto DPtc = S<R>::Dim;
-                  for ( int i = 0; i < DPtc; ++i ) {
-                    dbfile.write("q"+std::to_string(i+1), p_ckpt.q(ptcs, i).data(), {p_ckpt.q(ptcs, i).size()} );
-                    dbfile.write("p"+std::to_string(i+1), p_ckpt.p(ptcs, i).data(), {p_ckpt.p(ptcs, i).size()} );
-                  }
-                  dbfile.write( "frac", p_ckpt.frac(ptcs).data(), {p_ckpt.frac(ptcs).size()} );
-                  dbfile.write( "state", p_ckpt.state(ptcs).data(), {p_ckpt.state(ptcs).size()} );
-                }
-              }
-
-            }
-            dbfile.cd("..");
-          }
-      );
-
-    return prefix;
-  }
-
-  // template < int DGrid, typename R, template < typename > class S >
-  // int load_tracing( std::string dir, particle::array<R,S>& particles) {
-  //   int timestep = 0;
-  //   using T = std::underlying_type_t<particle::species>;
-
-  //   // rank0 read data
-  //   if ( mpi::world.rank() == 0 ) {
-  //     auto dir_itr = fs::directory_iterator(dir);
-  //     auto dbfile = silo::open(*dir_itr, silo::Mode::Read);
-  //     assert( dbfile.var_exists("/timestep") );
-
-  //     dbfile.read("/timestep", &timestep);
-  //   }
-  //   // rank0 broadcast data
-  //   {
-  //     int buf[1] = {timestep};
-  //     mpi::world.broadcast( 0, buf, 1 );
-  //     if ( mpi::world.rank() != 0 ) {
-  //       timestep = buf[0];
-  //     }
-  //   }
-
-  //   // ----------
-
-  //   const int myrank = ens_opt->intra.rank();
-
-  //   ParticleArrayCkpt<R, S> p_ckpt;
-  //   for ( auto f : fs::directory_iterator(dir) ) {
-  //     auto sf = silo::open(f, silo::Mode::Read);
-  //     for ( const auto& dname : sf.toc_dir() ) {
-  //       if ( dname.find("ensemble") != 0 ) continue;
-  //       sf.cd(dname);
-  //       for ( const auto& rdir : sf.toc_dir() ) {
-  //         if ( rdir.find("rank") != 0 ) continue;
-  //         sf.cd(rdir);
-  //         int r = sf.read1<int>("r");
-
-  //         {
-  //           auto N = dbfile.read1<particle::load_t>("load");
-
-  //           if ( 0 != N ) {
-  //             // auto[ from, num ] = dye::scatter_load(N, receiver_idx, num_receivers);
-  //             int from = 0;
-  //             auto num = N;
-  //             auto size_old = ptcs.size();
-  //             ptcs.resize(size_old + num);
-
-  //             constexpr auto DPtc = S<T>::Dim;
-  //             apt::array<int, 3> slice { from, num, 1 };
-  //             {
-  //               for ( int i = 0; i < DPtc; ++i ) {
-  //                 dbfile.readslice("q"+std::to_string(i+1), {slice}, particles._q[i].data() + size_old );
-  //                 dbfile.readslice("p"+std::to_string(i+1), {slice}, particles._p[i].data() + size_old );
-  //               }
-  //               dbfile.readslice("frac", {slice}, particles._frac.data() + size_old );
-  //               dbfile.readslice("state", {slice}, particles._state.data() + size_old );
-  //             }
-  //           }
-  //         }
-
-  //         sf.cd("..");
-  //       }
-  //       sf.cd("..");
-  //     }
-  //   }
-
-  //   return timestep;
-  // }
 }

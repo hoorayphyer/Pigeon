@@ -44,7 +44,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
       REQUIRE( ptc.is(flag::secondary) );
     }
 
-    Ptc ptc1 ( Vec(-45,10,-76), Vec(-13,-58,97), 0.94, species::photon, flag::traced );
+    Ptc ptc1 ( Vec(-45,10,-76), Vec(-13,-58,97), 0.94, species::photon, flag::secondary );
     arr.push_back(std::move(ptc1));
     REQUIRE_FALSE( ptc1.is(flag::exist) );
     REQUIRE( arr.size() == 2 );
@@ -61,7 +61,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
       REQUIRE( ptc.frac() == 0.94 );
 
       REQUIRE( ptc.is(species::photon) );
-      REQUIRE( ptc.is(flag::traced) );
+      REQUIRE( ptc.is(flag::secondary) );
     }
   }
 

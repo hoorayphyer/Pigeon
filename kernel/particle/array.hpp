@@ -6,11 +6,6 @@
 #include <iterator>
 #include <vector>
 
-namespace ckpt {
-  template < typename T, template < typename > class PtcSpecs >
-  struct ParticleArrayCkpt;
-}
-
 namespace particle {
   // dependees of array structure: checkpoints, sorter
   template < typename T, template < typename > class Specs >
@@ -28,8 +23,6 @@ namespace particle {
     using particle_type = vParticle< T, Specs >;
 
     using const_particle_type = vParticle< const T, Specs >;
-
-    friend class ckpt::ParticleArrayCkpt<T,Specs>;
 
     template < bool isConst >
     class iterator {
@@ -129,6 +122,19 @@ namespace particle {
     void erase( unsigned int from, unsigned int to );
 
     void resize(std::size_t size);
+
+    inline const auto back() const noexcept { return (*this)[size()-1]; }
+    inline auto back() noexcept { return (*this)[size() - 1]; }
+
+    inline const auto &qs(int i) const noexcept {return _q[i];}
+    inline const auto &ps(int i) const noexcept {return _p[i];}
+    inline const auto &fracs() const noexcept {return _frac;}
+    inline const auto &states() const noexcept {return _state;}
+
+    inline auto &qs(int i) noexcept { return _q[i]; }
+    inline auto &ps(int i) noexcept { return _p[i]; }
+    inline auto &fracs() noexcept { return _frac; }
+    inline auto &states() noexcept { return _state; }
   };
 
 }
