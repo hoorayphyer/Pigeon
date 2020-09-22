@@ -1,0 +1,17 @@
+project_name = "Dipole256"
+datadir_prefix = "../Data/"
+
+mu = 15000
+Omega = 0.2
+dt = 0.003
+total_timesteps = 5000
+spinup_time = 5.0
+
+[damping]
+thickness = 6.0
+rate = 10.0
+
+[plans]
+export = { on = true, start = 0, interval = 200, num_files = 1, downsample_ratio = 1 }
+profiling = { on = true, start = 0, interval = 100, max_entries = 100 }
+print_timestep_to_stdout_interval = 100
