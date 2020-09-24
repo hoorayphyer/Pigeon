@@ -52,8 +52,7 @@ namespace field {
     const int mode; // 0 : d_r 1 : d_th
     const std::optional<int>& lo;
     const std::optional<int>& hi;
-    const R dlnr;
-    const R dth;
+    const R delta;
 
     using proxy_t =
         std::tuple<const int, const std::optional<int>&, const std::optional<int>&,
@@ -65,7 +64,7 @@ namespace field {
                        const int (&b)[D], const int (&e)[D],
                        const bool continuous = false) {
       assert(comp != mode);
-      prefactor /= ( mode == r_ ? dlnr : dth );
+      prefactor /= delta;
       return std::forward_as_tuple(mode,lo,hi,E,comp, prefactor,b,e,continuous);
     }
 
@@ -80,15 +79,14 @@ namespace field {
         R f = prefactor;
         b = *lo + bdry;
 
+        const auto& s = m.stride(r_);
         for ( int j = b_in[th_]; j < e_in[th_]; ++j ) {
           int li_j = m.linear_index(th_, j);
           for ( int i = *lo; i < b; ++i ) {
-            int li = li_j + (i+1) * m.stride(r_);
-            // The following is O(dr^3) precise.
-            auto x01 = E[comp][li - m.stride(r_)] - E[comp][li];
-            auto x12 = E[comp][li] - E[comp][li + m.stride(r_)];
-            auto x23 = E[comp][li + m.stride(r_)] - E[comp][li + (m.stride(r_) << 1)];
-            output[li] += f * ( static_cast<R>(-71.0/24)*x01 + static_cast<R>(70.0/24)*x12 - static_cast<R>(23.0/24)*x23  );
+            int li = li_j + (i+1) * s;
+            // The following is O(dr^2) precise.
+            auto x = E[comp][li] - E[comp][li-s];
+            output[li-s] += f * ( x + x + E[comp][li] - E[comp][li+s] );
           }
         }
       }
@@ -112,7 +110,7 @@ namespace field {
 
       const auto& m = E.mesh();
       int b = b_in[th_];
-      int e = e_in[th_];
+      int e = e_in[th_] - bdry*bool(hi);
 
       if(!lo) b++;
       else {
@@ -168,11 +166,8 @@ namespace field {
     const int mode; // 0 : d_r 1 : d_th
     const std::optional<int>& lo;
     const std::optional<int>& hi;
-
     const _helper<R,D>& h;
-
-    const R dlnr;
-    const R dth;
+    const R delta;
 
     using proxy_t =
       std::tuple<const int, const std::optional<int>&, const std::optional<int>&, const _helper<R,D>& , const Field<R, 3, D> &, const int, R, const int (&)[D], const int (&)[D]>;
@@ -181,7 +176,7 @@ namespace field {
     proxy_t operator()(const Field<R, 3, D> &B, const int comp, R prefactor,
                        const int (&b)[D], const int (&e)[D]) {
       assert(comp != mode);
-      prefactor /= (mode == r_ ? dlnr : dth);
+      prefactor /= delta;
       return std::forward_as_tuple(mode,lo,hi,h,B,comp, prefactor,b,e);
     }
 
@@ -213,70 +208,73 @@ namespace field {
     }
 
 
-    static void d_th_dB(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
+    static void d_th_dB_r(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
+      const auto&&[mode, lo, hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
+
+      const auto& m = B.mesh();
+      int b = b_in[th_];
+      int e = e_in[th_] - 1 - bdry*bool(hi);
+
+      if (lo) {
+        b = bdry;
+        R f = prefactor / 3.0;
+        f *= h.estag() * h.estag();
+        for ( int j = 0; j < b; ++j ) {
+          int li_j = m.linear_index(th_, j+1);
+          R sr = h.sin(j + 2) / h.sin(j + 1);
+          R fsr = f * h.sin(j, true) / h.sin(j + 2);
+          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
+            int li = li_j + i * m.stride(r_);
+            output[li-m.stride(th_)] += fsr * h.fr(i) * ( B[comp][li + m.stride(th_)] - B[comp][li] * sr );
+          }
+        }
+      }
+      {
+        R f = prefactor;
+        f *= h.estag() * h.estag();
+        for (int j = b; j < e; ++j) {
+          int li_j = m.linear_index(th_, j);
+          R sr = h.sin(j + 1) / h.sin(j);
+          R fsr = f * h.sin(j, true) / h.sin(j + 1);
+          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
+            int li = li_j + i * m.stride(r_);
+            output[li] += fsr * h.fr(i) * (B[r_][li + m.stride(th_)] - B[r_][li] * sr) ;
+          }
+        }
+      }
+      if (hi) {
+        R f = prefactor / 3.0;
+        f *= h.estag() * h.estag();
+        for ( int j = e; j < e+bdry; ++j ) {
+          int li_j = m.linear_index(th_, j);
+          R sr = h.sin(j - 1) / h.sin(j);
+          R fsr = f * h.sin(j, true) / h.sin(j - 1);
+          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
+            int li = li_j + i * m.stride(r_);
+            output[li] -= fsr * h.fr(i) * ( B[comp][li - m.stride(th_)] - B[comp][li]*sr );
+          }
+        }
+      }
+    }
+
+    static void d_th_dB_phi(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
       const auto&&[mode, lo, hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
 
       const auto& m = B.mesh();
       int b = b_in[th_];
       int e = e_in[th_] - 1;
 
-      if ( comp == r_ ) {
-        if (lo) {
-          b = bdry;
-          R f = prefactor / 3.0;
-          f *= h.estag() * h.estag();
-          for ( int j = 0; j < b; ++j ) {
-            int li_j = m.linear_index(th_, j+1);
-            R sr = h.sin(j + 2) / h.sin(j + 1);
-            R fsr = f * h.sin(j, true) / h.sin(j + 2);
-            for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-              int li = li_j + i * m.stride(r_);
-              output[li-m.stride(th_)] += fsr * h.fr(i) * ( B[comp][li + m.stride(th_)] - B[comp][li] * sr );
-            }
-          }
-        }
-        {
-          R f = prefactor;
-          f *= h.estag() * h.estag();
-          for (int j = b; j < e; ++j) {
-            int li_j = m.linear_index(th_, j);
-            R sr = h.sin(j + 1) / h.sin(j);
-            R fsr = f * h.sin(j, true) / h.sin(j + 1);
-            for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-              int li = li_j + i * m.stride(r_);
-              output[li] += fsr * h.fr(i) * (B[r_][li + m.stride(th_)] - B[r_][li] * sr) ;
-            }
-          }
-        }
-        if (hi) {
-          R f = prefactor / 3.0;
-          f *= h.estag() * h.estag();
-          for ( int j = e; j < e+bdry; ++j ) {
-            int li_j = m.linear_index(th_, j);
-            R sr = h.sin(j - 1) / h.sin(j);
-            R fsr = f * h.sin(j, true) / h.sin(j - 1);
-            for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-              int li = li_j + i * m.stride(r_);
-              output[li] -= fsr * h.fr(i) * ( B[comp][li - m.stride(th_)] - B[comp][li]*sr );
-            }
-          }
-        }
-      }
-      else { // comp = _phi
-        // FIXME this part is not tested yet
-        R f = prefactor;
-        for (int j = b; j < e; ++j) {
-          int li_j = m.linear_index(th_, j);
-          R sinj0_in = h.sin(j);
-          R sinj1_in = h.sin(j + 1);
-          R fsin_inv = f / h.sin(j, true);
-          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-            int li = li_j + i * m.stride(r_);
-            // FIXME which sin is nonzero?
-            output[li] += fsin_inv * h.fr(i) *
-              (B[phi_][li + m.stride(th_)] * sinj1_in -
-               B[phi_][li] * sinj0_in);
-          }
+      R f = prefactor;
+      for (int j = b; j < e; ++j) {
+        int li_j = m.linear_index(th_, j);
+        R sinj0_in = h.sin(j);
+        R sinj1_in = h.sin(j + 1);
+        R fsin_inv = f / h.sin(j, true);
+        for (int i = b_in[r_]; i < e_in[r_]; ++i) {
+          int li = li_j + i * m.stride(r_);
+          output[li] += fsin_inv * h.fr(i) *
+            (B[phi_][li + m.stride(th_)] * sinj1_in -
+             B[phi_][li] * sinj0_in);
         }
       }
     }
@@ -300,10 +298,14 @@ void operator+=( field::Component<R, D, false> &&output, typename field::Diff_in
   using namespace field;
   const int mode = std::get<0>(diff);
   assert(mode < 2);
+  const int comp = std::get<5>(diff);
+  assert(comp == r_ or comp == phi_);
   if (mode == r_)
     Diff_in_CurlB<R,D>::d_r_dB(std::move(output), std::move(diff));
+  else if ( comp == r_ )
+    Diff_in_CurlB<R, D>::d_th_dB_r(std::move(output), std::move(diff));
   else
-    Diff_in_CurlB<R, D>::d_th_dB(std::move(output), std::move(diff));
+    Diff_in_CurlB<R, D>::d_th_dB_phi(std::move(output), std::move(diff));
 }
 
 template <typename R, int D>
@@ -402,7 +404,7 @@ namespace field {
     if (grid[1].lower() < grid[1].delta())
       lo_axis.emplace(0);
     if (grid[1].upper() > std::acos(-1.0) - grid[1].delta())
-      hi_axis.emplace(grid[1].dim());
+      hi_axis.emplace(grid[1].dim() + 1);
     return std::make_tuple(surf,outer,lo_axis,hi_axis);
   }
 
@@ -414,17 +416,26 @@ namespace field {
                const apt::Grid<R, DGrid> &grid,
                const mpi::CartComm &comm,
                int timestep, R dt) const {
-    // FIXME
-    // auto check_invalid = [](const auto &f, auto name) {
+    // // FIXME
+    // auto check_invalid = [timestep](const auto &f, auto name) {
     //   for (int c = 0; c < 3; ++c) {
     //     int res = 0;
-    //     for (const auto &x : f[c].data())
-    //       res += (std::isnan(x) or std::abs(x) > 1e10);
+    //     for ( int j = 0; j < 256; ++j ) {
+    //       for ( int i = 0; i < 50; ++i ) {
+    //         auto x = f[c]({i,j});
+    //         if (std::isnan(x) or std::abs(x) > 2e8) {
+    //           res++;
+    //           std::cout << "  " << name << c << " invalid at (i,j)=" << i << "," << j << std::endl;
+    //         }
+    //       }
+    //     }
     //     if (res > 0) {
-    //       std::cout << "FOUND INVALID! " << name << c << std::endl;
+    //       std::cout << "FOUND INVALID AT " << timestep <<": " << name << c << std::endl;
     //     }
     //   }
     // };
+
+    // FIXME not using range
 
     static_assert(DGrid == 2);
     // NOTE E,B,J are assumed to have been synced, and have same mesh
@@ -439,6 +450,7 @@ namespace field {
                      (lo_axis ? *lo_axis : mesh.range(th_).far_begin() )   };
     int e[DGrid] = { (outer ? *outer : mesh.range(r_).far_end()),
                      (hi_axis ? *hi_axis : mesh.range(th_).far_end())   };
+    // NOTE the hi_axis is included
 
     if (!hopt<R,DGrid>)
       hopt<R,DGrid>.emplace(grid, b[r_] - bool(surf), e[r_], b[th_], e[th_]);
@@ -448,7 +460,7 @@ namespace field {
     {
       for ( int i = b[r_]-bool(surf); i < e[r_]; ++i )
         h.fr(i) = std::exp(grid[r_].absc(i));
-      // FIXME turn back tr on
+      // FIXME turn tr back on
       // tr.ortho2coord("E0", E[0], b[r_], e[r_], b[th_], e[th_], h);
       for ( auto& x : h.fr() ) x /= h.estag();
       // tr.ortho2coord("E1", E[1], b[r_], e[r_], b[th_], e[th_], h);
@@ -459,27 +471,26 @@ namespace field {
       for (auto &x : h.fr()) x *= y;
       // tr.ortho2coord("B1", B[1], b[r_], e[r_], b[th_], e[th_], h);
       // tr.ortho2coord("B2", B[2], b[r_], e[r_], b[th_], e[th_], h);
-      // NOTE assert: now h.fr stores (r_i)^2 at integer cells
+      // NOTE assert: now h.fr stores (r_i.0)^2
     }
 
-    // ortho2coord(E, B, grid, b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
     for (auto &x : h.fr()) x = 1.0 / x;
 
     const auto dlnr = grid[r_].delta();
     const auto dth = grid[th_].delta();
 
-    Diff_in_CurlE<R, DGrid> diff_r{r_, surf, outer, dlnr, dth};
-    Diff_in_CurlE<R, DGrid> diff_th{th_, lo_axis, hi_axis, dlnr, dth};
-    Diff_in_CurlB<R, DGrid> diffh_r{r_, surf, outer, h, dlnr, dth};
-    Diff_in_CurlB<R, DGrid> diffh_th{th_, lo_axis, hi_axis, h, dlnr, dth};
+    Diff_in_CurlE<R, DGrid> diff_r{r_, surf, outer, dlnr};
+    Diff_in_CurlE<R, DGrid> diff_th{th_, lo_axis, hi_axis, dth};
+    Diff_in_CurlB<R, DGrid> diffh_r{r_, surf, outer, h, dlnr};
+    Diff_in_CurlB<R, DGrid> diffh_th{th_, lo_axis, hi_axis, h, dth};
 
     auto after_curlE =
-      [&surf,&lo_axis]( auto& b, auto& e ) {
+      [&surf,&lo_axis]( auto& b) {
         if (!surf) b[r_]++;
         if (!lo_axis) b[th_]++;
       };
     auto after_curlB =
-      [&outer, &hi_axis](auto &b, auto &e) {
+      [&outer, &hi_axis](auto &e) {
         if (!outer) e[r_]--;
         if (!hi_axis) e[th_]--;
       };
@@ -499,46 +510,47 @@ namespace field {
       };
 
     auto absorb_curl
-      = [&diff_r, &diff_th,&after_curlE](auto &F, const auto &E, auto factor, auto &b, auto &e) {
+      = [&diff_r, &diff_th,&after_curlE,hi=bool(hi_axis)](auto &F, const auto &E, auto factor, auto &b, auto &e, bool continuous = false) {
       F[r_] += diff_th(E, phi_, factor, b, e);
-      F[th_] -= diff_r(E, phi_, factor, b, e);
-      F[phi_] += diff_r(E, th_, factor, b, e);
+      e[th_] -= hi;
+      F[th_] -= diff_r(E, phi_, factor, b, e, continuous);
+      e[th_] += hi;
+      F[phi_] += diff_r(E, th_, factor, b, e, continuous);
       F[phi_] -= diff_th(E, r_, factor, b, e);
-      after_curlE(b, e);
+      after_curlE(b);
     };
 
     auto absorb_curlh
-      = [&diffh_r, &diffh_th,&after_curlB](auto &F, const auto &B, auto factor, auto &b, auto &e) {
+      = [&diffh_r, &diffh_th,&after_curlB,hi=bool(hi_axis)](auto &F, const auto &B, auto factor, auto &b, auto &e) {
       F[r_] += diffh_th(B, phi_, factor, b, e);
       F[th_] -= diffh_r(B, phi_, factor, b, e);
+      e[th_] -= hi;
       F[phi_] += diffh_r(B, th_, factor, b, e);
+      e[th_] += hi;
       F[phi_] -= diffh_th(B, r_, factor, b, e);
-      after_curlB(b, e);
+      after_curlB(e);
     };
 
     const bool beta_neq_0 = (beta > 1e-8);
 
-    Field<R, 3, DGrid> C (mesh);
-    {
-      C[r_] += diff_th(E,phi_,1.0,b,e);
-      C[th_] -= diff_r(E,phi_,1.0,b,e,true);
-      C[phi_] += diff_r(E,th_,1.0,b,e,true);
-      C[phi_] -= diff_th(E,r_,1.0,b,e);
-    }
-
-    if (beta_neq_0) {
-      after_curlE(b, e);
-      mul_absorb(B, C, -alpha * beta * dt, b, e);
-    }
-    for ( int c = 0; c < 3; ++c ) {
-      auto f = -4.0*std::acos(-1.0)*dt;
-      for ( auto& x : J[c].data() )
+    for (int c = 0; c < 3; ++c) {
+      auto f = -_fourpi * dt;
+      for (auto &x : J[c].data())
         x *= f;
     }
-    absorb_curlh ( J, B, dt, b, e );
+
+    Field<R, 3, DGrid> C (mesh);
+    absorb_curl(C,E,1.0, b,e, true); // Eq(*)
+
+    if (beta_neq_0) {
+      mul_absorb(B, C, -alpha * beta * dt, b, e);
+    } else { // undo after_curlE in Eq(*) for the sake of Eq(**)
+      if (!surf) b[r_]--;
+      if (!lo_axis) b[th_]--;
+    }
+    absorb_curlh ( J, B, dt, b, e ); // Eq(**)
     mul_absorb(E, J, 1.0, b, e );
-    if (beta_neq_0)
-      mul_absorb(B, C, -beta*beta*dt, b,e);
+    if (beta_neq_0) mul_absorb(B, C, -beta*beta*dt, b,e);
 
     for (int i = std::max(_op_inv_precision, 1); i != 0; --i) {
       absorb_curl(C,J,1.0,b,e);
