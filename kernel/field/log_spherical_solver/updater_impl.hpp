@@ -49,6 +49,25 @@ namespace field {
 
   template < typename R, int D >
   struct Diff_in_CurlE {
+  private:
+    static void _diff_bulk( Component<R,D,false>& output,
+                            const Component<R,D>& input,
+                            const R f, const int dir,
+                            const int b_r, const int e_r,
+                            const int b_th, const int e_th
+                            ) {
+      const auto& m = input.mesh();
+      const int s = m.stride(dir);
+      for (int j = b_th; j < e_th; ++j) {
+        int li_j = m.linear_index(th_, j);
+        for (int i = b_r; i < e_r; ++i) {
+          int li = li_j + i * m.stride(r_);
+          output[li] += f * (input[li] - input[li - s]);
+        }
+      }
+    }
+
+  public:
     const int mode; // 0 : d_r 1 : d_th
     const std::optional<int>& lo;
     const std::optional<int>& hi;
@@ -91,72 +110,55 @@ namespace field {
         }
       }
 
-      {
-        R f = prefactor;
-        for (int j = b_in[th_]; j < e_in[th_]; ++j) {
-          int li_j = m.linear_index(th_, j);
-          for (int i = b; i < e; ++i) {
-            int li = li_j + i * m.stride(r_);
-            output[li] += f * (E[comp][li] - E[comp][li - m.stride(r_)]);
-          }
-        }
-      }
-
+      _diff_bulk(output, E[comp], prefactor, r_, b, e, b_in[th_], e_in[th_] );
       // NOTE at outer boundary, the r derivative on E_\theta and E_\phi is taken to vanish.
     }
 
-    static void d_th_dE(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
+    static void d_th_dE_r(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
       const auto &&[mode, lo, hi, E, comp, prefactor, b_in, e_in, continuous] = std::move(diff);
-
-      const auto& m = E.mesh();
       int b = b_in[th_];
       int e = e_in[th_] - bdry*bool(hi);
 
       if(!lo) b++;
       else {
         b = bdry; // NOTE true for both comp == phi_ and comp == r_
-        if (comp == phi_) {
-          R f = prefactor / 3.0;
-          for (int j = 0; j < b; ++j) {
-            int li_j = m.linear_index(th_, j);
-            for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-              int li = li_j + i * m.stride(r_);
-              auto x = E[comp][li] + E[comp][li];
-              x += x;
-              x += x;
-              x += E[comp][li];
-              output[li] += f*( x - E[comp][li + m.stride(th_)]);
-            }
-          }
-        } // NOTE if comp == r_, by symmetry output += 0, which doesn't need any action.
+        // NOTE if comp == r_, by symmetry output += 0, which doesn't need any action.
       }
 
-      {
-        R f = prefactor;
-        for (int j = b; j < e; ++j) {
-          int li_j = m.linear_index(th_, j);
+      _diff_bulk(output, E[comp], prefactor, th_, b_in[r_], e_in[r_],b, e );
+    }
+
+    static void d_th_dE_phi(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
+      const auto &&[mode, lo, hi, E, comp, prefactor, b_in, e_in, continuous] = std::move(diff);
+
+      int b = b_in[th_];
+      int e = e_in[th_] - bdry*bool(hi);
+
+      auto diff_bdry
+        = [&, &m=E.mesh()]( const R f, const int j, const bool hi ) {
+          static_assert(bdry == 1);
+          const int li_j = m.linear_index(th_, j);
+          const int y = hi ? -1 : 1;
           for (int i = b_in[r_]; i < e_in[r_]; ++i) {
             int li = li_j + i * m.stride(r_);
-            output[li] += f * (E[comp][li] - E[comp][li - m.stride(th_)]);
-          }
-        }
-      }
-
-      if(hi and comp == phi_) {
-        R f = prefactor / 3.0;
-        for (int j = e; j < e+bdry; ++j) {
-          int li_j = m.linear_index(th_, j-1);
-          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-            int li = li_j + i * m.stride(r_);
-            auto x = E[comp][li] + E[comp][li];
+            auto x = E[phi_][li] + E[phi_][li];
             x += x;
             x += x;
-            x += E[comp][li];
-            output[li+m.stride(th_)] -= f * (x - E[comp][li - m.stride(th_)]);
+            x += E[phi_][li];
+            output[li + (hi)*m.stride(th_)] += f * ( x - E[phi_][li + y*m.stride(th_)] );
           }
-        }
+        };
+
+      if(!lo) b++;
+      else {
+        b = bdry; // NOTE true for both comp == phi_ and comp == r_
+        diff_bdry(prefactor/3.0, 0, false);
       }
 
+      _diff_bulk(output, E[comp], prefactor, th_, b_in[r_], e_in[r_],b, e );
+
+      if(hi)
+        diff_bdry(-prefactor/3.0, e-1, true);
     }
 
   };
@@ -215,19 +217,23 @@ namespace field {
       int b = b_in[th_];
       int e = e_in[th_] - 1 - bdry*bool(hi);
 
-      if (lo) {
-        b = bdry;
-        R f = prefactor / 3.0;
-        f *= h.estag() * h.estag();
-        for ( int j = 0; j < b; ++j ) {
-          int li_j = m.linear_index(th_, j+1);
-          R sr = h.sin(j + 2) / h.sin(j + 1);
-          R fsr = f * h.sin(j, true) / h.sin(j + 2);
+      auto diff_bdry
+        = [&, &m=B.mesh()]( const R f, const int j, const bool lo ) {
+          static_assert(bdry == 1);
+          const int li_j = m.linear_index(th_, j);
+          const int y = lo ? 1 : -1;
+          const R sr = h.sin(j + y) / h.sin(j);
+          const R fsr = f * h.sin(j, true) / h.sin(j + y);
+
           for (int i = b_in[r_]; i < e_in[r_]; ++i) {
             int li = li_j + i * m.stride(r_);
-            output[li-m.stride(th_)] += fsr * h.fr(i) * ( B[comp][li + m.stride(th_)] - B[comp][li] * sr );
+            output[li-(lo)*m.stride(th_)] += fsr * h.fr(i) * ( B[comp][li + y * m.stride(th_)] - B[comp][li] * sr );
           }
-        }
+        };
+
+      if (lo) {
+        b = bdry;
+        diff_bdry( prefactor*h.estag()*h.estag()/3.0, 1, true );
       }
       {
         R f = prefactor;
@@ -242,34 +248,23 @@ namespace field {
           }
         }
       }
-      if (hi) {
-        R f = prefactor / 3.0;
-        f *= h.estag() * h.estag();
-        for ( int j = e; j < e+bdry; ++j ) {
-          int li_j = m.linear_index(th_, j);
-          R sr = h.sin(j - 1) / h.sin(j);
-          R fsr = f * h.sin(j, true) / h.sin(j - 1);
-          for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-            int li = li_j + i * m.stride(r_);
-            output[li] -= fsr * h.fr(i) * ( B[comp][li - m.stride(th_)] - B[comp][li]*sr );
-          }
-        }
-      }
+      if (hi)
+        diff_bdry(-prefactor * h.estag() * h.estag() / 3.0, e, false);
     }
 
     static void d_th_dB_phi(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
       const auto&&[mode, lo, hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
 
       const auto& m = B.mesh();
-      int b = b_in[th_];
-      int e = e_in[th_] - 1;
+      const int b = b_in[th_];
+      const int e = e_in[th_] - 1;
 
-      R f = prefactor;
+      const R f = prefactor;
       for (int j = b; j < e; ++j) {
-        int li_j = m.linear_index(th_, j);
-        R sinj0_in = h.sin(j);
-        R sinj1_in = h.sin(j + 1);
-        R fsin_inv = f / h.sin(j, true);
+        const int li_j = m.linear_index(th_, j);
+        const R sinj0_in = h.sin(j);
+        const R sinj1_in = h.sin(j + 1);
+        const R fsin_inv = f / h.sin(j, true);
         for (int i = b_in[r_]; i < e_in[r_]; ++i) {
           int li = li_j + i * m.stride(r_);
           output[li] += fsin_inv * h.fr(i) *
@@ -287,10 +282,13 @@ void operator+=( field::Component<R, D, false> &&output, typename field::Diff_in
   using namespace field;
   const int mode = std::get<0>(diff);
   assert(mode < 2);
+  const int comp = std::get<5>(diff);
   if (mode == r_)
     Diff_in_CurlE<R,D>::d_r_dE(std::move(output), std::move(diff));
+  else if (comp == r_)
+    Diff_in_CurlE<R, D>::d_th_dE_r(std::move(output), std::move(diff));
   else
-    Diff_in_CurlE<R, D>::d_th_dE(std::move(output), std::move(diff));
+    Diff_in_CurlE<R, D>::d_th_dE_phi(std::move(output), std::move(diff));
 }
 
 template <typename R, int D>
