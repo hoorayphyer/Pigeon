@@ -13,7 +13,7 @@ namespace field {
     R _surface{}; // the cell containing _surface is the last cell below surface. Using R here so that each local grid knows if it's at surface boundary
     R _outer{};
     int _op_inv_precision = 4;
-    R _alpha = 0.501; // NOTE at > 0.5 to be stable
+    R _alpha = 1.0;
 
   public:
     constexpr auto& set_fourpi(R x) noexcept {_fourpi = x; return *this;}

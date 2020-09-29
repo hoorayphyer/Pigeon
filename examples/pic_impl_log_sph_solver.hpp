@@ -74,34 +74,24 @@ namespace pic {
     return std::min<real_t>( time / spinup_time, 1.0 ) * Omega;
   }
 
-  real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    // return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
-    // FIXME
-    // coordinate version below
-    return pic::mu * std::sin(2.0*theta) * std::exp(-lnr);
+  real_t B_r_star( real_t lnr, real_t theta, real_t , real_t ) noexcept {
+    return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
   }
-  real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    // return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
-    // coordinate version below
-    real_t sin = std::sin(theta);
-    return pic::mu * sin * sin * std::exp(-lnr);
+  real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t ) noexcept {
+    return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
   }
-  constexpr real_t B_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  constexpr real_t B_phi_star( real_t, real_t, real_t , real_t ) noexcept {
     return 0;
   }
 
   real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     real_t sin = std::sin(theta);
-    // return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * sin * sin;
-    // coordinate version below
-    return pic::mu * omega_spinup(time) * std::exp(-lnr) * sin * sin;
+    return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * sin * sin;
   }
   real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    // return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
-    // coordinate version below
-    return -pic::mu * omega_spinup(time) * std::exp(-lnr) * std::sin(2.0 * theta);
+    return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
   }
-  constexpr real_t E_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  constexpr real_t E_phi_star( real_t, real_t, real_t , real_t ) noexcept {
     return 0;
   }
 
@@ -159,10 +149,11 @@ namespace pic {
     {
       const int guard = myguard;
       fu.setName("LogSphericalSolver");
-      fu[0] = { 0, pic::supergrid[0].dim(), guard };
-      fu[1] = { 0, pic::supergrid[1].dim(), guard };
+      fu[0] = { surface_indent, pic::supergrid[0].dim(), guard };
+      fu[1] = { 0, pic::supergrid[1].dim()+1, guard };
 
       fu.set_fourpi( 4.0 * std::acos(-1.0l) );
+      fu.set_alpha(1.0);
       fu.set_op_inv_precision(field_op_inv_precision);
       fu.set_surface(supergrid[0].absc(surface_indent));
       fu.set_outer(supergrid[0].upper());
@@ -309,13 +300,11 @@ namespace pic {
       fu_asym_lo[0] = { 0, pic::supergrid[0].dim() };
       fu_asym_lo[1] = { -myguard, 1 }; // NOTE 1 so as to set values right on axis
       fu_asym_lo.is_upper_axis(false);
-      fu_asym_lo.require_original_EB(false);
 
       fu_asym_hi.setName("AxissymmetrizeEBHigher");
       fu_asym_hi[0] = { 0, pic::supergrid[0].dim() };
       fu_asym_hi[1] = { pic::supergrid[1].dim(), pic::supergrid[1].dim() + myguard };
       fu_asym_hi.is_upper_axis(true);
-      fu_asym_hi.require_original_EB(false);
     }
 
     fus.emplace_back(fu.Clone());
@@ -429,7 +418,7 @@ namespace pic {
   }
 
   void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
-    int factor = POW(export_plan.downsample_ratio, pic::DGrid); // FIXME test mods.export
+    int factor = POW(export_plan.downsample_ratio, pic::DGrid);
     for ( int i = 0; i < num_comps; ++i ) {
       for ( auto& x : fds[i].data() ) x /= factor;
     }

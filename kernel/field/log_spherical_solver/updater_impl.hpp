@@ -1,10 +1,9 @@
 #include "field/log_spherical_solver/updater.hpp"
-#include "field/sync.hpp" // FIXME not in use right now
+// #include "field/sync.hpp" // FIXME not in use right now
 #include "field/yee.hpp"
 #include <optional>
 #include <cassert>
 #include <tuple>
-#include <iostream> // FIXME
 
 namespace field {
   constexpr int r_ = 0, th_ = 1, phi_ = 2;
@@ -331,20 +330,18 @@ namespace field {
       for (int j = b_th; j < e_th; ++j) {
         int li_j = m.linear_index(th_, j);
         for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + (i) * m.stride(r_);
-          F[li] *= h.fr(i);
+          F[li_j + i*m.stride(r_)] *= h.fr(i);
         }
       }
     }
 
-    inline void _impl_sin( Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, bool ofs ) const { // TODOL semantics
+    inline void _impl_sin( Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool ofs_th ) const { // TODOL semantics
       const auto& m = F.mesh();
       for (int j = b_th; j < e_th; ++j) {
         int li_j = m.linear_index(th_, j);
-        R f = h.sin(j,ofs);
+        R f = h.sin(j,ofs_th);
         for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + i * m.stride(r_);
-          F[li] *= f * h.fr(i);
+          F[li_j + i * m.stride(r_)] *= f * h.fr(i);
         }
       }
     }
@@ -355,21 +352,37 @@ namespace field {
         int li_j = m.linear_index(th_, j);
         R f = 1.0 / h.sin(j,true);
         for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + i * m.stride(r_);
-          F[li] *= f * h.fr(i);
+          F[li_j + i * m.stride(r_)] *= f * h.fr(i);
         }
       }
     }
 
-    inline void _impl_c2o_B0( Component<R,DGrid,false> B0, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h) const { // TODOL semantics
+    inline void _impl_c2o_B0( Component<R,DGrid,false> B0, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool lo_axis, const bool hi_axis) const { // TODOL semantics
       const auto& m = B0.mesh();
       R y = h.estag() * h.estag();
-      for (int j = b_th; j < e_th; ++j) {
+      auto f_axis = [&]( int j, bool lo ) {
+        int sign = lo ? 1 : -1;
+        j += sign;
+        int li_j = m.linear_index(th_, j);
+        int s = sign * m.stride(th_);
+        const R f = y / (6.0 * std::asin(h.sin(j)) ); // asin(sin(j)) is a trick to get delta theta
+        for (int i = b_r; i < e_r; ++i) {
+          int li = li_j + i * m.stride(r_);
+          auto x = B0[li] + B0[li];
+          x += x;
+          x += x;
+          B0[li - s] = f * h.fr(i) * (x - B0[li + s]);
+        }
+      };
+
+      if ( lo_axis ) f_axis(b_th, true);
+      if (hi_axis) f_axis(e_th-1, false); // NOTE it uses coordinate B0, so must go before the bulk
+
+      for (int j = b_th+lo_axis; j < e_th-hi_axis; ++j) {
         int li_j = m.linear_index(th_, j);
         R f = y / h.sin(j);
         for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + i * m.stride(r_);
-          B0[li] *= f * h.fr(i);
+          B0[li_j + i * m.stride(r_)] *= f * h.fr(i);
         }
       }
     }
@@ -382,13 +395,13 @@ namespace field {
         _impl_sin(F, b_r,e_r,b_th,e_th,h, (name != "B0"));
     }
 
-    inline void coord2ortho( const std::string& name, Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h ) const { // TODOL semantics
+    inline void coord2ortho( const std::string& name, Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool lo_axis=false, const bool hi_axis=false ) const { // TODOL semantics
       if ( name == "E0" or name == "E1" or name == "B2")
         _impl_no_sin(F, b_r,e_r,b_th,e_th,h);
       else if ( name != "B0" )
         _impl_sin_recip(F, b_r,e_r,b_th,e_th,h);
       else
-        _impl_c2o_B0(F, b_r,e_r,b_th,e_th,h );
+        _impl_c2o_B0(F, b_r,e_r,b_th,e_th,h,lo_axis,hi_axis );
     }
   };
 
@@ -414,25 +427,6 @@ namespace field {
                const apt::Grid<R, DGrid> &grid,
                const mpi::CartComm &comm,
                int timestep, R dt) const {
-    // // FIXME
-    // auto check_invalid = [timestep](const auto &f, auto name) {
-    //   for (int c = 0; c < 3; ++c) {
-    //     int res = 0;
-    //     for ( int j = 0; j < 256; ++j ) {
-    //       for ( int i = 0; i < 50; ++i ) {
-    //         auto x = f[c]({i,j});
-    //         if (std::isnan(x) or std::abs(x) > 2e8) {
-    //           res++;
-    //           std::cout << "  " << name << c << " invalid at (i,j)=" << i << "," << j << std::endl;
-    //         }
-    //       }
-    //     }
-    //     if (res > 0) {
-    //       std::cout << "FOUND INVALID AT " << timestep <<": " << name << c << std::endl;
-    //     }
-    //   }
-    // };
-
     // FIXME not using range
 
     static_assert(DGrid == 2);
@@ -458,17 +452,16 @@ namespace field {
     {
       for ( int i = b[r_]-bool(surf); i < e[r_]; ++i )
         h.fr(i) = std::exp(grid[r_].absc(i));
-      // FIXME turn tr back on
-      // tr.ortho2coord("E0", E[0], b[r_], e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("E0", E[0], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
       for ( auto& x : h.fr() ) x /= h.estag();
-      // tr.ortho2coord("E1", E[1], b[r_], e[r_], b[th_], e[th_], h);
-      // tr.ortho2coord("E2", E[2], b[r_], e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("E1", E[1], b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("E2", E[2], b[r_]-bool(surf), e[r_], b[th_], e[th_]-bool(hi_axis), h);
       for (auto &x : h.fr() ) x *= x;
-      // tr.ortho2coord("B0", B[0], b[r_], e[r_], b[th_], e[th_], h); // FIXME check boundary
+      tr.ortho2coord("B0", B[0], b[r_], e[r_], b[th_], e[th_], h);
       R y = h.estag() * h.estag();
       for (auto &x : h.fr()) x *= y;
-      // tr.ortho2coord("B1", B[1], b[r_], e[r_], b[th_], e[th_], h);
-      // tr.ortho2coord("B2", B[2], b[r_], e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("B1", B[1], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      tr.ortho2coord("B2", B[2], b[r_], e[r_], b[th_], e[th_], h);
       // NOTE assert: now h.fr stores (r_i.0)^2
     }
 
@@ -566,19 +559,18 @@ namespace field {
     absorb_curl(B,E,-(alpha * dt), b,e);
     // NOTE sync E B is done outside
 
-    // {
-    //   //NOTE: assert: h.fr contains 1 / (r_i.0)^2
-    //   tr.coord2ortho("B1", B[1], b[r_], e[r_], b[th_], e[th_], h);
-    //   tr.coord2ortho("B2", B[2], b[r_], e[r_], b[th_], e[th_], h);
-    //   for ( auto& x : h.fr() ) x = std::sqrt(x);
-    //   tr.coord2ortho("E0", E[0], b[r_], e[r_], b[th_], e[th_], h);
-    //   for (auto &x : h.fr() ) x *= h.estag();
-    //   tr.coord2ortho("E1", E[1], b[r_], e[r_], b[th_], e[th_], h);
-    //   tr.coord2ortho("E2", E[2], b[r_], e[r_], b[th_], e[th_], h);
-    //   tr.coord2ortho("B0", B[0], b[r_], e[r_], b[th_], e[th_], h); // FIXME check boundary
-    //   // NOTE assert: now h.fr stores (r_i)^2 at integer cells
-    // }
+    {
+      // NOTE: assert: h.fr contains 1 / (r_i.0)^2
+      tr.coord2ortho("B0", B[0], b[r_], e[r_], b[th_], e[th_], h, bool(lo_axis), bool(hi_axis));
+      tr.coord2ortho("B1", B[1], b[r_], e[r_], b[th_], e[th_], h);
+      tr.coord2ortho("B2", B[2], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      for ( auto& x : h.fr() ) x = std::sqrt(x);
+      tr.coord2ortho("E0", E[0], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      for (auto &x : h.fr() ) x *= h.estag();
+      tr.coord2ortho("E1", E[1], b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
+      tr.coord2ortho("E2", E[2], b[r_]-bool(surf), e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      // NOTE assert: now h.fr stores (r_i)^2 at integer cells
+    }
 
-    // coord2ortho(B, E, grid, b[r_] - bool(surf), e[r_], b[th_], e[th_], h); // FIXME double using the shrunken b,e is OK. OK for bulk // patches, how about for surface?
   }
 }
