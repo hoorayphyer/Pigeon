@@ -13,6 +13,7 @@ done
 pic_args=()
 passed_dry_run="no"
 pic_conf=""
+job_sh=""
 
 for ((i=0; i < ${#other_args[@]}; i++)) # NOTE bash array index starts at 0
 do
@@ -25,6 +26,10 @@ do
         "--config"|"-c")
             ((i++))
             pic_conf="${other_args[i]}"
+            ;;
+        "--job"|"-j")
+            ((i++))
+            job_sh="${other_args[i]}"
             ;;
         "--journal")
             echo "WARNING: user specified journal file will be ignored in pgn"
@@ -103,8 +108,8 @@ mkdir $this_dir/bin -p
 cp -H CMakeLists.txt pic.hpp pic_impl.hpp $this_dir/ # -H to copy contents of symlinks to the target file
 cp bin/pic $this_dir/bin/
 
-if [[ -f job.sh ]]; then
-    cp job.sh $this_dir/
+if [[ -f $job_sh ]]; then
+    cp $job_sh $this_dir/"job.sh"
 fi
 
 if [[ "$pic_conf" != "" ]]; then
@@ -139,5 +144,6 @@ printf "%s\n" \
 eval $pic_cmd --dry-run >> $journal_file # NOTE --dry-run will ignore journal_file
 
 if [ "${jobID}" = $local_jobID ]; then
-    eval $pic_cmd
+    # eval $pic_cmd # FIXME
+    eval "mpirun -np 4 $pic_cmd"
 fi
