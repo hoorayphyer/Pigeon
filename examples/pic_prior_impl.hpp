@@ -4,8 +4,8 @@
 #include "apt/index.hpp"
 #include "apt/grid.hpp"
 
+#include "field/action.hpp"
 #include "field/field.hpp"
-// #include "field/haugbolle_solver/updater.hpp"
 
 #include "particle/properties.hpp"
 #include "particle/map.hpp"
@@ -26,8 +26,6 @@ namespace pic {
 
   template < bool Const > using Component = ::field::Component<real_t,DGrid,Const>;
   using FieldAction = ::field::Action<real_t,DGrid,real_j_t>;
-  // using Haugbolle = ::field::Haugbolle<real_t,DGrid,real_j_t>;
-  // using HaugbolleBdry = ::field::HaugbolleBdry<real_t,DGrid,real_j_t>;
   template < int DField > using Field = ::field::Field<real_t,DField,DGrid>;
   using JField = ::field::Field<real_j_t,3,DGrid>;
 
