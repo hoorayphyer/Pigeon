@@ -182,19 +182,18 @@ namespace pic {
     }
 
     map<real_t> N_scat {};
-    Field<1> pc_counter {};
-    real_t pc_cumulative_time {};
+    Field<4> pc_counter {};
+    Field<4> em_counter{};
+    real_t cumulative_time {};
 
     std::optional<map<JField>> Jsp; // current by species
     std::optional<Field<1>> skin_depth;
-    std::optional<Field<1>> pr_p;
-    std::optional<Field<1>> pr_n;
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
       for ( auto sp : properties )
         N_scat.insert( sp, 0 );
 
-      if (false) {// activate Jsp
+      if (true) {// activate Jsp
         Jsp.emplace(std::remove_reference_t<decltype(*Jsp)>{});
         for ( auto sp : properties )
           (*Jsp).insert(sp, {});
@@ -208,11 +207,7 @@ namespace pic {
       for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
       auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
       pc_counter = {range};
-
-      if (true) { // activate pr_p/n
-        pr_p.emplace(typename decltype(pr_p)::value_type{range});
-        pr_n.emplace(typename decltype(pr_n)::value_type{range});
-      }
+      em_counter = {range};
     };
 
   private:
@@ -448,8 +443,7 @@ namespace pic {
             map<PtcArray> ptcs_sp;
             ptcs_sp.insert(sp);
             std::swap( ptcs_sp[sp], particles[sp] );
-            Jsp[sp] = J;
-            Jsp[sp].reset();
+            Jsp[sp] = JField(J.mesh());
             _pu( ptcs_sp, Jsp[sp], new_ptc_buf, properties, E,B,grid,ens,dt,timestep,rng );
             std::swap( ptcs_sp[sp], particles[sp] );
 
@@ -661,6 +655,7 @@ namespace pic {
           if ( not ptc.is(flag::exist) ) continue;
           const auto this_sp = ptc.template get<species>();
 
+          // FIXME this relys on all particles in this buffer that carry flag::secondary are new particles. One possible exception is migration. So this action must be done before migration.
           if ( ptc.is(flag::secondary) ) {
             // log scattering events
             RTD::data().N_scat[this_sp] += ptc.frac();
@@ -671,19 +666,22 @@ namespace pic {
               for ( int j = 0; j < DGrid; ++j )
                 I[j] = grid[j].csba( ptc.q(j) );
               RTD::data().pc_counter[0](I) += ptc.frac();
-              if (RTD::data().pr_p) {
-                if (ptc.p(0) > 0)
-                  (*RTD::data().pr_p)[0](I) += ptc.frac() * ptc.p(0);
-                else
-                  (*RTD::data().pr_n)[0](I) += ptc.frac() * ptc.p(0);
-              }
+              for ( int j = 0; j < 3; ++j)
+                RTD::data().pc_counter[j+1](I) += 2.0 * ptc.frac() * ptc.p(j); // 2 because of positron
+            } else if (species::photon == this_sp) {
+              Index I; // domain index, not the global index
+              for (int j = 0; j < DGrid; ++j)
+                I[j] = grid[j].csba(ptc.q(j));
+              RTD::data().em_counter[0](I) += ptc.frac();
+              for (int j = 0; j < 3; ++j)
+                RTD::data().em_counter[j + 1](I) += ptc.frac() * ptc.p(j);
             }
           }
 
           particles[this_sp].push_back(std::move(ptc));
         }
         new_ptc_buf->resize(0);
-        RTD::data().pc_cumulative_time += dt;
+        RTD::data().cumulative_time += dt;
 
       }
     } analyzer;
@@ -1019,7 +1017,7 @@ namespace pic {
              if ( !is_within or (rng.uniform() > 0.01)) return;
 
              set_group(p, 1);
-             p.set(flag::traced, was_traced);
+             // p.set(flag::traced, was_traced); FIXME
              p.q(2) = 0.0; // set initial phi to 0
             });
 
@@ -1032,7 +1030,7 @@ namespace pic {
              if ( !is_within or (rng.uniform() > 0.01)) return;
 
              set_group(p, 2);
-             p.set(flag::traced, was_traced);
+             // p.set(flag::traced, was_traced); FIXME
              p.q(2) = 0.0;
            });
 
@@ -1046,7 +1044,7 @@ namespace pic {
              if ( !is_within or (rng.uniform() > 0.01)) return;
 
              set_group(p, 3);
-             p.set(flag::traced, was_traced);
+             // p.set(flag::traced, was_traced); FIXME
              p.q(2) = 0.0;});
 
         two_small_plasmoids.set_species({EL, PO})
@@ -1057,7 +1055,7 @@ namespace pic {
               = Tracer::is_within_bounds(p.q(), {std::log(5.21), std::log(6.79), 90.0_deg - 0.1/5.21, 90.0_deg});
              if ( !is_within or (rng.uniform() > 0.01)) return;
              set_group(p, 4);
-             p.set(flag::traced, was_traced);
+             // p.set(flag::traced, was_traced); FIXME
              p.q(2) = 0.0;});
 
         one_big_plasmoid.set_species({EL, PO, PH})
@@ -1068,7 +1066,7 @@ namespace pic {
                = Tracer::is_within_bounds(p.q(), {std::log(6.8), std::log(8.0), 90.0_deg - 0.2 / 6.8, 90.0_deg});
              if ( !is_within or (rng.uniform() > 0.01)) return;
              set_group(p, 5);
-             p.set(flag::traced, was_traced);
+             // p.set(flag::traced, was_traced); FIXME
              p.q(2) = 0.0;});
 
         util::Rng<real_t> rng;
@@ -1080,8 +1078,9 @@ namespace pic {
           (*a)(particles, J, nullptr, {}, E, B, grid, ptr, {}, resumed_timestep, rng);
         }
 
-        auto dir = ckpt::save_tracing(this_run_dir, save_tracing_plan.num_files,
-                                      ens_opt, resumed_timestep, particles);
+        auto dir = pic::Traman::save_tracing(
+            this_run_dir, save_tracing_plan.num_files, ens_opt,
+            resumed_timestep, particles);
       }
 
     } pr;
@@ -1100,17 +1099,29 @@ namespace pic {
   constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
 
   void export_prior_hook( const map<PtcArray>& particles, const map<Properties>& properties,
-                          const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const Ensemble& ens,
+                          const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const std::optional<mpi::CartComm>& cart_opt, const Ensemble& ens,
                           real_t dt, int timestep ) {
     { // pair creation counter
       auto& pc = RTD::data().pc_counter;
-      ens.reduce_to_chief( mpi::by::SUM, pc[0].data().data(), pc[0].data().size() );
+      for ( int i = 0; i < 4; ++i )
+        ens.reduce_to_chief( mpi::by::SUM, pc[i].data().data(), pc[i].data().size() );
     }
-    if (RTD::data().pr_p) {
-      auto &x = *RTD::data().pr_p;
-      ens.reduce_to_chief(mpi::by::SUM, x[0].data().data(), x[0].data().size());
-      auto &y = *RTD::data().pr_n;
-      ens.reduce_to_chief(mpi::by::SUM, y[0].data().data(), y[0].data().size());
+    { // photon emission counter
+      auto &em = RTD::data().em_counter;
+      for (int i = 0; i < 4; ++i)
+        ens.reduce_to_chief(mpi::by::SUM, em[i].data().data(), em[i].data().size());
+    }
+    if (RTD::data().Jsp) {
+      auto& Jsp = *RTD::data().Jsp;
+      for ( auto s : Jsp ) {
+        for ( int i = 0; i < 3; ++i )
+          ens.reduce_to_chief( mpi::by::SUM, Jsp[s][i].data().data(), Jsp[s][i].data().size() );
+      }
+      if ( cart_opt ) {
+        for ( auto s : Jsp ) {
+          field::merge_sync_guard_cells( Jsp[s], *cart_opt );
+        }
+      }
     }
 
     if (RTD::data().skin_depth) { // skin depth
@@ -1210,36 +1221,35 @@ namespace pic {
 
   apt::array<real_t,3> pair_creation_rate ( Index I, const Grid& grid, const Field<3>& ,
                                             const Field<3>& , const JField&  ) {
-    auto x = msh::interpolate( RTD::data().pc_counter, I2std(I), ShapeF() );
-    return { x[0] / RTD::data().pc_cumulative_time, 0, 0};
+    auto x = RTD::data().pc_counter[0](I);
+    return { x / RTD::data().cumulative_time, 0, 0};
+  }
+  apt::array<real_t,3> Pdot_photon_pair_creation ( Index I, const Grid& grid, const Field<3>& ,
+                                            const Field<3>& , const JField&  ) {
+    const auto& pc = RTD::data().pc_counter;
+    const auto& dt = RTD::data().cumulative_time;
+    return { pc[1](I)/dt , pc[2](I)/dt, pc[3](I)/dt};
   }
 
-  apt::array<real_t, 3> accumu_pos_pr_when_pc(Index I, const Grid &grid,
-                                              const Field<3> &, const Field<3> &,
-                                              const JField &) {
-    auto x = msh::interpolate(*RTD::data().pr_p, I2std(I), ShapeF());
-    return {x[0], 0, 0};
+  apt::array<real_t, 3> photon_emission_rate(Index I, const Grid &grid,
+                                             const Field<3> &, const Field<3> &,
+                                             const JField &) {
+    auto x = RTD::data().em_counter[0](I);
+    return {x / RTD::data().cumulative_time, 0, 0};
   }
-
-  apt::array<real_t, 3> accumu_neg_pr_when_pc(Index I, const Grid &grid,
-                                              const Field<3> &,
-                                              const Field<3> &,
-                                              const JField &) {
-    auto x = msh::interpolate(*RTD::data().pr_n, I2std(I), ShapeF());
-    return {x[0], 0, 0};
+  apt::array<real_t,3> Pdot_photon_emission( Index I, const Grid& grid, const Field<3>& ,
+                                            const Field<3>& , const JField&  ) {
+    const auto& em = RTD::data().em_counter;
+    const auto& dt = RTD::data().cumulative_time;
+    return { em[1](I)/dt , em[2](I)/dt, em[3](I)/dt};
   }
 
   template < particle::species SP >
-  apt::array<real_t,3> frac_J_sp ( Index I, const Grid& grid, const Field<3>& ,
-                                   const Field<3>& , const JField& J ) {
-    auto q = I2std(I);
-    auto j_sp = msh::interpolate((*RTD::data().Jsp)[SP], q, ShapeF());
-    auto j = msh::interpolate( J, q, ShapeF() );
-    for ( int i = 0; i < 3; ++i ) {
-      if ( j[i] == 0 ) j_sp[i] = 0;
-      else j_sp[i] /= j[i];
-    }
-    return { real_t(j_sp[0]), real_t(j_sp[1]), real_t(j_sp[2]) };
+  apt::array<real_t,3> J_by_species ( Index I, const Grid& grid, const Field<3>& ,
+                                      const Field<3>& , const JField& ) {
+    // NOTE due to interpolation, the exported Jsp's don't sum up to J.
+    const auto& Jsp = (*RTD::data().Jsp)[SP];
+    return msh::interpolate(Jsp, I2std(I), ShapeF());
   }
 
   apt::array<real_t,3> skin_depth ( Index I, const Grid& grid, const Field<3>& ,
@@ -1257,11 +1267,9 @@ namespace pic {
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
       fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-
-      if(RTD::data().pr_p) {
-        fexps.push_back(new FA("AccumuPosPr", 1, accumu_pos_pr_when_pc, nullptr));
-        fexps.push_back(new FA("AccumuNegPr", 1, accumu_neg_pr_when_pc, nullptr));
-      }
+      fexps.push_back( new FA ( "PdotPairCreation", 3, Pdot_photon_pair_creation, nullptr) );
+      fexps.push_back( new FA ( "PhotonEmissionRate", 1, photon_emission_rate, nullptr));
+      fexps.push_back( new FA ( "PdotEmission", 3, Pdot_photon_emission, nullptr) );
 
       if (RTD::data().skin_depth) {
         fexps.push_back(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
@@ -1272,11 +1280,20 @@ namespace pic {
         for (auto sp : *(RTD::data().Jsp)) {
           switch(sp) {
           case species::electron :
-            fexps.push_back( new FA ( "fJ_Electron", 3, frac_J_sp<species::electron>, average_when_downsampled) ); break;
+            fexps.push_back(new FA(
+                "Je", 3, J_by_species<species::electron>,
+                average_and_divide_flux_by_area));
+            break;
           case species::positron :
-            fexps.push_back( new FA ( "fJ_Positron", 3, frac_J_sp<species::positron>, average_when_downsampled) ); break;
+            fexps.push_back(new FA(
+                "Jp", 3, J_by_species<species::positron>,
+                average_and_divide_flux_by_area));
+            break;
           case species::ion :
-            fexps.push_back( new FA ( "fJ_Ion", 3, frac_J_sp<species::ion>, average_when_downsampled) ); break;
+            fexps.push_back(new FA(
+                "Ji", 3, J_by_species<species::ion>,
+                average_and_divide_flux_by_area));
+            break;
           default: ;
           }
         }
@@ -1301,7 +1318,10 @@ namespace pic {
   }
 
   apt::array<real_t,3> ptc_momentum ( const Properties& prop, const typename PtcArray::const_particle_type& ptc ) {
-    return { ptc.p(0), ptc.p(1), ptc.p(2) };
+    if (prop.mass_x > 0.01_r)
+      return { prop.mass_x*ptc.p(0), prop.mass_x*ptc.p(1), prop.mass_x*ptc.p(2) };
+    else
+      return { ptc.p(0), ptc.p(1), ptc.p(2) };
   }
 
   auto set_up_particle_export() {
@@ -1322,8 +1342,12 @@ namespace pic {
 namespace pic {
   void export_post_hook() {
     auto& pc = RTD::data().pc_counter;
-    std::fill( pc[0].data().begin(), pc[0].data().end(), 0 );
-    RTD::data().pc_cumulative_time = 0;
+    for ( int i = 0; i < 4; ++i )
+      std::fill( pc[i].data().begin(), pc[i].data().end(), 0 );
+    auto &em = RTD::data().em_counter;
+    for (int i = 0; i < 4; ++i)
+      std::fill(em[i].data().begin(), em[i].data().end(), 0);
+    RTD::data().cumulative_time = 0;
     if ( RTD::data().Jsp ) {
       // clear Jsp to save some space
       for (auto sp : *(RTD::data().Jsp))
