@@ -128,9 +128,8 @@ local_jobID="local.job"
 exec 5>&1 # save stdout of current session to fd5
 if [ -x "$(command -v qsub)" ]; then # PBS scheduler
     jobID=$(qsub -o $oe_dir -e $oe_dir -N ${project_name}-${tnow} "${sche_args[@]}" -v pic_command="$pic_cmd" $this_dir/job.sh |tee >(cat - >&5))
-#TODO make it work for SLURM
-#elif [ -x "$(command -v sbatch)" ]; then # SLURM scheduler
-#    jobID=$(sbatch -o $oe_dir/slurm-%j.%x.OU -e $oe_dir/slurm-%j.%x.ER -J ${project_name}-${tnow} ${sche_args[@]} -v PICARGS=${pic_args[@]} job.sh |tee >(cat - >&5))
+elif [ -x "$(command -v sbatch)" ]; then # SLURM scheduler
+    jobID=$(sbatch -o $oe_dir/slurm-%j.OU -e $oe_dir/slurm-%j.ER -J ${project_name}-${tnow} "${sche_args[@]}" --export=pic_command="$pic_cmd" $this_dir/job.sh |tee >(cat - >&5))
 else # run locally
     jobID=$local_jobID
 fi
