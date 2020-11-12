@@ -134,6 +134,8 @@ else # run locally
     jobID=$local_jobID
 fi
 
+printf "Entered message: $message\n"
+
 printf "%s\n" \
        "Project := $project_name"\
        "Message := $message"\
