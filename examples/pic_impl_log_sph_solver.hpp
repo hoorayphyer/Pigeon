@@ -259,7 +259,7 @@ namespace pic {
         };
 
       fu.setName("DampingLayer");
-      fu[0] = { damping_begin_index(), pic::supergrid[0].dim() };
+      fu[0] = { damping_begin_index(), pic::supergrid[0].dim()+myguard };
       fu[1] = { 0, pic::supergrid[1].dim() + 1 };
 
       fu.set_damping_rate(damping_rate);
@@ -351,7 +351,7 @@ namespace pic {
       }
 
     } ic;
-    ic[0] = { 0, supergrid[0].dim() };
+    ic[0] = { 0, supergrid[0].dim() + myguard };
     ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
 
     return ic;

@@ -418,26 +418,29 @@ namespace field {
                      (hi_axis ? *hi_axis : mesh.range(th_).far_end())   };
     // NOTE the hi_axis is included
 
-    if (!hopt<R,DGrid>)
-      hopt<R,DGrid>.emplace(grid, b[r_] - bool(surf), e[r_], b[th_], e[th_]);
+    if (!hopt<R,DGrid>) {
+      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
+      hopt<R,DGrid>.emplace(grid, b[r_] - bool(surf), e_r_max, b[th_], e[th_]);
+    }
 
     const auto &h = *(hopt<R,DGrid>);
     const ortho_coord_transform_t<R,DGrid> tr;
     {
-      for ( int i = b[r_]-bool(surf); i < e[r_]; ++i )
+      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
+      for ( int i = b[r_]-bool(surf); i < e_r_max; ++i )
         h.fr(i) = std::exp(grid[r_].absc(i));
-      tr.ortho2coord("E0", E[0], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
-      tr.prepJ(J,b[r_], e[r_], b[th_], e[th_], h, bool(lo_axis), bool(hi_axis) );
+      tr.ortho2coord("E0", E[0], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
+      tr.prepJ(J,b[r_], e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis) );
       // for ( auto& x : h.fr() ) x /= h.estag();
       // assert now h.fr(i) stores r_i.5
-      tr.ortho2coord("E1", E[1], b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
-      tr.ortho2coord("E2", E[2], b[r_]-bool(surf), e[r_], b[th_], e[th_]-bool(hi_axis), h); // FIXME transform r_out as well?
+      tr.ortho2coord("E1", E[1], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
+      tr.ortho2coord("E2", E[2], b[r_]-bool(surf), e_r_max, b[th_], e[th_]-bool(hi_axis), h); // FIXME transform r_out as well?
       for (auto &x : h.fr() ) x *= x;
-      tr.ortho2coord("B0", B[0], b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("B0", B[0], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
       R y = h.estag() * h.estag();
       for (auto &x : h.fr()) x *= y;
-      tr.ortho2coord("B1", B[1], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
-      tr.ortho2coord("B2", B[2], b[r_], e[r_], b[th_], e[th_], h);
+      tr.ortho2coord("B1", B[1], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
+      tr.ortho2coord("B2", B[2], b[r_], e_r_max, b[th_], e[th_], h);
       // NOTE assert: now h.fr stores (r_i.0)^2
     }
 
@@ -541,14 +544,15 @@ namespace field {
 
     {
       // NOTE: assert: h.fr contains 1 / (r_i.0)^2
-      tr.coord2ortho("B0", B[0], b[r_]-bool(surf), e[r_], b[th_], e[th_], h, bool(lo_axis), bool(hi_axis));
-      tr.coord2ortho("B1", B[1], b[r_], e[r_], b[th_], e[th_], h);
-      tr.coord2ortho("B2", B[2], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
+      tr.coord2ortho("B0", B[0], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis));
+      tr.coord2ortho("B1", B[1], b[r_], e_r_max, b[th_], e[th_], h);
+      tr.coord2ortho("B2", B[2], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
       for ( auto& x : h.fr() ) x = std::sqrt(x);
-      tr.coord2ortho("E0", E[0], b[r_], e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      tr.coord2ortho("E0", E[0], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
       for (auto &x : h.fr() ) x *= h.estag();
-      tr.coord2ortho("E1", E[1], b[r_]-bool(surf), e[r_], b[th_], e[th_], h);
-      tr.coord2ortho("E2", E[2], b[r_]-bool(surf), e[r_], b[th_], e[th_]-bool(hi_axis), h);
+      tr.coord2ortho("E1", E[1], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
+      tr.coord2ortho("E2", E[2], b[r_]-bool(surf), e_r_max, b[th_], e[th_]-bool(hi_axis), h);
       // NOTE assert: now h.fr stores (r_i)^2 at integer cells
     }
 

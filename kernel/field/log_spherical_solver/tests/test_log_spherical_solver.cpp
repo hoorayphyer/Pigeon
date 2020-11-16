@@ -38,7 +38,7 @@ TEST_CASE("test curlE", "[field]") {
 
   SECTION("test dr  of \mathcal{E}_th") {
     output.reset();
-    output[phi_] += diff_r(E,th_,1.0,b,e,false);
+    output[phi_] += diff_r(E,th_,1.0,b,e);
 
     R delta = grid[r_].delta();
     for (int j = 0; j < N+1; ++j) {
