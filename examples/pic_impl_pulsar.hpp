@@ -338,7 +338,7 @@ namespace pic {
 
       const int damping_begin_index = supergrid[0].csba(std::log(std::exp(supergrid[0].upper()) - damping_thickness));
       fu.setName("DampingLayer");
-      fu[0] = { damping_begin_index, pic::supergrid[0].dim() };
+      fu[0] = { damping_begin_index, pic::supergrid[0].dim()+myguard };
       fu[1] = { 0, pic::supergrid[1].dim() + 1 };
 
       fu.set_damping_rate(damping_rate);
@@ -983,7 +983,7 @@ namespace pic {
                  std::string this_run_dir) const {}
 
     } pr;
-    pr[0] = {0, supergrid[0].dim()};
+    pr[0] = {0, supergrid[0].dim() + myguard};
     pr[1] = {0, supergrid[1].dim() + 1}; // NOTE +1 to include upper boundary
 
     return pr;
