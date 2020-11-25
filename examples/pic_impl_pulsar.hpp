@@ -737,7 +737,7 @@ namespace pic {
     {
       asym_lo.setName("AxissymmetrizeJLower");
       asym_lo[0] = { 0, supergrid[0].dim() };
-      asym_lo[1] = { -myguard, 1 }; // NOTE +1 so as to set values right on axis
+      asym_lo[1] = { -myguard, 0 }; // NOTE must not use 1 in place of 0
       asym_lo.is_upper_axis(false);
 
       asym_hi.setName("AxissymmetrizeJHigher");

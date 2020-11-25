@@ -8,12 +8,12 @@ private:
   const BoundaryPosition _bpos;
 
   template < typename T >
-  void ReflectArrayAtAxis( MultiArray<T>& array, const Grid& grid, FieldType field_type, bool ispos = true ) const {
+  void ReflectArrayAtAxis( MultiArray<T>& array, const Grid& grid, FieldType field_type, int comp, bool ispos = true ) const {
 
     int boundary = static_cast<int>(_bpos);
     int axisDir = boundary / 2;
     bool isupper = boundary % 2;
-    int stag_axisDir = GetStagProperty( field_type, axisDir )[axisDir];
+    int stag_axisDir = GetStagProperty( field_type, comp )[axisDir];
     int trans[2] = { (axisDir + 1) % VECTOR_DIM , (axisDir + 2) % VECTOR_DIM };
     int increm[2] = { DirIncrement( trans[0], grid.extent() ) , DirIncrement( trans[1], grid.extent() ) };
     int increm_axis = DirIncrement( axisDir, grid.extent() );
@@ -33,8 +33,8 @@ private:
           if ( !ispos && i == imirror ) {
             array[ i * increm_axis + transIndex ] = 0.0;
           } else {
-            array[ i * increm_axis + transIndex ]
-                = static_cast<int>(ispos) * array[ imirror * increm_axis + transIndex ];
+            array[ i * increm_axis + transIndex ] = array[ imirror * increm_axis + transIndex ];
+            if (!ispos) array[ i * increm_axis + transIndex ] *= -1;
           }
 
         }
@@ -50,13 +50,13 @@ public:
 
   virtual void Apply(Scalar dt, VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield, Scalar time) override {
     const Grid& grid = Efield.grid();
-    ReflectArrayAtAxis( Efield.data(0), grid, FieldType::ETYPE );
-    ReflectArrayAtAxis( Efield.data(1), grid, FieldType::ETYPE, false );
-    ReflectArrayAtAxis( Efield.data(2), grid, FieldType::ETYPE, false );
+    ReflectArrayAtAxis( Efield.data(0), grid, FieldType::ETYPE, 0 );
+    ReflectArrayAtAxis( Efield.data(1), grid, FieldType::ETYPE, 1, false );
+    ReflectArrayAtAxis( Efield.data(2), grid, FieldType::ETYPE, 2, false );
 
-    ReflectArrayAtAxis( Bfield.data(0), grid, FieldType::ETYPE );
-    ReflectArrayAtAxis( Bfield.data(1), grid, FieldType::ETYPE, false );
-    ReflectArrayAtAxis( Bfield.data(2), grid, FieldType::ETYPE, false );
+    ReflectArrayAtAxis( Bfield.data(0), grid, FieldType::BTYPE, 0 );
+    ReflectArrayAtAxis( Bfield.data(1), grid, FieldType::BTYPE, 1, false );
+    ReflectArrayAtAxis( Bfield.data(2), grid, FieldType::BTYPE, 2, false );
   }
 
 };
