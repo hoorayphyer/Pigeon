@@ -430,7 +430,7 @@ namespace field {
       for ( int i = b[r_]-bool(surf); i < e_r_max; ++i )
         h.fr(i) = std::exp(grid[r_].absc(i));
       tr.ortho2coord("E0", E[0], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      tr.prepJ(J,b[r_], e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis) );
+      tr.prepJ(J,b[r_] - bool(surf), e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis) );
       // for ( auto& x : h.fr() ) x /= h.estag();
       // assert now h.fr(i) stores r_i.5
       tr.ortho2coord("E1", E[1], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);

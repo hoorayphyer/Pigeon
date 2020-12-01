@@ -1,0 +1,36 @@
+project_name = "Monopole128"
+datadir_prefix = "../Data/"
+dt = 0.005
+Np = 2
+Omega = 0.25
+mu = 1000.0
+total_timesteps = 4001
+spinup_time = 5.0
+
+[damping]
+thickness = 6.0
+rate = 10.0
+
+[forces]
+gravity = 0.5
+
+[atmosphere]
+multiplicity = 1.0
+v_th = 0.2
+
+[plans]
+sort = { on = true, start = 0, interval = 100 }
+
+export = { on = true, start = 0, interval = 200,
+           num_files = 1, downsample_ratio = 1 }
+
+checkpoint = { on = false, start = 10000, interval = 10000,
+               num_files = 1, max_num_checkpoints = 1 }
+
+load_balance = { on = false, start = 1000, interval = 1000, target_load = 100000 }
+
+profiling = { on = true, start = 0, interval = 100, max_entries = 100 }
+
+vitals = { on = true, start = 0, interval = 100 }
+
+print_timestep_to_stdout_interval = 100

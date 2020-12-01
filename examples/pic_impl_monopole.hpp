@@ -6,9 +6,7 @@
 #include "metric/log_spherical.hpp"
 #include "field/log_spherical_solver/updater.hpp"
 
-#include "particle/annihilation.hpp"
 #include "pic/forces/gravity.hpp"
-#include "pic/forces/landau0.hpp"
 #include "io/exportee_by_function.hpp"
 
 namespace pic {
@@ -20,17 +18,12 @@ namespace pic {
   constexpr Grid supergrid
   = {{ { 0.0, std::log(30.0), 128 }, { 0.0, 180.0_deg, 128 } }};
 
-  real_t Omega = 1.0 / 6.0;
+  real_t Omega;
   real_t dt;
   real_t mu;
   real_t wpic2;
 
-  real_t gamma_fd;
-  real_t E_ph;
   real_t gravity_strength;
-  real_t landau0_B_thr;
-  real_t magnetic_convert_B_thr;
-  std::array<real_t,2> mfp;
   real_t atm_x;
   real_t v_th;
 
@@ -42,21 +35,13 @@ namespace pic {
   std::string datadir_prefix;
   int total_timesteps;
 
-  Plan annih_plan {};
-
   void load_configuration(const ConfFile_t& conf) {
     safe_set(dt, conf["dt"]);
-    safe_set(mu, conf["gamma0"]); mu /= std::pow(Omega,2.0);
+    safe_set(Omega, conf["Omega"]);
+    safe_set(mu, conf["mu"]);
     safe_set(wpic2, conf["Np"]); wpic2 = 2 * Omega * mu / wpic2;
 
-    safe_set(gamma_fd,conf["pairs"]["gamma_fd"]);
-    safe_set(E_ph, conf["pairs"]["E_ph"]);
     safe_set(gravity_strength, conf["forces"]["gravity"]);
-    safe_set(landau0_B_thr, conf["forces"]["landau0_ratio"]); landau0_B_thr *= pic::mu;
-
-    safe_set(magnetic_convert_B_thr, conf["pairs"]["photon"]["magnetic_convert_ratio"]); magnetic_convert_B_thr *= pic::mu;
-    safe_set(mfp[0], conf["pairs"]["photon"]["mfp"][0]);
-    safe_set(mfp[1], conf["pairs"]["photon"]["mfp"][1]);
 
     safe_set(v_th, conf["atmosphere"]["v_th"]);
     safe_set(atm_x, conf["atmosphere"]["multiplicity"]);
@@ -102,15 +87,6 @@ namespace pic {
     vitals_plan.on = conf["plans"]["vitals"]["on"].value_or(true);
     vitals_plan.start = conf["plans"]["vitals"]["start"].value_or(0);
     safe_set(vitals_plan.interval, conf["plans"]["vitals"]["interval"]);
-
-    save_tracing_plan.on = conf["plans"]["tracing"]["on"].value_or(false);
-    save_tracing_plan.start = conf["plans"]["tracing"]["start"].value_or(0);
-    safe_set(save_tracing_plan.interval, conf["plans"]["tracing"]["interval"]);
-    save_tracing_plan.num_files = conf["plans"]["tracing"]["num_files"].value_or(1);
-
-    annih_plan.on = conf["plans"]["annihilation"]["on"].value_or(false);
-    annih_plan.start = conf["plans"]["annihilation"]["start"].value_or(0);
-    safe_set(annih_plan.interval, conf["plans"]["annihilation"]["interval"]);
   }
 
   real_t r_e() {
@@ -126,28 +102,27 @@ namespace pic {
   constexpr int field_op_inv_precision = 4;
   constexpr int myguard = std::max(
                                    ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision, false),
-                                   (pic::ShapeF::support() + 3) / 2); // NOTE minimum number of guards of J
-  // on one side is ( supp + 3 ) / 2
+                                   (pic::ShapeF::support() + 3) / 2); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   real_t omega_spinup ( real_t time ) noexcept {
     return std::min<real_t>( time / spinup_time, 1.0_r ) * Omega;
   }
 
-  real_t B_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * 2.0_r * std::cos(theta) * std::exp(-3.0_r * lnr);
+  real_t B_r_star( real_t lnr, real_t, real_t , real_t time ) noexcept {
+    return pic::mu * std::exp(-2.0_r * lnr);
   }
-  real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * std::sin(theta) * std::exp(-3.0_r * lnr);
+  real_t B_theta_star( real_t lnr, real_t, real_t , real_t time ) noexcept {
+    return 0;
   }
-  constexpr real_t B_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
+  constexpr real_t B_phi_star( real_t lnr, real_t, real_t , real_t time ) noexcept {
     return 0;
   }
 
   real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return pic::mu * omega_spinup(time) * std::exp(- 2.0_r * lnr) * std::sin( theta ) * std::sin(theta);
+    return 0;
   }
   real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return - pic::mu * omega_spinup(time) * std::exp(- 2.0_r * lnr ) * std::sin( 2.0_r*theta );
+    return - pic::mu * omega_spinup(time) * std::exp(- lnr ) * std::sin( theta );
   }
   constexpr real_t E_phi_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     return 0;
@@ -169,6 +144,7 @@ namespace pic {
       }
     }
   }
+  // TODOL annihilation will affect deposition // NOTE one can deposit in the end
 }
 
 namespace pic {
@@ -180,12 +156,8 @@ namespace pic {
     }
 
     map<real_t> N_scat {};
-    Field<4> pc_counter {};
-    Field<4> em_counter{};
-    real_t cumulative_time {};
 
     std::optional<map<JField>> Jsp; // current by species
-    std::optional<Field<1>> skin_depth;
 
     void init( const map<Properties>& properties, const Grid& localgrid ) {
       for ( auto sp : properties )
@@ -196,16 +168,6 @@ namespace pic {
         for ( auto sp : properties )
           (*Jsp).insert(sp, {});
       }
-
-      if (false) { // activate skin_depth
-        skin_depth.emplace(std::remove_reference_t<decltype(*skin_depth)>{});
-      }
-
-      Index bulk_dims;
-      for ( int i = 0; i < DGrid; ++i ) bulk_dims[i] = localgrid[i].dim();
-      auto range = apt::make_range({}, bulk_dims, myguard); // FIXME range with no guard gives memory error. Interpolation in export needs them.
-      pc_counter = {range};
-      em_counter = {range};
     };
 
   private:
@@ -399,21 +361,15 @@ namespace pic {
 }
 
 namespace pic {
-  constexpr real_t gamma_off = 15.0;
-  constexpr real_t Ndot_fd = 0.25;
-
   auto set_up_particle_properties() {
     map<Properties> properties;
     {
       properties.insert(species::electron, {1.0,-1.0,"electron","el"});
-      properties.insert(species::positron, {1.0,1.0,"positron","po"});
-      properties.insert(species::ion, { 5.0, 1.0, "ion","io"});
-      properties.insert(species::photon, { 0, 0, "photon","ph" });
+      properties.insert(species::ion, { 1.0, 1.0, "ion","io"});
     }
 
     {
       constexpr auto* lorentz = ::particle::force::template lorentz<real_t,Specs,::particle::vParticle>;
-      constexpr auto* landau0 = ::particle::force::landau0<real_t,Specs,::particle::vParticle>;
       constexpr auto* gravity = ::particle::force::gravity<real_t,Specs,::particle::vParticle>;
 
       if ( properties.has(species::electron) ) {
@@ -423,18 +379,6 @@ namespace pic {
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
         force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
-
-        force.Register(sp);
-      }
-      if ( properties.has(species::positron) ) {
-        auto sp = species::positron;
-        Force force;
-        const auto& prop = properties[sp];
-
-        force.add( lorentz, prop.charge_x / prop.mass_x );
-        force.add( gravity, gravity_strength );
-        force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
@@ -445,64 +389,9 @@ namespace pic {
 
         force.add( lorentz, prop.charge_x / prop.mass_x );
         force.add( gravity, gravity_strength );
-        // force.add( landau0, landau0_B_thr );
 
         force.Register(sp);
       }
-    }
-
-    using Ptc_t = typename PtcArray::particle_type;
-    namespace scat = ::particle::scat;
-
-    static auto flagger = [](particle::flagbits parent_bits, species) noexcept {
-      parent_bits[flag::secondary] = true;
-      return parent_bits;
-    };
-
-    {
-      ::particle::Scat<real_t,Specs> ep_scat;
-
-      ep_scat.eligs.push_back([](const Ptc_t& ptc){ return ptc.q(0) < std::log(9.0_r); });
-
-      scat::CurvatureRadiation<real_t,Specs>::gamma_fd = gamma_fd;
-      scat::CurvatureRadiation<real_t,Specs>::gamma_off = gamma_off;
-      scat::CurvatureRadiation<real_t,Specs>::Ndot_fd = Ndot_fd;
-      scat::CurvatureRadiation<real_t,Specs>::E_ph = E_ph;
-      ep_scat.channels.push_back( scat::CurvatureRadiation<real_t,Specs>::test );
-
-      if ( properties.has(species::photon) )
-        ep_scat.impl =
-          [](auto itr, auto &p, real_t t) {
-            return scat::RadiationFromCharges<false, real_t, Specs>(itr, p, t, flagger);
-        };
-      else
-        ep_scat.impl =
-          [](auto itr, auto &p, real_t t) {
-            return scat::RadiationFromCharges<true, real_t, Specs>(itr, p, t, flagger);
-          };
-
-      if ( properties.has(species::electron) && properties.has(species::positron) ) {
-        ep_scat.Register( species::electron );
-        ep_scat.Register( species::positron );
-      }
-    }
-
-    if ( properties.has(species::photon) ) {
-      ::particle::Scat<real_t,Specs> photon_scat;
-      photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
-      scat::MagneticConvert<real_t,Specs>::B_thr = magnetic_convert_B_thr;
-      scat::MagneticConvert<real_t,Specs>::mfp = mfp[0];
-      photon_scat.channels.push_back( scat::MagneticConvert<real_t,Specs>::test );
-
-      scat::TwoPhotonCollide<real_t,Specs>::mfp = mfp[1];
-      photon_scat.channels.push_back( scat::TwoPhotonCollide<real_t,Specs>::test );
-
-      photon_scat.impl =
-        [](auto itr, auto &p, real_t t) {
-          return scat::PhotonPairProduction<real_t, Specs>(itr, p, t, flagger);
-        };
-
-      photon_scat.Register( species::photon );
     }
 
     return properties;
@@ -698,7 +587,7 @@ namespace pic {
     } atm;
     {
       atm.setName("Atmosphere");
-      atm[0] = { star_interior-1, star_interior };
+      atm[0] = { star_interior - 1, star_interior };
       atm[1] = { 0, supergrid[1].dim() };
 
       atm.set_thermal_velocity(v_th).set_number_in_atmosphere(atm_x * N_atm_floor());
@@ -737,60 +626,13 @@ namespace pic {
     {
       asym_lo.setName("AxissymmetrizeJLower");
       asym_lo[0] = { 0, supergrid[0].dim() };
-      asym_lo[1] = { -myguard, 0 }; // NOTE must not use 1 in place of 0
+      asym_lo[1] = { -myguard, 0 }; // NOTE 0, cannot be 1 because it's add/sub_assign
       asym_lo.is_upper_axis(false);
 
       asym_hi.setName("AxissymmetrizeJHigher");
-      asym_hi[0] = { 0 , supergrid[0].dim() };
+      asym_hi[0] = { 0, supergrid[0].dim() };
       asym_hi[1] = { supergrid[1].dim(), supergrid[1].dim() + myguard };
       asym_hi.is_upper_axis(true);
-    }
-
-    struct NewPtcAnalyzer : public PtcAction {
-      virtual NewPtcAnalyzer* Clone() const { return new NewPtcAnalyzer(*this); }
-
-      virtual void operator() ( map<PtcArray>& particles, JField& J, std::vector<Particle>* new_ptc_buf, const map<Properties>&,
-                                const Field<3>&, const Field<3>&, const Grid& grid, const Ensemble* ,
-                                real_t dt, int timestep, util::Rng<real_t>& rng) override {
-        // Put particles where they belong after scattering
-        assert(new_ptc_buf != nullptr);
-
-        for ( auto& ptc : *new_ptc_buf ) {
-          if ( not ptc.is(flag::exist) ) continue;
-          const auto this_sp = ptc.template get<species>();
-
-          // FIXME this relys on all particles in this buffer that carry flag::secondary are new particles. One possible exception is migration. So this action must be done before migration.
-          if ( ptc.is(flag::secondary) ) {
-            // log scattering events
-            RTD::data().N_scat[this_sp] += ptc.frac();
-
-            // log pair creation events
-            if ( species::electron == this_sp ) {
-              Index I; // domain index, not the global index
-              for ( int j = 0; j < DGrid; ++j )
-                I[j] = grid[j].csba( ptc.q(j) );
-              RTD::data().pc_counter[0](I) += ptc.frac();
-              for ( int j = 0; j < 3; ++j)
-                RTD::data().pc_counter[j+1](I) += 2.0 * ptc.frac() * ptc.p(j); // 2 because of positron
-            } else if (species::photon == this_sp) {
-              Index I; // domain index, not the global index
-              for (int j = 0; j < DGrid; ++j)
-                I[j] = grid[j].csba(ptc.q(j));
-              RTD::data().em_counter[0](I) += ptc.frac();
-              for (int j = 0; j < 3; ++j)
-                RTD::data().em_counter[j + 1](I) += ptc.frac() * ptc.p(j);
-            }
-          }
-
-          particles[this_sp].push_back(std::move(ptc));
-        }
-        new_ptc_buf->resize(0);
-        RTD::data().cumulative_time += dt;
-
-      }
-    } analyzer;
-    {
-      analyzer.setName("NewPtcAnalysis");
     }
 
     struct Escaping : public PtcAction {
@@ -829,116 +671,11 @@ namespace pic {
       escape[1] = { 0, supergrid[1].dim() };
     }
 
-    class Annihilator : public PtcAction {
-    private:
-      // policy returns number of pairs to be annihilated
-      real_t(*_policy)(real_t num_electron_in_a_cell, real_t num_positron_in_a_cell) = nullptr;
-
-    public:
-      Annihilator* Clone() const override { return new Annihilator(*this); }
-
-      Annihilator& set_policy( real_t(*policy)(real_t,real_t) ) noexcept { _policy = policy; return *this; }
-
-      void operator() ( map<PtcArray>& particles, JField& J,
-                        std::vector<Particle>* ,
-                        const map<Properties>& properties,
-                        const Field<3>&, const Field<3>&,
-                        const Grid& grid, const Ensemble* ens,
-                        real_t dt, int timestep, util::Rng<real_t>& ) override {
-        if ( apt::range::is_empty(*this) ) return;
-
-        if ( annih_plan.is_do(timestep) ) {
-          assert( ens != nullptr );
-          assert( _policy != nullptr );
-
-          apt::array<apt::array<real_t,2>,DGrid> bounds;
-          for ( int i = 0; i < DGrid; ++i ) {
-            // NOTE guard cells or margins of range not included.
-            bounds[i][0] = grid[i].absc( range::begin(*this,i) );
-            bounds[i][1] = grid[i].absc( range::end(*this,i) );
-          }
-
-          particle::annihilate(particles[species::electron],particles[species::positron],J,
-                               properties[species::electron].charge_x,properties[species::positron].charge_x,
-                               grid, ens->intra, dt, ShapeF(), _policy, bounds);
-        }
-      }
-
-    } annih;
-
-    {
-      annih.setName("Annihilation");
-      annih[0] = { supergrid[0].csba(std::log(18.0)), supergrid[0].dim() + myguard };
-      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( 30.0_deg ) / supergrid[1].delta();
-      annih[1] = { i_equator - half_width, i_equator + half_width };
-
-      auto policy =
-        []( real_t num_e, real_t num_p ) noexcept {
-          return std::min(num_e, num_p) / 2;
-        };
-
-      annih.set_policy(policy);
-    }
-
-    class NoPhotonZone : public PtcAction {
-    private:
-      int _interval = 100;
-
-    public:
-      NoPhotonZone* Clone() const override { return new NoPhotonZone(*this); }
-      NoPhotonZone& set_interval( int interval ) noexcept { _interval = interval; return *this; }
-
-      void operator() ( map<PtcArray>& particles, JField& ,
-                        std::vector<Particle>* ,
-                        const map<Properties>& ,
-                        const Field<3>&, const Field<3>&,
-                        const Grid& grid, const Ensemble* ,
-                        real_t , int timestep, util::Rng<real_t>& ) override {
-        if ( (timestep % _interval != 0) or apt::range::is_empty(*this) ) return;
-
-        apt::array< apt::array<real_t,2>,DGrid> bounds;
-        for ( int i = 0; i < DGrid; ++i ) {
-          bounds[i][0] = grid[i].absc(range::begin(*this,i));
-          bounds[i][1] = grid[i].absc(range::end(*this,i));
-        }
-
-        auto in_zone =
-          [&bounds] ( const auto& q ) noexcept {
-            for ( int i = 0; i < DGrid; ++i ) {
-              if ( q[i] < bounds[i][0] or q[i] >= bounds[i][1] )
-                return false;
-            }
-            return true;
-          };
-
-        for ( auto ptc : particles[species::photon] ) { // TODOL semantics
-          if ( ptc.is(flag::exist) and in_zone(ptc.q()) ) {
-            ptc.reset(flag::exist);
-          }
-        }
-      }
-
-    } no_ph;
-
-    {
-      no_ph.setName("NoPhotonZone");
-      no_ph[0] = { supergrid[0].csba(std::log(18.0)), supergrid[0].dim() + myguard };
-      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
-      int half_width = ( 30.0_deg ) / supergrid[1].delta();
-      no_ph[1] = { i_equator - half_width, i_equator + half_width };
-
-      no_ph.set_interval(100);
-    }
-
-    pus.emplace_back(no_ph.Clone());
-    pus.emplace_back(annih.Clone());
     pus.emplace_back(escape.Clone());
     pus.emplace_back(pu.Clone());
     pus.emplace_back(atm.Clone());
     pus.emplace_back(asym_lo.Clone());
     pus.emplace_back(asym_hi.Clone());
-    pus.emplace_back(analyzer.Clone());
     // FIXME migrate need more memory check
     pus.emplace_back(migrate.Clone()); // After this line, particles are all within borders.
 
@@ -965,7 +702,7 @@ namespace pic {
       }
 
     } ic;
-    ic[0] = { 0, supergrid[0].dim() };
+    ic[0] = { 0, supergrid[0].dim() + 1 };
     ic[1] = { 0, supergrid[1].dim() + 1 }; // NOTE +1 to include upper boundary
 
     return ic;
@@ -981,7 +718,6 @@ namespace pic {
                  const std::optional<Ensemble> & ens_opt,
                  int resumed_timestep,
                  std::string this_run_dir) const {}
-
     } pr;
     pr[0] = {0, supergrid[0].dim() + myguard};
     pr[1] = {0, supergrid[1].dim() + 1}; // NOTE +1 to include upper boundary
@@ -1000,16 +736,6 @@ namespace pic {
   void export_prior_hook( const map<PtcArray>& particles, const map<Properties>& properties,
                           const Field<3>& E, const Field<3>& B, const JField& J,  const Grid& grid, const std::optional<mpi::CartComm>& cart_opt, const Ensemble& ens,
                           real_t dt, int timestep ) {
-    { // pair creation counter
-      auto& pc = RTD::data().pc_counter;
-      for ( int i = 0; i < 4; ++i )
-        ens.reduce_to_chief( mpi::by::SUM, pc[i].data().data(), pc[i].data().size() );
-    }
-    { // photon emission counter
-      auto &em = RTD::data().em_counter;
-      for (int i = 0; i < 4; ++i)
-        ens.reduce_to_chief(mpi::by::SUM, em[i].data().data(), em[i].data().size());
-    }
     if (RTD::data().Jsp) {
       auto& Jsp = *RTD::data().Jsp;
       for ( auto s : Jsp ) {
@@ -1022,35 +748,7 @@ namespace pic {
         }
       }
     }
-
-    if (RTD::data().skin_depth) { // skin depth
-      auto &skd = *(RTD::data().skin_depth);
-      skd = {J.mesh()};
-      skd.reset();
-
-      for ( auto sp : particles ) {
-        auto q2m = properties[sp].charge_x * properties[sp].charge_x / properties[sp].mass_x;
-        for ( const auto& ptc : particles[sp] ) {
-          if ( !ptc.is(flag::exist) ) continue;
-          Index I;
-          for ( int i = 0; i < DGrid; ++i )
-            I[i] = grid[i].csba( ptc.q(i) );
-          skd[0](I) += q2m * ptc.frac();
-        }
-      }
-      ens.reduce_to_chief( mpi::by::SUM, skd[0].data().data(), skd[0].data().size() );
-      if ( ens.is_chief() ) {
-        for ( const auto& I : apt::Block(apt::range::begin(skd.mesh().range()), apt::range::end(skd.mesh().range())) ) {
-          real_t r = grid[0].absc(I[0], 0.5);
-          real_t theta = grid[1].absc(I[1], 0.5);
-          real_t h = Metric::h<2>(r,theta) / (wpic2 * grid[0].delta() * grid[0].delta());
-          auto& v = skd[0](I);
-          v = std::sqrt(h / v);
-        }
-      }
-    }
   }
-
 }
 
 namespace pic {
@@ -1118,43 +816,12 @@ namespace pic {
     }
   }
 
-  apt::array<real_t,3> pair_creation_rate ( Index I, const Grid& grid, const Field<3>& ,
-                                            const Field<3>& , const JField&  ) {
-    auto x = RTD::data().pc_counter[0](I);
-    return { x / RTD::data().cumulative_time, 0, 0};
-  }
-  apt::array<real_t,3> Pdot_photon_pair_creation ( Index I, const Grid& grid, const Field<3>& ,
-                                            const Field<3>& , const JField&  ) {
-    const auto& pc = RTD::data().pc_counter;
-    const auto& dt = RTD::data().cumulative_time;
-    return { pc[1](I)/dt , pc[2](I)/dt, pc[3](I)/dt};
-  }
-
-  apt::array<real_t, 3> photon_emission_rate(Index I, const Grid &grid,
-                                             const Field<3> &, const Field<3> &,
-                                             const JField &) {
-    auto x = RTD::data().em_counter[0](I);
-    return {x / RTD::data().cumulative_time, 0, 0};
-  }
-  apt::array<real_t,3> Pdot_photon_emission( Index I, const Grid& grid, const Field<3>& ,
-                                            const Field<3>& , const JField&  ) {
-    const auto& em = RTD::data().em_counter;
-    const auto& dt = RTD::data().cumulative_time;
-    return { em[1](I)/dt , em[2](I)/dt, em[3](I)/dt};
-  }
-
   template < particle::species SP >
   apt::array<real_t,3> J_by_species ( Index I, const Grid& grid, const Field<3>& ,
                                       const Field<3>& , const JField& ) {
     // NOTE due to interpolation, the exported Jsp's don't sum up to J.
     const auto& Jsp = (*RTD::data().Jsp)[SP];
     return msh::interpolate(Jsp, I2std(I), ShapeF());
-  }
-
-  apt::array<real_t,3> skin_depth ( Index I, const Grid& grid, const Field<3>& ,
-                                    const Field<3>& , const JField& ) {
-    return {msh::interpolate(*(RTD::data().skin_depth), I2std(I), ShapeF())[0],
-            0, 0};
   }
 
   auto set_up_field_export() {
@@ -1165,14 +832,6 @@ namespace pic {
       fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
       fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
       fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
-      fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "PdotPairCreation", 3, Pdot_photon_pair_creation, nullptr) );
-      fexps.push_back( new FA ( "PhotonEmissionRate", 1, photon_emission_rate, nullptr));
-      fexps.push_back( new FA ( "PdotEmission", 3, Pdot_photon_emission, nullptr) );
-
-      if (RTD::data().skin_depth) {
-        fexps.push_back(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
-      }
 
       if ( RTD::data().Jsp ) {
         using namespace particle;
@@ -1240,20 +899,11 @@ namespace pic {
 
 namespace pic {
   void export_post_hook() {
-    auto& pc = RTD::data().pc_counter;
-    for ( int i = 0; i < 4; ++i )
-      std::fill( pc[i].data().begin(), pc[i].data().end(), 0 );
-    auto &em = RTD::data().em_counter;
-    for (int i = 0; i < 4; ++i)
-      std::fill(em[i].data().begin(), em[i].data().end(), 0);
-    RTD::data().cumulative_time = 0;
     if ( RTD::data().Jsp ) {
       // clear Jsp to save some space
       for (auto sp : *(RTD::data().Jsp))
         (*RTD::data().Jsp)[sp] = {};
     }
-    if ( RTD::data().skin_depth )
-      *(RTD::data().skin_depth) = {};
   }
 }
 
@@ -1264,11 +914,9 @@ namespace pic {
   std::string proofread(std::string indent) {
     std::ostringstream o;
     real_t gamma_0 = Omega * Omega * mu;
-    o << indent << "gamma_0=" << apt::fmt("%.0f", gamma_0 ) << std::endl;
     o << indent << "Np=" << apt::fmt("%.1f", 2 * Omega * mu / wpic2 ) << std::endl;
     o << indent << "(w_pic dt)^2 = " << apt::fmt("%.4f", wpic2 * dt * dt ) << std::endl;
     o << indent << "re=" << apt::fmt("%.4f", r_e() ) << std::endl;
-    o << indent << "Ndot_GJ=" << apt::fmt("%.4e", gamma_0 / ( 180.0_deg * r_e() ) ) << std::endl;
 
     {
       using namespace particle;
@@ -1278,14 +926,6 @@ namespace pic {
         << ", g=" << apt::fmt("%.2f", gravity_strength) << std::endl;
     }
 
-    {
-      using namespace particle;
-      o << indent << "PC: gamma_fd=" << apt::fmt("%.0f", gamma_fd);
-      o << ", E_ph=" << apt::fmt("%.0f", E_ph);
-
-      o << indent << "    gamma_RRL=" << gamma_fd * std::pow(gamma_fd / E_ph, 0.5);
-      // o << ", L_CR/L_sd=" << E_ph * Ndot_fd * Omega * std::pow( gamma_0 / gamma_fd, 3.0 );
-    }
     return o.str();
   }
 }
