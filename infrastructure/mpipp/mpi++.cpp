@@ -236,9 +236,41 @@ namespace mpi {
     for ( int i = 0; i < ndims; ++i )
       periods[i] = static_cast<int>( periodic[i] );
 
-    MPI_Comm comm_cart;;
+    MPI_Comm comm_cart;
     MPI_Cart_create( comm, ndims, dims.data(), periods.data(), true, &comm_cart );
     reset( new MPI_Comm(comm_cart) );
+  }
+
+  std::optional<CartComm> CartComm::sub( std::vector<int> clb, std::vector<int> ctr) {
+    std::optional<CartComm> res;
+    std::vector<int> crds;
+    std::vector<Topo> topos;
+    std::tie(crds,topos) = coords_topos(); // TODO use structural binding
+    const int ndims = crds.size();
+    std::optional<unsigned int> is_in{1};
+    for ( int i = 0; i < ndims; ++i ) {
+      if ( crds[i] < clb[i] or crds[i] >= ctr[i] ) {
+        is_in.reset();
+        break;
+      }
+    }
+
+    auto comm_opt = split(is_in);
+
+    if ( !comm_opt ) return res;
+
+    const auto& comm = *comm_opt;
+    // repurpose clb for dims, ctr for periods
+    for ( int i = 0; i < ndims; ++i ) {
+      clb[i] = std::min<int>( ctr[i] - clb[i], topos[i].dim() );
+      ctr[i] = ( topos[i].periodic() and ( clb[i] == topos[i].dim() ) );
+    }
+
+    MPI_Comm comm_cart;
+    MPI_Cart_create(comm, ndims, clb.data(), ctr.data(), false, &comm_cart); // NOTE reorder = false
+    res.emplace(CartComm());
+    res->reset(new MPI_Comm(comm_cart));
+    return res;
   }
 
   std::vector<int> CartComm::rank2coords ( int rank ) const {

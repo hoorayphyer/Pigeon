@@ -82,10 +82,17 @@ namespace mpi {
 
     constexpr int dim() const noexcept { return std::abs(_signed_dim); }
     constexpr bool periodic() const noexcept { return _signed_dim < 0; }
+    constexpr int signed_dim() const noexcept { return _signed_dim; }
   };
 
   struct CartComm : public Comm {
+  private:
+    CartComm() = default;
+
+  public:
     CartComm( const Comm& comm, std::vector<int> dims, std::vector<bool> periodic );
+
+    std::optional<CartComm> sub( std::vector<int> coords_bottom_left, std::vector<int> coords_top_right); // [ coords_bottom_left, coords_top_right )
 
     std::vector<int> rank2coords ( int rank ) const;
 
