@@ -782,8 +782,10 @@ namespace pic {
     else return B * POW(B,E-1);
   }
 
-  void average_when_downsampled ( IOField& fds, const IOGrid& , int num_comps, const mpi::CartComm& ) {
-    int factor = POW(export_plan.downsample_ratio, pic::DGrid);
+  void average_when_downsampled ( IOField& fds, const IOGrid& grid, int num_comps, const mpi::CartComm& ) {
+    int downsample_ratio =
+        static_cast<int>(grid[0].delta() / pic::supergrid[0].delta() + 0.5);
+    int factor = POW(downsample_ratio, pic::DGrid);
     for ( int i = 0; i < num_comps; ++i ) {
       for ( auto& x : fds[i].data() ) x /= factor;
     }

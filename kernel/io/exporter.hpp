@@ -21,7 +21,6 @@ namespace io {
       : _ratio(ratio), _guard(guard), _cart_opt(cart_opt), _ens(ens) {}
 
     void execute( const DataSaver& saver,
-
                   const apt::Grid<R,DGrid>& grid,
                   const field::Field<R, 3, DGrid>& E,
                   const field::Field<R, 3, DGrid>& B,
