@@ -243,10 +243,10 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
   if (rw_opt) {
     auto &rw = *rw_opt;
 
-    CartComm cart(rw, {Nth, Nr}, {true, true});
+    CartComm cart(rw, {Nr, Nth}, {true, true});
 
     std::vector<int> coords_bottom_left{0, 0};
-    std::vector<int> coords_top_right{3, 1};
+    std::vector<int> coords_top_right{1, 3};
 
     auto sub_cart = cart.sub(coords_bottom_left, coords_top_right);
     std::vector<int> msg {-1,-1,-1,-1,-1,-1,-1};
@@ -273,27 +273,27 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
       for ( int i = 0; i < cart.size(); ++i ) {
         const auto* p = buf.data() + i * msg.size();
         const auto is_in = p[0];
-        const auto cth = p[1];
-        const auto cr = p[2];
-        const auto sub_cth = p[3];
-        const auto sub_cr = p[4];
-        const auto sub_topo_th = p[5];
-        const auto sub_topo_r = p[6];
-        REQUIRE(i / Nr == cth);
-        REQUIRE(i % Nr == cr);
+        const auto cr = p[1];
+        const auto cth = p[2];
+        const auto sub_cr = p[3];
+        const auto sub_cth = p[4];
+        const auto sub_topo_r = p[5];
+        const auto sub_topo_th = p[6];
+        REQUIRE(i / Nth == cr);
+        REQUIRE(i % Nth == cth);
         REQUIRE(is_in ==
-                (coords_bottom_left[0] <= cth and cth < coords_top_right[0] and
-                 coords_bottom_left[1] <= cr and cr < coords_top_right[1]));
+                (coords_bottom_left[0] <= cr and cr < coords_top_right[0] and
+                 coords_bottom_left[1] <= cth and cth < coords_top_right[1]));
         if ( not is_in ) {
-          REQUIRE(sub_cth == -1);
           REQUIRE(sub_cr == -1);
-          REQUIRE(sub_topo_th == -1);
+          REQUIRE(sub_cth == -1);
           REQUIRE(sub_topo_r == -1);
+          REQUIRE(sub_topo_th == -1);
         } else {
-          REQUIRE(sub_cth == cth - coords_bottom_left[0]);
-          REQUIRE(sub_cr == cr - coords_bottom_left[1]);
-          REQUIRE(sub_topo_th == coords_top_right[0] - coords_bottom_left[0]);
-          REQUIRE(sub_topo_r == coords_top_right[1] - coords_bottom_left[1]);
+          REQUIRE(sub_cr == cr - coords_bottom_left[0]);
+          REQUIRE(sub_cth == cth - coords_bottom_left[1]);
+          REQUIRE(sub_topo_r == coords_top_right[0] - coords_bottom_left[0]);
+          REQUIRE(sub_topo_th == coords_top_right[1] - coords_bottom_left[1]);
         }
       }
     }
