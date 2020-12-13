@@ -99,15 +99,10 @@ namespace io {
     auto silo_mesh_type = is_collinear_mesh_silo ? silo::MeshType::Rect : silo::MeshType::Curv;
 
     char str_ts [10];
-    snprintf(str_ts, 10, "%06d", timestep);
+    snprintf(str_ts, 10, "%07d", timestep);
 
     DataSaver saver(cart_opt);
     { // set up saver
-      if ( cart_opt && cart_opt->rank() == 0 ) {
-        saver.master.reset( new silo::file_t( silo::open( prefix + "/timestep" + str_ts + ".silo", silo::Mode::Write ) ) );
-        saver.set_namescheme( str_ts, num_files );
-      }
-
       if ( cart_opt ) {
         saver.meshname = "PICMesh";
 
@@ -119,7 +114,13 @@ namespace io {
           saver.pmpio.dirname += tmp;
         }
         saver.pmpio.comm = cart_opt->split( (cart_opt->rank()) % num_files );
-        fs::mpido(*cart_opt, [&](){fs::create_directories(prefix+ "/data/timestep" + str_ts);} );
+        fs::mpido(*cart_opt, [&](){
+                    fs::create_directories(prefix+ "/data/timestep" + str_ts);
+                    saver.master.reset(new silo::file_t(
+                        silo::open(prefix + "/timestep" + str_ts + ".silo",
+                                   silo::Mode::Write)));
+                    saver.set_namescheme(str_ts, num_files);
+                  } );
 
         saver.optlist[silo::Opt::TIME] = timestep * dt;
         saver.optlist[silo::Opt::CYCLE] = timestep;

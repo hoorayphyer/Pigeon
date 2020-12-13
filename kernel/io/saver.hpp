@@ -13,7 +13,7 @@ namespace io {
 
   public:
     silo::Pmpio pmpio; // only significant on carts
-    std::unique_ptr<silo::file_t> master {}; // only significant on world.rank() == 0, use reference because silo library is sloppy about const-ness.
+    std::unique_ptr<silo::file_t> master {}; // only significant on cart.rank() == 0, use reference because silo library is sloppy about const-ness.
     std::string meshname;
     silo::OptList optlist;
 
