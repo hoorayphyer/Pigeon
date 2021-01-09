@@ -33,8 +33,8 @@ namespace field {
                               R dt
                               ) const override;
 
-    static constexpr int min_guard( int iteration_in_inverting_operator, bool is_beta_zero ) {
-      return 1 + iteration_in_inverting_operator + static_cast<int>(!is_beta_zero);
+    static constexpr int min_guard( int iteration_in_inverting_operator ) {
+      return 2 + iteration_in_inverting_operator;
     }
   };
 

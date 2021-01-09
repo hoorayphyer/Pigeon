@@ -1,6 +1,4 @@
 #include "field/log_spherical_solver/updater.hpp"
-// #include "field/sync.hpp" // FIXME not in use right now
-#include "field/yee.hpp"
 #include <optional>
 #include <cassert>
 #include <tuple>
@@ -12,20 +10,23 @@ namespace field {
   template <typename R, int D>
   class _helper {
   private:
-    mutable std::vector<R> _fr{};
+    std::vector<R> _fr{};
     std::vector<R> _sin_th{};
-    const int _b_r;
-    const int _b_th;
-    const R _estag; // exp( - 0.5 * dlnr )
+    int _b_r;
+    int _b_th;
+    R _estag; // exp( 0.5 * dlnr )
 
   public:
-    _helper(const apt::Grid<R, D> &grid, const int b_r, const int e_r,
-            const int b_th, const int e_th)
-        : _b_r(b_r), _b_th(b_th), _estag(std::exp(-grid[r_].delta()*0.5)) {
+    _helper() = default;
+    _helper(const apt::Grid<R, D> &grid, int b_r, int e_r, int b_th, int e_th)
+        : _b_r(b_r), _b_th(b_th), _estag(std::exp(grid[r_].delta()*0.5)) {
       _fr.resize(e_r - b_r);
       _fr.shrink_to_fit();
       _sin_th.resize(2 * (e_th - b_th));
       _sin_th.shrink_to_fit();
+
+      for (int i = 0; i < e_r - b_r; ++i)
+        _fr[i] = std::exp(grid[r_].absc(b_r+i));
 
       for (int j = 0; j < e_th - b_th; ++j) {
         _sin_th[2 * j] = std::sin(grid[th_].absc(b_th + j));
@@ -33,82 +34,17 @@ namespace field {
       }
     }
 
-    std::vector<R> &fr() const { return _fr; } // used mutable _fr
-    auto &fr(int i) const { return _fr[i - _b_r]; } // used mutable _fr
+    const std::vector<R> &fr() const { return _fr; }
+    std::vector<R> &fr() { return _fr; }
+    const auto &fr(int i) const { return _fr[i - _b_r]; }
+    auto &fr(int i) { return _fr[i - _b_r]; }
 
-    const auto &sin(int j, bool midway = false) const {
+    std::vector<R> &fsin() { return _sin_th; }
+
+    const auto &fsin(int j, bool midway = false) const {
       return _sin_th[((j - _b_th) << 1) + midway];
     }
     const auto& estag() const {return _estag;}
-  };
-
-
-  template < typename R, int D >
-  std::optional<const _helper<R,D>> hopt;
-
-  template < typename R, int D >
-  struct Diff_in_CurlE {
-  private:
-    static void _diff_bulk( Component<R,D,false>& output,
-                            const Component<R,D>& input,
-                            const R f, const int dir,
-                            const int b_r, const int e_r,
-                            const int b_th, const int e_th
-                            ) {
-      const auto& m = input.mesh();
-      const int s = m.stride(dir);
-      for (int j = b_th; j < e_th; ++j) {
-        int li_j = m.linear_index(th_, j);
-        for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + i * m.stride(r_);
-          output[li] += f * (input[li] - input[li - s]);
-        }
-      }
-    }
-
-  public:
-    const int mode; // 0 : d_r 1 : d_th
-    const std::optional<int>& lo;
-    const std::optional<int>& hi;
-    const R delta;
-
-    using proxy_t =
-        std::tuple<const int, const std::optional<int>&, const std::optional<int>&,
-                   const Field<R,3,D> &, const int, R,
-                   const int (&)[D], const int (&)[D] >;
-    static constexpr int Prefactor = 5;
-
-    proxy_t operator()(const Field<R, 3, D> &E, const int comp, R prefactor,
-                       const int (&b)[D], const int (&e)[D]) {
-      assert(comp != mode);
-      prefactor /= delta;
-      return std::forward_as_tuple(mode,lo,hi,E,comp, prefactor,b,e);
-    }
-
-    static void d_r_dE(Component<R,D,false>&& output, proxy_t&& diff) {// TODOL sematics
-      const auto &&[mode, lo, hi, E, comp, prefactor, b_in, e_in] = std::move(diff);
-      const auto& m = E.mesh();
-      int b = b_in[r_] + 1; // NOTE always +1 regardless of lo or not
-      int e = e_in[r_];
-
-      _diff_bulk(output, E[comp], prefactor, r_, b, e, b_in[th_], e_in[th_] );
-      // NOTE at outer boundary, the r derivative on E_\theta and E_\phi is taken to vanish. // FIXME reexamine
-    }
-
-    static void d_th_dE(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
-      const auto &&[mode, lo, hi, E, comp, prefactor, b_in, e_in] = std::move(diff);
-      int b = b_in[th_];
-      int e = e_in[th_] - bdry*bool(hi);
-
-      if(!lo) b++;
-      else {
-        b = bdry; // NOTE true for both comp == phi_ and comp == r_
-        // NOTE if comp == r_, by symmetry output += 0, which doesn't need any action.
-      }
-
-      _diff_bulk(output, E[comp], prefactor, th_, b_in[r_], e_in[r_],b, e );
-    }
-
   };
 
   template < typename R, int D >
@@ -116,268 +52,124 @@ namespace field {
     const int mode; // 0 : d_r 1 : d_th
     const std::optional<int>& lo;
     const std::optional<int>& hi;
+    const R delta;
+
+    void d(Component<R,D,false>&& output, const Field<R, 3, D> &B, const int comp, R prefactor, const int (&b_in)[D], const int (&e_in)[D]) {// TODOL sematics
+      prefactor /= delta;
+      const auto& m = B.mesh();
+
+      if (r_ == mode and lo) { // conductor surface
+        const auto &s = m.stride(r_);
+        for (int j = b_in[th_]; j < e_in[th_]; ++j) {
+          int li = m.linear_index(th_, j) + b_in[r_] * s;
+          auto x = B[comp][li + s] - B[comp][li];
+          output[li - s] +=
+            prefactor * (x + x + B[comp][li + s] - B[comp][li + (s << 1)]);
+        }
+      }
+
+      { // bulk
+        const int s = m.stride(mode);
+        for (int j = b_in[th_]; j < e_in[th_] - (th_==mode); ++j) {
+          int li_j = m.linear_index(th_, j);
+          for (int i = b_in[r_]; i < e_in[r_] - (r_==mode); ++i) {
+            int li = li_j + i * m.stride(r_);
+            output[li] += prefactor * (B[comp][li + s] - B[comp][li]);
+          }
+        }
+      }
+
+      // at r outer boundary, the r derivative is taken to vanish.
+    }
+
+  };
+
+  template < typename R, int D >
+  struct Diff_in_CurlE {
+    const int mode; // 0 : d_r 1 : d_th
+    const std::optional<int>& lo;
+    const std::optional<int>& hi;
     const _helper<R,D>& h;
     const R delta;
 
-    using proxy_t =
-      std::tuple<const int, const std::optional<int>&, const std::optional<int>&, const _helper<R,D>& , const Field<R, 3, D> &, const int, R, const int (&)[D], const int (&)[D]>;
-    static constexpr int Prefactor = 6;
-
-    proxy_t operator()(const Field<R, 3, D> &B, const int comp, R prefactor,
-                       const int (&b)[D], const int (&e)[D]) {
-      assert(comp != mode);
+    void d_r(Component<R,D,false>&& output, const Field<R, 3, D> &E, const int comp, R prefactor, const int (&b_in)[D], const int (&e_in)[D]) { // TODOL sematics
       prefactor /= delta;
-      return std::forward_as_tuple(mode,lo,hi,h,B,comp, prefactor,b,e);
-    }
 
-    // \mathscr{h}_r^{-1} = \mathscr{h}_\theta^{-1} = 1 / (e^r \sin \theta),
-    // \mathscr{h}_\phi^{-1} = \sin \theta / e^r
-    // static constexpr bool o_B_off_diag = false;
+      const auto& m = E.mesh();
 
-    static void d_r_dB(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
-      const auto&&[mode,lo,hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
-
-      const auto& m = B.mesh();
-      const int b = b_in[r_];
-      int e = e_in[r_];
-
-      if(lo) { // conductor surface
-        R f = prefactor * 3.0 * h.estag() ;
-        R g0 = - (2.0 / 3.0) / (h.estag() * h.estag());
-        R g2 = -h.estag() * h.estag() / 3.0;
-
-        const auto& s = m.stride(r_);
-        for ( int j = b_in[th_]; j < e_in[th_]; ++j ) {
-          int li_j = m.linear_index(th_, j);
-          for ( int i = b; i < b+1; ++i ) { // NOTE +1 is determined by number of cells needing one-sided derivative
-            int li = li_j + i * s;
-            // The following is O(dr^2) precise.
-            output[li-s] += f * h.fr(i) * (B[comp][li+s] +  g0 * B[comp][li] + g2 * B[comp][li+(s<<1)] );
-          }
-        }
-      }
-
-      if(!hi) e--;
-
-      R f = prefactor * h.estag() ;
+      R f = prefactor / h.estag();
       R g = h.estag() * h.estag();
       for (int j = b_in[th_]; j < e_in[th_]; ++j) {
         int li_j = m.linear_index(th_, j);
-        for (int i = b; i < e; ++i) {
+        for (int i = b_in[r_] + 1; i < e_in[r_]; ++i) {
           int li = li_j + i * m.stride(r_);
-          output[li] += f * h.fr(i) * ( B[comp][li + m.stride(r_)]*g - B[comp][li]);
+          output[li] += f * h.fr(i) * ( E[comp][li] - E[comp][li - m.stride(r_)]*g );
         }
       }
-      // NOTE turns out the forms of dr_dB_th and dr_dB_phi with scales are the same.
-
-      // NOTE at outer boundary, the r derivative of B_\theta is half cell beyond axis, and r derivative of B_\phi is zero. Neither case needs explicit treatment
     }
 
+    void d_th(Component<R,D,false>&& output, const Field<R, 3, D> &E, const int comp, R prefactor, const int (&b_in)[D], const int (&e_in)[D]) { // TODOL sematics
+      prefactor /= delta;
 
-    static void d_th_dB_r(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
-      const auto&&[mode, lo, hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
+      const int b = b_in[th_];
+      const int e = e_in[th_];
 
-      const int b = b_in[th_] + bdry*bool(lo);
-      const int e = e_in[th_] - 1 - bdry*bool(hi);
+      const R f = (phi_ == comp) ? prefactor /( h.estag()* h.estag() ) : prefactor;
 
       auto diff_bdry
-        = [&output, &e, &h, &B, &comp, b_r=b_in[r_], e_r=e_in[r_]]( const R f, const bool lo ) {
-          static_assert(bdry == 1);
-          const auto& m = B.mesh();
-          const int j = lo ? bdry : e;
-          const int li_j = m.linear_index(th_, j);
-          const int y = lo ? 1 : -1;
-          const R sr = h.sin(j + y) / h.sin(j);
-          const R fsr = f * h.sin(j - bool(lo), true) / h.sin(j + y);
+        = [&output, &e, &h=this->h, &E, &comp, b_r=b_in[r_], e_r=e_in[r_], &f]( const bool lo ) {
+          const auto& m = E.mesh();
 
+          const R ff = lo ? 4.0 * f : -4.0 * f;
+          const int y = lo ? 0 : -1;
+
+          const int li_j = m.linear_index(th_, lo ? 0 : e);
           for (int i = b_r; i < e_r; ++i) {
             int li = li_j + i * m.stride(r_);
-            output[li-(lo)*m.stride(th_)] += fsr * h.fr(i) * ( B[comp][li + y * m.stride(th_)] - B[comp][li] * sr );
+            // NOTE order O(dth^2)
+            output[li] += ff * h.fr(i) * E[comp][li + y * m.stride(th_)];
           }
         };
 
-      const R f = prefactor * h.estag() * h.estag();
+      if (phi_ == comp and lo) diff_bdry(true);
 
-      if (lo) diff_bdry( f/3.0, true );
-
-      const auto& m = B.mesh();
-      for (int j = b; j < e; ++j) {
+      const auto& m = E.mesh();
+      const bool inv = (r_ == comp);
+      for (int j = b+1; j < e; ++j) {
         int li_j = m.linear_index(th_, j);
-        R sr = h.sin(j + 1) / h.sin(j);
-        R fsr = f * h.sin(j, true) / h.sin(j + 1);
+        R fsr = f * h.fsin(j, !inv) / h.fsin(j, inv);
+        R sr = h.fsin(j - (!inv), true) / h.fsin(j - inv, true);
         for (int i = b_in[r_]; i < e_in[r_]; ++i) {
           int li = li_j + i * m.stride(r_);
-          output[li] += fsr * h.fr(i) * (B[r_][li + m.stride(th_)] - B[r_][li] * sr) ;
+          output[li] += fsr * h.fr(i) * (E[comp][li] - E[comp][li - m.stride(th_)] * sr);
         }
       }
 
-      if (hi) diff_bdry(-f/3.0, false);
-    }
-
-    static void d_th_dB_phi(Component<R,D,false>&& output, proxy_t&& diff) { // TODOL sematics
-      const auto&&[mode, lo, hi,h,B,comp,prefactor,b_in,e_in] = std::move(diff);
-
-      const auto& m = B.mesh();
-      const int b = b_in[th_];
-      const int e = e_in[th_] - 1;
-
-      const R f = prefactor;
-      for (int j = b; j < e; ++j) {
-        const int li_j = m.linear_index(th_, j);
-        const R sinj0_in = h.sin(j);
-        const R sinj1_in = h.sin(j + 1);
-        const R fsin_inv = f / h.sin(j, true);
-        for (int i = b_in[r_]; i < e_in[r_]; ++i) {
-          int li = li_j + i * m.stride(r_);
-          output[li] += fsin_inv * h.fr(i) *
-            (B[phi_][li + m.stride(th_)] * sinj1_in -
-             B[phi_][li] * sinj0_in);
-        }
-      }
+      if (phi_ == comp and hi) diff_bdry(false);
     }
   };
 
-}
-
-template <typename R, int D>
-void operator+=( field::Component<R, D, false> &&output, typename field::Diff_in_CurlE<R,D>::proxy_t&& diff ) {
-  using namespace field;
-  const int mode = std::get<0>(diff);
-  assert(mode < 2);
-  const int comp = std::get<5>(diff);
-  if (mode == r_)
-    Diff_in_CurlE<R, D>::d_r_dE(std::move(output), std::move(diff));
-  else
-    Diff_in_CurlE<R, D>::d_th_dE(std::move(output), std::move(diff));
-}
-
-template <typename R, int D>
-void operator+=( field::Component<R, D, false> &&output, typename field::Diff_in_CurlB<R,D>::proxy_t&& diff ) {
-  using namespace field;
-  const int mode = std::get<0>(diff);
-  assert(mode < 2);
-  const int comp = std::get<5>(diff);
-  assert(comp == r_ or comp == phi_);
-  if (mode == r_)
-    Diff_in_CurlB<R,D>::d_r_dB(std::move(output), std::move(diff));
-  else if ( comp == r_ )
-    Diff_in_CurlB<R, D>::d_th_dB_r(std::move(output), std::move(diff));
-  else
-    Diff_in_CurlB<R, D>::d_th_dB_phi(std::move(output), std::move(diff));
-}
-
-template <typename R, int D>
-void operator-=(field::Component<R, D, false> &&output,
-                typename field::Diff_in_CurlE<R, D>::proxy_t &&diff) {
-  using namespace field;
-  std::get<Diff_in_CurlE<R,D>::Prefactor>(diff) *= -1;
-  std::move(output) += std::move(diff);
-}
-
-template <typename R, int D>
-void operator-=(field::Component<R, D, false> &&output,
-                typename field::Diff_in_CurlB<R, D>::proxy_t &&diff) {
-  using namespace field;
-  std::get<Diff_in_CurlB<R, D>::Prefactor>(diff) *= -1;
-  std::move(output) += std::move(diff);
 }
 
 namespace field {
   template <typename R, int DGrid>
-  class ortho_coord_transform_t {
-  private:
-    inline void _impl_no_sin( Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h ) const { // TODOL semantics
-      const auto& m = F.mesh();
+  void transform( const std::string& name, Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h ) { // TODOL semantics
+    auto impl = [&](const bool has_sin, const bool ofs_th) {
+      const auto &m = F.mesh();
       for (int j = b_th; j < e_th; ++j) {
         int li_j = m.linear_index(th_, j);
-        for (int i = b_r; i < e_r; ++i) {
-          F[li_j + i*m.stride(r_)] *= h.fr(i);
-        }
-      }
-    }
-
-    inline void _impl_sin( Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool ofs_th ) const { // TODOL semantics
-      const auto& m = F.mesh();
-      for (int j = b_th; j < e_th; ++j) {
-        int li_j = m.linear_index(th_, j);
-        R f = h.sin(j,ofs_th);
+        R f = has_sin ? h.fsin(j, ofs_th) : 1.0;
         for (int i = b_r; i < e_r; ++i) {
           F[li_j + i * m.stride(r_)] *= f * h.fr(i);
         }
       }
-    }
+    };
 
-    inline void _impl_sin_recip( Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool ofs_th ) const { // TODOL semantics
-      const auto& m = F. mesh();
-      for (int j = b_th; j < e_th; ++j) {
-        int li_j = m.linear_index(th_, j);
-        R f = 1.0 / h.sin(j,ofs_th);
-        for (int i = b_r; i < e_r; ++i) {
-          F[li_j + i * m.stride(r_)] *= f * h.fr(i);
-        }
-      }
-    }
-
-    inline void _impl_c2o_B0( Component<R,DGrid,false> B0, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool lo_axis, const bool hi_axis) const { // TODOL semantics
-      const auto& m = B0.mesh();
-      R y = h.estag() * h.estag();
-      auto f_axis = [&]( int j, bool lo ) {
-        int sign = lo ? 1 : -1;
-        j += sign;
-        int li_j = m.linear_index(th_, j);
-        int s = sign * m.stride(th_);
-        const R f = y / (6.0 * std::asin(h.sin(j)) ); // asin(sin(j)) is a trick to get delta theta
-        for (int i = b_r; i < e_r; ++i) {
-          int li = li_j + i * m.stride(r_);
-          auto x = B0[li] + B0[li];
-          x += x;
-          x += x;
-          B0[li - s] = f * h.fr(i) * (x - B0[li + s]);
-        }
-      };
-
-      if ( lo_axis ) f_axis(b_th, true);
-      if (hi_axis) f_axis(e_th-1, false); // NOTE it uses coordinate B0, so must go before the bulk
-
-      for (int j = b_th+lo_axis; j < e_th-hi_axis; ++j) {
-        int li_j = m.linear_index(th_, j);
-        R f = y / h.sin(j);
-        for (int i = b_r; i < e_r; ++i) {
-          B0[li_j + i * m.stride(r_)] *= f * h.fr(i);
-        }
-      }
-    }
-
-  public:
-    inline void ortho2coord( const std::string& name, Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h ) const { // TODOL semantics
-      if ( name == "E0" or name == "E1" or name == "B2")
-        _impl_no_sin(F, b_r,e_r,b_th,e_th,h);
-      else
-        _impl_sin(F, b_r,e_r,b_th,e_th,h, (name != "B0"));
-    }
-
-    inline void coord2ortho( const std::string& name, Component<R,DGrid,false> F, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool lo_axis=false, const bool hi_axis=false ) const { // TODOL semantics
-      if ( name == "E0" or name == "E1" or name == "B2")
-        _impl_no_sin(F, b_r,e_r,b_th,e_th,h);
-      else if ( name != "B0" )
-        _impl_sin_recip(F, b_r,e_r,b_th,e_th,h,true);
-      else
-        _impl_c2o_B0(F, b_r,e_r,b_th,e_th,h,lo_axis,hi_axis );
-    }
-
-    template < typename RJ >
-    inline void prepJ( Field<RJ, 3, DGrid> &J, const int b_r, const int e_r, const int b_th, const int e_th, const _helper<R,DGrid>& h, const bool lo_axis=false, const bool hi_axis=false ) const {
-      // assume h.fr(i) stores r_i.0 to begin with
-      for ( auto& x : h.fr() ) x = 1 / x;
-      _impl_sin_recip(J[0], b_r, e_r, b_th, e_th, h, true);
-      for ( auto& x : h.fr() ) x *= h.estag();
-      _impl_sin_recip(J[1], b_r, e_r, b_th+bool(lo_axis), e_th-bool(hi_axis), h, false);
-      _impl_sin(J[2], b_r, e_r, b_th, e_th, h, true);
-
-      for ( auto& x : h.fr() ) x = 1 / x;
-      // now h.fr(i) stores r_i.5
-    }
-  };
+    if ( name == "B0" or name == "B1" or name == "E2")
+      impl(false, false);
+    else
+      impl(true, (name == "E0"));
+  }
 
   template <typename R, int D>
   inline auto check_boundaries(const apt::Grid<R,D>& grid, R lnr_surf, R lnr_out) {
@@ -401,13 +193,10 @@ namespace field {
                const apt::Grid<R, DGrid> &grid,
                const mpi::CartComm &comm,
                int timestep, R dt) const {
-    // FIXME not using range
-
     static_assert(DGrid == 2);
     // NOTE E,B,J are assumed to have been synced, and have same mesh
 
     const R alpha = std::min<R>(_alpha, 1.0);
-    const R beta = 1.0 - alpha;
 
     const auto[surf, outer, lo_axis, hi_axis] = check_boundaries(grid,_surface,_outer);
 
@@ -416,145 +205,109 @@ namespace field {
                      (lo_axis ? *lo_axis : mesh.range(th_).far_begin() )   };
     int e[DGrid] = { (outer ? *outer : mesh.range(r_).far_end()),
                      (hi_axis ? *hi_axis : mesh.range(th_).far_end())   };
-    // NOTE the hi_axis is included
+    // NOTE b,e are defined as that of B_\phi
 
-    if (!hopt<R,DGrid>) {
-      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
-      hopt<R,DGrid>.emplace(grid, b[r_] - bool(surf), e_r_max, b[th_], e[th_]);
-    }
+    const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
+    _helper<R, DGrid> h{grid, b[r_] - bool(surf), e_r_max, b[th_], e[th_]};
 
-    const auto &h = *(hopt<R,DGrid>);
-    const ortho_coord_transform_t<R,DGrid> tr;
-    {
-      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
-      for ( int i = b[r_]-bool(surf); i < e_r_max; ++i )
-        h.fr(i) = std::exp(grid[r_].absc(i));
-      tr.ortho2coord("E0", E[0], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      tr.prepJ(J,b[r_] - bool(surf), e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis) );
-      // for ( auto& x : h.fr() ) x /= h.estag();
-      // assert now h.fr(i) stores r_i.5
-      tr.ortho2coord("E1", E[1], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
-      tr.ortho2coord("E2", E[2], b[r_]-bool(surf), e_r_max, b[th_], e[th_]-bool(hi_axis), h); // FIXME transform r_out as well?
-      for (auto &x : h.fr() ) x *= x;
-      tr.ortho2coord("B0", B[0], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
-      R y = h.estag() * h.estag();
-      for (auto &x : h.fr()) x *= y;
-      tr.ortho2coord("B1", B[1], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      tr.ortho2coord("B2", B[2], b[r_], e_r_max, b[th_], e[th_], h);
-      // NOTE assert: now h.fr stores (r_i.0)^2
-    }
+    auto tr = [&](R estag, const int e_r_max) {
+      transform("B1", B[1], b[r_], e_r_max, b[th_], e[th_] - bool(hi_axis), h);
+      transform("B2", B[2], b[r_], e_r_max, b[th_], e[th_], h);
+      for (auto &x : h.fr()) x *= estag;
+      transform("B0", B[0], b[r_] - bool(surf), e_r_max, b[th_], e[th_], h);
 
+      for (auto &x : h.fr()) x *= x;
+      transform("E1", E[1], b[r_] - bool(surf), e_r_max, b[th_], e[th_], h);
+      transform("E2", E[2], b[r_] - bool(surf), e_r_max, b[th_], e[th_] - bool(hi_axis), h);
+      estag *= estag;
+      for (auto &x : h.fr()) x /= estag;
+      transform("E0", E[0], b[r_], e_r_max, b[th_], e[th_] - bool(hi_axis), h);
+    };
+    tr(h.estag(), e_r_max);
     for (auto &x : h.fr()) x = 1.0 / x;
+    // NOTE assert: now h.fr stores (r_i.0)^-2
 
-    const auto dlnr = grid[r_].delta();
-    const auto dth = grid[th_].delta();
-
-    Diff_in_CurlE<R, DGrid> diff_r{r_, surf, outer, dlnr};
-    Diff_in_CurlE<R, DGrid> diff_th{th_, lo_axis, hi_axis, dth};
-    Diff_in_CurlB<R, DGrid> diffh_r{r_, surf, outer, h, dlnr};
-    Diff_in_CurlB<R, DGrid> diffh_th{th_, lo_axis, hi_axis, h, dth};
-
-    auto after_curlE =
-      [&surf,&lo_axis]( auto& b) {
-        if (!surf) b[r_]++;
-        if (!lo_axis) b[th_]++;
-      };
-    auto after_curlB =
-      [&outer, &hi_axis](auto &e) {
-        if (!outer) e[r_]--;
-        if (!hi_axis) e[th_]--;
-      };
+    Diff_in_CurlB<R, DGrid> diff_r{r_, surf, outer, grid[r_].delta()};
+    Diff_in_CurlB<R, DGrid> diff_th{th_, lo_axis, hi_axis, grid[th_].delta()};
+    Diff_in_CurlE<R, DGrid> diffk_r{r_, surf, outer, h, grid[r_].delta()};
+    Diff_in_CurlE<R, DGrid> diffk_th{th_, lo_axis, hi_axis, h, grid[th_].delta()};
 
     auto mul_absorb =
-      []( auto& output, const auto& input, auto factor, const auto&b, const auto& e ){
+      []( auto& output, const auto& input, auto factor ){
+        // assume input and output have same mesh
         const auto& m = input.mesh();
         for ( int c = 0; c < 3; ++c ) {
-          for (int j = b[th_]; j < e[th_]; ++j) {
-            int li_j = m.linear_index(th_,j);
-            for (int i = b[r_]; i < e[r_]; ++i) {
-              int li = li_j + i * m.stride(r_);
-              output[c][li] += factor * input[c][li];
-            }
-          }
+          for ( std::size_t i = 0; i < input[c].data().size(); ++i )
+            output[c].data()[i] += factor * input[c].data()[i];
         }
       };
 
-    auto absorb_curl
-      = [&diff_r, &diff_th,&after_curlE,hi=bool(hi_axis),surf=bool(surf)](auto &F, const auto &E, auto factor, auto &b, auto &e) {
+    auto absorb_curlk
+      = [&diffk_r, &diffk_th,lo=bool(lo_axis),hi=bool(hi_axis),surf=bool(surf)](auto &F, const auto &E, const auto factor, auto &b, auto &e) {
       b[r_] -= surf;
-      F[r_] += diff_th(E, phi_, factor, b, e);
       e[th_] -= hi;
-      F[th_] -= diff_r(E, phi_, factor, b, e);
+      diffk_th.d_th(F[r_], E, phi_, factor, b, e);
+      diffk_r.d_r(F[th_], E, phi_, -factor, b, e);
       e[th_] += hi;
-      F[phi_] += diff_r(E, th_, factor, b, e);
+      diffk_r.d_r(F[phi_], E, th_, factor, b, e); // NOTE d_r E_th is NOT enforced to be zero on higher axis
       b[r_] += surf;
-      F[phi_] -= diff_th(E, r_, factor, b, e);
-      after_curlE(b);
+      e[th_] -= hi;
+      diffk_th.d_th(F[phi_], E, r_, -factor, b, e);
+      e[th_] += hi;
+
+      if (!surf) b[r_]++;
+      if (!lo) b[th_]++;
     };
 
-    auto absorb_curlh
-      = [&diffh_r, &diffh_th,&after_curlB,hi=bool(hi_axis),surf=bool(surf)](auto &F, const auto &B, auto factor, auto &b, auto &e) {
-      F[r_] += diffh_th(B, phi_, factor, b, e);
-      F[th_] -= diffh_r(B, phi_, factor, b, e);
+    auto absorb_curl
+      = [&diff_r, &diff_th,hi=bool(hi_axis),surf=bool(surf),outer=bool(outer)](auto &F, const auto &B, const auto factor, auto &b, auto &e) {
+      diff_th.d(F[r_], B, phi_, factor, b, e);
+      diff_r.d(F[th_], B, phi_, -factor, b, e); // NOTE d_r B_phi is NOT enforced to be zero on higher axis
       e[th_] -= hi;
-      F[phi_] += diffh_r(B, th_, factor, b, e);
+      diff_r.d(F[phi_], B, th_, factor, b, e);
       e[th_] += hi;
       b[r_] -=surf;
-      F[phi_] -= diffh_th(B, r_, factor, b, e);
+      diff_th.d(F[phi_], B, r_, -factor, b, e);
       b[r_] +=surf;
-      after_curlB(e);
-    };
 
-    const bool beta_neq_0 = (beta > 1e-8);
+      if (!outer) e[r_]--;
+      if (!hi) e[th_]--;
+    };
 
     for (int c = 0; c < 3; ++c) {
       auto f = -_fourpi * dt;
-      for (auto &x : J[c].data())
-        x *= f;
+      for (auto &x : J[c].data()) x *= f;
     }
 
     Field<R, 3, DGrid> C (mesh);
-    absorb_curl(C,E,1.0, b,e); // Eq(*)
+    absorb_curlk(C,E,1.0, b,e);
 
-    if (beta_neq_0) {
-      mul_absorb(B, C, -alpha * beta * dt, b, e);
-    } else { // undo after_curlE in Eq(*) for the sake of Eq(**)
-      if (!surf) b[r_]--;
-      if (!lo_axis) b[th_]--;
+    mul_absorb(B, C, -alpha * dt);
+    absorb_curl( J, B, dt, b, e );
+    mul_absorb(B, C, (alpha-(1.0 - alpha)) * dt);
+
+    mul_absorb(E, J, 1.0);
+    for (int i = std::max(_op_inv_precision, 1); i != 1; --i) {
+      C.reset();
+      absorb_curlk(C,J,1.0,b,e);
+      J.reset();
+      absorb_curl(J, C, -(alpha * alpha * dt * dt), b, e);
+      mul_absorb(E, J, 1.0);
     }
-    absorb_curlh ( J, B, dt, b, e ); // Eq(**)
-    mul_absorb(E, J, 1.0, b, e );
-    if (beta_neq_0) mul_absorb(B, C, -beta*beta*dt, b,e);
+    C.reset();
+    absorb_curlk(C,J,1.0,b,e);
+    absorb_curl(E, C, -(alpha * alpha * dt * dt), b, e);
 
-    for (int i = std::max(_op_inv_precision, 1); i != 0; --i) {
-      absorb_curl(C,J,1.0,b,e);
-      if ( i != 1 ) {
-        J.reset();
-        absorb_curlh(J, C, -(alpha * alpha * dt * dt), b, e);
-        mul_absorb(E, J, 1.0, b, e);
-        C.reset(); // crucial to place it here
-      } else {
-        // last iteration
-        absorb_curlh(E, C, -(alpha * alpha * dt * dt), b, e);
-      }
-    }
-
-    absorb_curl(B,E,-(alpha * dt), b,e);
+    absorb_curlk(B,E,-(alpha * dt), b,e);
     // NOTE sync E B is done outside
 
     {
       // NOTE: assert: h.fr contains 1 / (r_i.0)^2
-      const int e_r_max = outer ? mesh.range(r_).far_end() : e[r_];
-      tr.coord2ortho("B0", B[0], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h, bool(lo_axis), bool(hi_axis));
-      tr.coord2ortho("B1", B[1], b[r_], e_r_max, b[th_], e[th_], h);
-      tr.coord2ortho("B2", B[2], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      for ( auto& x : h.fr() ) x = std::sqrt(x);
-      tr.coord2ortho("E0", E[0], b[r_], e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      for (auto &x : h.fr() ) x *= h.estag();
-      tr.coord2ortho("E1", E[1], b[r_]-bool(surf), e_r_max, b[th_], e[th_], h);
-      tr.coord2ortho("E2", E[2], b[r_]-bool(surf), e_r_max, b[th_], e[th_]-bool(hi_axis), h);
-      // NOTE assert: now h.fr stores (r_i)^2 at integer cells
+      for (auto &x : h.fr()) x = std::sqrt(x);
+      for (auto &x : h.fsin()) {
+        x = (std::abs(x) < 0.5 * 0.5 * grid[th_].delta()) ? 0.0 : 1.0 / x;
+      }
+      tr(1/h.estag(), outer ? mesh.range(r_).far_end() : e[r_]);
     }
-
   }
 }
