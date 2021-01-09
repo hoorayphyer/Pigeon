@@ -66,7 +66,7 @@ namespace pic {
 namespace pic {
   constexpr int field_op_inv_precision = 4;
   constexpr int myguard = std::max(
-      ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision, false),
+      ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision),
       (pic::ShapeF::support() + 3) / 2); // NOTE minimum number of guards of J
                                          // on one side is ( supp + 3 ) / 2
 
@@ -74,11 +74,19 @@ namespace pic {
     return std::min<real_t>( time / spinup_time, 1.0 ) * Omega;
   }
 
+  constexpr int pole = 1;
+
   real_t B_r_star( real_t lnr, real_t theta, real_t , real_t ) noexcept {
-    return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
+    if constexpr( pole == 2 )
+      return pic::mu * 2.0 * std::cos(theta) * std::exp(-3.0 * lnr);
+    else
+      return pic::mu * std::exp(-2.0 * lnr);
   }
   real_t B_theta_star( real_t lnr, real_t theta, real_t , real_t ) noexcept {
-    return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
+    if constexpr( pole == 2 )
+      return pic::mu * std::sin(theta) * std::exp(-3.0 * lnr);
+    else
+      return 0;
   }
   constexpr real_t B_phi_star( real_t, real_t, real_t , real_t ) noexcept {
     return 0;
@@ -86,10 +94,16 @@ namespace pic {
 
   real_t E_r_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
     real_t sin = std::sin(theta);
-    return pic::mu * omega_spinup(time) * std::exp(- 2 * lnr) * sin * sin;
+    if constexpr( pole == 2 )
+      return pic::mu * omega_spinup(time) * std::exp(-2 * lnr) * sin * sin;
+    else
+    return 0;
   }
   real_t E_theta_star( real_t lnr, real_t theta, real_t , real_t time ) noexcept {
-    return - pic::mu * omega_spinup(time) * std::exp(- 2 * lnr ) * std::sin( 2*theta );
+    if constexpr( pole == 2 )
+      return -pic::mu * omega_spinup(time) * std::exp(-2 * lnr) * std::sin(2 * theta);
+    else
+      return - pic::mu * omega_spinup(time) * std::exp(- lnr ) * std::sin( theta );
   }
   constexpr real_t E_phi_star( real_t, real_t, real_t , real_t ) noexcept {
     return 0;

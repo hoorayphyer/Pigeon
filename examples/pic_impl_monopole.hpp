@@ -101,7 +101,7 @@ namespace pic {
 
   constexpr int field_op_inv_precision = 4;
   constexpr int myguard = std::max(
-                                   ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision, false),
+                                   ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision),
                                    (pic::ShapeF::support() + 3) / 2); // NOTE minimum number of guards of J on one side is ( supp + 3 ) / 2
 
   real_t omega_spinup ( real_t time ) noexcept {
@@ -144,7 +144,6 @@ namespace pic {
       }
     }
   }
-  // TODOL annihilation will affect deposition // NOTE one can deposit in the end
 }
 
 namespace pic {
@@ -544,22 +543,7 @@ namespace pic {
           for ( int i = 0; i < DGrid; ++i )
             q[i] = grid[i].absc(I[i], 0.5);
 
-          Vec3 nB {};
-          { // make nB centered in the cell
-            const auto& m = B.mesh();
-            auto li = m.linear_index(I);
-            if constexpr (DGrid == 2) {
-                nB[0] = 0.5_r * ( B[0][li] + B[0][li + m.stride(1)] );
-                nB[1] = 0.5_r * ( B[1][li] + B[1][li + m.stride(0)] );
-                nB[2] = 0.25_r * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
-              } else if (DGrid == 3){
-              nB[0] = 0.25_r * ( B[0][li] + B[0][li + m.stride(1)] + B[0][li + m.stride(2)] + B[0][li + m.stride(1) + m.stride(2)] );
-              nB[1] = 0.25_r * ( B[1][li] + B[1][li + m.stride(2)] + B[1][li + m.stride(0)] + B[1][li + m.stride(2) + m.stride(0)] );
-              nB[2] = 0.25_r * ( B[2][li] + B[2][li + m.stride(0)] + B[2][li + m.stride(1)] + B[2][li + m.stride(0) + m.stride(1)] );
-            }
-            if ( apt::abs(nB) == 0.0_r ) nB = {1.0_r, 0.0_r, 0.0_r}; // use radial direction as default
-            else nB /= apt::abs(nB);
-          }
+          Vec3 nB {1.0_r, 0.0_r, 0.0_r};
 
           Vec3 p{};
           p[2] = _omega_t( timestep * dt ) * std::exp(q[0]) * std::sin(q[1]); // corotating
@@ -697,7 +681,6 @@ namespace pic {
                         ) const {
         for ( const auto& I : apt::Block(apt::range::begin(*this),apt::range::end(*this)) ) {
           B[0](I) = B_r_star( grid[0].absc(I[0], 0.5 * B[0].offset()[0]), grid[1].absc(I[1], 0.5 * B[0].offset()[1]), 0, 0 );
-          B[1](I) = B_theta_star( grid[0].absc(I[0], 0.5 * B[1].offset()[0]), grid[1].absc(I[1], 0.5 * B[1].offset()[1]), 0, 0 );
         }
       }
 
