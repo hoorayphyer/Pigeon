@@ -238,7 +238,7 @@ namespace pic {
       auto &fu = fu_cond;
 
       fu.setName("RotatingConductor");
-      fu[0] = {0, star_interior};
+      fu[0] = {-myguard, star_interior};
       fu[1] = {0, pic::supergrid[1].dim() + 1};
 
       fu.set_E_cond({E_r_star, E_theta_star, E_phi_star});
