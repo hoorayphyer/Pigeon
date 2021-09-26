@@ -17,9 +17,9 @@ The technique to scientifically (as well as artistically) portrait the above is 
 * written in progressively modern-er C++
 * data saved with [HDF5](https://en.wikipedia.org/wiki/Hierarchical_Data_Format)
 * TDD with ample unit tests using [Catch2](https://github.com/catchorg/Catch2)
-* fully parallelized using [MPI](https://en.wikipedia.org/wiki/Message_Passing_Interface), and has successfully run using 120
-octacosa-core(28-core) Intel Broadwell processors on the Pleiades
-supercomputer at NASA’s Ames Research Center
+* fully parallelized using [MPI](https://en.wikipedia.org/wiki/Message_Passing_Interface). Successful large scale runs include
+    * 120 28-core Intel Broadwell processors on the Pleiades supercomputer at NASA’s Ames Research Center
+    * 500 24-core Intel Haswell processors on the Pleiades supercomputer at NASA’s Ames Research Center
 * achieves virtually perfect load balancing by overlaying the traditional
 Cartesian topology with a [primary/replica](https://en.wikipedia.org/wiki/Master/slave_(technology)) paradigm
 * supports simulation resumption
