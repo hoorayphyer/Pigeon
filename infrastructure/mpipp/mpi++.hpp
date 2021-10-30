@@ -86,6 +86,8 @@ class Topo {
       : _signed_dim(periodic ? -std::abs(dim) : std::abs(dim)) {}
   constexpr Topo(int dim) : _signed_dim(dim) {}
 
+  bool operator==(const Topo& other) const = default;
+
   constexpr int dim() const noexcept { return std::abs(_signed_dim); }
   constexpr bool periodic() const noexcept { return _signed_dim < 0; }
   constexpr int signed_dim() const noexcept { return _signed_dim; }

@@ -44,27 +44,16 @@ void permute(std::vector<T>& perm, F f) {
   }
 }
 
-template <typename T, int DGrid, template <typename> class Spec>
-void sort(array<T, Spec>& ptcs, const apt::Grid<T, DGrid>& grid) {
+template <typename T, template <typename> class Spec, typename Comp>
+void sort(array<T, Spec>& ptcs, const Comp& comp) {
   erase_nonexist(ptcs);
 
   std::vector<std::size_t> perm(ptcs.size());
   for (std::size_t i = 0; i < perm.size(); ++i) perm[i] = i;
 
-  constexpr T tile = 1.0;
-
-  auto comp = [&](const std::size_t& a, const std::size_t& b) {
-    for (int c = 0; c < Spec<T>::Dim; ++c) {
-      auto diff = (ptcs[a].q(c) - ptcs[b].q(c)) / grid[c].delta();
-      if (diff < -tile) return true;
-      if (diff > tile) return false;
-    }
-    return false;
-  };
-
   std::sort(perm.begin(), perm.end(), comp);
 
-  auto f = [&ptcs](std::size_t a, std::size_t b) mutable {
+  auto f = [&ptcs](std::size_t a, std::size_t b) {
     for (int c = 0; c < Spec<T>::Dim; ++c)
       std::swap(ptcs[a].q(c), ptcs[b].q(c));
     for (int c = 0; c < Spec<T>::Dim; ++c)
@@ -74,6 +63,35 @@ void sort(array<T, Spec>& ptcs, const apt::Grid<T, DGrid>& grid) {
   };
 
   permute(perm, f);
+}
+
+template <typename T, int DGrid, template <typename> class Spec>
+void sort(array<T, Spec>& ptcs, const apt::Grid<T, DGrid>& grid) {
+  auto comp = [&](const std::size_t& a, const std::size_t& b) {
+    constexpr T tile = 1.0;
+    for (int c = 0; c < Spec<T>::Dim; ++c) {
+      auto diff = (ptcs[a].q(c) - ptcs[b].q(c)) / grid[c].delta();
+      if (diff < -tile) return true;
+      if (diff > tile) return false;
+    }
+    return false;
+  };
+
+  sort(ptcs, comp);
+}
+
+template <typename T, template <typename> class Spec>
+void sort(array<T, Spec>& ptcs) {
+  auto comp = [&](const std::size_t& a, const std::size_t& b) {
+    for (int c = 0; c < Spec<T>::Dim; ++c) {
+      auto diff = ptcs[a].q(c) - ptcs[b].q(c);
+      if (diff < 0.0) return true;
+      if (diff > 0.0) return false;
+    }
+    return false;
+  };
+
+  sort(ptcs, comp);
 }
 }  // namespace particle
 
