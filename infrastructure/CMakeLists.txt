@@ -12,7 +12,7 @@ if (${ENABLE_TESTS})
 endif()
 
 # Set CXX flags
-set(CMAKE_CXX_FLAGS_RELEASE_INIT "-std=c++17 -pthread -O3 -g -DNDEBUG -Wall -Wextra -fPIC ${CXX_EXTRA_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE_INIT "-std=c++20 -pthread -O3 -g -DNDEBUG -Wall -Wextra -fPIC ${CXX_EXTRA_FLAGS}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   string(APPEND CMAKE_CXX_FLAGS_RELEASE_INIT "-xHost -no-prec-div")
 else()
