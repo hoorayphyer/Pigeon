@@ -1,12 +1,12 @@
-#include "testfw/testfw.hpp"
 #include "apt/csi.hpp"
+#include "testfw/testfw.hpp"
 
 using namespace apt;
 
 // comma-separated-integer
-TEMPLATE_TEST_CASE("Test csi", "[apt]" , int, long, long long) {
+TEMPLATE_TEST_CASE("Test csi", "[apt]", int, long, long long) {
   using T = TestType;
-  T x {};
+  T x{};
   SECTION("beginning zeros") {
     x = 1024;
     CHECK(csi(x) == "1,024");
@@ -45,7 +45,7 @@ TEMPLATE_TEST_CASE("Test csi", "[apt]" , int, long, long long) {
     x = 859376147;
     CHECK(csi(x) == "859,376,147");
 
-    if ( !std::is_same_v<T,int> ) {
+    if (!std::is_same_v<T, int>) {
       x = 2859376147;
       CHECK(csi(x) == "2,859,376,147");
       x = 22859376147;
@@ -92,7 +92,7 @@ TEMPLATE_TEST_CASE("Test csi", "[apt]" , int, long, long long) {
     x = -859376147;
     CHECK(csi(x) == "-859,376,147");
 
-    if ( !std::is_same_v<T,int> ) {
+    if (!std::is_same_v<T, int>) {
       x = -2859376147;
       CHECK(csi(x) == "-2,859,376,147");
       x = -22859376147;

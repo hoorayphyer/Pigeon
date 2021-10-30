@@ -1,8 +1,8 @@
 #ifndef _FIELDS_H_
 #define _FIELDS_H_
 
-#include "MultiArray.h"
 #include "Grid.h"
+#include "MultiArray.h"
 
 /// This is the base class for fields living on a grid. It maintains a
 /// \ref Grid object and caches its linear size. It also implements a
@@ -27,8 +27,8 @@ class FieldBase {
   Extent extent() const { return _grid.extent(); }
 
  protected:
-  Grid _grid;  ///< Grid that this field lives on
-  int _gridSize;    //!< Cache the grid size for easier retrieval
+  Grid _grid;     ///< Grid that this field lives on
+  int _gridSize;  //!< Cache the grid size for easier retrieval
 
   void check_grid_extent(const Extent& ext1, const Extent& ext2);
 };  // ----- end of class FieldBase -----
@@ -53,8 +53,8 @@ class ScalarField : public FieldBase {
   void initialize();
   void assign(data_type value);
   void copyFrom(const self_type& field);
-  self_type& operator = ( const self_type& field);
-  self_type& operator = ( self_type&& field);
+  self_type& operator=(const self_type& field);
+  self_type& operator=(self_type&& field);
 
   void resize(const Grid& grid);
 
@@ -98,7 +98,7 @@ class VectorField : public FieldBase {
   virtual ~VectorField();
 
   self_type& operator=(const self_type& field);
-  self_type& operator=( self_type&& field);
+  self_type& operator=(self_type&& field);
 
   /// Core functions
   void initialize();
@@ -136,15 +136,15 @@ class VectorField : public FieldBase {
 
 inline Index GetStagProperty(FieldType type, int comp) {
   if (0 == comp) {
-      return FieldType::ETYPE == type ? Index(1,0,0) : Index(0,1,1);
+    return FieldType::ETYPE == type ? Index(1, 0, 0) : Index(0, 1, 1);
   } else if (1 == comp) {
-      return FieldType::ETYPE == type ? Index(0,1,0) : Index(1,0,1);
+    return FieldType::ETYPE == type ? Index(0, 1, 0) : Index(1, 0, 1);
   } else {
-      return FieldType::ETYPE == type ? Index(0,0,1) : Index(1,1,0);
+    return FieldType::ETYPE == type ? Index(0, 0, 1) : Index(1, 1, 0);
   }
 }
 
-inline int DirIncrement (int dir, const Extent& ext) {
+inline int DirIncrement(int dir, const Extent& ext) {
   switch (dir) {
     case 0:
       return 1;

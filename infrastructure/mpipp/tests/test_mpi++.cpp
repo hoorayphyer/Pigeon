@@ -1,19 +1,20 @@
-#include "testfw/testfw.hpp"
 #include "mpipp/mpi++.hpp"
+#include "testfw/testfw.hpp"
 
 using namespace mpi;
 
 SCENARIO("World", "[parallel][mpi]") {
-  if ( world.size() >= 2 ) {
+  if (world.size() >= 2) {
     int myrank = world.rank();
-    // std::cout << "world size = " << world.size() << " ," << myrank << std::endl;
-    if ( 0 == myrank ) {
+    // std::cout << "world size = " << world.size() << " ," << myrank <<
+    // std::endl;
+    if (0 == myrank) {
       int msg = 147;
-      world.send( 1, 22, &msg );
-    } else if ( 1 == myrank) {
+      world.send(1, 22, &msg);
+    } else if (1 == myrank) {
       int msg;
-      world.recv( 0, 22, &msg, 1 );
-      REQUIRE( msg == 147 );
+      world.recv(0, 22, &msg, 1);
+      REQUIRE(msg == 147);
     }
   }
   world.barrier();
@@ -43,18 +44,18 @@ SCENARIO("World", "[parallel][mpi]") {
 // }
 
 SCENARIO("Comm", "[parallel][mpi]") {
-  auto comm_opt = world.split( true );
-  REQUIRE( comm_opt );
+  auto comm_opt = world.split(true);
+  REQUIRE(comm_opt);
   auto& comm = *comm_opt;
-  if ( world.size() >= 2 ) {
+  if (world.size() >= 2) {
     int myrank = comm.rank();
-    if ( 0 == myrank ) {
+    if (0 == myrank) {
       int msg = 147;
-      comm.send( 1, 22, &msg );
-    } else if ( 1 == myrank ) {
+      comm.send(1, 22, &msg);
+    } else if (1 == myrank) {
       int msg;
-      comm.recv( 0, 22, &msg, 1 );
-      REQUIRE( 147 == msg );
+      comm.recv(0, 22, &msg, 1);
+      REQUIRE(147 == msg);
     }
   }
   world.barrier();
@@ -85,39 +86,38 @@ SCENARIO("Comm", "[parallel][mpi]") {
 
 SCENARIO("intra P2P communications", "[parallel][mpi]") {
   SECTION("Nonblocking") {
-    if ( world.size() >= 2 ) {
-
+    if (world.size() >= 2) {
       SECTION("one sided communication, test on wait") {
-        if ( world.rank() == 0 ) {
+        if (world.rank() == 0) {
           int send_msg = 351;
-          Request req = world.Isend( 1, 147, &send_msg, 1 );
+          Request req = world.Isend(1, 147, &send_msg, 1);
           mpi::wait(req);
-        } else if ( world.rank() == 1 ) {
+        } else if (world.rank() == 1) {
           int recv_msg;
-          Request req = world.Irecv( 0, 147, &recv_msg, 1 );
+          Request req = world.Irecv(0, 147, &recv_msg, 1);
           mpi::wait(req);
-          REQUIRE( recv_msg == 351 );
+          REQUIRE(recv_msg == 351);
         }
         world.barrier();
       }
 
       SECTION("double sided communication, test on waitall") {
-        if ( world.rank() < 2 ) {
+        if (world.rank() < 2) {
           std::vector<Request> reqs(2);
           int myrank = world.rank();
           int send_msg = myrank + 147;
-          reqs[0] = world.Isend( 1 - myrank, 147, &send_msg, 1 );
+          reqs[0] = world.Isend(1 - myrank, 147, &send_msg, 1);
           int recv_msg = -1;
-          reqs[1] = world.Irecv( 1 - myrank, 147, &recv_msg, 1 );
+          reqs[1] = world.Irecv(1 - myrank, 147, &recv_msg, 1);
           waitall(reqs);
-          REQUIRE( send_msg == myrank + 147 );
-          REQUIRE( recv_msg == 1 - myrank + 147 );
+          REQUIRE(send_msg == myrank + 147);
+          REQUIRE(recv_msg == 1 - myrank + 147);
         }
         world.barrier();
       }
 
       SECTION("test wait on null requests") {
-        if ( world.rank() == 0  ) {
+        if (world.rank() == 0) {
           Request req;
           mpi::wait(req);
 
@@ -132,24 +132,22 @@ SCENARIO("intra P2P communications", "[parallel][mpi]") {
 
 SCENARIO("intra collective communications", "[parallel][mpi]") {
   SECTION("allreduce") {
-    auto rw_opt = aio::reduced_world(4,world);
-    if(rw_opt) {
+    auto rw_opt = aio::reduced_world(4, world);
+    if (rw_opt) {
       auto& rw = *rw_opt;
       WHEN("out of place") {
         std::vector<int> buf(100, rw.rank());
         auto res = rw.allreduce(mpi::by::SUM, buf.data(), buf.size());
         REQUIRE(bool(res));
-        for ( auto x : buf )
-          REQUIRE(x == rw.rank());
-        for ( auto x : *res )
-          REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
+        for (auto x : buf) REQUIRE(x == rw.rank());
+        for (auto x : *res) REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
       }
       WHEN("in place") {
         std::vector<int> buf(100, rw.rank());
-        auto res = rw.allreduce<mpi::IN_PLACE>(mpi::by::SUM, buf.data(), buf.size());
+        auto res =
+            rw.allreduce<mpi::IN_PLACE>(mpi::by::SUM, buf.data(), buf.size());
         REQUIRE(!res);
-        for (auto x : buf)
-          REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
+        for (auto x : buf) REQUIRE(x == rw.size() * (rw.size() - 1) / 2);
       }
     }
     world.barrier();
@@ -158,12 +156,11 @@ SCENARIO("intra collective communications", "[parallel][mpi]") {
   SECTION("broadcast") {
     auto rw_opt = aio::reduced_world(4, world);
     if (rw_opt) {
-      auto &rw = *rw_opt;
+      auto& rw = *rw_opt;
       std::vector<int> buf(100, rw.rank());
       const int root = 2;
       rw.broadcast(root, buf.data(), buf.size());
-      for (auto x : buf)
-        REQUIRE(x == root);
+      for (auto x : buf) REQUIRE(x == root);
     }
     world.barrier();
   }
@@ -171,13 +168,12 @@ SCENARIO("intra collective communications", "[parallel][mpi]") {
   SECTION("Ibroadcast") {
     auto rw_opt = aio::reduced_world(4, world);
     if (rw_opt) {
-      auto &rw = *rw_opt;
+      auto& rw = *rw_opt;
       std::vector<int> buf(100, rw.rank());
       const int root = 2;
       auto req = rw.Ibroadcast(root, buf.data(), buf.size());
       wait(req);
-      for (auto x : buf)
-        REQUIRE(x == root);
+      for (auto x : buf) REQUIRE(x == root);
     }
     world.barrier();
   }
@@ -185,21 +181,20 @@ SCENARIO("intra collective communications", "[parallel][mpi]") {
 
 SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
   SECTION("each comm has one member") {
-    if ( world.size() >= 2 && world.rank() < 2 ) {
+    if (world.size() >= 2 && world.rank() < 2) {
       int myrank = world.rank();
-      InterComm inter( self, 0, {world}, 1-myrank, 147 );
-      if ( 0 == myrank ) {
+      InterComm inter(self, 0, {world}, 1 - myrank, 147);
+      if (0 == myrank) {
         int msg = 147;
-        inter.send( 0, 22, &msg, 1 );
-      } else if ( 1 == myrank ) {
+        inter.send(0, 22, &msg, 1);
+      } else if (1 == myrank) {
         int msg;
-        inter.recv( 0, 22, &msg, 1 );
+        inter.recv(0, 22, &msg, 1);
         REQUIRE(msg == 147);
       }
     }
     world.barrier();
   }
-
 }
 
 // TODO
@@ -222,7 +217,7 @@ SCENARIO("intercomm P2P communications", "[parallel][mpi]") {
 
 SCENARIO("cartesian communicator", "[parallel][mpi]") {
   WHEN("1x1 and periodic") {
-    if ( world.rank() == 0 ) {
+    if (world.rank() == 0) {
       CartComm cart(self, {1, 1}, {true, true});
       for (int i = 0; i < 2; ++i) {
         auto [src_rank, dest_rank] = cart.shift(i, 1);
@@ -241,7 +236,7 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
   constexpr int Nth = 4;
   auto rw_opt = aio::reduced_world(Nr * Nth, world);
   if (rw_opt) {
-    auto &rw = *rw_opt;
+    auto& rw = *rw_opt;
 
     CartComm cart(rw, {Nr, Nth}, {true, true});
 
@@ -249,17 +244,17 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
     std::vector<int> coords_top_right{1, 3};
 
     auto sub_cart = cart.sub(coords_bottom_left, coords_top_right);
-    std::vector<int> msg {-1,-1,-1,-1,-1,-1,-1};
+    std::vector<int> msg{-1, -1, -1, -1, -1, -1, -1};
     msg[0] = bool(sub_cart);
     {
       auto c = cart.coords();
       msg[1] = c[0];
       msg[2] = c[1];
     }
-    if ( sub_cart ) {
+    if (sub_cart) {
       std::vector<int> crds;
       std::vector<Topo> topos;
-      std::tie(crds,topos) = sub_cart -> coords_topos();
+      std::tie(crds, topos) = sub_cart->coords_topos();
       msg[3] = crds[0];
       msg[4] = crds[1];
       msg[5] = topos[0].signed_dim();
@@ -267,10 +262,10 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
     }
 
     auto buf_opt = cart.gather(0, msg.data(), msg.size());
-    REQUIRE( bool(buf_opt) == bool(cart.rank() == 0) );
-    if ( buf_opt ) {
+    REQUIRE(bool(buf_opt) == bool(cart.rank() == 0));
+    if (buf_opt) {
       const auto& buf = *buf_opt;
-      for ( int i = 0; i < cart.size(); ++i ) {
+      for (int i = 0; i < cart.size(); ++i) {
         const auto* p = buf.data() + i * msg.size();
         const auto is_in = p[0];
         const auto cr = p[1];
@@ -284,7 +279,7 @@ SCENARIO("cartesian sub", "[parallel][mpi]") {
         REQUIRE(is_in ==
                 (coords_bottom_left[0] <= cr and cr < coords_top_right[0] and
                  coords_bottom_left[1] <= cth and cth < coords_top_right[1]));
-        if ( not is_in ) {
+        if (not is_in) {
           REQUIRE(sub_cr == -1);
           REQUIRE(sub_cth == -1);
           REQUIRE(sub_topo_r == -1);

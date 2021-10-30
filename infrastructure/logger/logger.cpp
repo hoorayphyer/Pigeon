@@ -1,13 +1,13 @@
 #include "logger/logger.hpp"
 
 namespace lgr {
-  std::string indent{};
+std::string indent{};
 
-  ofstream<> file;
-  ofstream<> debug;
+ofstream<> file;
+ofstream<> debug;
 
-  std::ostream& out = std::cout;
-  std::ostream& err = std::cerr;
+std::ostream& out = std::cout;
+std::ostream& err = std::cerr;
 
-  std::ostringstream str;
-}
+std::ostringstream str;
+}  // namespace lgr

@@ -1,9 +1,10 @@
 #ifndef _MULTIARRAY_H_
 #define _MULTIARRAY_H_
 
-#include "Types.h"
-#include <type_traits>
 #include <algorithm>
+#include <type_traits>
+
+#include "Types.h"
 
 ///
 /// @file   MultiArray.h
@@ -14,7 +15,6 @@
 /// multi-dimensional array used in the code to store field values on
 /// a grid.
 ///
-
 
 /// The MultiArray class is a unified interface for 1D, 2D and 3D
 /// arrays with proper index access and memory management.
@@ -37,10 +37,12 @@ class MultiArray {
     typedef T data_type;
     typedef typename std::conditional<isConst, const T*, T*>::type ptr_type;
     typedef typename std::conditional<isConst, const T&, T&>::type ref_type;
-    typedef typename std::conditional<isConst, const array_type&,
-                                      array_type&>::type arr_ref_type;
-    typedef typename std::conditional<isConst, const array_type*,
-                                      array_type*>::type arr_ptr_type;
+    typedef
+        typename std::conditional<isConst, const array_type&, array_type&>::type
+            arr_ref_type;
+    typedef
+        typename std::conditional<isConst, const array_type*, array_type*>::type
+            arr_ptr_type;
 
     // Constructors and destructors
     const_nonconst_iterator(arr_ref_type array, index_type pos)
@@ -122,8 +124,8 @@ class MultiArray {
 
     /// Index operator, returns regular or const reference
     /// depending on whether the iterator is const
-    ref_type operator()(const Index& idx) const{
-        return operator()(idx.x, idx.y, idx.z);
+    ref_type operator()(const Index& idx) const {
+      return operator()(idx.x, idx.y, idx.z);
     }
 
     /// Linear index operator, returns regular or const reference
@@ -139,9 +141,9 @@ class MultiArray {
     const index_type& pos() const { return _pos; }
 
    private:
-    arr_ref_type _array;                ///< A reference to the underlying array
-    index_type _pos;                    ///< Position that this iterator points to
-  };  // ----- end of class const_nonconst_iterator
+    arr_ref_type _array;  ///< A reference to the underlying array
+    index_type _pos;      ///< Position that this iterator points to
+  };                      // ----- end of class const_nonconst_iterator
 
   typedef const_nonconst_iterator<false> iterator;
   typedef const_nonconst_iterator<true> const_iterator;
@@ -226,14 +228,10 @@ class MultiArray {
   }
 
   /// Linearized indexing operator, read only
-  const data_type& operator[](int idx) const {
-    return _data[idx];
-  }
+  const data_type& operator[](int idx) const { return _data[idx]; }
 
   /// Linearized indexing operator, read and write
-  data_type& operator[](int idx) {
-    return _data[idx];
-  }
+  data_type& operator[](int idx) { return _data[idx]; }
 
   /// Vector indexing operator, read only
   const data_type& operator()(int x, int y = 0, int z = 0) const {
@@ -265,9 +263,7 @@ class MultiArray {
   }
 
   /// Set the whole array to a single initial value
-  void assign(const data_type& value) {
-    std::fill_n(_data, _size, value);
-  }
+  void assign(const data_type& value) { std::fill_n(_data, _size, value); }
 
   /// Resize the array.
   void resize(int width, int height = 1, int depth = 1) {
@@ -280,7 +276,7 @@ class MultiArray {
       delete[] _data;
     }
     _data = new T[_size];
-    assign( static_cast<T>(0) );
+    assign(static_cast<T>(0));
   }
 
   /// Resize the array according to an \ref Extent object.
@@ -337,11 +333,11 @@ class MultiArray {
       _dim = 3;
   }
 
-  ptr_type _data;                       ///< Pointer to the data stored
+  ptr_type _data;  ///< Pointer to the data stored
 
-  Extent _extent;                       ///< Extent of the array in all dimensions
-  int _size;                            ///< Total size of the array
-  int _dim;                             ///< Dimension of the array
+  Extent _extent;  ///< Extent of the array in all dimensions
+  int _size;       ///< Total size of the array
+  int _dim;        ///< Dimension of the array
 
 };  // ----- end of class MultiArray -----
 

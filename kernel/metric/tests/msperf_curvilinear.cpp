@@ -1,5 +1,5 @@
-#include "testfw/testfw.hpp"
 #include "manifold/curvilinear.hpp"
+#include "testfw/testfw.hpp"
 
 // SCENARIO("measure performance of LogSpherical", "[mani]") {
 //   using Coord = mani::coord<mani::coordsys::LogSpherical>;

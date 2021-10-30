@@ -1,0 +1,18 @@
+#!/bin/bash
+
+dir_arr=(
+    infrastructure/apt
+    infrastructure/filesys
+    infrastructure/logger
+    infrastructure/mpipp
+    infrastructure/random
+    infrastructure/silopp
+    infrastructure/testfw
+    infrastructure/timer
+    examples
+    kernel
+)
+
+for i in "${dir_arr[@]}"; do
+    find $i -regex '.*\.\(cpp\|hpp\|cc\|cxx\|h\)' -exec clang-format -i {} \;
+done

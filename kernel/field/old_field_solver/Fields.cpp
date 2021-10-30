@@ -1,5 +1,7 @@
-#include <stdexcept>
 #include "Fields.h"
+
+#include <stdexcept>
+
 #include "ArrayOperations.h"
 
 using namespace Helpers;
@@ -13,8 +15,7 @@ void FieldBase::check_grid_extent(const Extent& ext1, const Extent& ext2) {
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-ScalarField<T>::ScalarField()
-    : FieldBase(), _array() {}
+ScalarField<T>::ScalarField() : FieldBase(), _array() {}
 
 template <typename T>
 ScalarField<T>::ScalarField(const grid_type& grid)
@@ -54,23 +55,23 @@ void ScalarField<T>::copyFrom(const self_type& field) {
 }
 
 template <typename T>
-ScalarField<T>& ScalarField<T>::operator = ( const self_type& field){
-    this->_grid = field._grid;
-    this->_gridSize = field._gridSize;
-    _array = field._array;
-    return (*this);
+ScalarField<T>& ScalarField<T>::operator=(const self_type& field) {
+  this->_grid = field._grid;
+  this->_gridSize = field._gridSize;
+  _array = field._array;
+  return (*this);
 }
 
 template <typename T>
-ScalarField<T>& ScalarField<T>::operator = ( self_type&& field){
-    this->_grid = field._grid;
-    this->_gridSize = field._gridSize;
-    _array = std::move(field._array);
-    return (*this);
+ScalarField<T>& ScalarField<T>::operator=(self_type&& field) {
+  this->_grid = field._grid;
+  this->_gridSize = field._gridSize;
+  _array = std::move(field._array);
+  return (*this);
 }
 
 template <typename T>
-void ScalarField<T>::resize (const Grid& grid) {
+void ScalarField<T>::resize(const Grid& grid) {
   this->_grid = grid;
   this->_gridSize = grid.size();
   _array.resize(grid.extent());
@@ -83,8 +84,7 @@ ScalarField<T>& ScalarField<T>::multiplyBy(data_type value) {
 }
 
 template <typename T>
-ScalarField<T>& ScalarField<T>::multiplyBy(
-    const ScalarField<T>& field) {
+ScalarField<T>& ScalarField<T>::multiplyBy(const ScalarField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   map_multi_array(_array.begin(), field.data().begin(), this->_grid.extent(),
@@ -99,8 +99,7 @@ ScalarField<T>& ScalarField<T>::addBy(data_type value) {
 }
 
 template <typename T>
-ScalarField<T>& ScalarField<T>::addBy(
-    const ScalarField<T>& field) {
+ScalarField<T>& ScalarField<T>::addBy(const ScalarField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   map_multi_array(_array.begin(), field.data().begin(), this->_grid.extent(),
@@ -110,18 +109,18 @@ ScalarField<T>& ScalarField<T>::addBy(
 
 template <typename T>
 ScalarField<T>& ScalarField<T>::subtractBy(data_type value) {
-  map_multi_array(_array.begin(), this->_grid.extent(), Op_MinusConst<T>(value));
+  map_multi_array(_array.begin(), this->_grid.extent(),
+                  Op_MinusConst<T>(value));
   return (*this);
 }
 
 template <typename T>
-ScalarField<T>& ScalarField<T>::subtractBy(const ScalarField<T> &field) {
+ScalarField<T>& ScalarField<T>::subtractBy(const ScalarField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   map_multi_array(_array.begin(), field.data().begin(), this->_grid.extent(),
                   Op_MinusAssign<T>());
   return (*this);
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -129,12 +128,10 @@ ScalarField<T>& ScalarField<T>::subtractBy(const ScalarField<T> &field) {
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-VectorField<T>::VectorField()
-    : FieldBase(), _array() {}
+VectorField<T>::VectorField() : FieldBase(), _array() {}
 
 template <typename T>
-VectorField<T>::VectorField(const grid_type& grid)
-    : FieldBase(grid) {
+VectorField<T>::VectorField(const grid_type& grid) : FieldBase(grid) {
   for (int i = 0; i < VECTOR_DIM; ++i) {
     _array[i] = std::move(array_type(grid.extent()));
   }
@@ -152,21 +149,19 @@ template <typename T>
 VectorField<T>::~VectorField() {}
 
 template <typename T>
-VectorField<T>& VectorField<T>::operator= (const self_type& other) {
-    this->_grid = other._grid;
-    this->_gridSize = other._gridSize;
-    for (int i = 0; i < VECTOR_DIM; ++i)
-      _array[i] = other._array[i];
-    return (*this);
+VectorField<T>& VectorField<T>::operator=(const self_type& other) {
+  this->_grid = other._grid;
+  this->_gridSize = other._gridSize;
+  for (int i = 0; i < VECTOR_DIM; ++i) _array[i] = other._array[i];
+  return (*this);
 }
 
 template <typename T>
-VectorField<T>& VectorField<T>::operator= ( self_type&& other) {
-    this->_grid = other._grid;
-    this->_gridSize = other._gridSize;
-    for (int i = 0; i < VECTOR_DIM; ++i)
-      _array[i] = std::move(other._array[i]);
-    return (*this);
+VectorField<T>& VectorField<T>::operator=(self_type&& other) {
+  this->_grid = other._grid;
+  this->_gridSize = other._gridSize;
+  for (int i = 0; i < VECTOR_DIM; ++i) _array[i] = std::move(other._array[i]);
+  return (*this);
 }
 
 template <typename T>
@@ -199,7 +194,7 @@ void VectorField<T>::copyFrom(const self_type& field) {
 }
 
 template <typename T>
-void VectorField<T>::resize (const Grid& grid) {
+void VectorField<T>::resize(const Grid& grid) {
   this->_grid = grid;
   this->_gridSize = grid.size();
   for (int i = 0; i < VECTOR_DIM; i++) {
@@ -217,8 +212,7 @@ VectorField<T>& VectorField<T>::multiplyBy(data_type value) {
 }
 
 template <typename T>
-VectorField<T>& VectorField<T>::multiplyBy(
-    const ScalarField<T>& field) {
+VectorField<T>& VectorField<T>::multiplyBy(const ScalarField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   for (int i = 0; i < VECTOR_DIM; ++i) {
@@ -236,8 +230,7 @@ VectorField<T>& VectorField<T>::addBy(data_type value, int n) {
 }
 
 template <typename T>
-VectorField<T>& VectorField<T>::addBy(
-    const VectorField<T>& field) {
+VectorField<T>& VectorField<T>::addBy(const VectorField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   for (int i = 0; i < VECTOR_DIM; ++i) {
@@ -255,7 +248,7 @@ VectorField<T>& VectorField<T>::subtractBy(data_type value, int n) {
 }
 
 template <typename T>
-VectorField<T>& VectorField<T>::subtractBy(const VectorField<T> &field) {
+VectorField<T>& VectorField<T>::subtractBy(const VectorField<T>& field) {
   this->check_grid_extent(this->_grid.extent(), field.grid().extent());
 
   for (int i = 0; i < VECTOR_DIM; ++i) {

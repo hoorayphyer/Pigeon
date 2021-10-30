@@ -1,13 +1,14 @@
 #ifndef _FUPARAMS_H_
 #define _FUPARAMS_H_
 
-#include "Predefs.h"
 #include <array>
 #include <unordered_map>
 
+#include "Predefs.h"
+
 struct FBC {
-  typedef Scalar (*BCFunc_split_t) (Scalar t);
-  typedef Scalar (*BCFunc_split_x) (Scalar x1, Scalar x2, Scalar x3);
+  typedef Scalar (*BCFunc_split_t)(Scalar t);
+  typedef Scalar (*BCFunc_split_x)(Scalar x1, Scalar x2, Scalar x3);
 
   FieldBCType type;
   int indent;
@@ -27,7 +28,6 @@ struct FBC {
   // std::function<Scalar(Scalar, Scalar)> profile;
 };
 
-
 // TODO listen on locale
 struct FUParams {
   std::array<int, 3> neighbor_left{};
@@ -36,15 +36,14 @@ struct FUParams {
 
   std::array<bool, 6> is_at_boundary() const {
     std::array<bool, 6> res;
-    for ( int i = 0; i < 3; ++i ) {
-      res[2*i] = ( neighbor_left[i] == NEIGHBOR_NULL );
-      res[2*i + 1] = ( neighbor_right[i] == NEIGHBOR_NULL );
+    for (int i = 0; i < 3; ++i) {
+      res[2 * i] = (neighbor_left[i] == NEIGHBOR_NULL);
+      res[2 * i + 1] = (neighbor_right[i] == NEIGHBOR_NULL);
     }
     return res;
   }
 
-  std::unordered_map< BoundaryPosition, FBC > fieldBC;
+  std::unordered_map<BoundaryPosition, FBC> fieldBC;
 };
-
 
 #endif

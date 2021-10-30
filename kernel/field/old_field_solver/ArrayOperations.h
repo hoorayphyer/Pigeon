@@ -4,9 +4,10 @@
 // This file defines a series of operations on a chunk of a
 // multi-array
 
+#include <stdexcept>
+
 #include "multiarray/MultiArrayHelpers.h"
 #include "multiarray/Op.h"
-#include <stdexcept>
 
 template <typename It>
 void check_bounds(const It& iterator, const Extent& extent) {
@@ -26,7 +27,8 @@ void copy(const OutputIt& output, const InputIt& input, const Extent& extent) {
   check_bounds(input, extent);
   check_bounds(output, extent);
 
-  Helpers::map_multi_array(output, input, extent, Op_Assign<typename InputIt::data_type>());
+  Helpers::map_multi_array(output, input, extent,
+                           Op_Assign<typename InputIt::data_type>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -34,11 +36,13 @@ void copy(const OutputIt& output, const InputIt& input, const Extent& extent) {
 ///  with extent, assuming the output is a linearized array.
 ////////////////////////////////////////////////////////////////////////////////
 template <typename InputIt, typename OutputIt>
-void copy_to_linear(const OutputIt& output, const InputIt& input, const Extent& extent) {
+void copy_to_linear(const OutputIt& output, const InputIt& input,
+                    const Extent& extent) {
   check_bounds(input, extent);
   // check_bounds(output, extent);
 
-  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename InputIt::data_type>());
+  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename
+  // InputIt::data_type>());
   for (int k = 0; k < extent.depth(); ++k) {
     for (int j = 0; j < extent.height(); ++j) {
       for (int i = 0; i < extent.width(); ++i) {
@@ -55,11 +59,13 @@ void copy_to_linear(const OutputIt& output, const InputIt& input, const Extent& 
 ///  with extent, assuming the iutput is a linearized array.
 ////////////////////////////////////////////////////////////////////////////////
 template <typename InputIt, typename OutputIt>
-void copy_from_linear(const OutputIt& output, const InputIt& input, const Extent& extent) {
+void copy_from_linear(const OutputIt& output, const InputIt& input,
+                      const Extent& extent) {
   // check_bounds(input, extent);
   check_bounds(output, extent);
 
-  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename InputIt::data_type>());
+  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename
+  // InputIt::data_type>());
   for (int k = 0; k < extent.depth(); ++k) {
     for (int j = 0; j < extent.height(); ++j) {
       for (int i = 0; i < extent.width(); ++i) {
@@ -76,11 +82,13 @@ void copy_from_linear(const OutputIt& output, const InputIt& input, const Extent
 ///  with extent, assuming the iutput is a linearized array.
 ////////////////////////////////////////////////////////////////////////////////
 template <typename InputIt, typename OutputIt>
-void add_from_linear(const OutputIt& output, const InputIt& input, const Extent& extent) {
+void add_from_linear(const OutputIt& output, const InputIt& input,
+                     const Extent& extent) {
   // check_bounds(input, extent);
   check_bounds(output, extent);
 
-  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename InputIt::data_type>());
+  // Helpers::map_multi_array(output, input, extent, Op_Assign<typename
+  // InputIt::data_type>());
   for (int k = 0; k < extent.depth(); ++k) {
     for (int j = 0; j < extent.height(); ++j) {
       for (int i = 0; i < extent.width(); ++i) {
@@ -100,7 +108,8 @@ template <typename InputIt, typename T>
 void fill(const InputIt& input, const Extent& extent, T value) {
   check_bounds(input, extent);
 
-  Helpers::map_multi_array(input, extent, Op_AssignConst<typename InputIt::data_type>(value));
+  Helpers::map_multi_array(input, extent,
+                           Op_AssignConst<typename InputIt::data_type>(value));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,7 +122,8 @@ void multiply(const OutputIt& output, const InputIt& input,
   check_bounds(input, extent);
   check_bounds(output, extent);
 
-  Helpers::map_multi_array(output, input, extent, Op_MultAssign<typename InputIt::data_type>());
+  Helpers::map_multi_array(output, input, extent,
+                           Op_MultAssign<typename InputIt::data_type>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +133,8 @@ template <typename InputIt, typename T>
 void multiply(const InputIt& input, const Extent& extent, T value) {
   check_bounds(input, extent);
 
-  Helpers::map_multi_array(input, extent, Op_MultConst<typename InputIt::data_type>(value));
+  Helpers::map_multi_array(input, extent,
+                           Op_MultConst<typename InputIt::data_type>(value));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +146,8 @@ void add(const OutputIt& output, const InputIt& input, const Extent& extent) {
   check_bounds(input, extent);
   check_bounds(output, extent);
 
-  Helpers::map_multi_array(output, input, extent, Op_PlusAssign<typename InputIt::data_type>());
+  Helpers::map_multi_array(output, input, extent,
+                           Op_PlusAssign<typename InputIt::data_type>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +157,8 @@ template <typename InputIt, typename T>
 void add(const InputIt& input, const Extent& extent, T value) {
   check_bounds(input, extent);
 
-  Helpers::map_multi_array(input, extent, Op_PlusConst<typename InputIt::data_type>(value));
+  Helpers::map_multi_array(input, extent,
+                           Op_PlusConst<typename InputIt::data_type>(value));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,11 +166,13 @@ void add(const InputIt& input, const Extent& extent, T value) {
 ///  of the chunk given by extent.
 ////////////////////////////////////////////////////////////////////////////////
 template <typename InputIt, typename OutputIt>
-void subtract(const OutputIt& output, const InputIt& input, const Extent& extent) {
+void subtract(const OutputIt& output, const InputIt& input,
+              const Extent& extent) {
   check_bounds(input, extent);
   check_bounds(output, extent);
 
-  Helpers::map_multi_array(output, input, extent, Op_MinusAssign<typename InputIt::data_type>());
+  Helpers::map_multi_array(output, input, extent,
+                           Op_MinusAssign<typename InputIt::data_type>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +182,8 @@ template <typename InputIt, typename T>
 void subtract(const InputIt& input, const Extent& extent, T value) {
   check_bounds(input, extent);
 
-  Helpers::map_multi_array(input, extent, Op_MinusConst<typename InputIt::data_type>(value));
+  Helpers::map_multi_array(input, extent,
+                           Op_MinusConst<typename InputIt::data_type>(value));
 }
 
 #endif  // ----- #ifndef _ARRAYOPERATIONS_H_  -----
