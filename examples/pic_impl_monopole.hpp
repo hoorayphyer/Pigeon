@@ -8,6 +8,11 @@
 
 #include "pic/forces/gravity.hpp"
 #include "io/exportee_by_function.hpp"
+#include "io/data_exporter.hpp"
+#include "io/exportee.hpp"
+#include "msh/mesh_shape_interplay.hpp"
+#include <cassert>
+
 
 namespace pic {
   using Metric = metric::LogSpherical<real_t>;
@@ -709,10 +714,6 @@ namespace pic {
   }
 }
 
-#include "io/exportee.hpp"
-#include "msh/mesh_shape_interplay.hpp"
-#include <cassert>
-
 namespace pic {
   constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
 
@@ -808,43 +809,6 @@ namespace pic {
     const auto& Jsp = (*RTD::data().Jsp)[SP];
     return msh::interpolate(Jsp, I2std(I), ShapeF());
   }
-
-  auto set_up_field_export() {
-    std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
-    {
-      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
-
-      fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
-      fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
-      fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
-
-      if ( RTD::data().Jsp ) {
-        using namespace particle;
-        for (auto sp : *(RTD::data().Jsp)) {
-          switch(sp) {
-          case species::electron :
-            fexps.push_back(new FA(
-                "Je", 3, J_by_species<species::electron>,
-                average_and_divide_flux_by_area));
-            break;
-          case species::positron :
-            fexps.push_back(new FA(
-                "Jp", 3, J_by_species<species::positron>,
-                average_and_divide_flux_by_area));
-            break;
-          case species::ion :
-            fexps.push_back(new FA(
-                "Ji", 3, J_by_species<species::ion>,
-                average_and_divide_flux_by_area));
-            break;
-          default: ;
-          }
-        }
-      }
-    }
-    return fexps;
-  }
-
 }
 
 namespace pic {
@@ -866,19 +830,65 @@ namespace pic {
     else
       return { ptc.p(0), ptc.p(1), ptc.p(2) };
   }
+}
 
-  auto set_up_particle_export() {
-    std::vector<::io::PtcExportee<real_export_t, DGrid, real_t, Specs>*> pexps;
+namespace pic {
+
+  using DataExporter_t = io::DataExporter<real_export_t, DGrid, real_t, particle::Specs, real_j_t>;
+
+  std::vector<DataExporter_t> set_up_data_exporters() {
+    auto add_common_exportees = [] ( auto& exporter ) {
+      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
+
+      exporter
+        .add_exportee( new FA ( "E", 3, field_self<0>, average_when_downsampled) )
+        .add_exportee( new FA ( "B", 3, field_self<1>, average_when_downsampled) )
+        .add_exportee( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
+
+      if ( RTD::data().Jsp ) {
+        using namespace particle;
+        for (auto sp : *(RTD::data().Jsp)) {
+          switch(sp) {
+          case species::electron :
+            exporter.add_exportee(new FA(
+                                              "Je", 3, J_by_species<species::electron>,
+                                              average_and_divide_flux_by_area));
+            break;
+          case species::positron :
+            exporter.add_exportee(new FA(
+                                              "Jp", 3, J_by_species<species::positron>,
+                                              average_and_divide_flux_by_area));
+            break;
+          case species::ion :
+            exporter.add_exportee(new FA(
+                                              "Ji", 3, J_by_species<species::ion>,
+                                              average_and_divide_flux_by_area));
+            break;
+          default: ;
+          }
+        }
+      }
+      using PA = ::io::PexpTbyFunction<real_export_t, DGrid, real_t, Specs>;
+      exporter
+        .add_exportee(new PA("Num", 1, ptc_num, nullptr))
+        .add_exportee(new PA("E", 1, ptc_energy, nullptr))
+        .add_exportee(new PA("P", 3, ptc_momentum, nullptr));
+    };
+
+
+    // Note that DataExporter_t doesn't have copy constructor
+    std::vector<DataExporter_t> res;
     {
-      using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs>;
-      pexps.push_back( new PA ("Num", 1, ptc_num, nullptr) );
-
-      pexps.push_back( new PA ("E", 1, ptc_energy, nullptr) );
-
-      pexps.push_back( new PA ("P", 3, ptc_momentum, nullptr) );
+      auto& main_exporter = res.emplace_back();
+      main_exporter.set_is_collinear_mesh(false)
+        .set_downsample_ratio(export_plan.downsample_ratio)
+        .set_data_dir("")
+        .set_range(
+            {{{0, supergrid[0].dim() + myguard}, {0, supergrid[1].dim() + 1}}});
+      add_common_exportees(main_exporter);
     }
 
-    return pexps;
+    return res;
   }
 }
 

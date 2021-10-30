@@ -6,7 +6,6 @@
 #include "field/yee.hpp"
 
 #include "particle/sorter.hpp"
-#include "io/io.hpp"
 #include "dye/dynamic_balance.hpp"
 #include "ckpt/checkpoint.hpp"
 #include "ckpt/autosave.hpp"
@@ -55,7 +54,7 @@ namespace pic {
 
     std::vector<particle::Particle<R, S>> _ptc_buffer;
 
-    void taylor( apt::ActionBase<DGrid>& a ) {
+    void taylor( apt::array<apt::Range,DGrid>& a ) {
       // NOTE range is assumed to be noempty [,)
       auto f =
         [] ( int Ib_global, int Ie_global,
@@ -335,18 +334,12 @@ namespace pic {
           TIMING("ExportData", START {
               export_prior_hook( _particles, _properties, _E, _B, _J, _grid, _cart_opt, ens, dt, timestep );
 
-              auto fexps = set_up_field_export();
-              auto pexps = set_up_particle_export();
-
-              io::set_is_collinear_mesh(is_collinear_mesh); // TODO
-
-              io::export_data<pic::real_export_t>( this_run_dir, timestep, dt,
-                                                   export_plan.num_files,
-                                                   export_plan.downsample_ratio,
-                                                   _cart_opt, ens, _grid, _E, _B, _J,
-                                                   _particles, _properties, fexps, pexps );
-              for ( auto ptr : fexps ) delete ptr;
-              for ( auto ptr : pexps ) delete ptr;
+              for ( auto& exporter: set_up_data_exporters() ) {
+                auto range = exporter.get_range();
+                taylor(range);
+                if (apt::range::is_empty(range)) continue;
+                exporter.export_data(timestep, dt, export_plan.num_files, _cart_opt, ens, _grid, _E, _B, _J, _particles, _properties);
+              }
 
               export_post_hook();
             });
