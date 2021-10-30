@@ -22,7 +22,7 @@ double field_value(const std::vector<int>& coords, int comp) {
 void test_copy_sync(const Mesh<2>& mesh, const mpi::CartComm& cart) {
   const auto& range = mesh.range();
   const int guard = range[0].margin()[LFT];
-  const auto [my_coords, dims, periodic] = cart.coords_dims_periodic();
+  const auto [my_coords, topos] = cart.coords_topos();
   VF vf(mesh);
 
   // only bulk has nonzero values
@@ -65,8 +65,8 @@ void test_copy_sync(const Mesh<2>& mesh, const mpi::CartComm& cart) {
           region_begin_extent(lcr[0], range[0].full_size(), guard);
       auto neigh = my_coords;
       for (int i_dim = 0; i_dim < 2; ++i_dim)
-        neigh[i_dim] =
-            (my_coords[i_dim] + lcr[i_dim] + dims[i_dim]) % dims[i_dim];
+        neigh[i_dim] = (my_coords[i_dim] + lcr[i_dim] + topos[i_dim].dim()) %
+                       topos[i_dim].dim();
 
       bool at_bdry = false;
       for (int i_dim = 0; i_dim < 2; ++i_dim) {
@@ -88,7 +88,7 @@ void test_copy_sync(const Mesh<2>& mesh, const mpi::CartComm& cart) {
 void test_merge_sync(const Mesh<2>& mesh, const mpi::CartComm& cart) {
   const auto& range = mesh.range();
   const int guard = range[0].margin()[LFT];
-  const auto [my_coords, dims, periodic] = cart.coords_dims_periodic();
+  const auto [my_coords, topos] = cart.coords_topos();
   VF vf(mesh);
 
   // all cells have nonzero values
@@ -147,8 +147,8 @@ void test_merge_sync(const Mesh<2>& mesh, const mpi::CartComm& cart) {
               auto neigh = my_coords;
               for (int i_dim = 0; i_dim < 2; ++i_dim)
                 neigh[i_dim] =
-                    (my_coords[i_dim] + contrib[i_dim] + dims[i_dim]) %
-                    dims[i_dim];
+                    (my_coords[i_dim] + contrib[i_dim] + topos[i_dim].dim()) %
+                    topos[i_dim].dim();
               region_val += field_value(neigh, i_fld_dim);
             }
           }

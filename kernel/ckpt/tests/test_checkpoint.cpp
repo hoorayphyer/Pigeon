@@ -19,12 +19,6 @@ map<Properties> properties = []() {
   res.insert(species::positron, {1, 1, "positron"});
   return res;
 }();
-
-map<double> N_scat = []() {
-  map<double> res;
-  for (auto sp : properties) res.insert(sp, 0);
-  return res;
-}();
 }  // namespace particle
 
 struct StateClass : public particle::StateExpression<StateClass, State_t> {
@@ -104,7 +98,7 @@ SCENARIO("Test save_checkpoint", "[ckpt]") {
       }
 
       save_dir = ckpt::save_checkpoint(prefix, num_parts, ens_opt, timestep, E,
-                                       B, particles, particle::N_scat);
+                                       B, particles, particle::properties);
     }
 
     // test
@@ -274,7 +268,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
     }
 
     ckpt_dir = ckpt::save_checkpoint(prefix, num_parts, ens_opt, timestep, E, B,
-                                     ptcs_bef, particle::N_scat);
+                                     ptcs_bef, particle::properties);
   }
   rwld_opt.reset();
 
@@ -290,7 +284,7 @@ SCENARIO("Test load_checkpoint", "[mpi][ckpt]") {
     auto cart_opt = aio::make_cart(partition, *rwld_opt);
     auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
     int ckpt_ts = ckpt::load_checkpoint(ckpt_dir, ens_opt, cart_opt, E, B,
-                                        ptcs_aft, particle::N_scat, 0);
+                                        ptcs_aft, particle::properties, 0);
     REQUIRE(ckpt_ts == timestep);
   }
 

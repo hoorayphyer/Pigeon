@@ -34,11 +34,10 @@ TEMPLATE_TEST_CASE("Create Trivial Ensemble From Cartesian Topology",
 
     REQUIRE(ens.chief == 0);
     REQUIRE(ens.chief_cart_rank == cart.rank());
-    auto [c, d, p] = cart.coords_dims_periodic();
+    auto [c, topos] = cart.coords_topos();
     for (int i = 0; i < DGrid; ++i) {
       REQUIRE(ens.cart_coords[i] == c[i]);
-      REQUIRE(ens.cart_dims[i] == d[i]);
-      REQUIRE(ens.is_periodic[i] == p[i]);
+      REQUIRE(ens.cart_topos[i] == topos[i]);
     }
   }
   mpi::world.barrier();
@@ -96,8 +95,8 @@ TEMPLATE_TEST_CASE("Create one ensemble with nonzero replicas", "[dye][mpi]",
       REQUIRE(ens.chief_cart_rank == 0);
       for (int i = 0; i < DGrid; ++i) {
         REQUIRE(ens.cart_coords[i] == 0);
-        REQUIRE(ens.cart_dims[i] == 1);
-        REQUIRE(ens.is_periodic[i] == false);
+        REQUIRE(ens.cart_topos[i].dim() == 1);
+        REQUIRE(ens.cart_topos[i].periodic() == false);
       }
     }
   }

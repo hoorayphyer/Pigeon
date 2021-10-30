@@ -41,7 +41,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
 
       REQUIRE(ptc.frac() == 0.83);
 
-      REQUIRE(ptc.is(species::ion));
+      REQUIRE(ptc.template get<species>() == species::ion);
       REQUIRE(ptc.is(flag::secondary));
     }
 
@@ -62,7 +62,7 @@ SCENARIO("array push_back and iterator", "[particle]") {
 
       REQUIRE(ptc.frac() == 0.94);
 
-      REQUIRE(ptc.is(species::photon));
+      REQUIRE(ptc.template get<species>() == species::photon);
       REQUIRE(ptc.is(flag::secondary));
     }
   }
@@ -110,7 +110,7 @@ SCENARIO("array back inserter", "[particle]") {
 
   REQUIRE(ptc.frac() == 0.666);
 
-  REQUIRE(ptc.is(species::ion));
+  REQUIRE(ptc.template get<species>() == species::ion);
   REQUIRE(ptc.is(flag::secondary));
 }
 
