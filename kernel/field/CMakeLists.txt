@@ -2,7 +2,6 @@ add_library( field_sync SHARED sync.cpp )
 target_include_directories( field_sync PUBLIC ${KERNEL_DIR} ${CMAKE_SOURCE_DIR} )
 target_link_libraries( field_sync PRIVATE pic_rc mpi )
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old_field_solver)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/log_spherical_solver)
 
 if (${ENABLE_TESTS})
