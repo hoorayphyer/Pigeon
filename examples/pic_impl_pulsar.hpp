@@ -10,6 +10,11 @@
 #include "pic/forces/gravity.hpp"
 #include "pic/forces/landau0.hpp"
 #include "io/exportee_by_function.hpp"
+#include "io/data_exporter.hpp"
+#include "io/exportee.hpp"
+#include "msh/mesh_shape_interplay.hpp"
+#include <cassert>
+
 
 namespace pic {
   using Metric = metric::LogSpherical<real_t>;
@@ -125,7 +130,7 @@ namespace pic {
 
   constexpr int field_op_inv_precision = 4;
   constexpr int myguard = std::max(
-                                   ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision, false),
+                                   ::field::LogSphericalSolver<real_t, DGrid, real_j_t>::min_guard(field_op_inv_precision),
                                    (pic::ShapeF::support() + 3) / 2); // NOTE minimum number of guards of J
   // on one side is ( supp + 3 ) / 2
 
@@ -990,10 +995,6 @@ namespace pic {
   }
 }
 
-#include "io/exportee.hpp"
-#include "msh/mesh_shape_interplay.hpp"
-#include <cassert>
-
 namespace pic {
   constexpr bool is_collinear_mesh = false; // FIXME this is an ad hoc fix
 
@@ -1079,6 +1080,12 @@ namespace pic {
     }
   }
 
+  apt::array<real_t, 3> Br_alone(Index I, const Grid &grid, const Field<3> &E,
+                                   const Field<3> &B, const JField &J) {
+    return {msh::interpolate(B[0], I2std(I), ShapeF()),
+            0, 0};
+  }
+
   constexpr int POW( int B, int E ) {
     if ( E == 0 ) return 1;
     else return B * POW(B,E-1);
@@ -1157,51 +1164,6 @@ namespace pic {
     return {msh::interpolate(*(RTD::data().skin_depth), I2std(I), ShapeF())[0],
             0, 0};
   }
-
-  auto set_up_field_export() {
-    std::vector<::io::FieldExportee<real_export_t, DGrid, real_t, real_j_t>*> fexps;
-    {
-      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
-
-      fexps.push_back( new FA ( "E", 3, field_self<0>, average_when_downsampled) );
-      fexps.push_back( new FA ( "B", 3, field_self<1>, average_when_downsampled) );
-      fexps.push_back( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) );
-      fexps.push_back( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) );
-      fexps.push_back( new FA ( "PdotPairCreation", 3, Pdot_photon_pair_creation, nullptr) );
-      fexps.push_back( new FA ( "PhotonEmissionRate", 1, photon_emission_rate, nullptr));
-      fexps.push_back( new FA ( "PdotEmission", 3, Pdot_photon_emission, nullptr) );
-
-      if (RTD::data().skin_depth) {
-        fexps.push_back(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
-      }
-
-      if ( RTD::data().Jsp ) {
-        using namespace particle;
-        for (auto sp : *(RTD::data().Jsp)) {
-          switch(sp) {
-          case species::electron :
-            fexps.push_back(new FA(
-                "Je", 3, J_by_species<species::electron>,
-                average_and_divide_flux_by_area));
-            break;
-          case species::positron :
-            fexps.push_back(new FA(
-                "Jp", 3, J_by_species<species::positron>,
-                average_and_divide_flux_by_area));
-            break;
-          case species::ion :
-            fexps.push_back(new FA(
-                "Ji", 3, J_by_species<species::ion>,
-                average_and_divide_flux_by_area));
-            break;
-          default: ;
-          }
-        }
-      }
-    }
-    return fexps;
-  }
-
 }
 
 namespace pic {
@@ -1223,19 +1185,100 @@ namespace pic {
     else
       return { ptc.p(0), ptc.p(1), ptc.p(2) };
   }
+}
 
-  auto set_up_particle_export() {
-    std::vector<::io::PtcExportee<real_export_t, DGrid, real_t, Specs>*> pexps;
+namespace pic {
+
+  using DataExporter_t = io::DataExporter<real_export_t, DGrid, real_t, particle::Specs, real_j_t>;
+
+  std::vector<DataExporter_t> set_up_data_exporters() {
+    auto add_common_exportees = [] ( auto& exporter ) {
+      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
+
+      exporter
+        .add_exportee( new FA ( "E", 3, field_self<0>, average_when_downsampled) )
+        .add_exportee( new FA ( "B", 3, field_self<1>, average_when_downsampled) )
+        .add_exportee( new FA ( "J", 3, field_self<2>, average_and_divide_flux_by_area) )
+        .add_exportee( new FA ( "PairCreationRate", 1, pair_creation_rate, nullptr) )
+        .add_exportee( new FA ( "PdotPairCreation", 3, Pdot_photon_pair_creation, nullptr) )
+        .add_exportee( new FA ( "PhotonEmissionRate", 1, photon_emission_rate, nullptr))
+        .add_exportee( new FA ( "PdotEmission", 3, Pdot_photon_emission, nullptr) );
+
+      if (RTD::data().skin_depth) {
+        exporter.add_exportee(new FA("SkinDepth", 1, skin_depth, average_when_downsampled));
+      }
+
+      if ( RTD::data().Jsp ) {
+        using namespace particle;
+        for (auto sp : *(RTD::data().Jsp)) {
+          switch(sp) {
+          case species::electron :
+            exporter.add_exportee(new FA(
+                                              "Je", 3, J_by_species<species::electron>,
+                                              average_and_divide_flux_by_area));
+            break;
+          case species::positron :
+            exporter.add_exportee(new FA(
+                                              "Jp", 3, J_by_species<species::positron>,
+                                              average_and_divide_flux_by_area));
+            break;
+          case species::ion :
+            exporter.add_exportee(new FA(
+                                              "Ji", 3, J_by_species<species::ion>,
+                                              average_and_divide_flux_by_area));
+            break;
+          default: ;
+          }
+        }
+      }
+      using PA = ::io::PexpTbyFunction<real_export_t, DGrid, real_t, Specs>;
+      exporter
+        .add_exportee(new PA("Num", 1, ptc_num, nullptr))
+        .add_exportee(new PA("E", 1, ptc_energy, nullptr))
+        .add_exportee(new PA("P", 3, ptc_momentum, nullptr));
+    };
+
+
+    // Note that DataExporter_t doesn't have copy constructor
+    std::vector<DataExporter_t> res;
     {
-      using PA = ::io::PexpTbyFunction<real_export_t,DGrid,real_t,Specs>;
-      pexps.push_back( new PA ("Num", 1, ptc_num, nullptr) );
-
-      pexps.push_back( new PA ("E", 1, ptc_energy, nullptr) );
-
-      pexps.push_back( new PA ("P", 3, ptc_momentum, nullptr) );
+      auto& main_exporter = res.emplace_back();
+      main_exporter.set_is_collinear_mesh(false)
+        .set_downsample_ratio(export_plan.downsample_ratio)
+        .set_data_dir("")
+        .set_range(
+            {{{0, supergrid[0].dim() + myguard}, {0, supergrid[1].dim() + 1}}});
+      add_common_exportees(main_exporter);
     }
 
-    return pexps;
+    {
+      auto& current_sheet_exporter = res.emplace_back();
+
+      int i_equator = supergrid[1].dim() / 2 + 1; // pick the cell whose lb is at equator.
+      int half_width = (30.0_deg) / supergrid[1].delta();
+      current_sheet_exporter.set_is_collinear_mesh(false)
+        .set_downsample_ratio(1)
+        .set_data_dir("current_sheet")
+        .set_range(
+                   {{{supergrid[0].csba(std::log(4.5)), supergrid[0].dim() + myguard},
+                         {i_equator - half_width, i_equator + half_width}}});
+      add_common_exportees(current_sheet_exporter);
+    }
+
+    {
+      auto& full_Br_exporter = res.emplace_back();
+
+      full_Br_exporter.set_is_collinear_mesh(false)
+        .set_downsample_ratio(1)
+        .set_data_dir("Br_full")
+        .set_range(
+                   {{{0, supergrid[0].dim() + myguard}, {0, supergrid[1].dim() + 1}}});
+      using FA = ::io::FexpTbyFunction<real_export_t, DGrid, real_t, real_j_t>;
+
+      full_Br_exporter.add_exportee(new FA("Br", 1, Br_alone, nullptr));
+    }
+
+    return res;
   }
 }
 

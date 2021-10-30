@@ -6,6 +6,64 @@
 #include "pic/argparser.hpp"
 #include "particle/mpi_particle.hpp"
 
+namespace {
+  // local directory for storing data symlinks
+#ifdef APPARENT_DATA_DIR
+  std::string local_data_dir =
+    []() {
+      std::string str = APPARENT_DATA_DIR;
+      fs::remove_slash(str);
+      return str;
+    }();
+#else
+  std::string local_data_dir = "Data";
+#endif
+
+  // TODOL what if prefix == local_data_dir??
+  std::string init_this_run_dir( std::string prefix, std::string dirname ) {
+    // use world root time to ensure uniqueness
+    std::string this_run_dir;
+    if ( mpi::world.rank() == 0 ) {
+      prefix = fs::absolute(prefix);
+      fs::remove_slash(prefix);
+      fs::remove_slash(dirname);
+
+      // in case of running too frequently within a minute, directories with postfixed numbers are created
+      if ( fs::exists(prefix + "/" + dirname) ) {
+        for ( int n = 1; ; ++n ) {
+          if ( !fs::exists(prefix + "/" + dirname + "-" + std::to_string(n)) ) {
+            dirname += "-" + std::to_string(n);
+            break;
+          }
+        }
+      }
+      this_run_dir = prefix + "/" + dirname;
+
+      fs::create_directories(this_run_dir);
+      fs::create_directories(local_data_dir);
+      fs::create_directory_symlink(this_run_dir, local_data_dir + "/" + dirname);
+    }
+
+    if ( mpi::world.size() > 1 ) {
+      char buf[200];
+      if ( mpi::world.rank() == 0 ) {
+        for ( int i = 0; i < this_run_dir.size(); ++i )
+          buf[i] = this_run_dir[i];
+        buf[this_run_dir.size()] = '\0';
+        mpi::world.broadcast(0, buf, 200);
+      }
+      else {
+        mpi::world.broadcast(0, buf, 200);
+        this_run_dir = {buf};
+      }
+    }
+
+    return this_run_dir;
+
+  }
+}
+
+
 std::string data_dirname() {
   char subDir[100] = {};
   for ( int i = 0; i < 100; ++i )
@@ -99,7 +157,7 @@ int main(int argc, char** argv) {
   mpi::commit( mpi::Datatype<particle::Particle<pic::real_t, particle::Specs>>{} );
 
   { // use block to force destruction of potential mpi communicators before mpi::finalize
-    pic::this_run_dir = io::init_this_run_dir( pic::datadir_prefix, data_dirname() );
+    pic::this_run_dir = init_this_run_dir( pic::datadir_prefix, data_dirname() );
     auto cart_opt = make_cart(pic::dims, pic::periodic);
 
     // journaling

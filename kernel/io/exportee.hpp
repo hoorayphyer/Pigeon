@@ -1,7 +1,12 @@
 #ifndef _IO_EXPORTEE_HPP_
 #define _IO_EXPORTEE_HPP_
 
+#include "apt/grid.hpp"
+#include "field/field.hpp"
+#include "particle/array.hpp"
+#include "particle/map.hpp"
 #include "particle/properties.hpp"
+#include <optional>
 
 namespace mpi { struct CartComm; }
 

@@ -2,6 +2,7 @@
 #define  _APT_RANGE_HPP_
 
 #include "apt/pair.hpp"
+#include "apt/array.hpp"
 
 namespace apt {
   struct Range {
