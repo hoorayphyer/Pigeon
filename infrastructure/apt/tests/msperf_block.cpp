@@ -1,19 +1,17 @@
-#include "testfw/testfw.hpp"
 #include "apt/block.hpp"
+#include "testfw/testfw.hpp"
 #include "timer/timer.hpp"
 
 using namespace apt;
 
 SCENARIO("Measure performance of Block", "[apt]") {
-
-  constexpr Index<3> extent {128, 128, 128};
-  Block<3> block ({},extent);
+  constexpr Index<3> extent{128, 128, 128};
+  Block<3> block({}, extent);
 
   const int N = 1000;
   tmr::Timestamp t1;
-  for ( int dummy = 0; dummy < N; ++dummy ) {
-
-    for ( const auto& I : block ) {
+  for (int dummy = 0; dummy < N; ++dummy) {
+    for (const auto& I : block) {
       auto x = I[0] + I[1] * I[2];
     }
 
@@ -24,11 +22,10 @@ SCENARIO("Measure performance of Block", "[apt]") {
     //     }
     //   }
     // }
-
   }
   auto dur = t1.lapse();
   dur.in_units_of("ns");
   std::cout << dur.val() << std::endl;
-  WARN("Timing Block of " << extent << " = " << dur.val() / N << " " << dur.unit() );
-
+  WARN("Timing Block of " << extent << " = " << dur.val() / N << " "
+                          << dur.unit());
 }

@@ -2,7 +2,8 @@
 #include "pic.hpp"
 
 namespace io {
-  using namespace pic;
+using namespace pic;
 
-  template class DataExporter<real_export_t, DGrid, real_t, particle::Specs, real_j_t>;
-} // namespace io
+template class DataExporter<real_export_t, DGrid, real_t, particle::Specs,
+                            real_j_t>;
+}  // namespace io

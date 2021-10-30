@@ -3,4 +3,4 @@
 
 namespace field {
 template struct LogSphericalSolver<pic::real_t, pic::DGrid, pic::real_j_t>;
-} // namespace field
+}  // namespace field

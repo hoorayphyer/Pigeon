@@ -1,7 +1,8 @@
-#include "testfw/testfw.hpp"
-#include "filesys/filesys.hpp"
 #include <filesystem>
 #include <fstream>
+
+#include "filesys/filesys.hpp"
+#include "testfw/testfw.hpp"
 
 using namespace fs;
 
@@ -21,14 +22,14 @@ SCENARIO("Test directory_iterator", "[filesys]") {
     auto my_dir_itr = directory_iterator(dir);
     auto my_dir_itr_end = my_dir_itr.end();
 
-    while ( std_dir_itr != std_dir_itr_end ) {
+    while (std_dir_itr != std_dir_itr_end) {
       std::string my_entry = *my_dir_itr;
       std::string std_entry = (*std_dir_itr).path();
       REQUIRE(my_entry == std_entry);
       ++std_dir_itr;
       ++my_dir_itr;
     }
-    REQUIRE_FALSE( my_dir_itr != my_dir_itr_end );
+    REQUIRE_FALSE(my_dir_itr != my_dir_itr_end);
   }
 
   remove_all(dir);

@@ -2,6 +2,7 @@
 #define _COORDSYSTEMB_H_
 
 #include <cmath>
+
 #include "Predefs.h"
 
 enum class CoordType : int {
@@ -12,36 +13,24 @@ enum class CoordType : int {
 struct ScalesCartesian {
   enum { type = static_cast<unsigned int>(CoordType::CARTESIAN) };
 
-  inline double h1(double , double , double = 0.0) const {
-    return 1.0;
-  }
+  inline double h1(double, double, double = 0.0) const { return 1.0; }
 
-  inline double h2(double, double, double = 0.0) const {
-    return 1.0;
-  }
+  inline double h2(double, double, double = 0.0) const { return 1.0; }
 
-  inline double h3(double, double, double = 0.0) const {
-    return 1.0;
-  }
+  inline double h3(double, double, double = 0.0) const { return 1.0; }
 };
 
 struct ScalesLogSpherical {
-
   enum { type = static_cast<unsigned int>(CoordType::LOG_SPHERICAL) };
 
-  inline double h1(double x, double, double = 0.0) const {
-    return std::exp(x);
-  }
+  inline double h1(double x, double, double = 0.0) const { return std::exp(x); }
 
-  inline double h2(double x, double, double = 0.0) const {
-    return std::exp(x);
-  }
+  inline double h2(double x, double, double = 0.0) const { return std::exp(x); }
 
   inline double h3(double x, double y, double = 0.0) const {
     return std::exp(x) * std::sin(y);
   }
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Translating CoordType into the corresponding struct

@@ -1,21 +1,24 @@
 #pragma once
-#include "apt/range.hpp"
-#include "io/exportee.hpp"
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "apt/range.hpp"
+#include "io/exportee.hpp"
+
 namespace dye {
-template <int> struct Ensemble;
+template <int>
+struct Ensemble;
 }
 
 namespace io {
 
-template <typename RealDS, int DGrid, typename Real, template <typename> class S, typename RealJ>
+template <typename RealDS, int DGrid, typename Real,
+          template <typename> class S, typename RealJ>
 class DataExporter {
-public:
+ public:
   DataExporter() = default;
-  DataExporter(const DataExporter& other ) = delete;
+  DataExporter(const DataExporter &other) = delete;
   DataExporter(DataExporter &&other) = default;
 
   auto &set_is_collinear_mesh(bool collinear) {
@@ -49,10 +52,10 @@ public:
       int timestep, Real dt, int num_files,
       const std::optional<mpi::CartComm> &cart_opt,
       const dye::Ensemble<DGrid> &ens,
-      const apt::Grid<Real, DGrid> &grid, // local grid
+      const apt::Grid<Real, DGrid> &grid,  // local grid
       const field::Field<Real, 3, DGrid> &E,
       const field::Field<Real, 3, DGrid> &B,
-      const field::Field<RealJ, 3, DGrid> &J, // J is Jmesh on a replica
+      const field::Field<RealJ, 3, DGrid> &J,  // J is Jmesh on a replica
       const particle::map<particle::array<Real, S>> &particles,
       const particle::map<particle::Properties> &properties) const;
 
@@ -66,7 +69,7 @@ public:
     return *this;
   }
 
-private:
+ private:
   bool m_is_collinear_mesh = false;
   int m_downsample_ratio = 1;
   const int m_mesh_ghost = 1;
@@ -74,7 +77,8 @@ private:
   std::string m_mesh_name = "PICMesh";
   apt::array<apt::Range, DGrid> m_range;
 
-  std::vector<std::unique_ptr<FieldExportee<RealDS, DGrid, Real, RealJ>>> m_fexps;
+  std::vector<std::unique_ptr<FieldExportee<RealDS, DGrid, Real, RealJ>>>
+      m_fexps;
   std::vector<std::unique_ptr<PtcExportee<RealDS, DGrid, Real, S>>> m_pexps;
 };
-}
+}  // namespace io

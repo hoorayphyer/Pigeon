@@ -1,17 +1,18 @@
-#ifndef  _LOGGER_HPP_
-#define  _LOGGER_HPP_
+#ifndef _LOGGER_HPP_
+#define _LOGGER_HPP_
 
-#include "logger/ofstream.hpp"
 #include <iostream>
 #include <sstream>
 
-namespace lgr {
-  extern ofstream<> file;
-  extern ofstream<> debug;
+#include "logger/ofstream.hpp"
 
-  extern std::ostream& out;
-  extern std::ostream& err;
-  extern std::ostringstream str;
-}
+namespace lgr {
+extern ofstream<> file;
+extern ofstream<> debug;
+
+extern std::ostream& out;
+extern std::ostream& err;
+extern std::ostringstream str;
+}  // namespace lgr
 
 #endif

@@ -1,124 +1,136 @@
-#include "testfw/testfw.hpp"
-#include "particle/load_type.hpp"
-#include "particle/array_impl.hpp"
-#include "mpipp/mpi++.hpp"
-#include "dye/ensemble_impl.hpp"
-#include "dye/dynamic_balance_impl.hpp"
-#include "mpipp/mpi_p2p_impl.hpp"
-#include "mpipp/mpi_collective_impl.hpp"
-#include "particle/mpi_particle.hpp"
 #include <unordered_set>
+
+#include "dye/dynamic_balance_impl.hpp"
+#include "dye/ensemble_impl.hpp"
 #include "logger/ofstream.hpp"
+#include "mpipp/mpi++.hpp"
+#include "mpipp/mpi_collective_impl.hpp"
+#include "mpipp/mpi_p2p_impl.hpp"
+#include "particle/array_impl.hpp"
+#include "particle/load_type.hpp"
+#include "particle/mpi_particle.hpp"
+#include "testfw/testfw.hpp"
 
 using namespace particle;
 using Real = double;
 using aio::Specs;
 
 SCENARIO("Test calc_new_nprocs", "[dye][.]") {
-  if ( mpi::world.rank() == 0 ) {
-    aio::unif_int<int> nens_gen( 1, 100 );
-    aio::unif_int<int> ens_size_gen( 1, 100 );
+  if (mpi::world.rank() == 0) {
+    aio::unif_int<int> nens_gen(1, 100);
+    aio::unif_int<int> ens_size_gen(1, 100);
 
     int N = 1000;
-    while(N--) {
+    while (N--) {
       int nens = nens_gen();
-      load_t load_per_ens = 1; // just use a normalized load different than 0
+      load_t load_per_ens = 1;  // just use a normalized load different than 0
       load_t target_load = 0;
 
-      std::vector<load_t> loads_and_nprocs(2*nens);
+      std::vector<load_t> loads_and_nprocs(2 * nens);
       int max_nprocs = 0;
-      for ( int i = 0; i < nens; ++i ) {
-        loads_and_nprocs[2*i] = load_per_ens;
+      for (int i = 0; i < nens; ++i) {
+        loads_and_nprocs[2 * i] = load_per_ens;
         auto ens_size = ens_size_gen();
         max_nprocs += ens_size;
-        loads_and_nprocs[2*i+1] = ens_size;
+        loads_and_nprocs[2 * i + 1] = ens_size;
       }
 
-      DYNAMIC_SECTION("When all ensembles have same load, and target load is zero, ensembles should have same size and all processes should be recruited " << N ) {
-        auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs, target_load, max_nprocs);
+      DYNAMIC_SECTION(
+          "When all ensembles have same load, and target load is zero, "
+          "ensembles should have same size and all processes should be "
+          "recruited "
+          << N) {
+        auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs,
+                                                     target_load, max_nprocs);
         int total_procs_used = 0;
-        for ( int i = 0; i < nprocs_new.size(); ++i ) {
+        for (int i = 0; i < nprocs_new.size(); ++i) {
           total_procs_used += nprocs_new[i];
-          REQUIRE( ((nprocs_new[i] == max_nprocs/nens) || (nprocs_new[i] == max_nprocs/nens + 1)) );
+          REQUIRE(((nprocs_new[i] == max_nprocs / nens) ||
+                   (nprocs_new[i] == max_nprocs / nens + 1)));
         }
-        REQUIRE( total_procs_used == max_nprocs );
+        REQUIRE(total_procs_used == max_nprocs);
       }
 
-      DYNAMIC_SECTION("When some ensembles have 0 load while others have same load, then there should be at least one proc in each ensemble " << N ) {
+      DYNAMIC_SECTION(
+          "When some ensembles have 0 load while others have same load, then "
+          "there should be at least one proc in each ensemble "
+          << N) {
         // we skip i == 0 so as to make sure there will be nonzero total load
-        for ( int i = 1; i < nens; ++i ) {
-          if ( nens_gen() % 4 != 0 ) continue;
-          loads_and_nprocs[2*i] = 0;
+        for (int i = 1; i < nens; ++i) {
+          if (nens_gen() % 4 != 0) continue;
+          loads_and_nprocs[2 * i] = 0;
         }
 
-        std::unordered_set<int> ens_wo_load; // ens_without_load
-        for ( int i = 0; i < nens; ++i ) {
-          if ( 0 == loads_and_nprocs[2*i] )
-            ens_wo_load.insert(i);
+        std::unordered_set<int> ens_wo_load;  // ens_without_load
+        for (int i = 0; i < nens; ++i) {
+          if (0 == loads_and_nprocs[2 * i]) ens_wo_load.insert(i);
         }
 
-        auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs, target_load, max_nprocs);
+        auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs,
+                                                     target_load, max_nprocs);
         int total_procs_used = 0;
-        for ( int i = 0; i < nprocs_new.size(); ++i ) {
+        for (int i = 0; i < nprocs_new.size(); ++i) {
           total_procs_used += nprocs_new[i];
-          if ( ens_wo_load.find(i) != ens_wo_load.end() ) {
-            REQUIRE( nprocs_new[i] == 1 );
+          if (ens_wo_load.find(i) != ens_wo_load.end()) {
+            REQUIRE(nprocs_new[i] == 1);
           } else {
             auto nprocs_ave = (max_nprocs - ens_wo_load.size());
-            if ( ens_wo_load.size() == nens ) nprocs_ave = 0;
-            else nprocs_ave /= (nens - ens_wo_load.size());
+            if (ens_wo_load.size() == nens)
+              nprocs_ave = 0;
+            else
+              nprocs_ave /= (nens - ens_wo_load.size());
             CAPTURE(nprocs_ave);
-            REQUIRE( (nprocs_new[i] == nprocs_ave || nprocs_new[i] == nprocs_ave + 1) );
+            REQUIRE((nprocs_new[i] == nprocs_ave ||
+                     nprocs_new[i] == nprocs_ave + 1));
           }
         }
-        REQUIRE( total_procs_used == max_nprocs );
+        REQUIRE(total_procs_used == max_nprocs);
       }
     }
   }
 }
 
 TEST_CASE("Test calc_new_nprocs with nonzero target load", "[dye][.]") {
-  if ( mpi::world.rank() == 0 ) {
-    std::vector<load_t> loads_and_nprocs = { 584,1,588,1,584,1,588,1,
-                                             0,1,0,1, 0,1,0,1,
-                                             0,1,0,1, 0,1,0,1,
-                                             0,1,0,1,0,1,0,1 };
+  if (mpi::world.rank() == 0) {
+    std::vector<load_t> loads_and_nprocs = {
+        584, 1, 588, 1, 584, 1, 588, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+        0,   1, 0,   1, 0,   1, 0,   1, 0, 1, 0, 1, 0, 1, 0, 1};
     load_t target_load = 100000;
     int max_nprocs = 28;
-    auto nprocs_new = dye::impl::calc_new_nprocs(loads_and_nprocs, target_load, max_nprocs);
-    for ( auto x : nprocs_new )
-      REQUIRE(x == 1);
+    auto nprocs_new =
+        dye::impl::calc_new_nprocs(loads_and_nprocs, target_load, max_nprocs);
+    for (auto x : nprocs_new) REQUIRE(x == 1);
   }
 }
 
-TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
-                    , (std::integral_constant<int,4>)
-                    , (std::integral_constant<int,7>)
-                    ) {
+TEMPLATE_TEST_CASE("Test bifurcate", "[dye][mpi][.]",
+                   (std::integral_constant<int, 4>),
+                   (std::integral_constant<int, 7>)) {
   constexpr auto nprocs = TestType::value;
-  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
-    auto parent = *(mpi::world.split( mpi::world.rank() < nprocs ));
-    // what bifurcate does is it splits an intra comm into two separate intra comms and creates an intercomm between them
+  if (nprocs > 1 && mpi::world.size() >= nprocs) {
+    auto parent = *(mpi::world.split(mpi::world.rank() < nprocs));
+    // what bifurcate does is it splits an intra comm into two separate intra
+    // comms and creates an intercomm between them
     WHEN("all members don't share the same color") {
-      if ( mpi::world.rank() < nprocs ) {
+      if (mpi::world.rank() < nprocs) {
         bool color = parent.rank() < nprocs / 2;
-        auto[ intra, inter ] = dye::impl::bifurcate( parent, color );
+        auto [intra, inter] = dye::impl::bifurcate(parent, color);
         REQUIRE(inter);
-        if ( color ) {
-          REQUIRE( intra.size() == nprocs / 2 );
-          REQUIRE( inter->remote_size() == parent.size() - nprocs / 2 );
+        if (color) {
+          REQUIRE(intra.size() == nprocs / 2);
+          REQUIRE(inter->remote_size() == parent.size() - nprocs / 2);
         } else {
-          REQUIRE( intra.size() == parent.size() - nprocs / 2 );
-          REQUIRE( inter->remote_size() == nprocs / 2 );
+          REQUIRE(intra.size() == parent.size() - nprocs / 2);
+          REQUIRE(inter->remote_size() == nprocs / 2);
         }
       }
       mpi::world.barrier();
     }
 
     WHEN("all members share same color") {
-      if ( mpi::world.rank() < nprocs ) {
+      if (mpi::world.rank() < nprocs) {
         bool color = true;
-        auto[ intra, inter ] = dye::impl::bifurcate( parent, color );
+        auto [intra, inter] = dye::impl::bifurcate(parent, color);
         REQUIRE_FALSE(inter);
         REQUIRE(intra.size() == parent.size());
       }
@@ -127,165 +139,171 @@ TEMPLATE_TEST_CASE( "Test bifurcate","[dye][mpi][.]"
   }
 }
 
-TEMPLATE_TEST_CASE( "Test relinguish_data","[dye][mpi][.]"
-                    , (std::integral_constant<int,1>)
-                    , (std::integral_constant<int,2>)
-                    , (std::integral_constant<int,4>)
-                    , (std::integral_constant<int,8>)
-                    ) {
-  // the sending side of an intercommunicator consists of MPI_ROOT and one MPI_PROC_NULL
-  // the receiving side consists of number of processes specified by the template parameter
-  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
+TEMPLATE_TEST_CASE("Test relinguish_data", "[dye][mpi][.]",
+                   (std::integral_constant<int, 1>),
+                   (std::integral_constant<int, 2>),
+                   (std::integral_constant<int, 4>),
+                   (std::integral_constant<int, 8>)) {
+  // the sending side of an intercommunicator consists of MPI_ROOT and one
+  // MPI_PROC_NULL the receiving side consists of number of processes specified
+  // by the template parameter
+  mpi::commit(mpi::Datatype<Particle<Real, Specs>>{});
   constexpr auto nremotes = TestType::value;
   static_assert(nremotes > 0);
-  if ( mpi::world.size() >= nremotes + 2 ) {
-    auto parent = *( mpi::world.split( mpi::world.rank() < nremotes + 2 ) );
-    if ( mpi::world.rank() < nremotes + 2 ) {
-      auto[intra, itc] = dye::impl::bifurcate( parent, mpi::world.rank() < 2 );
-      array<Real,Specs> ptcs;
-      if ( mpi::world.rank() == 0 ) {
+  if (mpi::world.size() >= nremotes + 2) {
+    auto parent = *(mpi::world.split(mpi::world.rank() < nremotes + 2));
+    if (mpi::world.rank() < nremotes + 2) {
+      auto [intra, itc] = dye::impl::bifurcate(parent, mpi::world.rank() < 2);
+      array<Real, Specs> ptcs;
+      if (mpi::world.rank() == 0) {
         ptcs.resize(1000);
-        for ( int i = 0; i < ptcs.size(); ++i ) {
+        for (int i = 0; i < ptcs.size(); ++i) {
           ptcs[i].q(0) = 132.0;
           ptcs[i].p(0) = -546.0;
           ptcs[i].set(flag::secondary);
         }
-        dye::impl::relinguish_data( ptcs, *itc, MPI_ROOT );
-        REQUIRE( ptcs.size() == 0 );
-      } else if ( mpi::world.rank() == 1 ) {
+        dye::impl::relinguish_data(ptcs, *itc, MPI_ROOT);
+        REQUIRE(ptcs.size() == 0);
+      } else if (mpi::world.rank() == 1) {
         ptcs.resize(10);
-        dye::impl::relinguish_data( ptcs, *itc, MPI_PROC_NULL );
-        REQUIRE( ptcs.size() == 10 );
+        dye::impl::relinguish_data(ptcs, *itc, MPI_PROC_NULL);
+        REQUIRE(ptcs.size() == 10);
       } else {
-        dye::impl::relinguish_data( ptcs, *itc, 0 );
-        REQUIRE( ptcs.size() == 1000 / intra.size() );
-        for ( int i = 0; i < ptcs.size(); ++i ) {
-          REQUIRE( ptcs[i].q(0) == 132.0 );
-          REQUIRE( ptcs[i].p(0) == -546.0 );
-          REQUIRE( ptcs[i].is(flag::secondary) );
+        dye::impl::relinguish_data(ptcs, *itc, 0);
+        REQUIRE(ptcs.size() == 1000 / intra.size());
+        for (int i = 0; i < ptcs.size(); ++i) {
+          REQUIRE(ptcs[i].q(0) == 132.0);
+          REQUIRE(ptcs[i].p(0) == -546.0);
+          REQUIRE(ptcs[i].is(flag::secondary));
         }
       }
     }
   }
-  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
+  mpi::uncommit(mpi::Datatype<Particle<Real, Specs>>{});
 }
 
-TEMPLATE_TEST_CASE( "Test assign_labels between primaries and idles","[dye][mpi][.]"
-                    , (std::integral_constant<int,4>)
-                    , (std::integral_constant<int,7>)
-                    ) {
+TEMPLATE_TEST_CASE("Test assign_labels between primaries and idles",
+                   "[dye][mpi][.]", (std::integral_constant<int, 4>),
+                   (std::integral_constant<int, 7>)) {
   constexpr auto nprocs = TestType::value;
-  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
-    auto prmy_idle_comm = *(mpi::world.split( mpi::world.rank() < nprocs ));
-    if ( mpi::world.rank() < nprocs ) {
-      // what bifurcate does is it splits an intra comm into two separate intra comms and creates an intercomm between them
+  if (nprocs > 1 && mpi::world.size() >= nprocs) {
+    auto prmy_idle_comm = *(mpi::world.split(mpi::world.rank() < nprocs));
+    if (mpi::world.rank() < nprocs) {
+      // what bifurcate does is it splits an intra comm into two separate intra
+      // comms and creates an intercomm between them
       int nprmy = nprocs / 2;
       bool is_primary = prmy_idle_comm.rank() < nprmy;
-      std::vector<int> deficits; // significant only at primaries
-      if ( is_primary ) {
-        deficits = std::vector<int>(nprmy,0);
-        for ( int i = 0; i < nprocs - nprmy; ++i ) ++deficits[i % nprmy];
+      std::vector<int> deficits;  // significant only at primaries
+      if (is_primary) {
+        deficits = std::vector<int>(nprmy, 0);
+        for (int i = 0; i < nprocs - nprmy; ++i) ++deficits[i % nprmy];
       }
 
-      std::optional<int> cur_label; // current label
-      if ( is_primary ) cur_label.emplace( prmy_idle_comm.rank() );
+      std::optional<int> cur_label;  // current label
+      if (is_primary) cur_label.emplace(prmy_idle_comm.rank());
 
-      auto[ intra, job_market ] = dye::impl::bifurcate( prmy_idle_comm, is_primary );
+      auto [intra, job_market] =
+          dye::impl::bifurcate(prmy_idle_comm, is_primary);
       REQUIRE(job_market);
 
-      auto new_label = dye::impl::assign_labels( job_market, deficits, cur_label );
+      auto new_label =
+          dye::impl::assign_labels(job_market, deficits, cur_label);
       REQUIRE(new_label);
-      if ( is_primary ) REQUIRE( *new_label == *cur_label );
+      if (is_primary) REQUIRE(*new_label == *cur_label);
     }
   }
   mpi::world.barrier();
 }
 
-TEST_CASE( "Test assign_labels: a specific example ","[dye][mpi][.]") {
+TEST_CASE("Test assign_labels: a specific example ", "[dye][mpi][.]") {
   constexpr auto nprocs = 28;
-  if ( nprocs > 1 && mpi::world.size() >= nprocs ) {
-    auto prmy_idle_comm = *(mpi::world.split( mpi::world.rank() < nprocs ));
-    if ( mpi::world.rank() < nprocs ) {
+  if (nprocs > 1 && mpi::world.size() >= nprocs) {
+    auto prmy_idle_comm = *(mpi::world.split(mpi::world.rank() < nprocs));
+    if (mpi::world.rank() < nprocs) {
       int nprmy = 16;
       bool is_primary = prmy_idle_comm.rank() < nprmy;
-      std::vector<int> deficits; // significant only at primaries
-      if ( is_primary ) {
-        deficits = std::vector<int>(nprmy,0);
+      std::vector<int> deficits;  // significant only at primaries
+      if (is_primary) {
+        deficits = std::vector<int>(nprmy, 0);
         deficits[0] = 2;
         deficits[1] = 3;
         deficits[2] = 2;
         deficits[3] = 3;
       }
 
-      std::optional<int> cur_label; // current label
-      if ( is_primary ) cur_label.emplace( prmy_idle_comm.rank() );
+      std::optional<int> cur_label;  // current label
+      if (is_primary) cur_label.emplace(prmy_idle_comm.rank());
 
-      auto[ intra, job_market ] = dye::impl::bifurcate( prmy_idle_comm, is_primary );
+      auto [intra, job_market] =
+          dye::impl::bifurcate(prmy_idle_comm, is_primary);
       REQUIRE(job_market);
 
-      auto new_label = dye::impl::assign_labels( job_market, deficits, cur_label );
-      if ( is_primary ) REQUIRE( *new_label == *cur_label );
+      auto new_label =
+          dye::impl::assign_labels(job_market, deficits, cur_label);
+      if (is_primary) REQUIRE(*new_label == *cur_label);
 
       auto new_intra = mpi::world.split(new_label);
-      if (new_intra) new_intra -> barrier();
+      if (new_intra) new_intra->barrier();
     }
   }
   mpi::world.barrier();
 }
 
-TEMPLATE_TEST_CASE( "Test detailed balance","[dye][mpi][.]"
-                    , (std::integral_constant<int,2>)
-                    , (std::integral_constant<int,4>)
-                    , (std::integral_constant<int,16>)
-                    ) {
-  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
+TEMPLATE_TEST_CASE("Test detailed balance", "[dye][mpi][.]",
+                   (std::integral_constant<int, 2>),
+                   (std::integral_constant<int, 4>),
+                   (std::integral_constant<int, 16>)) {
+  mpi::commit(mpi::Datatype<Particle<Real, Specs>>{});
   constexpr auto ens_size = TestType::value;
-  if ( mpi::world.size() >= ens_size ) {
-    auto intra = mpi::world.split( mpi::world.rank() < ens_size );
-    if ( mpi::world.rank() < ens_size ) {
-      aio::gauss_real<double> load_gen( 1000.0, 1000.0 );
+  if (mpi::world.size() >= ens_size) {
+    auto intra = mpi::world.split(mpi::world.rank() < ens_size);
+    if (mpi::world.rank() < ens_size) {
+      aio::gauss_real<double> load_gen(1000.0, 1000.0);
       int N = 100;
-      while ( N-- ) {
+      while (N--) {
         std::vector<load_t> loads(ens_size);
-        if ( intra->rank() == 0 ) {
-          for ( auto& l : loads ) {
+        if (intra->rank() == 0) {
+          for (auto& l : loads) {
             auto tmp = load_gen();
             tmp = std::max<double>(tmp, 0);
             tmp = std::min<double>(tmp, 10000);
             l = static_cast<load_t>(tmp);
           }
         }
-        intra->broadcast(0,loads.data(), loads.size());
+        intra->broadcast(0, loads.data(), loads.size());
 
         array<Real, Specs> ptcs;
         ptcs.resize(loads[intra->rank()]);
 
-        dye::detailed_balance( ptcs, *intra );
+        dye::detailed_balance(ptcs, *intra);
 
         load_t total_load = 0;
-        for ( auto l : loads ) total_load += l;
-        CAPTURE( loads, ptcs.size(), total_load / ens_size );
-        REQUIRE( (ptcs.size() == total_load / ens_size || ptcs.size() == 1 + total_load / ens_size ) );
+        for (auto l : loads) total_load += l;
+        CAPTURE(loads, ptcs.size(), total_load / ens_size);
+        REQUIRE((ptcs.size() == total_load / ens_size ||
+                 ptcs.size() == 1 + total_load / ens_size));
       }
     }
     mpi::world.barrier();
   }
-  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
+  mpi::uncommit(mpi::Datatype<Particle<Real, Specs>>{});
 }
 
-TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially with trivial ensembles","[dye][mpi][.]"
-                    , (aio::IndexType<2,1>)
-                    ) {
-  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
+TEMPLATE_TEST_CASE(
+    "Test dynamic balancing on some cartesian topology initially with trivial "
+    "ensembles",
+    "[dye][mpi][.]", (aio::IndexType<2, 1>)) {
+  mpi::commit(mpi::Datatype<Particle<Real, Specs>>{});
   // TODO test a shrinking ensemble
   constexpr int DGrid = 2;
   int nens = 1;
   std::vector<int> cart_dims;
-  for ( auto i : TestType::get() ) {
-    cart_dims.push_back( i > 0 ? i : -i );
+  for (auto i : TestType::get()) {
+    cart_dims.push_back(i > 0 ? i : -i);
     nens *= cart_dims.back();
   }
-  // NOTE TODOL current implementation requires explicit touch-create before detailed balance
+  // NOTE TODOL current implementation requires explicit touch-create before
+  // detailed balance
   map<array<Real, Specs>> ptcs;
   map<std::vector<load_t>> loads;
   {
@@ -295,40 +313,37 @@ TEMPLATE_TEST_CASE( "Test dynamic balancing on some cartesian topology initially
     loads.insert(species::ion);
   }
 
-
-  if ( mpi::world.size() > nens ) {
-    aio::gauss_real<double> load_gen( 1000.0, 500.0 );
+  if (mpi::world.size() > nens) {
+    aio::gauss_real<double> load_gen(1000.0, 500.0);
     unsigned int target_load = 0;
-    auto cart_opt = aio::make_cart( cart_dims, {false,false}, mpi::world );
+    auto cart_opt = aio::make_cart(cart_dims, {false, false}, mpi::world);
     auto ens_opt = dye::create_ensemble<DGrid>(cart_opt);
 
-    for ( auto sp : loads ) {
+    for (auto sp : loads) {
       auto& load = loads[sp];
       load.resize(nens);
-      for ( int label = 0; label < nens; ++label ) {
+      for (int label = 0; label < nens; ++label) {
         auto x = load_gen();
         x = std::max<double>(x, 0.0);
         x = std::min<double>(x, 100000.0);
         load[label] = x;
 
-        if ( ens_opt && ens_opt->label() == label )
-          ptcs[sp].resize( load[label] );
+        if (ens_opt && ens_opt->label() == label) ptcs[sp].resize(load[label]);
       }
     }
 
-    dye::dynamic_load_balance(ptcs, ens_opt, cart_opt, target_load );
-
+    dye::dynamic_load_balance(ptcs, ens_opt, cart_opt, target_load);
   }
-  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
-
+  mpi::uncommit(mpi::Datatype<Particle<Real, Specs>>{});
 }
 
 SCENARIO("Stress test", "[dye][mpi][.]") {
-  mpi::commit(mpi::Datatype<Particle<Real,Specs>>{});
+  mpi::commit(mpi::Datatype<Particle<Real, Specs>>{});
   const int num_ens = 1;
   const int num_procs = mpi::world.size();
   const int num_cycles = 1000;
-  // NOTE TODOL current implementation requires explicit touch-create before detailed balance
+  // NOTE TODOL current implementation requires explicit touch-create before
+  // detailed balance
   map<array<Real, Specs>> particles;
   {
     particles.insert(species::electron);
@@ -337,45 +352,48 @@ SCENARIO("Stress test", "[dye][mpi][.]") {
   }
 
   auto rwld_opt = aio::reduced_world(num_procs, mpi::world);
-  if ( rwld_opt ) {
+  if (rwld_opt) {
     lgr::ofstream<> out;
     out.open("derun" + std::to_string(rwld_opt->rank()));
-    auto cart_opt = aio::make_cart( {num_ens}, {false}, *rwld_opt );
+    auto cart_opt = aio::make_cart({num_ens}, {false}, *rwld_opt);
     auto ens_opt = dye::create_ensemble<1>(cart_opt);
 
-    aio::gauss_real<double> load_gen( 1000.0, 500.0 );
-    load_gen.seed( aio::now() + rwld_opt->rank() );
+    aio::gauss_real<double> load_gen(1000.0, 500.0);
+    load_gen.seed(aio::now() + rwld_opt->rank());
     unsigned int target_load = 0;
 
     int N = num_cycles;
-    while ( N-- ) {
-      if ( ens_opt ) {
+    while (N--) {
+      if (ens_opt) {
         out << "--- Cycle = " << num_cycles - N << " ----" << std::endl;
-        out << "old sizes:" << std::endl;;
-        for ( auto sp : particles ) {
-          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size() << std::endl;
+        out << "old sizes:" << std::endl;
+        ;
+        for (auto sp : particles) {
+          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size()
+              << std::endl;
         }
 
-        for ( auto sp : particles ) {
-            auto x = load_gen();
-            x = std::max<double>(x, 0.0);
-            x = std::min<double>(x, 100000.0);
-            particles[sp].resize( static_cast<load_t>(x) );
+        for (auto sp : particles) {
+          auto x = load_gen();
+          x = std::max<double>(x, 0.0);
+          x = std::min<double>(x, 100000.0);
+          particles[sp].resize(static_cast<load_t>(x));
         }
 
-        out << "new sizes:" << std::endl;;
-        for ( auto sp : particles ) {
-          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size() << std::endl;
+        out << "new sizes:" << std::endl;
+        ;
+        for (auto sp : particles) {
+          out << "  sp " << static_cast<int>(sp) << ", " << particles[sp].size()
+              << std::endl;
         }
 
-        if ( N % 5 == 0 && N != 0 ) out.clear();
+        if (N % 5 == 0 && N != 0) out.clear();
       }
-      dye::dynamic_load_balance(particles, ens_opt, cart_opt, target_load );
+      dye::dynamic_load_balance(particles, ens_opt, cart_opt, target_load);
     }
 
     out.close();
   }
   mpi::world.barrier();
-  mpi::uncommit(mpi::Datatype<Particle<Real,Specs>>{});
-
+  mpi::uncommit(mpi::Datatype<Particle<Real, Specs>>{});
 }

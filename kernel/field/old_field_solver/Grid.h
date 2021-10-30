@@ -4,13 +4,14 @@
 #include "Predefs.h"
 
 struct Grid {
-  int dims[3] { 1, 1, 1 };   //!< Dimensions of the grid of each direction
-  int guard[3] {};  //!< Number of guard cells at either end of each direction
-  int indent[NUM_BOUNDARIES] {}; //!< Indent of the physical domain, required near the boundaries
+  int dims[3]{1, 1, 1};  //!< Dimensions of the grid of each direction
+  int guard[3]{};  //!< Number of guard cells at either end of each direction
+  int indent[NUM_BOUNDARIES]{};  //!< Indent of the physical domain, required
+                                 //!< near the boundaries
 
-  Scalar delta[3] { 1.0, 1.0, 1.0 };  //!< Grid spacing on each direction (spacing in coordinate
-                    //!< space)
-  Scalar lower[3] {};  //!< Lower limit of the grid on each direction
+  Scalar delta[3]{1.0, 1.0, 1.0};  //!< Grid spacing on each direction (spacing
+                                   //!< in coordinate space)
+  Scalar lower[3]{};  //!< Lower limit of the grid on each direction
 
   int dimension = 1;
 
@@ -35,15 +36,15 @@ struct Grid {
   ///  between guard cells and physical cells. The function is only
   ///  defined for i >= 0 and i < DIM.
   ////////////////////////////////////////////////////////////////////////////////
-  inline Scalar pos(int i, int n, int stagger ) const {
-   // if (i < dimension)
+  inline Scalar pos(int i, int n, int stagger) const {
+    // if (i < dimension)
     return (lower[i] + delta[i] * (n - guard[i] + 0.5 + 0.5 * stagger));
-   // else
+    // else
     //  return 0.0;
   }
 
-  inline Scalar pos(int i, int n, StaggerType stagger ) const {
-    return pos(i, n, static_cast<int>(stagger) );
+  inline Scalar pos(int i, int n, StaggerType stagger) const {
+    return pos(i, n, static_cast<int>(stagger));
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -61,10 +62,7 @@ struct Grid {
   ////////////////////////////////////////////////////////////////////////////////
   ///  Get the extent of the grid. Used for interfacing with multiarrays.
   ////////////////////////////////////////////////////////////////////////////////
-  inline Extent extent() const {
-    return Extent{dims[0], dims[1], dims[2]};
-  }
-
+  inline Extent extent() const { return Extent{dims[0], dims[1], dims[2]}; }
 };
 
 #endif  // ----- #ifndef _GRID_H_  -----

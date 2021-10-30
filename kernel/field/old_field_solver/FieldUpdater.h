@@ -1,9 +1,10 @@
 #ifndef _FIELDUPDATER_H_
 #define _FIELDUPDATER_H_
 
-#include "Fields.h"
-#include "FUParams.h"
 #include <unordered_map>
+
+#include "FUParams.h"
+#include "Fields.h"
 
 class FiniteDiff;
 // struct SaveSnapshotProxy;
@@ -23,14 +24,15 @@ class FieldCommunicator;
 //     auto& ptc = particles.PtcData()[idx];
 //     const int& C_dir = grid_full.getCell( ptc.cell )[dir];
 //     // check if the particle lies inside the layer
-//     if ( C_dir >= _shift[dir] && C_dir < _shift[dir] + _grid_damp.dims[dir] ) {
+//     if ( C_dir >= _shift[dir] && C_dir < _shift[dir] + _grid_damp.dims[dir] )
+//     {
 //       set_bit( ptc.flag, ParticleFlag::ignore_force );
 //     }
 //   }
 
-// TODO TODO during restart, damping bg should be read in. There is the storing damping data into snapshot in FieldUpdater.cpp
-// const auto& proxy = InfoCollector::Instance().ssProxy;
-// if ( proxy.isReadDampingBg ) {
+// TODO TODO during restart, damping bg should be read in. There is the storing
+// damping data into snapshot in FieldUpdater.cpp const auto& proxy =
+// InfoCollector::Instance().ssProxy; if ( proxy.isReadDampingBg ) {
 //   ReadFromSnapshot(proxy);
 // } else {
 // InitBackground( Efield_bg, Bfield_bg );
@@ -42,7 +44,9 @@ class FieldUpdater {
   typedef VectorField<Scalar> vector_field_type;
   typedef ScalarField<Scalar> scalar_field_type;
 
-  FieldUpdater( const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc, const VectorField<Scalar>& E_bg, const VectorField<Scalar>& B_bg );
+  FieldUpdater(const FUParams& params, FiniteDiff& fd, FieldCommunicator& fc,
+               const VectorField<Scalar>& E_bg,
+               const VectorField<Scalar>& B_bg);
   ~FieldUpdater();
 
   void Update(VectorField<Scalar>& Efield, VectorField<Scalar>& Bfield,
@@ -51,10 +55,18 @@ class FieldUpdater {
   // void CopyToSnapshot( SaveSnapshotProxy& proxy ) const;
 
  private:
-  void ComputeEfieldUpdate(Scalar dt, VectorField<Scalar>& B, VectorField<Scalar>& E, const VectorField<Scalar>& current);
-  void ComputeBfieldUpdate(Scalar dt, VectorField<Scalar>& E, VectorField<Scalar>& B, const VectorField<Scalar>& current);
-  void ComputeEfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& B, VectorField<Scalar>& E, const VectorField<Scalar>& current);
-  void ComputeBfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& E, VectorField<Scalar>& B, const VectorField<Scalar>& current);
+  void ComputeEfieldUpdate(Scalar dt, VectorField<Scalar>& B,
+                           VectorField<Scalar>& E,
+                           const VectorField<Scalar>& current);
+  void ComputeBfieldUpdate(Scalar dt, VectorField<Scalar>& E,
+                           VectorField<Scalar>& B,
+                           const VectorField<Scalar>& current);
+  void ComputeEfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& B,
+                                   VectorField<Scalar>& E,
+                                   const VectorField<Scalar>& current);
+  void ComputeBfieldUpdateExplicit(Scalar dt, VectorField<Scalar>& E,
+                                   VectorField<Scalar>& B,
+                                   const VectorField<Scalar>& current);
 
   const Grid& _grid;
   std::array<bool, 6> _is_at_boundary;
@@ -67,16 +79,16 @@ class FieldUpdater {
   // contains fieldBC objects if the current ensemble is at physical boundary
   std::unordered_map<BoundaryPosition, FieldBC*> _fieldBC;
 
-  Index _d_start; // start of the computational domain on this node
-  Extent _d_ext; // extent of the computational domain on this node
+  Index _d_start;  // start of the computational domain on this node
+  Extent _d_ext;   // extent of the computational domain on this node
 
   vector_field_type _BfieldOld;
   vector_field_type _BfieldDelta;
   vector_field_type _EfieldTmp;
   vector_field_type _EfieldDelta;
 
-//  // this is a hack for invoking ordinary diff along r for E and J transverse
-//  bool _isBdry_EJ[NUM_BOUNDARIES];
+  //  // this is a hack for invoking ordinary diff along r for E and J
+  //  transverse bool _isBdry_EJ[NUM_BOUNDARIES];
 
 };  // ----- end of class FieldUpdater -----
 

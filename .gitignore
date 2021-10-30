@@ -1,5 +1,6 @@
 /*
-
+!clang-format-pigeon
+!.clang-format
 !.gitignore
 !pgn
 !README.md

@@ -2,5 +2,5 @@
 #include "pic.hpp"
 
 namespace field {
-  template struct OldSolve<pic::real_t, pic::DGrid, pic::real_j_t>;
+template struct OldSolve<pic::real_t, pic::DGrid, pic::real_j_t>;
 }

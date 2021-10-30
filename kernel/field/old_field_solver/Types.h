@@ -1,19 +1,19 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-#include "Predefs.h"
 #include <cstdint>
 
+#include "Predefs.h"
+
 // Simple bit check function
-inline constexpr bool check_bit (int input, int pos) {
+inline constexpr bool check_bit(int input, int pos) {
   return (input & (1 << pos)) == (1 << pos);
 }
 
 // Simple test against floating zero
 inline bool check_zero(double input, double eps = EPS) {
-  return ( (input < eps) && (input > -eps) );
+  return ((input < eps) && (input > -eps));
 }
-
 
 // Keeping this enum old-style, just for easier usage (not so
 // verbose), such as boundary[LOWER_1] instead of
@@ -38,7 +38,7 @@ enum class FieldBCType {
   ROTATING_CONDUCTOR,
   DAMPING,
   COORDINATE,
-};         // ----- end of enum FieldBCType -----
+};  // ----- end of enum FieldBCType -----
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Struct for storing the extent (3-dimensional size) of a multi-array.
@@ -91,21 +91,21 @@ struct Vec3 {
     else
       return z;
     // else
-      // throw std::out_of_range("Index out of bound!");
+    // throw std::out_of_range("Index out of bound!");
   }
 
-  inline self_type& operator= (const self_type& other) {
+  inline self_type& operator=(const self_type& other) {
     x = other.x;
     y = other.y;
     z = other.z;
     return *this;
   }
 
-  inline bool operator== (const self_type& other) const {
+  inline bool operator==(const self_type& other) const {
     return (x == other.x && y == other.y && z == other.z);
   }
 
-  inline bool operator!= (const self_type& other) const {
+  inline bool operator!=(const self_type& other) const {
     return (x != other.x || y != other.y || z != other.z);
   }
 
@@ -134,15 +134,12 @@ struct Vec3 {
   //   tmp -= other;
   //   return tmp;
   // }
-
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Class to store a multi-dimensional size
 ////////////////////////////////////////////////////////////////////////////////
-struct Extent : public Vec3<int>
-{
+struct Extent : public Vec3<int> {
   Extent() : Vec3(0, 1, 1) {}
   Extent(int w, int h = 1, int d = 1) : Vec3(w, h, d) {}
   Extent(const Vec3<int>& vec) : Vec3(vec) {}
@@ -155,14 +152,12 @@ struct Extent : public Vec3<int>
   inline const int& depth() const { return z; }
 
   inline int size() const { return x * y * z; }
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Class to store a multi-dimensional index
 ////////////////////////////////////////////////////////////////////////////////
-struct Index : public Vec3<int>
-{
+struct Index : public Vec3<int> {
   Index() : Vec3(0, 0, 0) {}
   Index(int idx, const Extent& ext) {
     z = idx / (ext.width() * ext.height());
@@ -176,7 +171,6 @@ struct Index : public Vec3<int>
   inline int index(const Extent& ext) const {
     return x + y * ext.width() + z * ext.width() * ext.height();
   }
-
 };
 
 #endif  // ----- #ifndef _TYPES_H_  -----

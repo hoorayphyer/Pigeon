@@ -1,5 +1,5 @@
-#ifndef  INCLUDE_SCALES_H_
-#define  INCLUDE_SCALES_H_
+#ifndef INCLUDE_SCALES_H_
+#define INCLUDE_SCALES_H_
 
 #include "Grid.h"
 #include "MultiArray.h"
@@ -31,9 +31,9 @@ class Scales {
 
     for (int n = 0; n < _stagger_num; n++) {
       // Using bit operations might be more intuitive?
-      int istag = check_bit(n, 0); // Extract lowest bit
-      int jstag = check_bit(n, 1); // Extract second lowest bit
-      int kstag = check_bit(n, 2); // Extract highest bit
+      int istag = check_bit(n, 0);  // Extract lowest bit
+      int jstag = check_bit(n, 1);  // Extract second lowest bit
+      int kstag = check_bit(n, 2);  // Extract highest bit
       // Alternatives
       // int istag = n % 2;
       // int jstag = (n / 2) % 2;
@@ -55,7 +55,6 @@ class Scales {
         }
       }
     }
-
   }
 
   ~Scales() {}
@@ -71,9 +70,7 @@ class Scales {
     return _scales[n][stag_id];
   }
 
-  array_type& get_scales(int n, int stag_id) {
-    return _scales[n][stag_id];
-  }
-}; // ----- end of class Scales -----
+  array_type& get_scales(int n, int stag_id) { return _scales[n][stag_id]; }
+};  // ----- end of class Scales -----
 
-#endif   // INCLUDE_SCALES_H_
+#endif  // INCLUDE_SCALES_H_
