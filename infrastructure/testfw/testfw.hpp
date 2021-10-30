@@ -4,6 +4,7 @@
 #include <cmath>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <random>
 
 #include "apt/print.hpp"

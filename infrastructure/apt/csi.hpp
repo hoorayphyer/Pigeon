@@ -1,6 +1,7 @@
 #ifndef _APT_CSI_HPP_
 #define _APT_CSI_HPP_
 #include <cstdio>
+#include <string>
 
 namespace apt {
 // comma-separated-integer
