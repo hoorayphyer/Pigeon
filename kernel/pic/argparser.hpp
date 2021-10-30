@@ -1,6 +1,8 @@
 #ifndef _ARGPARSER_HPP_
 #define _ARGPARSER_HPP_
 
+#include <optional>
+
 namespace pic {
 struct CLIArgs {
   std::optional<std::string> journal_file{};
