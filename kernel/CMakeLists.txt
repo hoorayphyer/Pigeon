@@ -25,9 +25,10 @@ add_library(mpi INTERFACE)
 # FIXME not sure why the RPATH info in mpipp is not transitive here. Build? Install?
 find_package(MPI)
 target_compile_options(mpi INTERFACE "${MPI_CXX_COMPILE_OPTIONS}")
-separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # a workaround since findMPI doesn't provide this yet
 target_include_directories(mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure ${MPI_CXX_INCLUDE_DIRS})
-target_link_options(mpi INTERFACE ${MPI_CXX_LINK_OPTIONS})
+# NOTE somehow the following two lines should be commented out for things to work
+# separate_arguments(MPI_CXX_LINK_OPTIONS NATIVE_COMMAND ${MPI_CXX_LINK_FLAGS}) # a workaround since findMPI doesn't provide this yet
+# target_link_options(mpi INTERFACE ${MPI_CXX_LINK_OPTIONS})
 target_link_directories(mpi INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
 target_link_libraries(mpi INTERFACE ${MPI_CXX_LIBRARIES})
 target_link_libraries(mpi INTERFACE -lmpipp)
