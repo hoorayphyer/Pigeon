@@ -1,5 +1,4 @@
-#ifndef _MPI_POINT_TO_POINT_HPP_
-#define _MPI_POINT_TO_POINT_HPP_
+#pragma once
 
 #include "mpipp/mpi_request.hpp"
 
@@ -45,5 +44,3 @@ struct P2P_Comm {
 };
 
 }  // namespace mpi
-
-#endif

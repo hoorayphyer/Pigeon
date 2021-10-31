@@ -1,5 +1,4 @@
-#ifndef _APT_PRINT_HPP_
-#define _APT_PRINT_HPP_
+#pragma once
 
 #include <cstdio>
 #include <string>
@@ -62,5 +61,3 @@ std::string fmt(std::string s, T&&... x) {
   return {str};
 }
 }  // namespace apt
-
-#endif

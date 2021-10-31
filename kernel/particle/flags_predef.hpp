@@ -1,5 +1,4 @@
-#ifndef _FLAGS_PREDEF_HPP_
-#define _FLAGS_PREDEF_HPP_
+#pragma once
 
 namespace particle {
 // 16 flags
@@ -26,5 +25,3 @@ constexpr bool is_reserved_flag(flag f) noexcept {
   return static_cast<unsigned int>(f) < 3;
 }
 }  // namespace particle
-
-#endif

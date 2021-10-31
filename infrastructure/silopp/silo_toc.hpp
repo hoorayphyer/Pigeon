@@ -1,5 +1,4 @@
-#ifndef _SILO_TOC_
-#define _SILO_TOC_
+#pragma once
 
 #include <string>
 #include <vector>
@@ -26,5 +25,3 @@ struct Toc {
 };
 
 }  // namespace silo
-
-#endif

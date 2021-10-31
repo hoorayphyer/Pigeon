@@ -1,5 +1,4 @@
-#ifndef _APT_TYPE_TRAITS_HPP_
-#define _APT_TYPE_TRAITS_HPP_
+#pragma once
 
 namespace apt {
 template <class C>
@@ -128,5 +127,3 @@ using copy_cvref_t = copy_const_t<From, copy_ref_t<From, To>>;
 template <typename T>
 using remove_cvref_t = remove_cv_t<remove_ref_t<T>>;
 }  // namespace apt
-
-#endif

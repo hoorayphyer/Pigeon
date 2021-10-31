@@ -1,5 +1,4 @@
-#ifndef _SILO_XX_HPP_
-#define _SILO_XX_HPP_
+#pragma once
 
 #include "apt/handle.hpp"
 #include "silopp/silo_navigation.hpp"
@@ -30,5 +29,3 @@ inline void close(file_t& f) { f.reset(); }
 namespace silo {
 std::string errmsg();
 }
-
-#endif

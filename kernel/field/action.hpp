@@ -1,5 +1,4 @@
-#ifndef _FIELD_ACTION_HPP_
-#define _FIELD_ACTION_HPP_
+#pragma once
 
 #include "apt/action_base.hpp"
 #include "apt/grid.hpp"
@@ -36,5 +35,3 @@ struct Action : public apt::ActionBase<DGrid> {
                           Real dt) const = 0;
 };
 }  // namespace field
-
-#endif

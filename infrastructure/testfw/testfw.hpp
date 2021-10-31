@@ -1,5 +1,4 @@
-#ifndef _TEST_ALL_IN_ONE_HPP_
-#define _TEST_ALL_IN_ONE_HPP_
+#pragma once
 
 #include <cmath>
 #include <ctime>
@@ -124,5 +123,3 @@ std::optional<int> color_from_nprocs(std::vector<int> nprocs, const int rank) {
   return color;
 }
 }  // namespace aio
-
-#endif

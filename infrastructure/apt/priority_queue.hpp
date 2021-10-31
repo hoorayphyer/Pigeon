@@ -1,5 +1,4 @@
-#ifndef _APT_PRIORITY_QUEUE_HPP_
-#define _APT_PRIORITY_QUEUE_HPP_
+#pragma once
 #include <queue>
 
 namespace apt {
@@ -39,5 +38,3 @@ class priority_queue {
   inline auto size() const { return _pq.size(); }
 };
 }  // namespace apt
-
-#endif

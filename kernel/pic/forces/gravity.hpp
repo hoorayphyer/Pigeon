@@ -1,5 +1,4 @@
-#ifndef _PIC_FORCE_GRAVITY_HPP_
-#define _PIC_FORCE_GRAVITY_HPP_
+#pragma once
 
 // TODOL all the stuff under this {} are meant to be user-specified. Here the
 // pulsar in LogSpherical is used
@@ -12,5 +11,3 @@ void gravity(Ptc_t<T, Specs>& ptc, T dt, const apt::Vec<T, Specs<T>::Dim>&,
   ptc.p(0) -= g * std::exp(-2 * ptc.q(0)) * dt;
 }
 }  // namespace particle::force
-
-#endif

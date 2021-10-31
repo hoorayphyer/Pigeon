@@ -1,5 +1,4 @@
-#ifndef _MPI_XX_HPP_
-#define _MPI_XX_HPP_
+#pragma once
 
 #include "apt/pair.hpp"
 #include "mpipp/mpi_collective.hpp"
@@ -162,5 +161,3 @@ void uncommit(Datatype<T>) {
 extern const Comm world;
 extern const Comm self;
 }  // namespace mpi
-
-#endif

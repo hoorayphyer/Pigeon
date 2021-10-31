@@ -1,5 +1,4 @@
-#ifndef _MIGRATION_HPP_
-#define _MIGRATION_HPP_
+#pragma once
 
 #include <vector>
 
@@ -30,5 +29,3 @@ void migrate(std::vector<Particle<Real, PtcSpecs>>& buffer,
 // active processes ( preferrably all processes to avoid future sync. ) Using
 // timestep is a good choice.
 }  // namespace particle
-
-#endif

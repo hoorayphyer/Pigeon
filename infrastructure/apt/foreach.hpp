@@ -1,5 +1,4 @@
-#ifndef _APT_FOREACH_HPP_
-#define _APT_FOREACH_HPP_
+#pragma once
 
 #include <utility>  // for std::forward
 
@@ -13,5 +12,3 @@ constexpr void foreach (const Func& f, Args && ... args) noexcept {
 }
 
 }  // namespace apt
-
-#endif

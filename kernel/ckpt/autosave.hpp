@@ -1,5 +1,4 @@
-#ifndef _CHECKPOINT_AUTOSAVE_HPP_
-#define _CHECKPOINT_AUTOSAVE_HPP_
+#pragma once
 
 #include <optional>
 #include <queue>
@@ -33,5 +32,3 @@ struct Autosave {
   }
 };
 }  // namespace ckpt
-
-#endif

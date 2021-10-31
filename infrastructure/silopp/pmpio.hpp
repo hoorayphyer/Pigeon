@@ -1,5 +1,4 @@
-#ifndef _SILOPP_PMPIO_HPP_
-#define _SILOPP_PMPIO_HPP_
+#pragma once
 
 #include "silopp/silo++.hpp"
 
@@ -47,5 +46,3 @@ struct Pmpio {
 };
 
 }  // namespace silo
-
-#endif

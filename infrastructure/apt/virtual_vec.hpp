@@ -1,5 +1,4 @@
-#ifndef _APT_VIRTUAL_VEC_HPP_
-#define _APT_VIRTUAL_VEC_HPP_
+#pragma once
 
 #include <tuple>
 
@@ -98,5 +97,3 @@ struct vVec : public VecExpression<vVec<T, N>, T>,
 };
 
 }  // namespace apt
-
-#endif

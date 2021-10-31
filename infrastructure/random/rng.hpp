@@ -1,5 +1,4 @@
-#ifndef _UTIL_RNG_HPP_
-#define _UTIL_RNG_HPP_
+#pragma once
 
 #include <random>
 
@@ -29,5 +28,3 @@ class Rng {
   }
 };
 }  // namespace util
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_SCATTERING_HPP_
-#define _PARTICLE_SCATTERING_HPP_
+#pragma once
 
 #include <memory>
 #include <optional>
@@ -155,5 +154,3 @@ template <typename T, template <typename> class S>
 void PhotonPairProduction(back_insert_iterator_t<T, S> itr, Ptc_t<T, S>& photon,
                           T, flagger_t);
 }  // namespace particle::scat
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _FIELD_MESH_HPP_
-#define _FIELD_MESH_HPP_
+#pragma once
 
 #include "apt/block.hpp"
 #include "apt/range.hpp"
@@ -58,5 +57,3 @@ struct Mesh {
   }
 };
 }  // namespace field
-
-#endif

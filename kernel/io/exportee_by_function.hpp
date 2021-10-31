@@ -1,5 +1,4 @@
-#ifndef _IO_EXPORTEE_BY_FUNCTION_HPP_
-#define _IO_EXPORTEE_BY_FUNCTION_HPP_
+#pragma once
 
 #include "io/exportee.hpp"
 // #include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with
@@ -129,5 +128,3 @@ struct PexpTbyFunction : public PtcExportee<RealDS, DGrid, Real, S> {
   }
 };
 }  // namespace io
-
-#endif

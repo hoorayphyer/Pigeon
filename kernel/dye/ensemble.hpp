@@ -1,5 +1,4 @@
-#ifndef _DYE_ENSEMBLE_HPP_
-#define _DYE_ENSEMBLE_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 #include "mpipp/mpi++.hpp"
@@ -49,5 +48,3 @@ std::optional<Ensemble<DGrid>> create_ensemble(
         cart);  // create ensemble that only consists of chief itself
 
 }  // namespace dye
-
-#endif

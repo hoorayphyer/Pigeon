@@ -1,5 +1,4 @@
-#ifndef _MPI_COLLECTIVE_HPP_
-#define _MPI_COLLECTIVE_HPP_
+#pragma once
 
 #include <optional>
 
@@ -61,5 +60,3 @@ struct Collective_Comm {
 };
 
 }  // namespace mpi
-
-#endif

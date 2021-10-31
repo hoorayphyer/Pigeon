@@ -1,5 +1,4 @@
-#ifndef _TIMER_HPP_
-#define _TIMER_HPP_
+#pragma once
 #include <any>
 #include <string>
 
@@ -53,5 +52,3 @@ struct Timestamp {
 };
 
 }  // namespace tmr
-
-#endif

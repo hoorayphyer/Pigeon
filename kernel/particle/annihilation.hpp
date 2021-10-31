@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_ANNIHILATION_HPP_
-#define _PARTICLE_ANNIHILATION_HPP_
+#pragma once
 
 #include "apt/grid.hpp"
 #include "field/field.hpp"
@@ -18,5 +17,3 @@ void annihilate(array<R, S>& el, array<R, S>& po, field::Field<RJ, 3, DGrid>& J,
                 R (*policy)(R num_electron_in_a_cell, R num_positron_in_a_cell),
                 const apt::array<apt::array<R, 2>, DGrid>& bounds);
 }
-
-#endif

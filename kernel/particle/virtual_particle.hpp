@@ -1,5 +1,4 @@
-#ifndef _VIRTUAL_PARTICLE_HPP_
-#define _VIRTUAL_PARTICLE_HPP_
+#pragma once
 
 #include "apt/virtual_vec.hpp"
 #include "particle/particle_expression.hpp"
@@ -72,5 +71,3 @@ struct vParticle
 };
 
 }  // namespace particle
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _DEBUG_COMPARE_PTCS_HPP_
-#define _DEBUG_COMPARE_PTCS_HPP_
+#pragma once
 
 #include "mpipp/mpi++.hpp"
 #include "particle/sorter.hpp"
@@ -75,5 +74,3 @@ std::array<std::size_t, 5> compare_particles(particle::array<T, S>&& ptcs1,
           count_ptcs(ptcs2)};
 }
 }  // namespace debug
-
-#endif

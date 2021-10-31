@@ -1,5 +1,4 @@
-#ifndef _PIC_VITALS_HPP_
-#define _PIC_VITALS_HPP_
+#pragma once
 
 #include <fstream>
 
@@ -84,5 +83,3 @@ void check_vitals(std::string filename, T t_phys,
   return;
 }
 }  // namespace pic
-
-#endif

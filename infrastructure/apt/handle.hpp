@@ -1,5 +1,4 @@
-#ifndef _APT_HANDLE_HPP_
-#define _APT_HANDLE_HPP_
+#pragma once
 
 #include <memory>
 
@@ -38,5 +37,3 @@ struct Handle {
   long use_count() const noexcept { return _ptr.use_count(); }
 };
 }  // namespace apt
-
-#endif

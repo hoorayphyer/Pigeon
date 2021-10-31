@@ -1,5 +1,4 @@
-#ifndef _APT_VEC_EXPRESSION_HPP_
-#define _APT_VEC_EXPRESSION_HPP_
+#pragma once
 #include "apt/foreach.hpp"
 
 namespace apt {
@@ -51,5 +50,3 @@ struct VecModAssign<VecExpression<E1, Real> > {
 };
 
 }  // namespace apt
-
-#endif

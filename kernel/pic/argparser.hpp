@@ -1,5 +1,4 @@
-#ifndef _ARGPARSER_HPP_
-#define _ARGPARSER_HPP_
+#pragma once
 
 #include <optional>
 
@@ -38,5 +37,3 @@ auto parse_args(int argc, char** argv) {
   return res;
 }
 }  // namespace pic
-
-#endif

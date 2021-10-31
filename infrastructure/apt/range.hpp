@@ -1,5 +1,4 @@
-#ifndef _APT_RANGE_HPP_
-#define _APT_RANGE_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 #include "apt/pair.hpp"
@@ -217,5 +216,3 @@ constexpr bool is_empty(const array<Range, D>& range) noexcept {
   return false;
 }
 }  // namespace apt::range
-
-#endif

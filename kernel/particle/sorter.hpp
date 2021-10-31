@@ -1,5 +1,5 @@
-#ifndef _PARTICLE_SORTER_HPP_
-#define _PARTICLE_SORTER_HPP_
+#pragma once
+
 #include <algorithm>
 
 #include "apt/grid.hpp"
@@ -94,5 +94,3 @@ void sort(array<T, Spec>& ptcs) {
   sort(ptcs, comp);
 }
 }  // namespace particle
-
-#endif

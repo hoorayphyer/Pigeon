@@ -1,5 +1,4 @@
-#ifndef _APT_PAIR_HPP_
-#define _APT_PAIR_HPP_
+#pragma once
 
 namespace apt {
 template <typename T>
@@ -28,5 +27,3 @@ pair<T&> tie(T& lft, T& rgt) noexcept {
 
 inline constexpr bool LFT = false;
 inline constexpr bool RGT = true;
-
-#endif

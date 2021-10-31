@@ -1,5 +1,5 @@
-#ifndef _DEBUGGER_HPP_
-#define _DEBUGGER_HPP_
+#pragma once
+
 #include <string>
 #include <vector>
 
@@ -19,5 +19,3 @@ inline void throw_error(std::string message) {
                            ")");
 }
 }  // namespace debug
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _APT_ACTION_BASE_HPP_
-#define _APT_ACTION_BASE_HPP_
+#pragma once
 
 #include <string>
 
@@ -27,5 +26,3 @@ struct ActionBase : public array<Range, DGrid> {
   };  // covariant return types, see Modern C++ Design
 };
 }  // namespace apt
-
-#endif

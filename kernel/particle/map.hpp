@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_MAP_HPP_
-#define _PARTICLE_MAP_HPP_
+#pragma once
 
 #include <array>
 #include <optional>
@@ -99,5 +98,3 @@ struct map {
   inline auto size() const noexcept { return _data.size(); }
 };
 }  // namespace particle
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _APT_TERNARY_HPP_
-#define _APT_TERNARY_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 
@@ -17,5 +16,3 @@ constexpr int L = 0;
 constexpr int C = 1;
 constexpr int R = 2;
 }  // namespace apt
-
-#endif

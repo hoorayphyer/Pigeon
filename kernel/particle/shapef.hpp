@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_SHAPEF_HPP_
-#define _PARTICLE_SHAPEF_HPP_
+#pragma once
 
 #include <cmath>
 
@@ -61,5 +60,3 @@ struct induced_shapef_t {
 };
 
 }  // namespace particle
-
-#endif

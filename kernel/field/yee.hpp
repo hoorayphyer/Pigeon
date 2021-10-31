@@ -1,5 +1,4 @@
-#ifndef _FIELD_YEE_HPP_
-#define _FIELD_YEE_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 #include "field/offset.hpp"
@@ -16,5 +15,3 @@ constexpr auto ofs_gen(offset_t type, int comp) noexcept {
   return res;
 }
 }  // namespace field::yee
-
-#endif

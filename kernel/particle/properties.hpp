@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_PROPERTIES_HPP_
-#define _PARTICLE_PROPERTIES_HPP_
+#pragma once
 
 #include <string>
 
@@ -11,5 +10,3 @@ struct Properties {
   std::string nickname = "";
 };
 }  // namespace particle
-
-#endif

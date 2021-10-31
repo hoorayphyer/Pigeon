@@ -1,5 +1,4 @@
-#ifndef _APT_NUMERIC_HPP_
-#define _APT_NUMERIC_HPP_
+#pragma once
 
 #include <cmath>
 
@@ -172,5 +171,3 @@ constexpr auto abs(const VecExpression<E>& vec) noexcept {
 }
 
 }  // namespace apt
-
-#endif
