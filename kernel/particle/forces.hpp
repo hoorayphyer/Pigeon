@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_FORCES_HPP_
-#define _PARTICLE_FORCES_HPP_
+#pragma once
 
 #include <vector>
 
@@ -49,5 +48,3 @@ template <typename T, template <typename> class S,
 void lorentz_exact(Ptc_t<T, S>& ptc, T dt, const apt::Vec<T, S<T>::Dim>& E,
                    const apt::Vec<T, S<T>::Dim>& B, T q_over_m);
 }  // namespace particle::force
-
-#endif

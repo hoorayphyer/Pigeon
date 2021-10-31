@@ -1,5 +1,4 @@
-#ifndef _APT_APPLY_HPP_
-#define _APT_APPLY_HPP_
+#pragma once
 
 #include <utility>  // for std::forward
 
@@ -20,5 +19,3 @@ constexpr decltype(auto) apply(const Func& f, Arg&& arg) noexcept {
                           std::make_integer_sequence<int, D>{});
 }
 }  // namespace apt
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _APT_ARRAY_HPP_
-#define _APT_ARRAY_HPP_
+#pragma once
 
 namespace apt {
 template <typename T, int D>
@@ -41,5 +40,3 @@ struct array<T, 0> {
   static constexpr int NDim = 0;
 };
 }  // namespace apt
-
-#endif

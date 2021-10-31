@@ -1,5 +1,4 @@
-#ifndef _APT_CSI_HPP_
-#define _APT_CSI_HPP_
+#pragma once
 #include <cstdio>
 #include <string>
 
@@ -18,5 +17,3 @@ std::string csi(T x) {
   }
 }
 }  // namespace apt
-
-#endif

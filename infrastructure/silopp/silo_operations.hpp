@@ -1,5 +1,4 @@
-#ifndef _SILO_OPERATIONS_HPP_
-#define _SILO_OPERATIONS_HPP_
+#pragma once
 #include <string>
 #include <vector>
 
@@ -58,5 +57,3 @@ struct Operations {
   void write(std::string varname, T vardata);
 };
 }  // namespace silo
-
-#endif

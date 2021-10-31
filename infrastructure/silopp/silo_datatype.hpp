@@ -1,5 +1,4 @@
-#ifndef _SILO_DATATYPE_
-#define _SILO_DATATYPE_
+#pragma once
 
 namespace silo {
 template <typename Type>
@@ -28,5 +27,3 @@ constexpr int datatype(const T&) noexcept {
   return datatype((T*)0);
 }
 }  // namespace silo
-
-#endif

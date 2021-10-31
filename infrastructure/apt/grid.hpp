@@ -1,5 +1,4 @@
-#ifndef _APT_GRID_HPP_
-#define _APT_GRID_HPP_
+#pragma once
 
 #include <cmath>
 
@@ -151,5 +150,3 @@ constexpr T dV(const Grid<T, DGrid>& grid) noexcept {
   return res;
 }
 }  // namespace apt
-
-#endif

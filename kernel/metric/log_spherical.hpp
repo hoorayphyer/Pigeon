@@ -1,5 +1,4 @@
-#ifndef _METRIC_LOGSPHERICAL_HPP_
-#define _METRIC_LOGSPHERICAL_HPP_
+#pragma once
 
 #include <cmath>
 
@@ -241,5 +240,3 @@ auto LogSpherical<T>::geodesic_move(X& x, P& p, T dt,
   return dx;
 }
 }  // namespace metric
-
-#endif

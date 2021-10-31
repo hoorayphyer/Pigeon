@@ -1,5 +1,4 @@
-#ifndef _LOGGER_OFSTREAM_HPP_
-#define _LOGGER_OFSTREAM_HPP_
+#pragma once
 
 #include <fstream>
 #include <string>
@@ -99,5 +98,3 @@ struct ofstream {
   inline void turn_off() noexcept { _is_on = false; }
 };
 }  // namespace lgr
-
-#endif

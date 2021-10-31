@@ -1,5 +1,4 @@
-#ifndef _SILO_NAVIGATION_HPP_
-#define _SILO_NAVIGATION_HPP_
+#pragma once
 #include <string>
 
 typedef struct DBfile DBfile;
@@ -23,5 +22,3 @@ struct Navigator {
 };
 
 }  // namespace silo
-
-#endif

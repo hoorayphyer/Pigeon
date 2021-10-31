@@ -1,5 +1,4 @@
-#ifndef _FIELD_LOG_SPHERICAL_UPDATER_HPP_
-#define _FIELD_LOG_SPHERICAL_UPDATER_HPP_
+#pragma once
 
 #include "field/action.hpp"
 
@@ -55,5 +54,3 @@ struct LogSphericalSolver : public Action<R, DGrid, RJ> {
 };
 
 }  // namespace field
-
-#endif

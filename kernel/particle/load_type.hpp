@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_LOAD_TYPE_HPP_
-#define _PARTICLE_LOAD_TYPE_HPP_
+#pragma once
 
 namespace particle {
 // use long long instead of unsigned long long to avoid sutble bug like
@@ -8,5 +7,3 @@ namespace particle {
 // being (unsigned long)(-99)
 using load_t = long long;
 }  // namespace particle
-
-#endif

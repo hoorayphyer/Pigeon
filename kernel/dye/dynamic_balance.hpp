@@ -1,5 +1,4 @@
-#ifndef _DYE_DYNAMIC_BALANCE_HPP_
-#define _DYE_DYNAMIC_BALANCE_HPP_
+#pragma once
 
 #include "dye/ensemble.hpp"
 #include "particle/array.hpp"
@@ -35,5 +34,3 @@ void dynamic_load_balance(
     std::optional<Ensemble<DGrid>>& ens_opt,
     const std::optional<mpi::CartComm>& cart_opt, unsigned int target_load);
 }  // namespace dye
-
-#endif

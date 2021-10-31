@@ -1,5 +1,4 @@
-#ifndef _FILESYS_HPP_
-#define _FILESYS_HPP_
+#pragma once
 
 #include <any>
 #include <string>
@@ -63,5 +62,3 @@ void mpido(const Comm& comm, const F& f) {
   comm.barrier();
 }
 }  // namespace fs
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _MESH_SHAPE_INTERPLAY_HPP_
-#define _MESH_SHAPE_INTERPLAY_HPP_
+#pragma once
 
 #include "apt/type_traits.hpp"
 #include "apt/vec.hpp"  // TODOL solely for interpolate as return value
@@ -53,5 +52,3 @@ void deposit(field::Field<RealJ, DField, DGrid>& J, U charge_over_dt,
              const apt::array<U, DField>& q1_std);
 
 }
-
-#endif

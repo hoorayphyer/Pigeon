@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_HPP_
-#define _PARTICLE_HPP_
+#pragma once
 
 #include "apt/vec.hpp"
 #include "particle/particle_expression.hpp"
@@ -84,5 +83,3 @@ struct Particle
 };
 
 }  // namespace particle
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _APT_VEC_HPP_
-#define _APT_VEC_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 #include "apt/vec_expression.hpp"
@@ -36,5 +35,3 @@ struct Vec : public VecExpression<Vec<T, N>, T>,
   constexpr T& operator[](int i) noexcept { return _v[i]; }
 };
 }  // namespace apt
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _SILO_OPTLIST_HPP_
-#define _SILO_OPTLIST_HPP_
+#pragma once
 
 #include <memory>
 #include <unordered_map>
@@ -82,5 +81,3 @@ struct OptList : public std::unordered_map<Opt, OptVal> {
 };
 
 }  // namespace silo
-
-#endif

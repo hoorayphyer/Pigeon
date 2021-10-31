@@ -1,5 +1,4 @@
-#ifndef _MPI_DATATYPE_HPP_
-#define _MPI_DATATYPE_HPP_
+#pragma once
 
 #include <mpi.h>
 
@@ -29,5 +28,3 @@ constexpr MPI_Datatype datatype(const T*) noexcept {
   return datatype((T*)0);
 }
 }  // namespace mpi
-
-#endif

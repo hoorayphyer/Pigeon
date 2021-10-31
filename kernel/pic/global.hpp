@@ -1,5 +1,4 @@
-#ifndef _PIC_GLOBAL_HPP_
-#define _PIC_GLOBAL_HPP_
+#pragma once
 
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
@@ -14,5 +13,3 @@ ForceGen<Real, Specs, Ptc_t> force_gen;
 template <typename Real, template <typename> class Specs>
 ScatGen<Real, Specs> scat_gen;
 }  // namespace particle
-
-#endif

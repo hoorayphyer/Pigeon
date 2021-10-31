@@ -1,5 +1,5 @@
-#ifndef _PIC_PLANS_HPP_
-#define _PIC_PLANS_HPP_
+#pragma once
+
 #include <limits>
 
 namespace pic {
@@ -59,4 +59,3 @@ std::optional<int (*)(int)>
     init_replica_deploy{};  // take in ensemble label and return the intended
                             // number of replicas in that ensemble
 }  // namespace pic
-#endif

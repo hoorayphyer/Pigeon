@@ -1,5 +1,4 @@
-#ifndef _PIC_IMPL_HPP_
-#define _PIC_IMPL_HPP_
+#pragma once
 
 #include <cassert>
 
@@ -1477,5 +1476,3 @@ std::string proofread(std::string indent) {
   return o.str();
 }
 }  // namespace pic
-
-#endif

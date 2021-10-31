@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_EXPRESSION_HPP_
-#define _PARTICLE_EXPRESSION_HPP_
+#pragma once
 
 #include "particle/state.hpp"
 
@@ -39,5 +38,3 @@ struct PtcExpression : public particle::StateExpression<Ptc, State> {
 };
 
 }  // namespace particle
-
-#endif

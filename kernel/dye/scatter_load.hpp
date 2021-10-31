@@ -1,5 +1,4 @@
-#ifndef _DYE_SCATTER_LOAD_
-#define _DYE_SCATTER_LOAD_
+#pragma once
 
 #include "apt/pair.hpp"
 
@@ -24,4 +23,3 @@ constexpr apt::pair<int> scatter_load(int total_load, int this_receiver_idx,
 }
 
 }  // namespace dye
-#endif

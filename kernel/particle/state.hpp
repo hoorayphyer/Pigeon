@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_STATE_HPP_
-#define _PARTICLE_STATE_HPP_
+#pragma once
 
 #include <bitset>
 #include <cstdint>
@@ -228,5 +227,3 @@ struct StateExpression {
 };
 
 }  // namespace particle
-
-#endif

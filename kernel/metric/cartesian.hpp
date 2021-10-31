@@ -1,5 +1,4 @@
-#ifndef _METRIC_CARTESIAN_HPP_
-#define _METRIC_CARTESIAN_HPP_
+#pragma once
 
 namespace metric {
 template <typename T>
@@ -70,5 +69,3 @@ constexpr T (*Diff(int Fcomp,
   return nullptr;
 }
 }  // namespace field
-
-#endif

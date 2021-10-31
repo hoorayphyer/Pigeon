@@ -1,5 +1,4 @@
-#ifndef _CHECKPOINT_HPP_
-#define _CHECKPOINT_HPP_
+#pragma once
 
 #include <optional>
 #include <string>
@@ -39,5 +38,3 @@ int load_checkpoint(std::string dir,
                     const particle::map<particle::Properties>& properties,
                     int target_load = 0);
 }  // namespace ckpt
-
-#endif

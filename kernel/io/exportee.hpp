@@ -1,5 +1,4 @@
-#ifndef _IO_EXPORTEE_HPP_
-#define _IO_EXPORTEE_HPP_
+#pragma once
 
 #include <optional>
 
@@ -58,5 +57,3 @@ struct PtcExportee : public ExporteeBase {
 };
 
 }  // namespace io
-
-#endif

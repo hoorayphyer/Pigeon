@@ -1,5 +1,4 @@
-#ifndef _DEBUGGER_NAN_HPP_
-#define _DEBUGGER_NAN_HPP_
+#pragma once
 
 #include <cmath>
 #include <iostream>
@@ -70,5 +69,3 @@ inline bool check_nan(Logger& log, const T& a, const U&... args) {
   return check_nan_impl<0>(log, a, args...);
 }
 }  // namespace debug
-
-#endif

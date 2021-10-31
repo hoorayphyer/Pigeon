@@ -1,5 +1,4 @@
-#ifndef _FIELD_COMMUNICATION_HPP_
-#define _FIELD_COMMUNICATION_HPP_
+#pragma once
 
 namespace mpi {
 struct CartComm;
@@ -45,5 +44,3 @@ inline void merge_sync_guard_cells(Field<T, DField, DGrid>& field,
                          field.mesh().range());
 }
 }  // namespace field
-
-#endif

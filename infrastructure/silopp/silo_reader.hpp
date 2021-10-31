@@ -1,5 +1,5 @@
-#ifndef _SILO_READER_HPP_
-#define _SILO_READER_HPP_
+#pragma once
+
 #include <string>
 #include <vector>
 
@@ -47,5 +47,3 @@ struct Reader {
                  void* var);
 };
 }  // namespace silo
-
-#endif

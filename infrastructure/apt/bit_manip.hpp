@@ -1,5 +1,4 @@
-#ifndef _APT_BIT_MANIP_HPP_
-#define _APT_BIT_MANIP_HPP_
+#pragma once
 
 #include <cstddef>
 
@@ -21,5 +20,3 @@ constexpr void setbits(T &x, U y) noexcept {
         << Pos);
 }
 }  // namespace apt
-
-#endif

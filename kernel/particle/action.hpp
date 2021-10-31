@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_ACTION_HPP_
-#define _PARTICLE_ACTION_HPP_
+#pragma once
 
 #include "apt/action_base.hpp"
 #include "apt/grid.hpp"
@@ -37,5 +36,3 @@ struct Action : public apt::ActionBase<DGrid> {
                           util::Rng<R>& rng) = 0;
 };
 }  // namespace particle
-
-#endif

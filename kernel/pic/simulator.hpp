@@ -1,5 +1,4 @@
-#ifndef _PIC_SIMULATOR_HPP_
-#define _PIC_SIMULATOR_HPP_
+#pragma once
 
 #include <memory>
 
@@ -448,5 +447,3 @@ struct Simulator {
   }
 };
 }  // namespace pic
-
-#endif

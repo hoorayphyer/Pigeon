@@ -1,5 +1,4 @@
-#ifndef _MPI_PARTICLE_HPP_
-#define _MPI_PARTICLE_HPP_
+#pragma once
 
 #include <vector>
 
@@ -46,5 +45,3 @@ struct Datatype<particle::Particle<T, S>> {
 template <typename T, template <typename> class S>
 MPI_Datatype Datatype<particle::Particle<T, S>>::type = MPI_DATATYPE_NULL;
 }  // namespace mpi
-
-#endif

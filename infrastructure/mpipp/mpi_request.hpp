@@ -1,5 +1,4 @@
-#ifndef _MPI_REQUEST_HPP_
-#define _MPI_REQUEST_HPP_
+#pragma once
 
 #include <mpi.h>
 
@@ -19,5 +18,3 @@ void waitall(std::vector<Request>& reqs);
 void cancel(Request& req);
 void cancelall(std::vector<Request>& reqs);
 }  // namespace mpi
-
-#endif

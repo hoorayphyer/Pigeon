@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_ARRAY_HPP_
-#define _PARTICLE_ARRAY_HPP_
+#pragma once
 
 #include <iterator>
 #include <vector>
@@ -176,5 +175,3 @@ class back_insert_iterator<particle::array<T, Specs>> {
 };
 
 }  // namespace std
-
-#endif

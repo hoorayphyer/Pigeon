@@ -1,5 +1,4 @@
-#ifndef _LOGGER_HPP_
-#define _LOGGER_HPP_
+#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -14,5 +13,3 @@ extern std::ostream& out;
 extern std::ostream& err;
 extern std::ostringstream str;
 }  // namespace lgr
-
-#endif

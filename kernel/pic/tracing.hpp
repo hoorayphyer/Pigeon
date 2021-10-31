@@ -1,5 +1,4 @@
-#ifndef _PIC_TRACING_HPP_
-#define _PIC_TRACING_HPP_
+#pragma once
 
 #include <unordered_map>
 
@@ -192,5 +191,3 @@ struct Tracer : public Action<DGrid, R, S, RJ> {
   }
 };
 }  // namespace particle
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _PARTICLE_UPDATER_HPP_
-#define _PARTICLE_UPDATER_HPP_
+#pragma once
 
 #include <unordered_set>
 
@@ -159,5 +158,3 @@ class Migrator : public Action<DGrid, R, S, RJ> {
 };
 
 }  // namespace particle
-
-#endif

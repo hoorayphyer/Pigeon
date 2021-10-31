@@ -1,5 +1,4 @@
-#ifndef _APT_BLOCK_HPP_
-#define _APT_BLOCK_HPP_
+#pragma once
 
 #include <iterator>
 
@@ -131,5 +130,3 @@ constexpr apt::Block<D> project_out(int longi, apt::Index<D> b,
   return {b, e};
 }
 }  // namespace apt
-
-#endif

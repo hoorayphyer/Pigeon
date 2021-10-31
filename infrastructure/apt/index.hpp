@@ -1,5 +1,4 @@
-#ifndef _APT_INDEX_HPP_
-#define _APT_INDEX_HPP_
+#pragma once
 
 #include "apt/array.hpp"
 
@@ -175,5 +174,3 @@ constexpr apt::Longidx operator-(int a, apt::Longidx l) noexcept {
   l = a - l.val();
   return l;
 }
-
-#endif

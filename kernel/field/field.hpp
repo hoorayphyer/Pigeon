@@ -1,5 +1,4 @@
-#ifndef _FIELD_HPP_
-#define _FIELD_HPP_
+#pragma once
 
 #include <vector>
 
@@ -109,5 +108,3 @@ struct Field {
   }
 };
 }  // namespace field
-
-#endif
