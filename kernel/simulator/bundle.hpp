@@ -27,12 +27,12 @@ template <int DGrid, typename R, template <typename> class S, typename RJ>
 struct ParticleBundle {
   particle::map<particle::array<R, S>>& particles;
   field::Field<RJ, 3, DGrid>& J;
-  std::vector<particle::Particle<R, S>>* new_ptc_buf;
+  std::vector<particle::Particle<R, S>>& new_ptc_buf;
   const particle::map<particle::Properties>& properties;
   const field::Field<R, 3, DGrid>& E;
   const field::Field<R, 3, DGrid>& B;
   const apt::Grid<R, DGrid>& grid;
-  const dye::Ensemble<DGrid>* ens;
+  const dye::Ensemble<DGrid>& ens;
   R dt;
   int timestep;
   util::Rng<R>& rng;
@@ -51,6 +51,15 @@ struct ExportBundle {
   R dt;
   int timestep;
 };
+
+  // RATIONALE
+  //
+  // InitialConditionBundle and PostResumeBundle are mutually exclusive. That
+  // is, depending on the presence of a resume dir, only one of them will need
+  // to be executed. From the program's point of view, we only need to maintain
+  // one Bundle class. But this way user will have to modify their code just to
+  // make sure to use only the correct actions, which is too error prone.
+  // Therefore, we keep these separate
 
 template <int DGrid, typename R, template <typename> class S, typename RJ>
 struct InitialConditionBundle {

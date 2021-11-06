@@ -6,19 +6,29 @@
 
 namespace pic {
 template <int DGrid>
-struct ActionBase : public array<apt::Range, DGrid> {
+struct ActionBase {
  private:
+  apt::array<apt::Range, DGrid> m_ranges;
   std::string m_name = "Unknown";
 
  public:
-  void setName(std::string name) { m_name = std::move(name); }
+  void set_name(std::string name) { m_name = std::move(name); }
+
+  void set_range(std::size_t i, apt::Range range) {
+    // TODO use .at(i) once we get rid of apt::array
+    m_ranges[i] = std::move(range);
+  }
+
+  void set_ranges(apt::array<apt::Range, DGrid> ranges) {
+    m_ranges = std::move(ranges);
+  }
 
   const auto& name() const noexcept { return m_name; }
 
   virtual ~ActionBase() = default;
 };
 
-template <typename R, int DGrid, typename RJ>
+template <int DGrid, typename R, typename RJ>
 struct FieldAction : public ActionBase<DGrid> {
   using Bundle_t = FieldBundle<DGrid, R, RJ>;
 

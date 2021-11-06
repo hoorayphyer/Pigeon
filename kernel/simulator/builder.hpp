@@ -6,6 +6,7 @@
 
 #include "io/data_exporter.hpp"
 #include "simulator/action.hpp"
+#include "simulator/simulator.hpp"
 
 namespace pic {
 
@@ -19,6 +20,7 @@ struct SimulationBuilder {
   using PostResumeAction_t = PostResumeAction<DGrid, R, S, RJ>;
   using DataExporter_t = io::DataExporter<RD, DGrid, R, S, RJ>;
   using ExportBundle_t = ExportBundle<DGrid, R, S, RJ>;
+  using Simulator_t = Simulator<DGrid, R, S, RJ, RD>;
 
   /**
      add a field action of ConcreteAction constructed with `ctor_args`.
@@ -71,7 +73,7 @@ struct SimulationBuilder {
 
      @return reference to the newly added exporter
    */
-  DataExporter_t& add_exporter();
+  DataExporter_t& add_exporter() { return m_exporters.emplace_back(); }
 
   auto& add_extra_init(std::function<void()> f) {
     m_f_extra_init = std::move(f);
@@ -93,6 +95,20 @@ struct SimulationBuilder {
     return *this;
   }
 
+  auto& set_this_run_dir(std::string dir) {
+    m_this_run_dir = std::move(dir);
+    return *this;
+  }
+
+  // TODO
+  // add_supergrid();
+  // add_ptc_prop();
+  // init_cart. See pic.cpp, make_cart
+  // set_checkpoint_dir();
+  // set_periodic();
+
+  Simulator_t build();
+
  private:
   // these are with global ranges;
   std::vector<std::unique_ptr<FieldAction_t>> m_fld_actions;
@@ -101,10 +117,20 @@ struct SimulationBuilder {
   std::vector<std::unique_ptr<PostResumeAction_t>> m_post_resume_actions;
   std::vector<DataExporter_t> m_exporters;
 
-  std::function<void()> m_f_extra_init;
-  std::function<void(const ExportBundle_t&)> m_f_prior_export;
-  std::function<void(const ExportBundle_t&)> m_f_post_export;
-  std::function<void()> m_f_custom_step;
+  std::optional<std::function<void()>> m_f_extra_init;
+  std::optional<std::function<void(const ExportBundle_t&)>> m_f_prior_export;
+  std::optional<std::function<void(const ExportBundle_t&)>> m_f_post_export;
+  std::optional<std::function<void()>> m_f_custom_step;
+
+  std::optional<std::string> m_this_run_dir;
+
+  std::optional<apt::Grid<R, DGrid>> m_supergrid;
+  std::optional<std::optional<mpi::CartComm>> m_cart;
+  particle::map<particle::Properties> m_props;
+
+  std::optional<std::string> m_checkpoint_dir;
+  std::optional<int> m_total_timesteps;
+  std::optional<apt::array<bool, DGrid>> m_periodic;
 
   template <typename Action>
   auto& get_actions() {
@@ -130,5 +156,9 @@ struct SimulationBuilder {
         new ConcreteAction(std::forward<Args>(ctor_args)...));
     return static_cast<ConcreteAction&>(*uniq_ptr);
   }
+
+  std::string precondition() const;
+
+  int load_init_cond(Simulator_t& sim);
 };
 }  // namespace pic
