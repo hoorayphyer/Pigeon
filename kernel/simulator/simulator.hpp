@@ -67,7 +67,7 @@ struct Simulator {
 
   void taylor(apt::array<apt::Range, DGrid>& a) const;
 
-  void update_parts(const dye::Ensemble<DGrid>& ens);
+  void update_parts();
 
   Simulator() = default;
 

@@ -51,8 +51,9 @@ void Simulator<DGrid, R, S, RJ, RD>::taylor(
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
-void Simulator<DGrid, R, S, RJ, RD>::update_parts(
-    const dye::Ensemble<DGrid>& ens) {
+void Simulator<DGrid, R, S, RJ, RD>::update_parts() {
+  assert(m_ens_opt);
+  const auto& ens = *m_ens_opt;
   for (int i = 0; i < DGrid; ++i) {
     m_grid[i] =
         m_supergrid[i].divide(ens.cart_topos[i].dim(), ens.cart_coords[i]);
@@ -61,9 +62,10 @@ void Simulator<DGrid, R, S, RJ, RD>::update_parts(
   auto retaylor_ranges = [this](const auto& ranges_orig, auto& actions) {
     assert(actions.size() == ranges_orig.size());
     for (auto i = 0u; i < actions.size(); ++i) {
-      auto ranges = ranges_orig[i];
+      if (!actions[i]) continue;
+      auto& ranges = actions[i]->ranges();
+      ranges = ranges_orig[i];
       taylor(ranges);
-      actions[i]->set_ranges(ranges);
     }
   };
 
@@ -150,7 +152,7 @@ void Simulator<DGrid, R, S, RJ, RD>::initialize(
   // 2. data export. PutMultivar requires every patch to output every species
   for (auto sp : m_properties) m_particles.insert(sp, particle::array<R, S>());
 
-  if (m_ens_opt) update_parts(*m_ens_opt);
+  if (m_ens_opt) update_parts();
 
   // TODO profiling plan not accessible
   // if (profiling_plan.on and profiling_plan.is_qualified()) {
@@ -336,7 +338,7 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
           std::optional<int> new_label;
           if (m_ens_opt) new_label.emplace(m_ens_opt->label());
           if (stamp) lgr::file % "  update parts of simulator..." << std::endl;
-          if (old_label != new_label) update_parts(*m_ens_opt);
+          if (old_label != new_label) update_parts();
           if (stamp) lgr::file % "  Done." << std::endl;
         });
   }

@@ -19,11 +19,11 @@ struct ActionBase {
     m_ranges[i] = std::move(range);
   }
 
-  void set_ranges(apt::array<apt::Range, DGrid> ranges) {
-    m_ranges = std::move(ranges);
-  }
-
   const auto& name() const noexcept { return m_name; }
+
+  const auto& ranges() const noexcept { return m_ranges; }
+
+  auto& ranges() noexcept { return m_ranges; }
 
   virtual ~ActionBase() = default;
 };

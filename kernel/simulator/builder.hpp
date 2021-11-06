@@ -12,7 +12,7 @@ namespace pic {
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
-struct SimulationBuilder {
+class SimulationBuilder {
  public:
   using FieldAction_t = FieldAction<DGrid, R, RJ>;
   using ParticleAction_t = ParticleAction<DGrid, R, S, RJ>;
@@ -75,37 +75,57 @@ struct SimulationBuilder {
    */
   DataExporter_t& add_exporter() { return m_exporters.emplace_back(); }
 
-  auto& add_extra_init(std::function<void()> f) {
+  SimulationBuilder& add_extra_init(std::function<void()> f) {
     m_f_extra_init = std::move(f);
     return *this;
   }
 
-  auto& set_prior_export(std::function<void(const ExportBundle_t&)> f) {
-    m_f_prior_export = std::move(f);
+  SimulationBuilder& set_prior_export(
+      std::function<void(const ExportBundle_t&)> f) {
+    m_f_prior_export.emplace(std::move(f));
     return *this;
   }
 
-  auto& set_post_export(std::function<void(const ExportBundle_t&)> f) {
-    m_f_post_export = std::move(f);
+  SimulationBuilder& set_post_export(
+      std::function<void(const ExportBundle_t&)> f) {
+    m_f_post_export.emplace(std::move(f));
     return *this;
   }
 
-  auto& add_custom_step(std::function<void()> f) {
-    m_f_custom_step = std::move(f);
+  SimulationBuilder& add_custom_step(std::function<void()> f) {
+    m_f_custom_step.emplace(std::move(f));
     return *this;
   }
 
-  auto& set_this_run_dir(std::string dir) {
-    m_this_run_dir = std::move(dir);
+  SimulationBuilder& set_this_run_dir(std::string dir) {
+    m_this_run_dir.emplace(std::move(dir));
     return *this;
   }
 
-  // TODO
-  // add_supergrid();
-  // add_ptc_prop();
-  // init_cart. See pic.cpp, make_cart
-  // set_checkpoint_dir();
-  // set_periodic();
+  SimulationBuilder& set_supergrid(const apt::Grid<R, DGrid>& supergrid) {
+    m_supergrid.emplace(supergrid);
+    return *this;
+  }
+
+  SimulationBuilder& set_checkpoint_dir(std::string dir) {
+    m_checkpoint_dir.emplace(std::move(dir));
+    return *this;
+  }
+
+  SimulationBuilder& create_cartesian_topology(
+      const apt::array<int, DGrid>& dims,
+      const apt::array<bool, DGrid>& periodic);
+
+  SimulationBuilder& set_particle_properties(
+      particle::map<particle::Properties> props) {
+    m_props = std::move(props);
+    return *this;
+  }
+
+  SimulationBuilder& set_field_guard(int guard) {
+    m_fld_guard = guard;
+    return *this;
+  }
 
   Simulator_t build();
 
@@ -126,11 +146,15 @@ struct SimulationBuilder {
 
   std::optional<apt::Grid<R, DGrid>> m_supergrid;
   std::optional<std::optional<mpi::CartComm>> m_cart;
+  apt::array<int, DGrid> m_dims;
+  apt::array<bool, DGrid> m_periodic;
   particle::map<particle::Properties> m_props;
 
   std::optional<std::string> m_checkpoint_dir;
   std::optional<int> m_total_timesteps;
-  std::optional<apt::array<bool, DGrid>> m_periodic;
+  std::optional<int> m_fld_guard;
+
+  bool m_is_build_called = false;  // make sure `build()` is called only once
 
   template <typename Action>
   auto& get_actions() {
