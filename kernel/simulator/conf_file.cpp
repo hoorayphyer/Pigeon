@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstdint>  // for int64_t
-#include <fstream>  // must be included for toml.hpp to work
 #include <memory>
 #include <sstream>  // for toml parsing error
 
