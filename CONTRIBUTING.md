@@ -7,37 +7,61 @@ If you wish to submit a PR, please be aware that:
     (Visual Studio 2019). All three is a bonus.
 - You should regenerate the single-header file as part of your PR (a CI check will fail if you don't).
 
-### Regenerating toml.hpp
-1. Make your changes as necessary
-2. If you've added a new header file that isn't going to be transitively included by one of the
-    others, add an include directive to `include/toml++/toml.h`
-3. Run `python/generate_single_header.py`
+<br>
 
-### Building and running the tests
+## Regenerating toml.hpp
+1. Make your changes as necessary
+    - If you've added a new header file that isn't going to be transitively included by one of the
+        others, add an include directive to `include/toml++/toml.h`
+2. Install the prerequisite python packages: `pip3 install -r tools/requirements.txt`
+3. Run `tools/generate_single_header.py`
+
+<br>
+
+## Building and running the tests
 Testing is done using [Catch2], included in the respository as a submodule under `extern/Catch2`.
 The first time you want to begin testing you'll need to ensure submodules have been fetched:  
 ```bash
-git submodule update --init extern/Catch2
-git submodule update --init extern/tloptional
+git submodule update --init --depth 1 external/Catch2 external/tloptional
 ```
 
-#### Testing on Windows with Visual Studio
+### Testing on Windows with Visual Studio
 
 Install [Visual Studio 2019] and [Test Adapter for Catch2], then open `vs/toml++.sln` and build the
 projects in the `tests` solution folder. Visual Studio's Test Explorer should pick these up and
 allow you to run the tests directly.
 
-If test discovery fails you can usually fix it by clicking enabling
+If test discovery fails you can usually fix it by enabling
 `Auto Detect runsettings Files` (settings gear icon > `Configure Run Settings`).
 
-#### Testing on Linux (and WSL)
-Install [meson] and [ninja] if necessary, then test with both gcc and clang:
+### Testing on Linux (and WSL)
 ```bash
-CXX=g++ meson build-gcc
-CXX=clang++ meson build-clang
-cd build-gcc && ninja && ninja test
-cd ../build-clang && ninja && ninja test
+# install ninja, meson, locales (first time only)
+sudo apt update && sudo apt install -y locales python3 python3-pip ninja-build
+sudo pip3 install meson
+sudo locale-gen 'en_US.utf8' \
+                'ja_JP.utf8' \
+                'de_DE.utf8' \
+                'it_IT.utf8' \
+                'tr_TR.utf8' \
+                'fi_FI.utf8' \
+                'fr_FR.utf8' \
+                'zh_CN.utf8'
+
+# create the build configs (first time only)
+CXX=g++     meson build-gcc-debug     --buildtype=debug   -Dpedantic=true -Dbuild_tests=true -Dgenerate_cmake_config=false
+CXX=clang++ meson build-clang-debug   --buildtype=debug   -Dpedantic=true -Dbuild_tests=true -Dgenerate_cmake_config=false
+CXX=g++     meson build-gcc-release   --buildtype=release -Dpedantic=true -Dbuild_tests=true -Dgenerate_cmake_config=false
+CXX=clang++ meson build-clang-release --buildtype=release -Dpedantic=true -Dbuild_tests=true -Dgenerate_cmake_config=false
+
+# run the tests
+cd build-gcc-debug && ninja && ninja test               \
+    && cd ../build-clang-debug && ninja && ninja test   \
+    && cd ../build-gcc-release && ninja && ninja test   \
+    && cd ../build-clang-release && ninja && ninja test \
+    && cd ..
 ```
+
 
 [Visual Studio 2019]: https://visualstudio.microsoft.com/vs/
 [Test Adapter for Catch2]: https://marketplace.visualstudio.com/items?itemName=JohnnyHendriks.ext01

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{0E287B5A-1168-43FD-B067-F6BE8E182A57}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <Import Project="$(ProjectDir)\toml++.props" />
+  <ItemGroup>
+    <ClInclude Include="include\toml++\impl\array.h" />
+    <ClInclude Include="include\toml++\impl\array_impl.h" />
+    <ClInclude Include="include\toml++\impl\common.h" />
+    <ClInclude Include="include\toml++\impl\date_time.h" />
+    <ClInclude Include="include\toml++\impl\default_formatter.h" />
+    <ClInclude Include="include\toml++\impl\default_formatter_impl.h" />
+    <ClInclude Include="include\toml++\impl\formatter.h" />
+    <ClInclude Include="include\toml++\impl\json_formatter.h" />
+    <ClInclude Include="include\toml++\impl\json_formatter_impl.h" />
+    <ClInclude Include="include\toml++\impl\node.h" />
+    <ClInclude Include="include\toml++\impl\node_impl.h" />
+    <ClInclude Include="include\toml++\impl\node_view.h" />
+    <ClInclude Include="include\toml++\impl\parse_error.h" />
+    <ClInclude Include="include\toml++\impl\parse_result.h" />
+    <ClInclude Include="include\toml++\impl\parser.h" />
+    <ClInclude Include="include\toml++\impl\parser_impl.h" />
+    <ClInclude Include="include\toml++\impl\preprocessor.h" />
+    <ClInclude Include="include\toml++\impl\print_to_stream.h" />
+    <ClInclude Include="include\toml++\impl\table.h" />
+    <ClInclude Include="include\toml++\impl\table_impl.h" />
+    <ClInclude Include="include\toml++\impl\template_instantiations.h" />
+    <ClInclude Include="include\toml++\impl\utf8.h" />
+    <ClInclude Include="include\toml++\impl\utf8_streams.h" />
+    <ClInclude Include="include\toml++\impl\utf8_streams_impl.h" />
+    <ClInclude Include="include\toml++\impl\value.h" />
+    <ClInclude Include="include\toml++\impl\version.h" />
+    <ClInclude Include="include\toml++\toml.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".circleci\config.yml" />
+    <None Include=".clang-format" />
+    <None Include=".editorconfig" />
+    <None Include=".gitattributes" />
+    <None Include=".gitignore" />
+    <None Include=".runsettings" />
+    <None Include="CODE_OF_CONDUCT.md" />
+    <None Include="CONTRIBUTING.md" />
+    <None Include="LICENSE" />
+    <None Include="README.md" />
+    <None Include="cmake\install-rules.cmake" />
+    <None Include="cmake\project-is-top-level.cmake" />
+    <None Include="cmake\tomlplusplus.cmake.in" />
+    <None Include="cmake\tomlplusplusConfig.cmake" />
+    <None Include="cmake\variables.cmake" />
+    <None Include="cpp.hint" />
+    <None Include="docs\pages\main_page.dox" />
+    <None Include="docs\poxy.toml" />
+    <None Include="meson.build" />
+    <None Include="toml++.props" />
+    <None Include="tools\ci_single_header_check.py" />
+    <None Include="tools\generate_conformance_tests.py" />
+    <None Include="tools\generate_single_header.py" />
+    <None Include="tools\generate_windows_test_targets.py" />
+    <None Include="tools\utils.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="toml++.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+    <Text Include="meson_options.txt" />
+    <Text Include="tools\requirements.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

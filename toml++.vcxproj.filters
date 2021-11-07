@@ -1,0 +1,172 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="include\toml++\toml.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\array.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\array_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\common.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\date_time.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\default_formatter.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\default_formatter_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\formatter.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\json_formatter.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\json_formatter_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\node.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\node_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\node_view.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\parse_error.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\parse_result.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\parser.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\parser_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\preprocessor.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\print_to_stream.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\table.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\table_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\template_instantiations.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\utf8.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\utf8_streams.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\utf8_streams_impl.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\value.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\toml++\impl\version.h">
+      <Filter>include\impl</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="toml++.props" />
+    <None Include=".gitattributes" />
+    <None Include=".gitignore" />
+    <None Include="CODE_OF_CONDUCT.md" />
+    <None Include="CONTRIBUTING.md" />
+    <None Include="LICENSE" />
+    <None Include="meson.build" />
+    <None Include="README.md" />
+    <None Include=".circleci\config.yml">
+      <Filter>.circleci</Filter>
+    </None>
+    <None Include="tools\ci_single_header_check.py">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="tools\generate_windows_test_targets.py">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="tools\generate_single_header.py">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="tools\generate_conformance_tests.py">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="tools\utils.py">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="docs\pages\main_page.dox">
+      <Filter>docs\pages</Filter>
+    </None>
+    <None Include="cpp.hint" />
+    <None Include="docs\poxy.toml">
+      <Filter>docs</Filter>
+    </None>
+    <None Include=".runsettings" />
+    <None Include="cmake\install-rules.cmake">
+      <Filter>cmake</Filter>
+    </None>
+    <None Include="cmake\project-is-top-level.cmake">
+      <Filter>cmake</Filter>
+    </None>
+    <None Include="cmake\tomlplusplusConfig.cmake">
+      <Filter>cmake</Filter>
+    </None>
+    <None Include="cmake\variables.cmake">
+      <Filter>cmake</Filter>
+    </None>
+    <None Include="cmake\tomlplusplus.cmake.in">
+      <Filter>cmake</Filter>
+    </None>
+    <None Include=".clang-format" />
+    <None Include=".editorconfig" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include=".circleci">
+      <UniqueIdentifier>{a987f817-4ce2-4fd7-9d86-50e619d8d97b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="docs">
+      <UniqueIdentifier>{5ed0949f-6855-4664-ad86-2b38ceeb400b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{98f8e2f6-ce87-435a-bd9a-4f02b8ac66e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tools">
+      <UniqueIdentifier>{573403e5-97d9-4c96-972d-60a17566ee53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="docs\pages">
+      <UniqueIdentifier>{9bdc71ff-34f1-4312-9f15-1850d4c5908b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="cmake">
+      <UniqueIdentifier>{47351d16-986b-4f4b-bd5e-b7c66a7a68d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\impl">
+      <UniqueIdentifier>{4e42aaa3-98cd-4678-9c1c-ffa3eaf519d7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="toml++.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="meson_options.txt" />
+    <Text Include="tools\requirements.txt">
+      <Filter>tools</Filter>
+    </Text>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
+</Project>
