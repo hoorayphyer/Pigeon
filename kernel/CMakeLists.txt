@@ -94,4 +94,4 @@ add_subdirectory(dye)
 add_subdirectory(io)
 add_subdirectory(ckpt)
 
-add_subdirectory(pic)
+add_subdirectory(simulator)
