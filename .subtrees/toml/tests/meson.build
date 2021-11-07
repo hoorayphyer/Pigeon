@@ -1,10 +1,16 @@
 test_sources = [
-	'main.cpp',
+	'conformance_burntsushi_invalid.cpp',
+	'conformance_burntsushi_valid.cpp',
+	'conformance_iarna_invalid.cpp',
+	'conformance_iarna_valid.cpp',
+	'impl_toml.cpp',
+	'impl_catch2.cpp',
+	'tests.cpp',
+	'parsing_floats.cpp',
 	'parsing_arrays.cpp',
 	'parsing_booleans.cpp',
 	'parsing_comments.cpp',
 	'parsing_dates_and_times.cpp',
-	'parsing_floats.cpp',
 	'parsing_integers.cpp',
 	'parsing_key_value_pairs.cpp',
 	'parsing_spec_example.cpp',
@@ -12,159 +18,165 @@ test_sources = [
 	'parsing_tables.cpp',
 	'manipulating_arrays.cpp',
 	'manipulating_tables.cpp',
-	'tests.cpp'
+	'manipulating_values.cpp',
+	'unicode.cpp',
+	'user_feedback.cpp',
+	'using_iterators.cpp',
+	'windows_compat.cpp'
 ]
 
-disable_exceptions = 'cpp_eh=none'
-no_unreleased_features = '-DTOML_UNRELEASED_FEATURES=0'
-toml_char8_strings = '-DTOML_CHAR_8_STRINGS=1'
-manually_set_cpp_std = 'cpp_std=none'
-cpp20 = '-std=c++2a'
-use_tloptional = '-DTARTANLLAMA_OPTIONAL'
-compiler_supports_char8_strings = compiler.compiles('''
-	#include <string_view>
-	#include <string>
-	using namespace std::string_view_literals;
-	std::u8string func()
+#######################################################################################################################
+# fast math check
+#######################################################################################################################
+
+compiler_supports_fast_math_args = []
+if compiler.get_id() == 'gcc' or compiler.get_id() == 'clang'
+	compiler_supports_fast_math_args += '-ffast-math'
+	compiler_supports_fast_math_args += '-ffp-contract=fast'
+elif compiler.get_id() == 'msvc' or compiler.get_id() == 'intel-cl'
+	compiler_supports_fast_math_args += '/fp:fast'
+endif
+compiler_supports_fast_math = compiler.links('''
+	#include <cmath>
+	#include <iostream>
+	int main()
 	{
-		return std::u8string{ u8"this is a test."sv };
+		std::cout << std::exp2(2.0) << std::pow(2.0, 3.0) << "\n";
+		return 0;
 	}
 	''',
-	name : 'char8 string check',
-	args : [ '-std=c++2a' ]
+	name: 'supports fast-math',
+	args: compiler_supports_fast_math_args
 )
 
-############################################################################
-### char
-############################################################################
+#######################################################################################################################
+# do the thing!
+#######################################################################################################################
 
+fast_math_modes = [ false, true ]
+exception_modes = [ true, false ]
+unreleased_feature_modes = [ false, true ]
+cpp20_modes = [ false, true ]
+test_executables = []
+counter = 0
 
-char = executable(
-	'char',
-	test_sources,
-	include_directories : inc
-)
-test('char', char)
+foreach cpp20 : cpp20_modes
+	if cpp20 and not compiler_supports_cpp20
+		continue
+	endif
+	foreach unrel : unreleased_feature_modes
+		foreach fast_math : fast_math_modes
+			if fast_math and not compiler_supports_fast_math
+				continue
+			endif
+			foreach exceptions : exception_modes
 
+				test_name = ''
+				test_overrides = []
+				test_overrides += overrides
+				test_args = []
+				test_args += additional_arguments
 
-char_noexcept = executable(
-	'char_noexcept',
-	test_sources,
-	include_directories : inc,
-	override_options : [ disable_exceptions ]
-)
-test('char_noexcept', char_noexcept)
+				if cpp20
+					test_name = 'cpp20'
+					test_overrides += 'cpp_std=none'
+					test_args += compiler_supports_cpp20_args
+					if compiler_supports_char8
+						test_args += compiler_supports_char8_args
+					endif
+				else
+					test_name = 'cpp17'
+				endif
 
+				if exceptions
+					test_overrides += 'cpp_eh=default'
+					test_args += '-DSHOULD_HAVE_EXCEPTIONS=1'
+					if is_windows
+						test_args += '-D_HAS_EXCEPTIONS=1'
+					endif
+				else
+					test_name = test_name + '_noexcept'
+					test_overrides += 'cpp_eh=none'
+					test_args += '-DSHOULD_HAVE_EXCEPTIONS=0'
+					if is_windows
+						test_args += '-D_HAS_EXCEPTIONS=0'
+					endif
+				endif
 
-char_strict = executable(
-	'char_strict',
-	test_sources,
-	include_directories : inc,
-	cpp_args : [ no_unreleased_features ]
-)
-test('char_strict', char_strict)
+				if fast_math
+					test_name = test_name + '_fastmath'
+					test_args += compiler_supports_fast_math_args
+				endif
 
+				if compiler_supports_float16 or compiler_supports_fp16
+					if compiler_supports_fp16
+						test_args += '-DSHOULD_HAVE_FP16=1'
+					endif
+					if compiler_supports_float16
+						test_args += '-DSHOULD_HAVE_FLOAT16=1'
+					endif
+				endif
+				if compiler_supports_int128
+					test_args += '-DSHOULD_HAVE_INT128=1'
+				endif
+				if compiler_supports_float128
+					test_args += '-DSHOULD_HAVE_FLOAT128=1'
+				endif
 
-char_strict_noexcept = executable(
-	'char_strict_noexcept',
-	test_sources,
-	include_directories : inc,
-	override_options : [ disable_exceptions ],
-	cpp_args : [ no_unreleased_features ]
-)
-test('char_strict_noexcept', char_strict_noexcept)
+				if unrel
+					test_name = test_name + '_unrel'
+					test_args += '-DTOML_UNRELEASED_FEATURES=1'
+				else
+					test_args += '-DTOML_UNRELEASED_FEATURES=0'
+				endif
 
+				if counter % 6 == 3
+					test_args += '-DTOML_HEADER_ONLY=1'
+				endif
+				if counter % 2 == 1
+					test_args += '-DUSE_SINGLE_HEADER=1'
+				endif
+				if counter % 4 == 2 and exceptions
+					test_args += '-DUSE_TARTANLLAMA_OPTIONAL=1'
+					test_name = test_name + '_tlopt'
+				endif
+				
+				test_executables += [[
+					test_name,
+					executable(
+						test_name,
+						test_sources,
+						include_directories: include_dirs,
+						cpp_args: test_args,
+						override_options: test_overrides
+					)
+				]]
 
-############################################################################
-### char w/ tl::optional
-############################################################################
+				counter = counter + 1
 
+			endforeach # exceptions
+		endforeach # fast_math
+	endforeach # strict
+endforeach # cpp20
 
-char_tlopt = executable(
-	'char_tlopt',
-	test_sources,
-	include_directories : inc,
-	cpp_args : [ use_tloptional ]
-)
-test('char_tlopt', char_tlopt)
+locales = [
+	'C',
+	'en_US.utf8',
+	'ja_JP.utf8',
+	'it_IT.utf8',
+	'tr_TR.utf8',
+	'fi_FI.utf8',
+	'fr_FR.utf8',
+	'zh_CN.utf8',
+	'de_DE.utf8'
+]
 
-
-char_tlopt_strict = executable(
-	'char_tlopt_strict',
-	test_sources,
-	include_directories : inc,
-	cpp_args : [ no_unreleased_features, use_tloptional ]
-)
-test('char_tlopt_strict', char_tlopt_strict)
-
-
-if compiler_supports_char8_strings
-
-
-	############################################################################
-	### char8
-	############################################################################
-
-
-	char8 = executable(
-		'char8',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std ],
-		cpp_args : [ cpp20, toml_char8_strings ]
-	)
-	test('char8', char8)
-
-	char8_noexcept = executable(
-		'char8_noexcept',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std, disable_exceptions ],
-		cpp_args : [ cpp20, toml_char8_strings ]
-	)
-	test('char8_noexcept', char8_noexcept)
-	
-	char8_strict = executable(
-		'char8_strict',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std ],
-		cpp_args : [ cpp20, toml_char8_strings, no_unreleased_features ]
-	)
-	test('char8_strict', char8_strict)
-
-	char8_strict_noexcept = executable(
-		'char8_strict_noexcept',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std, disable_exceptions ],
-		cpp_args : [ cpp20, toml_char8_strings, no_unreleased_features ]
-	)
-	test('char8_strict_noexcept', char8_strict_noexcept)
-
-
-	############################################################################
-	### char8 w/ tl::optional
-	############################################################################
-
-
-	char8_tlopt = executable(
-		'char8_tlopt',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std ],
-		cpp_args : [ cpp20, toml_char8_strings, use_tloptional ]
-	)
-	test('char8_tlopt', char8_tlopt)
-
-	char8_tlopt_strict = executable(
-		'char8_tlopt_strict',
-		test_sources,
-		include_directories : inc,
-		override_options : [ manually_set_cpp_std ],
-		cpp_args : [ cpp20, toml_char8_strings, no_unreleased_features, use_tloptional ]
-	)
-	test('char8_tlopt_strict', char8_tlopt_strict)
-
-
-endif
+foreach executable : test_executables
+	foreach locale : locales
+		test(
+			executable[0] + ' (' + locale + ')', executable[1],
+			env: ['LC_ALL=' + locale],
+			workdir: meson.source_root()/'tests'
+		)
+	endforeach
+endforeach

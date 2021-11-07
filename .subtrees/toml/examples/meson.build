@@ -1,11 +1,22 @@
-parse_file = executable(
-	'parse_file',
-	[ 'parse_file.cpp' ],
-	include_directories : inc
-)
+example_args = []
+example_args += additional_arguments
+if is_gcc or is_clang
+	example_args += [ '-Wno-switch', '-Wno-switch-default', '-Wno-switch-enum' ]
+endif
 
-toml_to_json_transcoder = executable(
+examples = [
+	'simple_parser',
 	'toml_to_json_transcoder',
-	[ 'toml_to_json_transcoder.cpp' ],
-	include_directories : inc
-)
+	'toml_generator',
+	'error_printer'
+]
+
+foreach example : examples
+	executable(
+		example,
+		[ example+'.cpp' ],
+		include_directories: include_dirs,
+		cpp_args: example_args,
+		override_options: overrides
+	)
+endforeach

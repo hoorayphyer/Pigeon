@@ -1,2 +1,5 @@
-option('BUILD_TESTS', type : 'feature', value : 'auto', description : 'Whether to build tests (defaults to auto: only if not a subproject)')
-option('BUILD_EXAMPLES', type : 'feature', value : 'auto', description : 'Whether to build examples (defaults to auto: only if not a subproject)')
+option('build_tests', 			type: 'boolean', value: false,	description: 'Build tests (default: false - no effect when included as a subproject)')
+option('build_examples',		type: 'boolean', value: false,	description: 'Build examples (default: false - no effect when included as a subproject)')
+option('generate_cmake_config',	type: 'boolean', value: true,	description: 'Generate a cmake package config file (default: true - no effect when included as a subproject)')
+option('pedantic',				type: 'boolean', value: false,	description: 'Enable as many compiler warnings as possible (default: false)')
+option('time_trace',			type: 'boolean', value: false,	description: 'Enable the -ftime-trace option (Clang only)')

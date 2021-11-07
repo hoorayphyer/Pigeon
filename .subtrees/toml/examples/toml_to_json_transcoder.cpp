@@ -1,57 +1,41 @@
-#include <iostream>
-#include <fstream>
+// This file is a part of toml++ and is subject to the the terms of the MIT license.
+// Copyright (c) Mark Gillard <mark.gillard@outlook.com.au>
+// See https://github.com/marzer/tomlplusplus/blob/master/LICENSE for the full license text.
+// SPDX-License-Identifier: MIT
+
+// This example demonstrates how to use the toml::json_formatter to re-serialize TOML data as JSON.
+
+#include "examples.h"
+
+#define TOML_UNRELEASED_FEATURES 1
 #include <toml++/toml.h>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
+
 using namespace std::string_view_literals;
 
 int main(int argc, char** argv)
 {
-	#ifdef _WIN32
-	SetConsoleOutputCP(65001); //UTF-8 console output
-	#endif
+	examples::init();
 
-	//read from a file
-	if (argc > 1)
+	toml::table table;
+	try
 	{
-		auto path = std::string{ argv[1] };
-		auto file = std::ifstream{ path };
-		if (!file)
-		{
-			std::cerr << "The file '"sv << path << "' could not be opened for reading."sv << std::endl;
-			return -1;
-		}
 
-		try
-		{
-			const auto table = toml::parse(file, std::move(path));
-			std::cout << toml::json_formatter{ table } << std::endl;
-		}
-		catch (const toml::parse_error& err)
-		{
-			std::cerr << "Error parsing file:\n"sv << err << std::endl;
+		// read from a file if a path argument is given
+		if (argc > 1)
+			table = toml::parse_file(argv[1]);
 
-			return 1;
-		}
+		// otherwise read directly from stdin
+		else
+			table = toml::parse(std::cin, "stdin"sv);
+
+		std::cout << toml::json_formatter{ table } << "\n";
+	}
+	catch (const toml::parse_error& err)
+	{
+		std::cerr << err << "\n";
+		return 1;
 	}
 
-	//read directly from stdin
-	else 
-	{
-		try
-		{
-			const auto table = toml::parse(std::cin);
-			std::cout << toml::json_formatter{ table } << std::endl;
-		}
-		catch (const toml::parse_error& err)
-		{
-			std::cerr << "Error parsing stdin:\n"sv << err << std::endl;
-
-			return 1;
-		}
-	}
-
+	std::cout << toml::json_formatter{ table } << "\n";
 	return 0;
 }
