@@ -1,23 +1,60 @@
 #include "simulator/conf_file.hpp"
 
-#include <cstdint>  // for int64
-#include <format>
+#include <cassert>
+#include <cstdint>  // for int64_t
+#include <fstream>  // must be included for toml.hpp to work
+#include <memory>
+#include <sstream>  // for toml parsing error
 
-#include "toml++/toml.h"
+#include "fmt/format.h"
+#include "toml.hpp"
 
 using namespace std::string_view_literals;
 
 namespace pic {
 
 namespace {
-using Node_t = toml::table;
+
+class Node_t {
+ public:
+  Node_t(toml::table&& table) { m_table.reset(new auto {std::move(table)}); }
+  Node_t(const Node_t&) = default;
+  Node_t(Node_t&&) = default;
+
+  Node_t operator[](const std::string& entry) const {
+    Node_t res;
+    res.m_table = m_table;
+    if (!m_node) {
+      res.m_node.emplace((*m_table)[entry]);
+    } else {
+      res.m_node.emplace((*m_node)[entry]);
+    }
+    return res;
+  }
+
+  auto& native() {
+    assert(m_node);
+    return *m_node;
+  }
+
+  const auto& native() const {
+    assert(m_node);
+    return *m_node;
+  }
+
+ private:
+  Node_t() = default;
+  using node_view_t = toml::node_view<toml::node>;
+  std::shared_ptr<toml::table> m_table;
+  std::optional<node_view_t> m_node;
+};
 
 template <typename T>
 constexpr auto get_toml_native_type() {
   if constexpr (std::is_floating_point_v<T>) {
     return double{};
   } else if constexpr (std::is_integral_v<T>) {
-    return int64{};
+    return std::int64_t{};
   } else {
     return T{};
   }
@@ -30,13 +67,16 @@ using toml_native_t = std::remove_cvref_t<decltype(get_toml_native_type<T>())>;
 ConfFile ConfFile::load(const std::string& file) {
   ConfFile res;
   try {
-    res.m_node = toml::parse_file(file);
+    res.m_node = Node_t{toml::parse_file(file)};
   } catch (const toml::parse_error& err) {
-    auto msg =
-        std::format("Error parsing file '{}':\n{}\n  ({})"sv,
-                    *err.source().path, err.description(), err.source().begin);
+    // error.source().begin is type `source_positon`, which only has overload <<
+    // for streams but not direct conversion to string. So use stringstream
+    // here.
+    std::ostringstream oss;
+    oss << "Error parsing file '" << *err.source().path << "':\n"
+        << err.description() << "\n  (" << err.source().begin << ")\n";
 
-    throw std::runtime_error(msg);
+    throw std::runtime_error(oss.str());
   }
 
   return res;
@@ -44,20 +84,19 @@ ConfFile ConfFile::load(const std::string& file) {
 
 ConfFile ConfFile::operator[](const std::string& entry) {
   ConfFile res;
-  // c++20 has std::format for compile-time format and std::vformat for
-  // runtime format
-  res.m_current_entries = std::format("{}[{}]", m_current_entries, entry);
+  res.m_current_entries = fmt::format("{}[{}]", m_current_entries, entry);
   res.m_node = std::any_cast<Node_t&>(m_node)[entry];
   return res;
 }
 
 template <typename T>
-T ConfFile::as<T>() const {
-  auto toml_native_val =
-      std::any_cast<const Node_t&>(m_node).template value<toml_native_t<T>>();
+T ConfFile::as() const {
+  auto toml_native_val = std::any_cast<const Node_t&>(m_node)
+                             .native()
+                             .template value<toml_native_t<T>>();
   if (!toml_native_val) {
     auto msg =
-        std::format("ERROR : setting {} with non-existent value in config file",
+        fmt::format("ERROR : setting {} with non-existent value in config file",
                     m_current_entries);
     throw std::runtime_error(msg);
   }
@@ -66,9 +105,10 @@ T ConfFile::as<T>() const {
 }
 
 template <typename T>
-T ConfFile::as_or<T>(T val_default) const {
-  auto toml_native_val = std::any_cast<const Node_t&>(m_node).template value_or(
-      static_cast<toml_native_t<T>>(val_default));
+T ConfFile::as_or(T val_default) const {
+  auto toml_native_val =
+      std::any_cast<const Node_t&>(m_node).native().template value_or(
+          static_cast<toml_native_t<T>>(val_default));
 
   return static_cast<T>(toml_native_val);
 }

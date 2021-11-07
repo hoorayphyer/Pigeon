@@ -19,5 +19,6 @@ struct ConfFile {
   ConfFile() = default;
   std::string m_current_entries = "";
   std::any m_node;  // type erasure
+  // std::any only stores copyable objects
 };
 }  // namespace pic

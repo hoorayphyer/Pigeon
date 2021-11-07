@@ -1,3 +1,6 @@
+add_library(confFile SHARED "conf_file.cpp")
+target_include_directories(confFile BEFORE PRIVATE ${KERNEL_DIR} ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/toml ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/fmt/include)
+
 add_library(simulationBuilder SHARED "builder.cpp")
 target_include_directories(simulationBuilder BEFORE PRIVATE ${KERNEL_DIR})
 # TODO pic_rc for pic.hpp
