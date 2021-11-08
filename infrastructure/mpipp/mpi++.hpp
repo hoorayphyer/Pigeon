@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "apt/pair.hpp"
 #include "mpipp/mpi_collective.hpp"
 #include "mpipp/mpi_p2p.hpp"
@@ -140,7 +142,9 @@ struct InterComm : public apt::Handle<MPI_Comm, comm_free, comm_null>,
 }  // namespace mpi
 
 namespace mpi {
+void initialize();
 void initialize(int argc, char** argv);
+void initialize(const std::vector<std::string>& args);
 void finalize();
 
 void commit(MPI_Datatype& x);

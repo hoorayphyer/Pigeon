@@ -28,7 +28,46 @@ void uncommit(MPI_Datatype& x) {
   if (x != MPI_DATATYPE_NULL) MPI_Type_free(&x);
 }
 
-void initialize(int argc, char** argv) { MPI_Init(&argc, &argv); }
+void initialize() { MPI_Init(NULL, NULL); }
+
+void initialize(int argc, char** argv) {
+  if (argc == 0 || argv == nullptr) {
+    initialize();
+  } else {
+    MPI_Init(&argc, &argv);
+  }
+}
+
+void initialize(const std::vector<std::string>& args) {
+  if (args.empty()) {
+    initialize();
+    return;
+  }
+
+  int argc = static_cast<int>(args.size());
+  char** argv = new char*[argc + 1];
+  for (int i = 0; i < argc; ++i) {
+    auto str_size = args[i].size();
+    argv[i] = new char[str_size + 1];
+    args[i].copy(argv[i], str_size);
+    argv[i][str_size] = '\0';  // null terminated
+  }
+  argv[argc] = NULL;
+
+  auto clean_up = [&]() {
+    for (int i = 0; i < argc; ++i) delete[] argv[i];
+    delete[] argv;
+  };
+
+  try {
+    initialize(argc, argv);
+  } catch (...) {
+    clean_up();
+    throw;
+  }
+
+  clean_up();
+}
 
 void finalize() {
   for (auto x : custom_datatypes) uncommit(*x);
