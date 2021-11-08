@@ -1,147 +1,139 @@
-struct SimulationBundleForField {
-  Field& E;
-  Field& B;
-  JField& Jmesh;
-  const Grid& grid;
-  const mpi::CartComm &cart;
-  int timestep;
-  real_t dt;
-};
+#include <iostream>
 
-struct SimulationBundleForParticle {
-  map<PtcArray>& particles;
-  JField& J;
-  std::vector<Particle<R, S>>* new_ptc_buf;
-  const map<Properties>& properties;
-  const Field& E;
-  const Field& B;
-  const Grid& grid;
-  const Ensemble* ens;
-  real_t dt;
-  int timestep;
-  util::Rng<R>& rng;
-};
+#include "pigeon.hpp"
 
-template <int DGrid>
-struct ActionBase : public array<Range, DGrid> {
- private:
-  std::string _name = "Unknown";
-
- public:
-  ActionBase& setName(std::string name) {
-    _name = name;
-    return *this;
-  }
-
-  const auto& name() const noexcept { return _name; }
-
-  virtual ~ActionBase() = default;
-  // no Clone
-};
-
-template <typename Real, int DGrid, typename RealJ>
-struct FieldAction : public ActionBase<DGrid> {
- public:
-  virtual ~Action() = default;
-
-  virtual void operator()(const SimulationBundleForField& bundle) const = 0;
-};
-
-
-template <int DGrid, typename R, template <typename> class S, typename RJ>
-struct PtcAction : public ActionBase<DGrid> {
-  virtual ~Action() = default;
-
-  virtual void operator()(const SimulationBundleForParticle& bundle) const = 0;
-};
-
-
-struct SimulationBuilder {
- public:
-  template <typename ConcreteFieldAction, typename... Args>
-  ConcreteFieldAction& add_field_action(Args&&... ctor_args) {
-    static_assert(std::is_base_of_v<FieldAction, ConcreteFieldAction>);
-    auto& uniq_ptr = m_fld_actions.emplace_back(new ConcreteFieldAction(std::forward<Args>(ctor_args)...));
-    return static_cast<ConcreteFieldAction&>(*uniq_ptr);
-  }
-
-  auto& add_particle_action();
-
-  auto& add_extra_init( std::function<R()> ); // for RTD
-
-  auto& set_prior_export();
-
-  auto& add_exporter();
-
-  auto& set_post_export();
-
-  auto& add_custom_step();  // for checking vitals
-
- private:
-  // these are with global ranges;
-  std::vector<std::unique_ptr<FieldAction>> m_fld_actions;
-  std::vector<std::unique_ptr<PtcAction>> m_ptc_actions;
-};
-
-void handle_cmd_args();
-
-struct ConfFile {
-public:
-  static ConfFile load( const std::string& file );
-
-
-  ConfFile operator[]( const std::string& entry ) {
-    ConfFile res;
-    // c++20 has std::format for compile-time format and std::vformat for
-    // runtime format
-    res.m_parent_entries = std::format("{}[{}]", m_parent_entries, entry);
-    res.node = node[entry];
-    return res;
-  }
-
-  template <typename T>
-  T as() {
-    // move safe_set logic here
-  }
-
-  template <typename T>
-  T as_or( T val_default ) {
-    // move safe_set logic here
-  }
-
-private:
-  ConfFile() = default;
-  std::string m_parent_entries = "".
-    toml::table node;
-};
-
-
-struct SampleFieldAction : public FieldAction {
-  
-};
+struct SampleFieldAction : public FieldAction {};
 
 constexpr real_t compile_time_const = 0;
 
 int main(int argc, char** argv) {
-  handle_cmd_args();
+  const auto args = pic::parse_args(argc, argv);
+  assert(args.config_file);
 
-  auto conf = ConfFile::load("some toml file");
+  auto conf = ConfFile::load(*args.config_file);
+
+  // TODO can we absorb this into parse_args and use std::exit therein?
+  if (args.is_dry_run) {
+    int retcode = 0;
+    std::cout << "Dry Run Checks :=" << std::endl;
+#if PIC_DEBUG
+    std::cout << "\tDebug" << std::endl;
+#else
+    std::cout << "\tRelease" << std::endl;
+#endif
+    // TODO proofread
+    // std::cout << pic::proofread("\t") << std::endl;
+    if (args.resume_dir) {
+      auto resume_dir = fs::absolute(*args.resume_dir);
+      if (!fs::exists(resume_dir)) {
+        retcode = 1;
+        std::cout << "ERROR : Invalid resume directory : " << resume_dir
+                  << std::endl;
+      } else if (resume_dir.find("checkpoints/timestep") == std::string::npos) {
+        // if the directory exists but is not one of the checkpoints
+        retcode = 1;
+        std::cout << "ERROR : Invalid resume directory : " << resume_dir
+                  << ". Specify which checkpoint!" << std::endl;
+      } else {
+        std::cout << "\tResume from : " << resume_dir << std::endl;
+      }
+    }
+
+    return retcode;
+  }
 
   auto dt = conf["dt"].as<real_t>();
+  auto n_timesteps = conf["total_timesteps"].as_or<int>(100);
   auto gamma_fd = conf["pairs"]["gamma_fd"].as<real_t>();
 
   SimulationBuilder builder;
 
+  // TODO
+  mpi::commit(
+      mpi::Datatype<particle::Particle<pic::real_t, particle::Specs>>{});
+
+  builder.initialize_this_run_dir().create_cartesian_topology();
+
+  {  // TODO can this block be put in builder?
+
+    // journaling
+    fs::mpido(mpi::world, [&]() {
+      const std::string official_jnl(pic::this_run_dir + "/journal.txt");
+      std::string jnl;
+      if (cli_args.journal_file) {
+        // a journal file is specified
+        jnl = fs::absolute(*cli_args.journal_file);
+        if (!fs::exists(jnl)) {
+          std::cout << "Specified journal doesn't exist. Using default journal "
+                       "instead."
+                    << std::endl;
+          jnl = official_jnl;
+        }
+      } else {
+        // if a journal file is not specified, create one
+        jnl = official_jnl;
+      }
+      std::ofstream out;
+      out.open(jnl, std::ios_base::app);  // NOTE app creates new file when jnl
+                                          // doesn't exist
+#if PIC_DEBUG
+      out << "BuildType := Debug" << std::endl;
+#else
+                             out << "BuildType := Release" << std::endl;
+#endif
+      out << "DataDir := " << pic::this_run_dir << std::endl;
+      if (resume_dir) out << "Resume := " << *resume_dir << std::endl;
+      out.close();
+      if (!fs::equivalent(jnl, official_jnl)) {
+        // NOTE fs::rename doesn't work on some platforms because of
+        // cross-device link.
+        fs::copy_file(jnl, official_jnl);
+      }
+    });
+
+    fs::mpido(mpi::world, [&]() {
+      fs::create_directories(pic::this_run_dir + "/data");
+      fs::create_directories(pic::this_run_dir + "/logs");
+      fs::create_directories(pic::this_run_dir + "/pigeon");
+      fs::copy_file("CMakeLists.txt",
+                    pic::this_run_dir + "/pigeon/CMakeLists.txt");
+      fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp");
+      fs::copy_file("pic_impl.hpp", pic::this_run_dir + "/pigeon/pic_impl.hpp");
+      if (cli_args.config_file) {
+        fs::copy_file(*cli_args.config_file,
+                      pic::this_run_dir + "/pigeon/conf.toml");
+      }
+    });
+    lgr::file.set_filename(pic::this_run_dir + "/logs/rank" +
+                           std::to_string(mpi::world.rank()) + ".log");
+  }
+  lgr::file.set_filename(pic::this_run_dir + "/logs/rank" +
+                         std::to_string(mpi::world.rank()) + ".log");
+
+  // TODO
+  auto properties = pic::set_up_particle_properties();
+  builder.set_particle_properties(properties).;
+
+  if (mpi::world.rank() == 0)
+    std::cout << "Initializing simulator..." << std::endl;
+
   {
     auto& field_act = builder.add_field_action<SampleFieldAction>();
-    {
-      field_act.set_name("blahblah");
-    }
+    { field_act.set_name("blahblah"); }
+    // ....
   }
 
-  // auto sim = builder.build();
+  auto& sim = builder.build();
   // sim.start();
   // sim.print_steps(); // prints steps in order
+
+  // TODO having to have user call this is a bit error_prone
+  const auto init_ts = sim.initial_timestep();
+  if (mpi::world.rank() == 0) std::cout << "Launch" << std::endl;
+  for (int ts = init_ts; ts < init_ts + n_timesteps; ++ts) {
+    sim.evolve(ts, pic::dt);
+  }
+  lgr::file.close();
 
   return 0;
 }

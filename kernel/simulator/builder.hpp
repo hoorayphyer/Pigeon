@@ -10,6 +10,8 @@
 
 namespace pic {
 
+struct CLIArgs;
+
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
 class SimulationBuilder {
@@ -21,6 +23,9 @@ class SimulationBuilder {
   using DataExporter_t = io::DataExporter<RD, DGrid, R, S, RJ>;
   using ExportBundle_t = ExportBundle<DGrid, R, S, RJ>;
   using Simulator_t = Simulator<DGrid, R, S, RJ, RD>;
+
+  SimulationBuilder(const CLIArgs& args);
+  ~SimulationBuilder();
 
   /**
      add a field action of ConcreteAction constructed with `ctor_args`.
@@ -97,16 +102,15 @@ class SimulationBuilder {
     return *this;
   }
 
-  SimulationBuilder& set_this_run_dir(std::string dir) {
-    m_this_run_dir.emplace(std::move(dir));
-    return *this;
-  }
+  SimulationBuilder& initialize_this_run_dir(std::string prefix,
+                                             std::string project_name);
 
   SimulationBuilder& set_supergrid(const apt::Grid<R, DGrid>& supergrid) {
     m_supergrid.emplace(supergrid);
     return *this;
   }
 
+  // TODO still need this when resume_dir is available?
   SimulationBuilder& set_checkpoint_dir(std::string dir) {
     m_checkpoint_dir.emplace(std::move(dir));
     return *this;
@@ -127,7 +131,7 @@ class SimulationBuilder {
     return *this;
   }
 
-  Simulator_t build();
+  Simulator_t& build();
 
  private:
   // these are with global ranges;
@@ -154,7 +158,7 @@ class SimulationBuilder {
   std::optional<int> m_total_timesteps;
   std::optional<int> m_fld_guard;
 
-  bool m_is_build_called = false;  // make sure `build()` is called only once
+  std::optional<Simulator_t> m_sim;
 
   template <typename Action>
   auto& get_actions() {

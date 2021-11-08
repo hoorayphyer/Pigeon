@@ -4,7 +4,7 @@ target_include_directories(confFile BEFORE PRIVATE ${KERNEL_DIR} ${CMAKE_CURRENT
 add_library(simulationBuilder SHARED "builder.cpp")
 target_include_directories(simulationBuilder BEFORE PRIVATE ${KERNEL_DIR})
 # TODO pic_rc for pic.hpp
-target_link_libraries(simulationBuilder PRIVATE mpi io logger ckpt pic_rc particle_array)
+target_link_libraries(simulationBuilder PRIVATE mpi io logger filesys ckpt pic_rc particle_array)
 
 
 add_library(simulatior SHARED "simulator.cpp")

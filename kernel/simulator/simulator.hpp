@@ -40,6 +40,7 @@ struct Simulator {
   util::Rng<R> m_rng;
   int m_fld_guard;
   std::string m_this_run_dir;
+  int m_initial_timestep = 0;
 
   apt::Grid<R, DGrid> m_grid;
   std::optional<dye::Ensemble<DGrid>> m_ens_opt;
@@ -79,6 +80,8 @@ struct Simulator {
 
  public:
   friend class SimulationBuilder<DGrid, R, S, RJ, RD>;
+
+  int initial_timestep() const noexcept { return m_initial_timestep; }
 
   void evolve(int timestep, R dt);
 };

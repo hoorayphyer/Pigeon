@@ -1,9 +1,119 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "filesys/filesys.hpp"
+#include "simulator/argparser.hpp"
 #include "simulator/builder.hpp"
 
+namespace {
+
+std::string init_this_run_dir(std::string prefix, std::string dirname) {
+  // use world root time to ensure uniqueness
+  std::string this_run_dir;
+  if (mpi::world.rank() == 0) {
+    prefix = fs::absolute(prefix);
+    fs::remove_slash(prefix);
+    fs::remove_slash(dirname);
+
+    // in case of running too frequently within a minute, directories with
+    // postfixed numbers are created
+    if (fs::exists(prefix + "/" + dirname)) {
+      for (int n = 1;; ++n) {
+        if (!fs::exists(prefix + "/" + dirname + "-" + std::to_string(n))) {
+          dirname += "-" + std::to_string(n);
+          break;
+        }
+      }
+    }
+    this_run_dir = prefix + "/" + dirname;
+
+    // local directory for storing data symlinks
+    // TODO Maybe deprecate this?
+#ifdef APPARENT_DATA_DIR
+    std::string local_data_dir = []() {
+      std::string str = APPARENT_DATA_DIR;
+      fs::remove_slash(str);
+      return str;
+    }();
+#else
+    std::string local_data_dir = "Data";
+#endif
+
+    fs::create_directories(this_run_dir);
+    fs::create_directories(local_data_dir);
+    fs::create_directory_symlink(this_run_dir, local_data_dir + "/" + dirname);
+  }
+
+  if (mpi::world.size() > 1) {
+    char buf[200];
+    if (mpi::world.rank() == 0) {
+      for (int i = 0; i < this_run_dir.size(); ++i) buf[i] = this_run_dir[i];
+      buf[this_run_dir.size()] = '\0';
+      mpi::world.broadcast(0, buf, 200);
+    } else {
+      mpi::world.broadcast(0, buf, 200);
+      this_run_dir = {buf};
+    }
+  }
+
+  return this_run_dir;
+}
+
+std::string data_dirname(std::string project_name) {
+  char subDir[100] = {};
+  for (int i = 0; i < 100; ++i) subDir[i] = '\0';
+  if (mpi::world.rank() == 0) {
+    char myTime[100] = {};
+    time_t rawtime;
+    struct tm* timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(myTime, 100, "%Y%m%d-%H%M", timeinfo);
+    snprintf(subDir, sizeof(subDir), "%s", myTime);
+  }
+  return project_name + "-" + subDir;
+}
+}  // namespace
+
 namespace pic {
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
+SimulationBuilder<DGrid, R, S, RJ, RD>::SimulationBuilder(const CLIArgs& args) {
+  const std::optional<std::string> resume_dir = [&]() {
+    auto res = args.resume_dir;
+    if (res) {
+      *res = fs::absolute(*res);
+    }
+    return res;
+  }();
+
+  mpi::initialize(args.rest);
+}
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
+SimulationBuilder<DGrid, R, S, RJ, RD>::~SimulationBuilder() {
+  // TODO double check if this is OK
+  mpi::world.barrier();
+  // reset m_sim to force destruction of potential mpi communicators before
+  // mpi::finalize
+  m_sim.reset();
+  mpi::finalize();
+}
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
+SimulationBuilder<DGrid, R, S, RJ, RD>&
+SimulationBuilder<DGrid, R, S, RJ, RD>::initialize_this_run_dir(
+    std::string prefix, std::string project_name) {
+  auto dirname = data_dirname(project_name);
+  auto this_run_dir = init_this_run_dir(prefix, dirname);
+
+  m_this_run_dir.emplace(this_run_dir);
+
+  return *this;
+}
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
@@ -54,9 +164,6 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   if (m_ic_actions.size() == 0) {
     msg += "- no initial condition is given\n";
   }
-  if (!m_total_timesteps) {
-    msg += "- must set the total number of timesteps\n";
-  }
   if (!m_fld_guard) {
     msg += "- must set the field guard\n";
   }
@@ -66,6 +173,8 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
 int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
+  if (mpi::world.rank() == 0)
+    std::cout << "Loading initial condition..." << std::endl;
   int init_ts = 0;
   // TODO profiling_plan
   // if (profiling_plan.on and profiling_plan.is_qualified()) {
@@ -133,11 +242,10 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
-SimulationBuilder<DGrid, R, S, RJ, RD>::Simulator_t
+SimulationBuilder<DGrid, R, S, RJ, RD>::Simulator_t&
 SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
-  if (m_is_build_called) {
-    throw std::runtime_error(
-        "must call build() no more than once on a SimulationBuilder object!");
+  if (m_sim) {
+    return *m_sim;
   }
 
   {
@@ -148,7 +256,10 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
     }
   }
 
-  Simulator_t sim;
+  // Simulator_t ctor is not accessible in optional
+  m_sim.emplace(Simulator_t());
+
+  auto& sim = *m_sim;
   sim.initialize(std::move(*m_supergrid), std::move(*m_cart),
                  std::move(m_props), std::move(m_periodic), m_dims);
   auto init_ts = load_init_cond(sim);
@@ -162,8 +273,7 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
   sim.m_f_custom_step = std::move(m_f_custom_step);
   sim.m_fld_guard = *m_fld_guard;
   sim.m_this_run_dir = *m_this_run_dir;
-
-  m_is_build_called = true;
+  sim.m_initial_timestep = init_ts;
 
   return sim;
 }
