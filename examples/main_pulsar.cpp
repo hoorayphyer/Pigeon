@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
   auto n_timesteps = conf["total_timesteps"].as_or<int>(100);
   auto gamma_fd = conf["pairs"]["gamma_fd"].as<real_t>();
 
-  SimulationBuilder builder;
+  SimulationBuilder builder(args);
 
   // TODO
   mpi::commit(
@@ -55,60 +55,9 @@ int main(int argc, char** argv) {
   builder.initialize_this_run_dir().create_cartesian_topology();
 
   {  // TODO can this block be put in builder?
-
-    // journaling
-    fs::mpido(mpi::world, [&]() {
-      const std::string official_jnl(pic::this_run_dir + "/journal.txt");
-      std::string jnl;
-      if (cli_args.journal_file) {
-        // a journal file is specified
-        jnl = fs::absolute(*cli_args.journal_file);
-        if (!fs::exists(jnl)) {
-          std::cout << "Specified journal doesn't exist. Using default journal "
-                       "instead."
-                    << std::endl;
-          jnl = official_jnl;
-        }
-      } else {
-        // if a journal file is not specified, create one
-        jnl = official_jnl;
-      }
-      std::ofstream out;
-      out.open(jnl, std::ios_base::app);  // NOTE app creates new file when jnl
-                                          // doesn't exist
-#if PIC_DEBUG
-      out << "BuildType := Debug" << std::endl;
-#else
-                             out << "BuildType := Release" << std::endl;
-#endif
-      out << "DataDir := " << pic::this_run_dir << std::endl;
-      if (resume_dir) out << "Resume := " << *resume_dir << std::endl;
-      out.close();
-      if (!fs::equivalent(jnl, official_jnl)) {
-        // NOTE fs::rename doesn't work on some platforms because of
-        // cross-device link.
-        fs::copy_file(jnl, official_jnl);
-      }
-    });
-
-    fs::mpido(mpi::world, [&]() {
-      fs::create_directories(pic::this_run_dir + "/data");
-      fs::create_directories(pic::this_run_dir + "/logs");
-      fs::create_directories(pic::this_run_dir + "/pigeon");
-      fs::copy_file("CMakeLists.txt",
-                    pic::this_run_dir + "/pigeon/CMakeLists.txt");
-      fs::copy_file("pic.hpp", pic::this_run_dir + "/pigeon/pic.hpp");
-      fs::copy_file("pic_impl.hpp", pic::this_run_dir + "/pigeon/pic_impl.hpp");
-      if (cli_args.config_file) {
-        fs::copy_file(*cli_args.config_file,
-                      pic::this_run_dir + "/pigeon/conf.toml");
-      }
-    });
     lgr::file.set_filename(pic::this_run_dir + "/logs/rank" +
                            std::to_string(mpi::world.rank()) + ".log");
   }
-  lgr::file.set_filename(pic::this_run_dir + "/logs/rank" +
-                         std::to_string(mpi::world.rank()) + ".log");
 
   // TODO
   auto properties = pic::set_up_particle_properties();
@@ -133,6 +82,8 @@ int main(int argc, char** argv) {
   for (int ts = init_ts; ts < init_ts + n_timesteps; ++ts) {
     sim.evolve(ts, pic::dt);
   }
+
+  // TODO move this to builder dtor
   lgr::file.close();
 
   return 0;

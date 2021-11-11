@@ -24,7 +24,7 @@ class SimulationBuilder {
   using ExportBundle_t = ExportBundle<DGrid, R, S, RJ>;
   using Simulator_t = Simulator<DGrid, R, S, RJ, RD>;
 
-  SimulationBuilder(const CLIArgs& args);
+  SimulationBuilder(CLIArgs args);
   ~SimulationBuilder();
 
   /**
@@ -110,12 +110,6 @@ class SimulationBuilder {
     return *this;
   }
 
-  // TODO still need this when resume_dir is available?
-  SimulationBuilder& set_checkpoint_dir(std::string dir) {
-    m_checkpoint_dir.emplace(std::move(dir));
-    return *this;
-  }
-
   SimulationBuilder& create_cartesian_topology(
       const apt::array<int, DGrid>& dims,
       const apt::array<bool, DGrid>& periodic);
@@ -134,6 +128,8 @@ class SimulationBuilder {
   Simulator_t& build();
 
  private:
+  CLIArgs m_args;
+
   // these are with global ranges;
   std::vector<std::unique_ptr<FieldAction_t>> m_fld_actions;
   std::vector<std::unique_ptr<ParticleAction_t>> m_ptc_actions;
@@ -154,7 +150,6 @@ class SimulationBuilder {
   apt::array<bool, DGrid> m_periodic;
   particle::map<particle::Properties> m_props;
 
-  std::optional<std::string> m_checkpoint_dir;
   std::optional<int> m_total_timesteps;
   std::optional<int> m_fld_guard;
 
@@ -188,5 +183,8 @@ class SimulationBuilder {
   std::string precondition() const;
 
   int load_init_cond(Simulator_t& sim);
+
+  void set_up_journal() const;
+  void populate_this_run_dir() const;
 };
 }  // namespace pic

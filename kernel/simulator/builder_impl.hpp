@@ -79,16 +79,14 @@ namespace pic {
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
-SimulationBuilder<DGrid, R, S, RJ, RD>::SimulationBuilder(const CLIArgs& args) {
-  const std::optional<std::string> resume_dir = [&]() {
-    auto res = args.resume_dir;
-    if (res) {
-      *res = fs::absolute(*res);
-    }
-    return res;
-  }();
+SimulationBuilder<DGrid, R, S, RJ, RD>::SimulationBuilder(CLIArgs args)
+    : m_args(std::move(args)) {
+  auto& dir = m_args.resume_dir;
+  if (dir) {
+    *dir = fs::absolute(*dir);
+  }
 
-  mpi::initialize(args.rest);
+  mpi::initialize(m_args.rest);
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
@@ -111,6 +109,8 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::initialize_this_run_dir(
   auto this_run_dir = init_this_run_dir(prefix, dirname);
 
   m_this_run_dir.emplace(this_run_dir);
+
+  populate_this_run_dir();
 
   return *this;
 }
@@ -181,8 +181,8 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
   //   lgr::file << "--- Loading Initial Condition..." << std::endl;
   // }
 
-  if (m_checkpoint_dir) {
-    init_ts = ckpt::load_checkpoint(*m_checkpoint_dir, sim.m_ens_opt,
+  if (m_args.resume_dir) {
+    init_ts = ckpt::load_checkpoint(*m_args.resume_dir, sim.m_ens_opt,
                                     sim.m_cart_opt, sim.m_E, sim.m_B,
                                     sim.m_particles, sim.m_properties);
     if (sim.m_ens_opt) {
@@ -238,6 +238,65 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
   // }
 
   return init_ts;
+}
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
+void SimulationBuilder<DGrid, R, S, RJ, RD>::set_up_journal() const {
+  const auto& this_run_dir = *m_this_run_dir;
+  const std::string jnl_default(this_run_dir + "/journal.txt");
+  std::string jnl = [&jnl_default, this]() {
+    std::string res = jnl_default;
+    if (m_args.journal_file) {
+      // a journal file is specified
+      res = fs::absolute(*m_args.journal_file);
+      if (!fs::exists(res)) {
+        // TODO std cout?
+        std::cout << "Specified journal doesn't exist. Using default journal "
+                     "instead."
+                  << std::endl;
+        res = jnl_default;
+      }
+    }
+
+    return res;
+  }();
+  std::ofstream out;
+  out.open(jnl, std::ios_base::app);  // NOTE app creates new file when jnl
+                                      // doesn't exist
+#if PIC_DEBUG
+  out << "BuildType := Debug" << std::endl;
+#else
+  out << "BuildType := Release" << std::endl;
+#endif
+  out << "DataDir := " << this_run_dir << std::endl;
+  if (m_args.resume_dir) out << "Resume := " << *m_args.resume_dir << std::endl;
+  out.close();
+  if (!fs::equivalent(jnl, jnl_default)) {
+    // NOTE fs::rename doesn't work on some platforms because of
+    // cross-device link.
+    fs::copy_file(jnl, jnl_default);
+  }
+}
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
+void SimulationBuilder<DGrid, R, S, RJ, RD>::populate_this_run_dir() const {
+  fs::mpido(mpi::world, [this]() {
+    const auto& this_run_dir = *m_this_run_dir;
+
+    set_up_journal();
+
+    fs::create_directories(this_run_dir + "/data");
+    fs::create_directories(this_run_dir + "/logs");
+    fs::create_directories(this_run_dir + "/pigeon");
+    fs::copy_file("CMakeLists.txt", this_run_dir + "/pigeon/CMakeLists.txt");
+    fs::copy_file("pic.hpp", this_run_dir + "/pigeon/pic.hpp");
+    fs::copy_file("pic_impl.hpp", this_run_dir + "/pigeon/pic_impl.hpp");
+    if (m_args.config_file) {
+      fs::copy_file(*m_args.config_file, this_run_dir + "/pigeon/conf.toml");
+    }
+  });
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
