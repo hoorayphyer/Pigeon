@@ -54,11 +54,6 @@ int main(int argc, char** argv) {
 
   builder.initialize_this_run_dir().create_cartesian_topology();
 
-  {  // TODO can this block be put in builder?
-    lgr::file.set_filename(pic::this_run_dir + "/logs/rank" +
-                           std::to_string(mpi::world.rank()) + ".log");
-  }
-
   // TODO
   auto properties = pic::set_up_particle_properties();
   builder.set_particle_properties(properties).;
@@ -82,9 +77,6 @@ int main(int argc, char** argv) {
   for (int ts = init_ts; ts < init_ts + n_timesteps; ++ts) {
     sim.evolve(ts, pic::dt);
   }
-
-  // TODO move this to builder dtor
-  lgr::file.close();
 
   return 0;
 }

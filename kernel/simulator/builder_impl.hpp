@@ -1,3 +1,5 @@
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -92,6 +94,7 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::SimulationBuilder(CLIArgs args)
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
 SimulationBuilder<DGrid, R, S, RJ, RD>::~SimulationBuilder() {
+  lgr::file.close();
   // TODO double check if this is OK
   mpi::world.barrier();
   // reset m_sim to force destruction of potential mpi communicators before
@@ -111,6 +114,10 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::initialize_this_run_dir(
   m_this_run_dir.emplace(this_run_dir);
 
   populate_this_run_dir();
+
+  auto log_file =
+      fmt::format("{}/logs/rank/{}.log", *m_this_run_dir, mpi::world.rank());
+  lgr::file.set_filename(log_file);
 
   return *this;
 }
