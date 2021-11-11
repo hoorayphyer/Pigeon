@@ -174,6 +174,9 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   if (!m_fld_guard) {
     msg += "- must set the field guard\n";
   }
+  if (!m_is_mpi_particle_committed) {
+    msg += "- must commit a particle type for MPI\n";
+  }
   return msg;
 }
 

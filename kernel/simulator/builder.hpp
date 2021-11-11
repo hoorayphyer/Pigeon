@@ -127,8 +127,17 @@ class SimulationBuilder {
 
   Simulator_t& build();
 
+  // TODO 1. maybe use concept 2. can we avoid having to have user call this
+  template <typename Ptc>
+  SimulationBuilder& commit_particle_type_for_mpi() {
+    mpi::commit(mpi::Datatype<Ptc>{});
+    m_is_mpi_particle_committed = true;
+    return *this;
+  }
+
  private:
   CLIArgs m_args;
+  bool m_is_mpi_particle_committed = false;
 
   // these are with global ranges;
   std::vector<std::unique_ptr<FieldAction_t>> m_fld_actions;

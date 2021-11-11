@@ -6,12 +6,8 @@ struct SampleFieldAction : public FieldAction {};
 
 constexpr real_t compile_time_const = 0;
 
-int main(int argc, char** argv) {
-  const auto args = pic::parse_args(argc, argv);
-  assert(args.config_file);
-
-  auto conf = ConfFile::load(*args.config_file);
-
+// TODO need better encapsulation
+void dry_run() {
   // TODO can we absorb this into parse_args and use std::exit therein?
   if (args.is_dry_run) {
     int retcode = 0;
@@ -41,16 +37,19 @@ int main(int argc, char** argv) {
 
     return retcode;
   }
+}
+
+int main(int argc, char** argv) {
+  const auto args = pic::parse_args(argc, argv);
+  assert(args.config_file);
+
+  auto conf = ConfFile::load(*args.config_file);
 
   auto dt = conf["dt"].as<real_t>();
   auto n_timesteps = conf["total_timesteps"].as_or<int>(100);
   auto gamma_fd = conf["pairs"]["gamma_fd"].as<real_t>();
 
   SimulationBuilder builder(args);
-
-  // TODO
-  mpi::commit(
-      mpi::Datatype<particle::Particle<pic::real_t, particle::Specs>>{});
 
   builder.initialize_this_run_dir().create_cartesian_topology();
 
