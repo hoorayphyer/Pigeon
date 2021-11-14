@@ -1,5 +1,6 @@
 add_library(confFile SHARED "conf_file.cpp")
-target_include_directories(confFile BEFORE PRIVATE ${KERNEL_DIR} ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/toml ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/fmt/include)
+target_include_directories(confFile BEFORE PRIVATE ${KERNEL_DIR} ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/toml)
+target_link_libraries(confFile PUBLIC fmt)
 
 add_library(simulationBuilder SHARED "builder.cpp")
 target_include_directories(simulationBuilder BEFORE PRIVATE ${KERNEL_DIR})
@@ -7,10 +8,10 @@ target_include_directories(simulationBuilder BEFORE PRIVATE ${KERNEL_DIR})
 target_link_libraries(simulationBuilder PRIVATE mpi io logger filesys ckpt pic_rc particle_array)
 
 
-add_library(simulatior SHARED "simulator.cpp")
-target_include_directories(simulatior BEFORE PRIVATE ${KERNEL_DIR})
+add_library(simulator SHARED "simulator.cpp")
+target_include_directories(simulator BEFORE PRIVATE ${KERNEL_DIR})
 # TODO pic_rc for pic.hpp
-target_link_libraries(simulatior PRIVATE field_sync dye mpi io filesys logger ckpt pic_rc particle_array timer)
+target_link_libraries(simulator PUBLIC confFile simulationBuilder mpi PRIVATE field_sync dye io filesys logger ckpt pic_rc particle_array timer)
 
 # add_library(simulator SHARED "simulator.cpp")
 # target_include_directories(simulator BEFORE PRIVATE ${KERNEL_DIR} ${CMAKE_CURRENT_LIST_DIR}/../../.subtrees/toml/include)

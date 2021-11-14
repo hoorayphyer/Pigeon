@@ -1,61 +1,62 @@
+#include <cassert>
 #include <iostream>
 
 #include "pigeon.hpp"
 
-struct SampleFieldAction : public FieldAction {};
+// TODOL users may forget to sync value and state. Add another layer then
+namespace particle {  // must have this namespace for now
+template <typename T>
+struct Specs {
+  using value_type = T;
+  static constexpr int Dim = 3;
+  using state_type = long long;
+  static_assert(8 * sizeof(state_type) >= 64);
+};
+}  // namespace particle
+
+constexpr int DGrid = 2;
+using real_t = float;
+using real_j_t = float;
+using real_export_t = float;
+using ShapeF = particle::shapef_t<particle::shape::Cloud_In_Cell>;
+
+using pgn = PIGEON<DGrid, real_t, particle::Specs, real_j_t, real_export_t>;
+
+struct SampleFieldAction : public pgn::FieldAction_t {
+  void operator()(const Bundle_t& bundle) const override {}
+};
+
+auto set_up_particle_properties() {
+  particle::map<particle::Properties> properties;
+  return properties;
+}
 
 constexpr real_t compile_time_const = 0;
-
-// TODO need better encapsulation
-void dry_run() {
-  // TODO can we absorb this into parse_args and use std::exit therein?
-  if (args.is_dry_run) {
-    int retcode = 0;
-    std::cout << "Dry Run Checks :=" << std::endl;
-#if PIC_DEBUG
-    std::cout << "\tDebug" << std::endl;
-#else
-    std::cout << "\tRelease" << std::endl;
-#endif
-    // TODO proofread
-    // std::cout << pic::proofread("\t") << std::endl;
-    if (args.resume_dir) {
-      auto resume_dir = fs::absolute(*args.resume_dir);
-      if (!fs::exists(resume_dir)) {
-        retcode = 1;
-        std::cout << "ERROR : Invalid resume directory : " << resume_dir
-                  << std::endl;
-      } else if (resume_dir.find("checkpoints/timestep") == std::string::npos) {
-        // if the directory exists but is not one of the checkpoints
-        retcode = 1;
-        std::cout << "ERROR : Invalid resume directory : " << resume_dir
-                  << ". Specify which checkpoint!" << std::endl;
-      } else {
-        std::cout << "\tResume from : " << resume_dir << std::endl;
-      }
-    }
-
-    return retcode;
-  }
-}
 
 int main(int argc, char** argv) {
   const auto args = pic::parse_args(argc, argv);
   assert(args.config_file);
 
-  auto conf = ConfFile::load(*args.config_file);
+  auto conf = pgn::ConfFile_t::load(*args.config_file);
 
+  auto datadir_prefix = conf["datadir_prefix"].as_or<std::string>("../Data/");
+  auto project_name = conf["project_name"].as_or<std::string>("Unnamed");
   auto dt = conf["dt"].as<real_t>();
   auto n_timesteps = conf["total_timesteps"].as_or<int>(100);
   auto gamma_fd = conf["pairs"]["gamma_fd"].as<real_t>();
 
-  SimulationBuilder builder(args);
+  // TODO put these to toml after getting rid of apt::array
+  apt::array<int, DGrid> dims = {1, 1};
+  apt::array<bool, DGrid> periodic = {false, false};
 
-  builder.initialize_this_run_dir().create_cartesian_topology();
+  pgn::SimulationBuilder_t builder(args);
+
+  builder.initialize_this_run_dir(datadir_prefix, project_name)
+      .create_cartesian_topology(dims, periodic);
 
   // TODO
-  auto properties = pic::set_up_particle_properties();
-  builder.set_particle_properties(properties).;
+  auto properties = set_up_particle_properties();
+  builder.set_particle_properties(properties);
 
   if (mpi::world.rank() == 0)
     std::cout << "Initializing simulator..." << std::endl;
@@ -74,7 +75,7 @@ int main(int argc, char** argv) {
   const auto init_ts = sim.initial_timestep();
   if (mpi::world.rank() == 0) std::cout << "Launch" << std::endl;
   for (int ts = init_ts; ts < init_ts + n_timesteps; ++ts) {
-    sim.evolve(ts, pic::dt);
+    sim.evolve(ts, dt);
   }
 
   return 0;

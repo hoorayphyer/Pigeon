@@ -34,7 +34,7 @@ class SimulationBuilder {
    */
   template <typename ConcreteAction, typename... Args>
   ConcreteAction& add_field_action(Args&&... ctor_args) {
-    return add_action<FieldAction_t, ConcreteAction>(
+    return add_action_impl<FieldAction_t, ConcreteAction>(
         std::forward<Args>(ctor_args)...);
   }
 
@@ -45,7 +45,7 @@ class SimulationBuilder {
    */
   template <typename ConcreteAction, typename... Args>
   ConcreteAction& add_particle_action(Args&&... ctor_args) {
-    return add_action<ParticleAction_t, ConcreteAction>(
+    return add_action_impl<ParticleAction_t, ConcreteAction>(
         std::forward<Args>(ctor_args)...);
   }
 
@@ -57,7 +57,7 @@ class SimulationBuilder {
    */
   template <typename ConcreteAction, typename... Args>
   ConcreteAction& add_init_cond_action(Args&&... ctor_args) {
-    return add_action<InitialConditionAction_t, ConcreteAction>(
+    return add_action_impl<InitialConditionAction_t, ConcreteAction>(
         std::forward<Args>(ctor_args)...);
   }
 
@@ -69,7 +69,7 @@ class SimulationBuilder {
    */
   template <typename ConcreteAction, typename... Args>
   ConcreteAction& add_post_resume_action(Args&&... ctor_args) {
-    return add_action<PostResumeAction_t, ConcreteAction>(
+    return add_action_impl<PostResumeAction_t, ConcreteAction>(
         std::forward<Args>(ctor_args)...);
   }
 
