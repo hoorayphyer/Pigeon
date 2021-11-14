@@ -47,6 +47,11 @@ add_library(logger INTERFACE)
 target_link_directories(logger INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
 target_link_libraries(logger INTERFACE -llogger)
 
+add_library(fmt INTERFACE)
+target_include_directories(fmt INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/include)
+target_link_directories(fmt INTERFACE ${CMAKE_CURRENT_LIST_DIR}/../infrastructure/lib)
+target_link_libraries(fmt INTERFACE -lfmt)
+
 function(test_gen category name)
   set(test_target "test_${category}_${name}")
   add_executable( ${test_target} "tests/test_${name}.cpp")

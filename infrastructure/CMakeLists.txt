@@ -69,3 +69,11 @@ add_subdirectory(mpipp)
 add_subdirectory(silopp)
 add_subdirectory(random)
 add_subdirectory(testfw)
+
+# by setting `-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>`, it will write to include/ and lib/ under the prefix
+ExternalProject_Add(fmt
+  SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../.subtrees/fmt
+  INSTALL_DIR ${CMAKE_CURRENT_LIST_DIR}
+  CMAKE_ARGS -DBUILD_SHARED_LIBS=TRUE
+             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+  )
