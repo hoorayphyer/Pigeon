@@ -118,7 +118,7 @@ void axissymmetrize(
 }  // namespace
 
 namespace field {
-class Solver : public pgn::FieldAction_t {
+class Solver : public pgn::FieldAction_t<Solver> {
  public:
   Solver(real_t four_pi, real_t alpha, int op_inv_precision, real_t surface,
          real_t outer)
@@ -134,7 +134,7 @@ class Solver : public pgn::FieldAction_t {
 };
 
 // NOTE only implemented for UPPER boundary
-struct RotatingConductor : public pgn::FieldAction_t {
+struct RotatingConductor : public pgn::FieldAction_t<RotatingConductor> {
  private:
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_E_cond;
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_B_cond;
@@ -175,7 +175,7 @@ struct RotatingConductor : public pgn::FieldAction_t {
 };
 
 // NOTE only implemented for UPPER boundary
-struct DampingLayer : public pgn::FieldAction_t {
+struct DampingLayer : public pgn::FieldAction_t<DampingLayer> {
  private:
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_E_bg;
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_B_bg;
@@ -228,7 +228,7 @@ struct DampingLayer : public pgn::FieldAction_t {
   }
 };
 
-struct Axissymmetric : public pgn::FieldAction_t {
+struct Axissymmetric : public pgn::FieldAction_t<Axissymmetric> {
  private:
   bool m_is_upper_axis = false;
 
@@ -324,8 +324,6 @@ int main(int argc, char** argv) {
         .set_range(0, {gv::star_interior, gv::supergrid[0].dim(), gv::guard})
         .set_range(1, {0, gv::supergrid[1].dim() + 1, gv::guard});
 
-    // TODO now set_E/B_cond must precede the remaining because of the setter
-    // template
     builder.add_field_action<field::RotatingConductor>()
         .set_E_cond({E_r_star, E_theta_star, E_phi_star})
         .set_B_cond({B_r_star, B_theta_star, B_phi_star})

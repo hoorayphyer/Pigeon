@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <type_traits>
 
 #include "apt/range.hpp"
 #include "simulator/bundle.hpp"
@@ -21,27 +22,9 @@ struct ActionBase {
   virtual ~ActionBase() = default;
 };
 
-template <typename Action>
-struct ActionSetter_t {
-  Action& set_name(const std::string& name) {
-    auto& res = static_cast<Action&>(*this);
-    res.m_name = name;
-    return res;
-  }
-
-  Action& set_range(std::size_t i, apt::Range range) {
-    auto& res = static_cast<Action&>(*this);
-    // TODO use .at(i) once we get rid of apt::array
-    res.m_ranges[i] = std::move(range);
-    return res;
-  }
-};
-
 template <int DGrid, typename R, typename RJ>
-struct FieldAction : public ActionBase<DGrid>,
-                     public ActionSetter_t<FieldAction<DGrid, R, RJ>> {
+struct FieldAction : public ActionBase<DGrid> {
   using Bundle_t = FieldBundle<DGrid, R, RJ>;
-  friend class ActionSetter_t<FieldAction<DGrid, R, RJ>>;
 
   virtual ~FieldAction() = default;
 
@@ -70,5 +53,41 @@ struct PostResumeAction : public ActionBase<DGrid> {
   virtual ~PostResumeAction() = default;
 
   virtual void operator()(const Bundle_t& bundle) const = 0;
+};
+
+// RATIONALE
+//
+// want to add a few setters in a ConcreteAction class and return
+// ConcreteAction&, so as to be chained with other setters that class may
+// have.
+//
+// AbstractAction is one of the above Action types that derive from
+// ActionBase. The setters only set members of ActionBase, but adding
+// AbstractAction and automatically inheriting AbstractAction makes the user
+// code simpler. For example,
+//
+//     struct A : ActionWithSetter<A, DGrid, FieldAction>;
+//
+// `A` automatically inherits FieldAction while getting the setters.
+// Otherwise, `A` has to add a second inheritance to FieldAction to register
+// itself as a FieldAction.
+//
+// Why not just make FieldAction template on ConcreteAction and put these
+// setters therein? Well, we need a common base class for all concrete field
+// actions, so as to be put in the SimulationBuilder.
+template <typename ConcreteAction, int DGrid, typename AbstractAction>
+struct ActionWithSetters : public AbstractAction {
+  static_assert(std::is_base_of_v<ActionBase<DGrid>, AbstractAction>);
+
+  ConcreteAction& set_name(const std::string& name) {
+    ActionBase<DGrid>::m_name = name;
+    return static_cast<ConcreteAction&>(*this);
+  }
+
+  ConcreteAction& set_range(std::size_t i, apt::Range range) {
+    // TODO use .at(i) once we get rid of apt::array
+    ActionBase<DGrid>::m_ranges[i] = std::move(range);
+    return static_cast<ConcreteAction&>(*this);
+  }
 };
 }  // namespace pic
