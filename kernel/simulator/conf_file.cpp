@@ -31,6 +31,15 @@ class Node_t {
     return res;
   }
 
+  Node_t operator[](int entry) const {
+    Node_t res;
+    res.m_table = m_table;
+    // m_table doesn't support accessing by an integer
+    assert(m_node);
+    res.m_node.emplace((*m_node)[entry]);
+    return res;
+  }
+
   auto& native() {
     assert(m_node);
     return *m_node;
@@ -82,6 +91,13 @@ ConfFile ConfFile::load(const std::string& file) {
 }
 
 ConfFile ConfFile::operator[](const std::string& entry) {
+  ConfFile res;
+  res.m_current_entries = fmt::format("{}[{}]", m_current_entries, entry);
+  res.m_node = std::any_cast<Node_t&>(m_node)[entry];
+  return res;
+}
+
+ConfFile ConfFile::operator[](int entry) {
   ConfFile res;
   res.m_current_entries = fmt::format("{}[{}]", m_current_entries, entry);
   res.m_node = std::any_cast<Node_t&>(m_node)[entry];

@@ -1,10 +1,15 @@
 #pragma once
 
-#include "field/action.hpp"
+#include "apt/grid.hpp"
+#include "field/field.hpp"
+
+namespace mpi {
+struct CartComm;
+}
 
 namespace field {
 template <typename R, int DGrid, typename RJ>
-struct LogSphericalSolver : public Action<R, DGrid, RJ> {
+struct LogSphericalSolver {
   // NOTE Assume second order difference scheme
   // NOTE Ignore setting of range for now
  private:
@@ -17,36 +22,17 @@ struct LogSphericalSolver : public Action<R, DGrid, RJ> {
   R _alpha = 1.0;
 
  public:
-  constexpr auto& set_fourpi(R x) noexcept {
-    _fourpi = x;
-    return *this;
-  }
-  constexpr auto& set_op_inv_precision(int n) noexcept {
-    _op_inv_precision = n;
-    return *this;
-  }
-  constexpr auto& set_alpha(R a) noexcept {
-    _alpha = a;
-    return *this;
-  }
-  constexpr auto& set_surface(R a) noexcept {
-    _surface = a;
-    return *this;
-  }
-  constexpr auto& set_outer(R a) noexcept {
-    _outer = a;
-    return *this;
-  }
+  LogSphericalSolver(R four_pi, R alpha, int op_inv_precision, R surface,
+                     R outer)
+      : _fourpi(four_pi),
+        _surface(surface),
+        _outer(outer),
+        _op_inv_precision(op_inv_precision),
+        _alpha(alpha) {}
 
-  virtual LogSphericalSolver* Clone() const {
-    return new LogSphericalSolver(*this);
-  }
-
-  virtual void operator()(Field<R, 3, DGrid>& E, Field<R, 3, DGrid>& B,
-                          Field<RJ, 3, DGrid>& J,
-                          const apt::Grid<R, DGrid>& grid,
-                          const mpi::CartComm& cart, int timestep,
-                          R dt) const override;
+  void operator()(Field<R, 3, DGrid>& E, Field<R, 3, DGrid>& B,
+                  Field<RJ, 3, DGrid>& J, const apt::Grid<R, DGrid>& grid,
+                  const mpi::CartComm& cart, int timestep, R dt) const;
 
   static constexpr int min_guard(int iteration_in_inverting_operator) {
     return 2 + iteration_in_inverting_operator;

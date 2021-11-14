@@ -9,6 +9,8 @@ struct ConfFile {
 
   ConfFile operator[](const std::string& entry);
 
+  ConfFile operator[]( int entry );
+
   template <typename T>
   T as() const;
 
