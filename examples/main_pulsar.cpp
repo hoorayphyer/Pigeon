@@ -180,7 +180,13 @@ struct DampingLayer : public pgn::FieldAction_t<DampingLayer> {
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_E_bg;
   apt::array<real_t (*)(real_t, real_t, real_t, real_t t), 3> m_B_bg;
   real_t m_rate{};
-  real_t (*m_profile)(real_t q_normal) = nullptr;
+
+  real_t m_r_damp_begin;  // only needed in m_profile
+  real_t m_thickness;     // only_needed in m_profile
+  real_t m_profile(real_t lnr) const {
+    lnr = (std::exp(lnr) - m_r_damp_begin) / m_thickness;
+    return 0.5 * lnr * lnr;
+  }
 
  public:
   auto& set_E_background(
@@ -197,12 +203,18 @@ struct DampingLayer : public pgn::FieldAction_t<DampingLayer> {
     m_rate = rate;
     return *this;
   }
-  auto& set_damping_profile(real_t (*p)(real_t)) {
-    m_profile = p;
+
+  auto& set_damping_begin(real_t r_damp_b) {
+    m_r_damp_begin = r_damp_b;
     return *this;
   }
 
-  virtual void operator()(const Bundle_t& bundle) const override {
+  auto& set_damping_thickness(real_t thickness) {
+    m_thickness = thickness;
+    return *this;
+  }
+
+  void operator()(const Bundle_t& bundle) const override {
     auto impose = [this, &grid = bundle.grid, dt = bundle.dt](
                       auto& F, const auto& F_bg, int comp) {
       const auto& ofs = F[comp].offset();
@@ -238,7 +250,7 @@ struct Axissymmetric : public pgn::FieldAction_t<Axissymmetric> {
     return *this;
   }
 
-  virtual void operator()(const Bundle_t& bundle) const override {
+  void operator()(const Bundle_t& bundle) const override {
     // NOTE Guard cells values are needed when interpolating E and B
     // E_theta, B_r, B_phi are on the axis. All but B_r should be set to zero
     auto assign = [](real_t& v_g, real_t& v_b) noexcept { v_g = v_b; };
@@ -331,21 +343,15 @@ int main(int argc, char** argv) {
         .set_range(0, {0, gv::star_interior})
         .set_range(1, {0, gv::supergrid[1].dim() + 1});
 
-    // TODO move profile into DampingLayer class
-    auto profile = [](real_t lnr) -> real_t {
-      // static real_t r_damp_b =
-      //     std::exp(supergrid[0].upper()) - damping_thickness;
-      // lnr = (std::exp(lnr) - r_damp_b) / damping_thickness;
-      // return 0.5 * lnr * lnr;
-    };
-
     const int damping_begin_index = gv::supergrid[0].csba(
         std::log(std::exp(gv::supergrid[0].upper()) - damping_thickness));
     builder.add_field_action<field::DampingLayer>()
         .set_E_background({E_r_star, E_theta_star, E_phi_star})
         .set_B_background({B_r_star, B_theta_star, B_phi_star})
         .set_damping_rate(damping_rate)
-        .set_damping_profile(profile)
+        .set_damping_begin(std::exp(gv::supergrid[0].upper()) -
+                           damping_thickness)
+        .set_damping_thickness(damping_thickness)
         .set_name("DampingLayer")
         .set_range(0, {damping_begin_index, gv::supergrid[0].dim() + gv::guard})
         .set_range(1, {0, gv::supergrid[1].dim() + 1});
