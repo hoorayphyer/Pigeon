@@ -33,6 +33,8 @@ struct PIGEON {
       pic::ActionWithSetters<ConcreteAction, DGrid,
                              typename SimulationBuilder_t::PostResumeAction_t>;
 
+  using ExportBundle_t = SimulationBuilder_t::ExportBundle_t;
+
   using ParticleMigrator_t = particle::Migrator<DGrid, R, S, RJ>;
 
   using ConfFile_t = pic::ConfFile;

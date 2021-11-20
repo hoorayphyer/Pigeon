@@ -695,6 +695,85 @@ struct PostResume : public pgn::PostResumeAction_t<PostResume> {
   }
 };
 
+namespace io {
+void do_prior_export(const pgn::ExportBundle_t& bundle) {
+  // TODO RTD
+
+  // {  // pair creation counter
+  //   auto& pc = RTD::data().pc_counter;
+  //   for (int i = 0; i < 4; ++i)
+  //     ens.reduce_to_chief(mpi::by::SUM, pc[i].data().data(),
+  //                         pc[i].data().size());
+  // }
+  // {  // photon emission counter
+  //   auto& em = RTD::data().em_counter;
+  //   for (int i = 0; i < 4; ++i)
+  //     ens.reduce_to_chief(mpi::by::SUM, em[i].data().data(),
+  //                         em[i].data().size());
+  // }
+  // if (RTD::data().Jsp) {
+  //   auto& Jsp = *RTD::data().Jsp;
+  //   for (auto s : Jsp) {
+  //     for (int i = 0; i < 3; ++i)
+  //       ens.reduce_to_chief(mpi::by::SUM, Jsp[s][i].data().data(),
+  //                           Jsp[s][i].data().size());
+  //   }
+  //   if (cart_opt) {
+  //     for (auto s : Jsp) {
+  //       field::merge_sync_guard_cells(Jsp[s], *cart_opt);
+  //     }
+  //   }
+  // }
+
+  // if (RTD::data().skin_depth) {  // skin depth
+  //   auto& skd = *(RTD::data().skin_depth);
+  //   skd = {J.mesh()};
+  //   skd.reset();
+
+  //   for (auto sp : particles) {
+  //     auto q2m = properties[sp].charge_x * properties[sp].charge_x /
+  //                properties[sp].mass_x;
+  //     for (const auto& ptc : particles[sp]) {
+  //       if (!ptc.is(flag::exist)) continue;
+  //       Index I;
+  //       for (int i = 0; i < DGrid; ++i) I[i] = grid[i].csba(ptc.q(i));
+  //       skd[0](I) += q2m * ptc.frac();
+  //     }
+  //   }
+  //   ens.reduce_to_chief(mpi::by::SUM, skd[0].data().data(),
+  //                       skd[0].data().size());
+  //   if (ens.is_chief()) {
+  //     for (const auto& I : apt::Block(apt::range::begin(skd.mesh().range()),
+  //                                     apt::range::end(skd.mesh().range()))) {
+  //       real_t r = grid[0].absc(I[0], 0.5);
+  //       real_t theta = grid[1].absc(I[1], 0.5);
+  //       real_t h = Metric::h<2>(r, theta) /
+  //                  (wpic2 * grid[0].delta() * grid[0].delta());
+  //       auto& v = skd[0](I);
+  //       v = std::sqrt(h / v);
+  //     }
+  //   }
+  // }
+}
+
+void do_post_export(const pgn::ExportBundle_t& bundle) {
+  // TODO RTD
+
+  // auto& pc = RTD::data().pc_counter;
+  // for (int i = 0; i < 4; ++i)
+  //   std::fill(pc[i].data().begin(), pc[i].data().end(), 0);
+  // auto& em = RTD::data().em_counter;
+  // for (int i = 0; i < 4; ++i)
+  //   std::fill(em[i].data().begin(), em[i].data().end(), 0);
+  // RTD::data().cumulative_time = 0;
+  // if (RTD::data().Jsp) {
+  //   // clear Jsp to save some space
+  //   for (auto sp : *(RTD::data().Jsp)) (*RTD::data().Jsp)[sp] = {};
+  // }
+  // if (RTD::data().skin_depth) *(RTD::data().skin_depth) = {};
+}
+}  // namespace io
+
 int main(int argc, char** argv) {
   const auto args = pic::parse_args(argc, argv);
   assert(args.config_file);
@@ -863,6 +942,8 @@ int main(int argc, char** argv) {
       .set_range(0, {0, gv::supergrid[0].dim()})
       .set_range(1, {0, gv::supergrid[1].dim() +
                             1});  // NOTE +1 to include upper boundary
+
+  builder.set_prior_export(io::do_prior_export).set_post_export(io::do_post_export);
 
   auto& sim = builder.build();
 
