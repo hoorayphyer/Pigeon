@@ -1,6 +1,7 @@
 #pragma once
 
 #include "io/exportee.hpp"
+#include "mpipp/mpi++.hpp" // mpi::CartComm
 // #include "msh/mesh_shape_interplay_impl.hpp" // FIXME need deposit with
 // induced shape
 #include <cassert>

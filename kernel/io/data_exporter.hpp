@@ -5,6 +5,7 @@
 
 #include "apt/range.hpp"
 #include "io/exportee.hpp"
+#include "io/exportee_by_function.hpp"
 
 namespace dye {
 template <int>
@@ -66,6 +67,31 @@ class DataExporter {
 
   auto &add_exportee(PtcExportee<RealDS, DGrid, Real, S> *exportee) {
     m_pexps.emplace_back(exportee);
+    return *this;
+  }
+
+  using FieldExporteeByFunc = FexpTbyFunction<RealDS, DGrid, Real, RealJ>;
+  using ParticleExporteeByFunc = PexpTbyFunction<RealDS, DGrid, Real, S>;
+
+  /*
+   * overloads for field exportee by function
+   */
+  auto &add_exportee(std::string name, int num_comps,
+                     typename FieldExporteeByFunc::F action,
+                     typename FieldExporteeByFunc::H post_hook = nullptr) {
+    m_fexps.emplace_back(
+        new FieldExporteeByFunc(std::move(name), num_comps, action, post_hook));
+    return *this;
+  }
+
+  /*
+   * overloads for particle exportee by function
+   */
+  auto &add_exportee(std::string name, int num_comps,
+                     typename ParticleExporteeByFunc::F action,
+                     typename ParticleExporteeByFunc::H post_hook = nullptr) {
+    m_pexps.emplace_back(new ParticleExporteeByFunc(std::move(name), num_comps,
+                                                    action, post_hook));
     return *this;
   }
 

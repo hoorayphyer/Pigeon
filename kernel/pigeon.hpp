@@ -47,6 +47,11 @@ struct PIGEON {
 
   template <int DField>
   using Field = field::Field<R, DField, DGrid>;
+
+  using JField = field::Field<RJ, 3, DGrid>;  // TODO get rid of this
+
+  using IOField = field::Field<RD, 3, DGrid>;
+  using IOGrid = apt::Grid<RD, DGrid>;  // TODO can we just use same grid???
 };
 
 using particle::species;

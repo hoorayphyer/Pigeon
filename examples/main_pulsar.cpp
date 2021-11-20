@@ -4,6 +4,7 @@
 
 #include "field/log_spherical_solver/updater.hpp"
 #include "metric/log_spherical.hpp"
+#include "msh/mesh_shape_interplay.hpp"
 #include "particle/annihilation.hpp"
 #include "particle/updater.hpp"
 #include "pigeon.hpp"
@@ -772,6 +773,172 @@ void do_post_export(const pgn::ExportBundle_t& bundle) {
   // }
   // if (RTD::data().skin_depth) *(RTD::data().skin_depth) = {};
 }
+
+constexpr auto I2std(const pgn::Index_t& I) {
+  apt::array<real_t, DGrid> res;
+  for (int i = 0; i < DGrid; ++i) res[i] = I[i] + 0.5;  // interpolate to MIDWAY
+  return res;
+}
+
+template <int F>
+apt::array<real_t, 3> field_self(pgn::Index_t I, const pgn::Grid_t& grid,
+                                 const pgn::Field<3>& E, const pgn::Field<3>& B,
+                                 const pgn::JField& J) {
+  if constexpr (F == 0) {
+    return msh::interpolate(E, I2std(I), ShapeF());
+  } else if (F == 1) {
+    return msh::interpolate(B, I2std(I), ShapeF());
+  } else if (F == 2) {
+    return msh::interpolate(J, I2std(I), ShapeF());
+  } else {
+    static_assert(F < 3);
+  }
+}
+
+apt::array<real_t, 3> Br_alone(pgn::Index_t I, const pgn::Grid_t& grid,
+                               const pgn::Field<3>& E, const pgn::Field<3>& B,
+                               const pgn::JField& J) {
+  return {msh::interpolate(B[0], I2std(I), ShapeF()), 0, 0};
+}
+
+constexpr int POW(int B, int E) {
+  if (E == 0)
+    return 1;
+  else
+    return B * POW(B, E - 1);
+}
+
+void average_when_downsampled(pgn::IOField& fds, const pgn::IOGrid& grid,
+                              int num_comps, const mpi::CartComm&) {
+  int downsample_ratio =
+      static_cast<int>(grid[0].delta() / gv::supergrid[0].delta() + 0.5);
+  int factor = POW(downsample_ratio, DGrid);
+  for (int i = 0; i < num_comps; ++i) {
+    for (auto& x : fds[i].data()) x /= factor;
+  }
+}
+
+void average_and_divide_flux_by_area(pgn::IOField& fds, const pgn::IOGrid& grid,
+                                     int num_comps, const mpi::CartComm& cart) {
+  average_when_downsampled(fds, grid, num_comps, cart);
+
+  using Metric = metric::LogSpherical<real_export_t>;
+  // define a function pointer.
+  real_export_t (*hh_func)(real_export_t, real_export_t, real_export_t) =
+      nullptr;
+  apt::array<real_export_t, 3> q{};
+
+  for (int comp = 0; comp < num_comps; ++comp) {
+    const auto& ofs = fds[comp].offset();
+    switch (comp) {
+      case 0:
+        hh_func = Metric::template hh<0>;
+        break;
+      case 1:
+        hh_func = Metric::template hh<1>;
+        break;
+      case 2:
+        hh_func = Metric::template hh<2>;
+        break;
+    }
+
+    for (const auto& I : apt::Block(apt::range::begin(fds.mesh().range()),
+                                    apt::range::end(fds.mesh().range()))) {
+      for (int i = 0; i < DGrid; ++i) q[i] = grid[i].absc(I[i], 0.5 * ofs[i]);
+      auto hh = hh_func(q[0], q[1], q[2]);
+      if (std::abs(hh) > 1e-12)
+        fds[comp](I) /= hh;
+      else
+        fds[comp](I) = 0.0;
+    }
+  }
+}
+
+apt::array<real_t, 3> pair_creation_rate(pgn::Index_t I,
+                                         const pgn::Grid_t& grid,
+                                         const pgn::Field<3>&,
+                                         const pgn::Field<3>&,
+                                         const pgn::JField&) {
+  // TODO RTD
+  // auto x = RTD::data().pc_counter[0](I);
+  // return {x / RTD::data().cumulative_time, 0, 0};
+}
+apt::array<real_t, 3> Pdot_photon_pair_creation(pgn::Index_t I,
+                                                const pgn::Grid_t& grid,
+                                                const pgn::Field<3>&,
+                                                const pgn::Field<3>&,
+                                                const pgn::JField&) {
+  // TODO RTD
+  // const auto& pc = RTD::data().pc_counter;
+  // const auto& dt = RTD::data().cumulative_time;
+  // return {pc[1](I) / dt, pc[2](I) / dt, pc[3](I) / dt};
+}
+
+apt::array<real_t, 3> photon_emission_rate(pgn::Index_t I,
+                                           const pgn::Grid_t& grid,
+                                           const pgn::Field<3>&,
+                                           const pgn::Field<3>&,
+                                           const pgn::JField&) {
+  // TODO RTD
+  // auto x = RTD::data().em_counter[0](I);
+  // return {x / RTD::data().cumulative_time, 0, 0};
+}
+apt::array<real_t, 3> Pdot_photon_emission(pgn::Index_t I,
+                                           const pgn::Grid_t& grid,
+                                           const pgn::Field<3>&,
+                                           const pgn::Field<3>&,
+                                           const pgn::JField&) {
+  // TODO RTD
+  // const auto& em = RTD::data().em_counter;
+  // const auto& dt = RTD::data().cumulative_time;
+  // return {em[1](I) / dt, em[2](I) / dt, em[3](I) / dt};
+}
+
+template <particle::species SP>
+apt::array<real_t, 3> J_by_species(pgn::Index_t I, const pgn::Grid_t& grid,
+                                   const pgn::Field<3>&, const pgn::Field<3>&,
+                                   const pgn::JField&) {
+  // TODO RTD
+  // // NOTE due to interpolation, the exported Jsp's don't sum up to J.
+  // const auto& Jsp = (*RTD::data().Jsp)[SP];
+  // return msh::interpolate(Jsp, I2std(I), ShapeF());
+}
+
+apt::array<real_t, 3> skin_depth(pgn::Index_t I, const pgn::Grid_t& grid,
+                                 const pgn::Field<3>&, const pgn::Field<3>&,
+                                 const pgn::JField&) {
+  // TODO RTD
+  // return {msh::interpolate(*(RTD::data().skin_depth), I2std(I), ShapeF())[0],
+  // 0,
+  //         0};
+}
+
+apt::array<real_t, 3> ptc_num(
+    const particle::Properties& prop,
+    const pgn::ParticleArray_t::const_particle_type& ptc) {
+  return {1.0, 0.0, 0.0};
+}
+
+// NOTE energy should factor in mass
+apt::array<real_t, 3> ptc_energy(
+    const particle::Properties& prop,
+    const pgn::ParticleArray_t::const_particle_type& ptc) {
+  if (prop.mass_x > 0.01_r)
+    return {prop.mass_x * std::sqrt(1.0_r + apt::sqabs(ptc.p())), 0.0, 0.0};
+  else
+    return {apt::abs(ptc.p()), 0.0, 0.0};
+}
+
+apt::array<real_t, 3> ptc_momentum(
+    const particle::Properties& prop,
+    const pgn::ParticleArray_t::const_particle_type& ptc) {
+  if (prop.mass_x > 0.01_r)
+    return {prop.mass_x * ptc.p(0), prop.mass_x * ptc.p(1),
+            prop.mass_x * ptc.p(2)};
+  else
+    return {ptc.p(0), ptc.p(1), ptc.p(2)};
+}
+
 }  // namespace io
 
 int main(int argc, char** argv) {
@@ -943,7 +1110,85 @@ int main(int argc, char** argv) {
       .set_range(1, {0, gv::supergrid[1].dim() +
                             1});  // NOTE +1 to include upper boundary
 
-  builder.set_prior_export(io::do_prior_export).set_post_export(io::do_post_export);
+  builder.set_prior_export(io::do_prior_export)
+      .set_post_export(io::do_post_export);
+
+  auto add_common_exportees = [](auto& exporter) {
+    exporter
+        .add_exportee("E", 3, io::field_self<0>, io::average_when_downsampled)
+        .add_exportee("B", 3, io::field_self<1>, io::average_when_downsampled)
+        .add_exportee("J", 3, io::field_self<2>,
+                      io::average_and_divide_flux_by_area)
+        .add_exportee("PairCreationRate", 1, io::pair_creation_rate)
+        .add_exportee("PdotPairCreation", 3, io::Pdot_photon_pair_creation)
+        .add_exportee("PhotonEmissionRate", 1, io::photon_emission_rate)
+        .add_exportee("PdotEmission", 3, io::Pdot_photon_emission);
+
+    // TODO RTD
+    // if (RTD::data().skin_depth) {
+    //   exporter.add_exportee("SkinDepth", 1, skin_depth,
+    //                         average_when_downsampled);
+    // }
+
+    // TODO RTD
+    // if (RTD::data().Jsp) {
+    //   using namespace particle;
+    //   for (auto sp : *(RTD::data().Jsp)) {
+    //     switch (sp) {
+    //       case species::electron:
+    //         exporter.add_exportee("Je", 3, J_by_species<species::electron>,
+    //                               average_and_divide_flux_by_area);
+    //         break;
+    //       case species::positron:
+    //         exporter.add_exportee("Jp", 3, J_by_species<species::positron>,
+    //                               average_and_divide_flux_by_area);
+    //         break;
+    //       case species::ion:
+    //         exporter.add_exportee("Ji", 3, J_by_species<species::ion>,
+    //                               average_and_divide_flux_by_area);
+    //         break;
+    //       default:;
+    //     }
+    //   }
+    // }
+    exporter.add_exportee("Num", 1, io::ptc_num)
+        .add_exportee("E", 1, io::ptc_energy)
+        .add_exportee("P", 3, io::ptc_momentum);
+  };
+
+  add_common_exportees(
+      builder.add_exporter()
+          .set_is_collinear_mesh(false)
+          // .set_downsample_ratio(export_plan.downsample_ratio) // TODO plan
+          .set_data_dir("")
+          .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
+                       {0, gv::supergrid[1].dim() + 1}}})
+
+  );
+
+  {
+    int i_equator = gv::supergrid[1].dim() / 2 +
+                    1;  // pick the cell whose lb is at equator.
+    int half_width = (30.0_deg) / gv::supergrid[1].delta();
+    add_common_exportees(
+        builder.add_exporter()
+            .set_is_collinear_mesh(false)
+            .set_downsample_ratio(1)
+            .set_data_dir("current_sheet")
+            .set_range({{{gv::supergrid[0].csba(std::log(4.5)),
+                          gv::supergrid[0].dim() + gv::guard},
+                         {i_equator - half_width, i_equator + half_width}}})
+
+    );
+  }
+
+  builder.add_exporter()
+      .set_is_collinear_mesh(false)
+      .set_downsample_ratio(1)
+      .set_data_dir("Br_full")
+      .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
+                   {0, gv::supergrid[1].dim() + 1}}})
+      .add_exportee("Br", 1, io::Br_alone);
 
   auto& sim = builder.build();
 
