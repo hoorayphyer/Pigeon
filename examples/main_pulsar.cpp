@@ -673,6 +673,28 @@ class NoPhotonZone : public pgn::ParticleAction_t<NoPhotonZone> {
 
 }  // namespace particle
 
+struct InitialCondition
+    : public pgn::InitialConditionAction_t<InitialCondition> {
+  void operator()(const Bundle_t& bundle) const override {
+    const auto& ranges = this->ranges();
+    const auto& grid = bundle.grid;
+    auto& B = bundle.B;
+    for (const auto& I :
+         apt::Block(apt::range::begin(ranges), apt::range::end(ranges))) {
+      B[0](I) = B_r_star(grid[0].absc(I[0], 0.5 * B[0].offset()[0]),
+                         grid[1].absc(I[1], 0.5 * B[0].offset()[1]), 0, 0);
+      B[1](I) = B_theta_star(grid[0].absc(I[0], 0.5 * B[1].offset()[0]),
+                             grid[1].absc(I[1], 0.5 * B[1].offset()[1]), 0, 0);
+    }
+  }
+};
+
+struct PostResume : public pgn::PostResumeAction_t<PostResume> {
+  void operator()(const Bundle_t& bundle) const override {
+    // not implemented
+  }
+};
+
 int main(int argc, char** argv) {
   const auto args = pic::parse_args(argc, argv);
   assert(args.config_file);
@@ -806,7 +828,7 @@ int main(int argc, char** argv) {
       real_t N_atm_floor = std::exp(1.0) * 2.0 * gv::Omega * gv::mu / wpic2;
       builder.add_particle_action<particle::Atmosphere>()
           .set_name("Atmosphere")
-        .set_range(0, {gv::star_interior - 1, gv::star_interior})
+          .set_range(0, {gv::star_interior - 1, gv::star_interior})
           .set_range(1, {0, gv::supergrid[1].dim()})
           .set_thermal_velocity(v_th)
           .set_number_in_atmosphere(atm_x * N_atm_floor)
@@ -836,6 +858,11 @@ int main(int argc, char** argv) {
         .set_name("MigrateParticles")
         .set_supergrid(gv::supergrid);
   }
+
+  builder.add_init_cond_action<InitialCondition>()
+      .set_range(0, {0, gv::supergrid[0].dim()})
+      .set_range(1, {0, gv::supergrid[1].dim() +
+                            1});  // NOTE +1 to include upper boundary
 
   auto& sim = builder.build();
 

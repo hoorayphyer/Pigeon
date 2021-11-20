@@ -23,6 +23,16 @@ struct PIGEON {
       pic::ActionWithSetters<ConcreteAction, DGrid,
                              typename SimulationBuilder_t::ParticleAction_t>;
 
+  template <typename ConcreteAction>
+  using InitialConditionAction_t = pic::ActionWithSetters<
+      ConcreteAction, DGrid,
+      typename SimulationBuilder_t::InitialConditionAction_t>;
+
+  template <typename ConcreteAction>
+  using PostResumeAction_t =
+      pic::ActionWithSetters<ConcreteAction, DGrid,
+                             typename SimulationBuilder_t::PostResumeAction_t>;
+
   using ParticleMigrator_t = particle::Migrator<DGrid, R, S, RJ>;
 
   using ConfFile_t = pic::ConfFile;
