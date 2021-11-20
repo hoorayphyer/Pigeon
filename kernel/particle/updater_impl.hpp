@@ -1,4 +1,6 @@
 #include "msh/mesh_shape_interplay.hpp"
+#include "particle/forces.hpp"
+#include "particle/scattering.hpp"
 #include "particle/updater.hpp"
 
 #if PIC_DEBUG
@@ -17,8 +19,7 @@ void Updater<DGrid, R, S, ShapeF, RJ>::operator()(
     map<array<R, S>>& particles, field::Field<RJ, 3, DGrid>& J,
     std::vector<Particle<R, S>>* new_ptc_buf, const map<Properties>& properties,
     const field::Field<R, 3, DGrid>& E, const field::Field<R, 3, DGrid>& B,
-    const apt::Grid<R, DGrid>& grid, const dye::Ensemble<DGrid>*, R dt,
-    int timestep, util::Rng<R>& rng) {
+    const apt::Grid<R, DGrid>& grid, R dt, int timestep, util::Rng<R>& rng) const {
   auto update_species = [&](species sp) {
     auto& sp_ptcs = particles[sp];
     if (sp_ptcs.size() == 0) return;

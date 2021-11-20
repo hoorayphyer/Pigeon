@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "apt/grid.hpp"
+#include "dye/ensemble.hpp"
 #include "field/field.hpp"
 #include "mpipp/mpi++.hpp"
 #include "particle/array.hpp"
@@ -52,14 +53,14 @@ struct ExportBundle {
   int timestep;
 };
 
-  // RATIONALE
-  //
-  // InitialConditionBundle and PostResumeBundle are mutually exclusive. That
-  // is, depending on the presence of a resume dir, only one of them will need
-  // to be executed. From the program's point of view, we only need to maintain
-  // one Bundle class. But this way user will have to modify their code just to
-  // make sure to use only the correct actions, which is too error prone.
-  // Therefore, we keep these separate
+// RATIONALE
+//
+// InitialConditionBundle and PostResumeBundle are mutually exclusive. That
+// is, depending on the presence of a resume dir, only one of them will need
+// to be executed. From the program's point of view, we only need to maintain
+// one Bundle class. But this way user will have to modify their code just to
+// make sure to use only the correct actions, which is too error prone.
+// Therefore, we keep these separate
 
 template <int DGrid, typename R, template <typename> class S, typename RJ>
 struct InitialConditionBundle {
