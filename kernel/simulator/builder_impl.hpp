@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "filesys/filesys.hpp"
+#include "simulator/action_predefined.hpp"
 #include "simulator/argparser.hpp"
 #include "simulator/builder.hpp"
 
@@ -89,6 +90,9 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::SimulationBuilder(CLIArgs args)
   }
 
   mpi::initialize(m_args.rest);
+
+  // Simulator_t ctor is not accessible in optional
+  m_sim.emplace(Simulator_t());
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
@@ -313,36 +317,53 @@ template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
 SimulationBuilder<DGrid, R, S, RJ, RD>::Simulator_t&
 SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
-  if (m_sim) {
-    return *m_sim;
+  auto& sim = *m_sim;
+
+  if (m_is_sim_complete) {
+    return sim;
   }
 
   {
     auto msg = precondition();
     if (!msg.empty()) {
-      msg = "Error: incomplete simulation setup\n" + msg;
+      msg = "Error: simulation setup is either invalid or incomplete!\n" + msg;
       throw std::runtime_error(msg);
     }
   }
 
-  // Simulator_t ctor is not accessible in optional
-  m_sim.emplace(Simulator_t());
+  // append a particle migrator to particle actions
+  add_particle_action<particle::Migrator<DGrid, R, S, RJ>>()
+      .set_name("MigrateParticles")
+      .set_supergrid(*m_supergrid);
 
-  auto& sim = *m_sim;
+  auto copy_ranges = [](const auto& actions, auto& ranges) {
+    const auto size = actions.size();
+    ranges.resize(size);
+    for (int i = 0; i < size; ++i) {
+      assert(actions[i]);
+      ranges[i] = actions[i]->ranges();
+    }
+  };
+
+  copy_ranges(sim.m_fld_actions, sim.m_fld_action_orig_ranges);
+  copy_ranges(sim.m_ptc_actions, sim.m_ptc_action_orig_ranges);
+
+  // TODO sim also has m_exporters_orig_ranges
+
+  sim.m_fld_guard = *m_fld_guard;
+  sim.m_this_run_dir = *m_this_run_dir;
+
+  // TODO weird to have sim.initiaize and the above together. There are some
+  // dependencies. Maybe move sim.initialize here??
   sim.initialize(std::move(*m_supergrid), std::move(*m_cart),
                  std::move(m_props), std::move(m_periodic), m_dims);
   auto init_ts = load_init_cond(sim);
 
+  sim.m_initial_timestep = init_ts;
+
   sim.m_rng.set_seed(init_ts + mpi::world.rank());
 
-  // TODO field/ptc actions and their orig ranges
-  sim.m_f_prior_export = std::move(m_f_prior_export);
-  sim.m_exporters = std::move(m_exporters);
-  sim.m_f_post_export = std::move(m_f_post_export);
-  sim.m_f_custom_step = std::move(m_f_custom_step);
-  sim.m_fld_guard = *m_fld_guard;
-  sim.m_this_run_dir = *m_this_run_dir;
-  sim.m_initial_timestep = init_ts;
+  m_is_sim_complete = true;
 
   return sim;
 }

@@ -78,7 +78,7 @@ class SimulationBuilder {
 
      @return reference to the newly added exporter
    */
-  DataExporter_t& add_exporter() { return m_exporters.emplace_back(); }
+  DataExporter_t& add_exporter() { return m_sim->m_exporters.emplace_back(); }
 
   SimulationBuilder& add_extra_init(std::function<void()> f) {
     m_f_extra_init = std::move(f);
@@ -87,18 +87,18 @@ class SimulationBuilder {
 
   SimulationBuilder& set_prior_export(
       std::function<void(const ExportBundle_t&)> f) {
-    m_f_prior_export.emplace(std::move(f));
+    m_sim->m_f_prior_export.emplace(std::move(f));
     return *this;
   }
 
   SimulationBuilder& set_post_export(
       std::function<void(const ExportBundle_t&)> f) {
-    m_f_post_export.emplace(std::move(f));
+    m_sim->m_f_post_export.emplace(std::move(f));
     return *this;
   }
 
   SimulationBuilder& add_custom_step(std::function<void()> f) {
-    m_f_custom_step.emplace(std::move(f));
+    m_sim->m_f_custom_step.emplace(std::move(f));
     return *this;
   }
 
@@ -138,18 +138,12 @@ class SimulationBuilder {
  private:
   CLIArgs m_args;
   bool m_is_mpi_particle_committed = false;
+  bool m_is_sim_complete = false;
 
   // these are with global ranges;
-  std::vector<std::unique_ptr<FieldAction_t>> m_fld_actions;
-  std::vector<std::unique_ptr<ParticleAction_t>> m_ptc_actions;
   std::vector<std::unique_ptr<InitialConditionAction_t>> m_ic_actions;
   std::vector<std::unique_ptr<PostResumeAction_t>> m_post_resume_actions;
-  std::vector<DataExporter_t> m_exporters;
-
   std::optional<std::function<void()>> m_f_extra_init;
-  std::optional<std::function<void(const ExportBundle_t&)>> m_f_prior_export;
-  std::optional<std::function<void(const ExportBundle_t&)>> m_f_post_export;
-  std::optional<std::function<void()>> m_f_custom_step;
 
   std::optional<std::string> m_this_run_dir;
 
@@ -162,14 +156,16 @@ class SimulationBuilder {
   std::optional<int> m_total_timesteps;
   std::optional<int> m_fld_guard;
 
+  // use std::optional so as to destruct m_sim before mpi::finalize, see
+  // destructor.
   std::optional<Simulator_t> m_sim;
 
   template <typename Action>
   auto& get_actions() {
     if constexpr (std::is_same_v<Action, FieldAction_t>) {
-      return m_fld_actions;
+      return m_sim->m_fld_actions;
     } else if constexpr (std::is_same_v<Action, ParticleAction_t>) {
-      return m_ptc_actions;
+      return m_sim->m_ptc_actions;
     } else if constexpr (std::is_same_v<Action, InitialConditionAction_t>) {
       return m_ic_actions;
     } else if constexpr (std::is_same_v<Action, PostResumeAction_t>) {

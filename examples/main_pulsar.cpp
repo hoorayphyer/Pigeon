@@ -1099,10 +1099,6 @@ int main(int argc, char** argv) {
 
     builder.add_particle_action<particle::NewPtcAnalyzer>().set_name(
         "NewParticleAnalysis");  // TODO set range?
-
-    builder.add_particle_action<pgn::ParticleMigrator_t>()
-        .set_name("MigrateParticles")
-        .set_supergrid(gv::supergrid);
   }
 
   builder.add_init_cond_action<InitialCondition>()

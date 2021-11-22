@@ -3,7 +3,6 @@
 #include "particle/array.hpp"
 #include "particle/shapef.hpp"
 #include "particle/species_predef.hpp"
-#include "simulator/action_predefined.hpp"
 #include "simulator/argparser.hpp"
 #include "simulator/builder.hpp"
 #include "simulator/conf_file.hpp"
@@ -34,8 +33,6 @@ struct PIGEON {
                              typename SimulationBuilder_t::PostResumeAction_t>;
 
   using ExportBundle_t = SimulationBuilder_t::ExportBundle_t;
-
-  using ParticleMigrator_t = particle::Migrator<DGrid, R, S, RJ>;
 
   using ConfFile_t = pic::ConfFile;
   using Grid_t = apt::Grid<R, DGrid>;
