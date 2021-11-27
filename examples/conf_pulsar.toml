@@ -26,7 +26,7 @@ mfp = [0.2, 5.0]
 multiplicity = 0.0
 v_th = 0.2
 
-[plans]
+[schedules]
 sort = { on = true, start = 0, interval = 100 }
 
 export = { on = true, start = 0, interval = 100,

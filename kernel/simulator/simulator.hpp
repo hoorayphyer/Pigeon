@@ -19,6 +19,7 @@
 
 #include "io/data_exporter.hpp"
 #include "simulator/action.hpp"
+#include "simulator/schedule.hpp"
 
 namespace pic {
 
@@ -65,6 +66,13 @@ struct Simulator {
   std::optional<std::function<void(const ExportBundle_t&)>> m_f_post_export;
 
   std::optional<std::function<void()>> m_f_custom_step;
+
+  Schedule m_sch_sort_ptcs;
+  ExportSchedule m_sch_export;
+  CheckpointSchedule m_sch_ckpt;
+  DynamicLoadBalanceSchedule m_sch_dlb;
+  ProfilingSchedule m_sch_prof;
+  int m_print_timestep_to_stdout_interval = 100;
 
   void taylor(apt::array<apt::Range, DGrid>& a) const;
 

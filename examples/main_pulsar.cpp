@@ -980,6 +980,9 @@ int main(int argc, char** argv) {
 
   const real_t r_e = wpic2 * apt::dV(gv::supergrid) / (4.0 * M_PI);
 
+  const int downsample_ratio =
+      conf["schedules"]["export"]["downsample_ratio"].as_or<int>(1);
+
   pgn::SimulationBuilder_t builder(args);
 
   builder.initialize_this_run_dir(datadir_prefix, project_name)
@@ -1152,13 +1155,12 @@ int main(int argc, char** argv) {
         .add_exportee("P", 3, io::ptc_momentum);
   };
 
-  add_common_exportees(
-      builder.add_exporter()
-          .set_is_collinear_mesh(false)
-          // .set_downsample_ratio(export_plan.downsample_ratio) // TODO plan
-          .set_data_dir("")
-          .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
-                       {0, gv::supergrid[1].dim() + 1}}})
+  add_common_exportees(builder.add_exporter()
+                           .set_is_collinear_mesh(false)
+                           .set_downsample_ratio(downsample_ratio)
+                           .set_data_dir("")
+                           .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
+                                        {0, gv::supergrid[1].dim() + 1}}})
 
   );
 
@@ -1185,6 +1187,54 @@ int main(int argc, char** argv) {
       .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
                    {0, gv::supergrid[1].dim() + 1}}})
       .add_exportee("Br", 1, io::Br_alone);
+
+  builder.set_print_timestep_to_stdout_interval(
+      conf["schedules"]["print_timestep_to_stdout_interval"].as_or<int>(100));
+
+  {
+    auto& sch = builder.sort_ptcs_schedule();
+    const auto& cf = conf["schedules"]["sort"];
+    sch.on = cf["on"].as_or<bool>(true);
+    sch.start = cf["start"].as_or<int>(0);
+    sch.interval = cf["interval"].as<int>();
+  }
+
+  {
+    auto& sch = builder.export_schedule();
+    const auto& cf = conf["schedules"]["export"];
+    sch.on = cf["on"].as_or<bool>(true);
+    sch.start = cf["start"].as_or<int>(0);
+    sch.interval, cf["interval"].as<int>();
+    sch.num_files = cf["num_files"].as_or<int>(1);
+  }
+
+  {
+    auto& sch = builder.checkpoint_schedule();
+    const auto& cf = conf["schedules"]["checkpoint"];
+    sch.on = cf["on"].as_or<bool>(false);
+    sch.start = cf["start"].as_or<int>(1);
+    sch.interval = cf["interval"].as<int>();
+    sch.num_files = cf["num_files"].as_or<int>(1);
+    sch.max_num_checkpoints = cf["max_num_checkpoints"].as_or<int>(1);
+  }
+
+  {
+    auto& sch = builder.load_balancing_schedule();
+    const auto& cf = conf["schedules"]["load_balance"];
+    sch.on = cf["on"].as_or<bool>(true);
+    sch.start = cf["start"].as_or<int>(0);
+    sch.interval = cf["interval"].as<int>();
+    sch.target_load = cf["target_load"].as_or<int>(100000);
+  }
+
+  {
+    auto& sch = builder.profiling_schedule();
+    const auto& cf = conf["schedules"]["profiling"];
+    sch.on = cf["on"].as_or<bool>(false);
+    sch.start = cf["start"].as_or<int>(0);
+    sch.interval = cf["interval"].as<int>();
+    sch.max_entries = cf["max_entries"].optional<int>();
+  }
 
   auto& sim = builder.build();
 

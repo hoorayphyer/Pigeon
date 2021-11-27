@@ -90,17 +90,17 @@ ConfFile ConfFile::load(const std::string& file) {
   return res;
 }
 
-ConfFile ConfFile::operator[](const std::string& entry) {
+ConfFile ConfFile::operator[](const std::string& entry) const {
   ConfFile res;
   res.m_current_entries = fmt::format("{}[{}]", m_current_entries, entry);
-  res.m_node = std::any_cast<Node_t&>(m_node)[entry];
+  res.m_node = std::any_cast<const Node_t&>(m_node)[entry];
   return res;
 }
 
-ConfFile ConfFile::operator[](int entry) {
+ConfFile ConfFile::operator[](int entry) const {
   ConfFile res;
   res.m_current_entries = fmt::format("{}[{}]", m_current_entries, entry);
-  res.m_node = std::any_cast<Node_t&>(m_node)[entry];
+  res.m_node = std::any_cast<const Node_t&>(m_node)[entry];
   return res;
 }
 
@@ -128,9 +128,23 @@ T ConfFile::as_or(T val_default) const {
   return static_cast<T>(toml_native_val);
 }
 
+template <typename T>
+std::optional<T> ConfFile::optional() const {
+  std::optional<T> res;
+
+  if (auto toml_native_val = std::any_cast<const Node_t&>(m_node)
+                                 .native()
+                                 .template value<toml_native_t<T>>()) {
+    res.emplace(static_cast<T>(*toml_native_val));
+  }
+
+  return res;
+}
+
 #define INSTANTIATE_AS_TYPE(_TYPE_)                      \
   template _TYPE_ ConfFile::as_or<_TYPE_>(_TYPE_) const; \
-  template _TYPE_ ConfFile::as<_TYPE_>() const
+  template _TYPE_ ConfFile::as<_TYPE_>() const;          \
+  template std::optional<_TYPE_> ConfFile::optional<_TYPE_>() const
 
 INSTANTIATE_AS_TYPE(bool);
 INSTANTIATE_AS_TYPE(float);

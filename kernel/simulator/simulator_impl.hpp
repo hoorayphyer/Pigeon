@@ -92,11 +92,10 @@ void Simulator<DGrid, R, S, RJ, RD>::initialize(
 
   m_grid = m_supergrid;
 
-  // TODO profiling_plan not accessible
-  // if (profiling_plan.on and profiling_plan.is_qualified()) {
-  //   lgr::file.open(std::ios_base::app);
-  //   lgr::file << "--- Initializing Simulator..." << std::endl;
-  // }
+  if (m_sch_prof.on and m_sch_prof.is_qualified()) {
+    lgr::file.open(std::ios_base::app);
+    lgr::file << "--- Initializing Simulator..." << std::endl;
+  }
 
   // TODO maybe move this to builder. init_replica_deploy
   if (false) {  // if (pic::init_replica_deploy) {
@@ -154,10 +153,9 @@ void Simulator<DGrid, R, S, RJ, RD>::initialize(
 
   if (m_ens_opt) update_parts();
 
-  // TODO profiling plan not accessible
-  // if (profiling_plan.on and profiling_plan.is_qualified()) {
-  //   lgr::file << "--- Done." << std::endl;
-  // }
+  if (m_sch_prof.on and m_sch_prof.is_qualified()) {
+    lgr::file << "--- Done." << std::endl;
+  }
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
@@ -166,10 +164,9 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
   // NOTE we choose to do particle update before field update so that in
   // saving snapshots we don't need to save _J
 
-  // TODO print_timestep_to_stdout_interval
-  // if (timestep % print_timestep_to_stdout_interval == 0 &&
-  //     mpi::world.rank() == 0)
-  //   std::cout << "==== Timestep " << timestep << " ====" << std::endl;
+  if (timestep % m_print_timestep_to_stdout_interval == 0 &&
+      mpi::world.rank() == 0)
+    std::cout << "==== Timestep " << timestep << " ====" << std::endl;
 
 #if PIC_DEBUG
   debug::timestep = timestep;
@@ -179,18 +176,17 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
 
   std::optional<tmr::Timestamp> stamp_all;
   std::optional<tmr::Timestamp> stamp;
-  // TODO profiling_plan
-  // if (profiling_plan.is_do(timestep) and profiling_plan.is_qualified()) {
-  //   stamp_all.emplace();
-  //   stamp.emplace();
-  //   if (profiling_plan.is_reached_max_entries(timestep)) lgr::file.clear();
-  //   lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
-  //   lgr::file.indent_append("\t");
-  //   if (_ens_opt)
-  //     lgr::file % "ensemble label = " << _ens_opt->label() << std::endl;
-  //   else
-  //     lgr::file % "ensemble label = NONE" << std::endl;
-  // }
+  if (m_sch_prof.is_do(timestep) and m_sch_prof.is_qualified()) {
+    stamp_all.emplace();
+    stamp.emplace();
+    if (m_sch_prof.is_reached_max_entries(timestep)) lgr::file.clear();
+    lgr::file << "==== Timestep " << timestep << " ====" << std::endl;
+    lgr::file.indent_append("\t");
+    if (m_ens_opt)
+      lgr::file % "ensemble label = " << m_ens_opt->label() << std::endl;
+    else
+      lgr::file % "ensemble label = NONE" << std::endl;
+  }
 
   auto TIMING = [&stamp](std::string message, auto f) {
     if (stamp) {
@@ -220,14 +216,12 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
 
     m_J.reset();
 
-    // TODO sort_ptcs_plan
-    // if (sort_ptcs_plan.is_do(timestep)) {
-    //   TIMING(
-    //       "SortParticles", START {
-    //         for (auto sp : m_particles) particle::sort(m_particles[sp],
-    //         m_grid);
-    //       });
-    // }
+    if (m_sch_sort_ptcs.is_do(timestep)) {
+      TIMING(
+          "SortParticles", START {
+            for (auto sp : m_particles) particle::sort(m_particles[sp], m_grid);
+          });
+    }
 
     if (stamp && m_particles.size() != 0) {
       lgr::file % "ParticleCounts:" << std::endl;
@@ -270,7 +264,7 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
     }
 
     // export data before m_J is disrupted by field solver
-    if (true) {  // if (export_plan.is_do(timestep)) { // TODO export_plan
+    if (m_sch_export.is_do(timestep)) {
       TIMING(
           "ExportData", START {
             ExportBundle_t bundle{m_particles, m_properties, m_E,        m_B,
@@ -322,8 +316,7 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
     }
   }
 
-  // TODO load_balance_plan
-  if (true) {  // if (load_balance_plan.is_do(timestep)) {
+  if (m_sch_dlb.is_do(timestep)) {
     TIMING(
         "DynamicLoadBalance", START {
           // TODO has a few hyper parameters
@@ -331,9 +324,8 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
           std::optional<int> old_label;
           if (m_ens_opt) old_label.emplace(m_ens_opt->label());
 
-          int target_load = 0;  // TODO load_balance_plan.target_load
-
-          dynamic_load_balance(m_particles, m_ens_opt, m_cart_opt, target_load);
+          dynamic_load_balance(m_particles, m_ens_opt, m_cart_opt,
+                               m_sch_dlb.target_load);
 
           std::optional<int> new_label;
           if (m_ens_opt) new_label.emplace(m_ens_opt->label());
@@ -344,12 +336,11 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
   }
 
   static ckpt::Autosave autosave;  // significant only on mpi::world.rank() == 0
-  if (true) {  // TODO if (checkpoint_plan.is_do(timestep)) {
+  if (m_sch_ckpt.is_do(timestep)) {
     TIMING(
         "SaveCheckpoint", START {
-          int num_files = 1;  // TODO checkpoint_plan.num_files
-          int max_num_checkpoints =
-              1;  // TODO checkpoint_plan.max_num_checkpoints
+          int num_files = m_sch_ckpt.num_files;
+          int max_num_checkpoints = m_sch_ckpt.max_num_checkpoints;
           auto dir = ckpt::save_checkpoint(m_this_run_dir, num_files, m_ens_opt,
                                            timestep, m_E, m_B, m_particles,
                                            m_properties);
@@ -360,17 +351,6 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
           }
         });
   }
-
-  // TODO
-  // if (save_tracing_plan.is_do(timestep)) {
-  //   TIMING(
-  //       "SaveTracing", START {
-  //         auto dir = pic::Traman::save_tracing(m_this_run_dir,
-  //                                              save_tracing_plan.num_files,
-  //                                              _ens_opt, timestep,
-  //                                              _particles);
-  //       });
-  // }
 
   if (stamp_all) {
     lgr::file.indent_reset();

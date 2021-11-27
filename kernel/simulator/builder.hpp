@@ -125,6 +125,21 @@ class SimulationBuilder {
     return *this;
   }
 
+  auto& sort_ptcs_schedule() { return m_sim->m_sch_sort_ptcs; }
+
+  auto& export_schedule() { return m_sim->m_sch_export; }
+
+  auto& checkpoint_schedule() { return m_sim->m_sch_ckpt; }
+
+  auto& load_balancing_schedule() { return m_sim->m_sch_dlb; }
+
+  auto& profiling_schedule() { return m_sim->m_sch_prof; }
+
+  SimulationBuilder& set_print_timestep_to_stdout_interval(int interval) {
+    m_sim->m_print_timestep_to_stdout_interval = interval;
+    return *this;
+  }
+
   Simulator_t& build();
 
   // TODO 1. maybe use concept 2. can we avoid having to have user call this
