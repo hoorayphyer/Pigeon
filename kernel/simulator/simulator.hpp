@@ -65,6 +65,10 @@ struct Simulator {
   std::vector<DataExporter_t> m_exporters;
   std::optional<std::function<void(const ExportBundle_t&)>> m_f_post_export;
 
+  std::optional<
+      std::function<void(const particle::map<particle::Properties>& properties,
+                         const apt::Grid<R, DGrid>& localgrid)>>
+      m_f_extra_init;
   std::optional<std::function<void()>> m_f_custom_step;
 
   Schedule m_sch_sort_ptcs;

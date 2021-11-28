@@ -73,10 +73,9 @@ void Simulator<DGrid, R, S, RJ, RD>::update_parts() {
   retaylor_ranges(m_ptc_action_orig_ranges, m_ptc_actions);
   // TODO also taylor exporters
 
-  // TODO
-  // {  // init runtime data
-  //   RTD::data().init(m_properties, m_grid);
-  // }
+  if (m_f_extra_init) {
+    (*m_f_extra_init)(m_properties, m_grid);
+  }
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,

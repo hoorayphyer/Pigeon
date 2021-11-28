@@ -1268,6 +1268,27 @@ int main(int argc, char** argv) {
     sch.max_entries = cf["max_entries"].optional<int>();
   }
 
+  builder.set_extra_init([](const auto& properties, const auto& localgrid) {
+    for (auto sp : properties) gv::N_scat.insert(sp, 0);
+
+    if (false) {  // activate Jsp
+      gv::Jsp.emplace();
+      for (auto sp : properties) (*gv::Jsp).insert(sp, {});
+    }
+
+    if (false) {  // activate skin_depth
+      gv::skin_depth.emplace();
+    }
+
+    pgn::Index_t bulk_dims;
+    for (int i = 0; i < DGrid; ++i) bulk_dims[i] = localgrid[i].dim();
+    // FIXME range with no guard gives memory error. Interpolation in export
+    // needs them.
+    auto range = apt::make_range({}, bulk_dims, gv::guard);
+    gv::pc_counter = {range};
+    gv::em_counter = {range};
+  });
+
   auto& sim = builder.build();
 
   // TODO having to have user call this is a bit error_prone

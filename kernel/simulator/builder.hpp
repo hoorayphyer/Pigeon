@@ -80,8 +80,11 @@ class SimulationBuilder {
    */
   DataExporter_t& add_exporter() { return m_sim->m_exporters.emplace_back(); }
 
-  SimulationBuilder& add_extra_init(std::function<void()> f) {
-    m_f_extra_init = std::move(f);
+  SimulationBuilder& set_extra_init(
+      std::function<void(const particle::map<particle::Properties>& properties,
+                         const apt::Grid<R, DGrid>& localgrid)>
+          f) {
+    m_sim->m_f_extra_init = std::move(f);
     return *this;
   }
 
@@ -158,7 +161,6 @@ class SimulationBuilder {
   // these are with global ranges;
   std::vector<std::unique_ptr<InitialConditionAction_t>> m_ic_actions;
   std::vector<std::unique_ptr<PostResumeAction_t>> m_post_resume_actions;
-  std::optional<std::function<void()>> m_f_extra_init;
 
   std::optional<std::string> m_this_run_dir;
 
