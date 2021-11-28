@@ -67,6 +67,7 @@ constexpr apt::Longidx operator-(int a, apt::Longidx l) noexcept {
 struct global_variables {
   inline static real_t mu;
   inline static real_t Omega;
+  inline static real_t wpic2;
   inline static real_t spinup_time;
 
   inline static constexpr pgn::Grid_t supergrid = {
@@ -79,6 +80,17 @@ struct global_variables {
       LogSphSolver_t::min_guard(field_op_inv_precision),
       (ShapeF::support() + 3) / 2);  // NOTE minimum number of guards of J
   // on one side is ( supp + 3 ) / 2
+
+  /** The following are some custom data
+   */
+  inline static particle::map<real_t> N_scat{};
+  inline static pgn::Field<4> pc_counter{};
+  inline static pgn::Field<4> em_counter{};
+  inline static real_t cumulative_time{};
+
+  inline static std::optional<particle::map<pgn::JField>>
+      Jsp;  // current by species
+  inline static std::optional<pgn::Field<1>> skin_depth;
 };
 using gv = global_variables;
 
@@ -306,15 +318,41 @@ struct MainUpdater : public pgn::ParticleAction_t<MainUpdater> {
     return *this;
   }
 
-  void operator()(const Bundle_t& bundle) const override {
-    // TODO add Jsp when that's included
-    m_updater(bundle.particles, bundle.J, &bundle.new_ptc_buf,
-              bundle.properties, bundle.E, bundle.B, bundle.grid, bundle.dt,
-              bundle.timestep, bundle.rng);
+  auto& set_export_schedule(pgn::ExportSchedule sch) {
+    m_sch = std::move(sch);
+    return *this;
+  }
+
+  void operator()(const Bundle_t& bd) const override {
+    auto run_updater = [&](auto& ptcs, auto& J) {
+      m_updater(ptcs, J, &bd.new_ptc_buf, bd.properties, bd.E, bd.B, bd.grid,
+                bd.dt, bd.timestep, bd.rng);
+    };
+
+    if (gv::Jsp and m_sch.is_do(bd.timestep)) {
+      auto& Jsp = *gv::Jsp;
+      // store J by species separately for data export
+      for (auto sp : bd.particles) {
+        map<pgn::ParticleArray_t> ptcs_sp;
+        ptcs_sp.insert(sp);
+        std::swap(ptcs_sp[sp], bd.particles[sp]);
+        Jsp[sp] = pgn::JField(bd.J.mesh());
+        run_updater(ptcs_sp, Jsp[sp]);
+        std::swap(ptcs_sp[sp], bd.particles[sp]);
+
+        for (int C = 0; C < 3; ++C) {
+          for (int i = 0; i < bd.J.mesh().linear_size(); ++i)
+            bd.J[C][i] += Jsp[sp][C][i];
+        }
+      }
+    } else {
+      run_updater(bd.particles, bd.J);
+    }
   }
 
  private:
   ParticleUpdater_t m_updater;
+  pgn::ExportSchedule m_sch;
 };
 
 struct Atmosphere : public pgn::ParticleAction_t<Atmosphere> {
@@ -514,13 +552,9 @@ struct Axisymmetric : public pgn::ParticleAction_t<Axisymmetric> {
 };
 
 struct NewPtcAnalyzer : public pgn::ParticleAction_t<NewPtcAnalyzer> {
-  void operator()(const Bundle_t& bundle) const override {
+  void operator()(const Bundle_t& bd) const override {
     // Put particles where they belong after scattering
-    const auto& grid = bundle.grid;
-    auto& new_ptc_buf = bundle.new_ptc_buf;
-    auto& particles = bundle.particles;
-
-    for (auto& ptc : new_ptc_buf) {
+    for (auto& ptc : bd.new_ptc_buf) {
       if (not ptc.is(flag::exist)) continue;
       const auto this_sp = ptc.template get<species>();
 
@@ -528,32 +562,30 @@ struct NewPtcAnalyzer : public pgn::ParticleAction_t<NewPtcAnalyzer> {
       // flag::secondary are new particles. One possible exception is
       // migration. So this action must be done before migration.
       if (ptc.is(flag::secondary)) {
-        // TODO RTD needs to be revived
         // log scattering events
-        // RTD::data().N_scat[this_sp] += ptc.frac();
+        gv::N_scat[this_sp] += ptc.frac();
 
-        // // log pair creation events
-        // if (species::electron == this_sp) {
-        //   Index I;  // domain index, not the global index
-        //   for (int j = 0; j < DGrid; ++j) I[j] = grid[j].csba(ptc.q(j));
-        //   RTD::data().pc_counter[0](I) += ptc.frac();
-        //   for (int j = 0; j < 3; ++j)
-        //     RTD::data().pc_counter[j + 1](I) +=
-        //         2.0 * ptc.frac() * ptc.p(j);  // 2 because of positron
-        // } else if (species::photon == this_sp) {
-        //   Index I;  // domain index, not the global index
-        //   for (int j = 0; j < DGrid; ++j) I[j] = grid[j].csba(ptc.q(j));
-        //   RTD::data().em_counter[0](I) += ptc.frac();
-        //   for (int j = 0; j < 3; ++j)
-        //     RTD::data().em_counter[j + 1](I) += ptc.frac() * ptc.p(j);
-        // }
+        // log pair creation events
+        if (species::electron == this_sp) {
+          pgn::Index_t I;  // domain index, not the global index
+          for (int j = 0; j < DGrid; ++j) I[j] = bd.grid[j].csba(ptc.q(j));
+          gv::pc_counter[0](I) += ptc.frac();
+          for (int j = 0; j < 3; ++j)
+            gv::pc_counter[j + 1](I) +=
+                2.0 * ptc.frac() * ptc.p(j);  // 2 because of positron
+        } else if (species::photon == this_sp) {
+          pgn::Index_t I;  // domain index, not the global index
+          for (int j = 0; j < DGrid; ++j) I[j] = bd.grid[j].csba(ptc.q(j));
+          gv::em_counter[0](I) += ptc.frac();
+          for (int j = 0; j < 3; ++j)
+            gv::em_counter[j + 1](I) += ptc.frac() * ptc.p(j);
+        }
       }
 
-      particles[this_sp].push_back(std::move(ptc));
+      bd.particles[this_sp].push_back(std::move(ptc));
     }
-    new_ptc_buf.resize(0);
-    // TODO RTD needs to be revived
-    // RTD::data().cumulative_time += dt;
+    bd.new_ptc_buf.resize(0);
+    gv::cumulative_time += bd.dt;
   }
 };
 
@@ -697,81 +729,77 @@ struct PostResume : public pgn::PostResumeAction_t<PostResume> {
 };
 
 namespace io {
-void do_prior_export(const pgn::ExportBundle_t& bundle) {
-  // TODO RTD
+void do_prior_export(const pgn::ExportBundle_t& bd) {
+  {  // pair creation counter
+    auto& pc = gv::pc_counter;
+    for (int i = 0; i < 4; ++i)
+      bd.ens.reduce_to_chief(mpi::by::SUM, pc[i].data().data(),
+                             pc[i].data().size());
+  }
+  {  // photon emission counter
+    auto& em = gv::em_counter;
+    for (int i = 0; i < 4; ++i)
+      bd.ens.reduce_to_chief(mpi::by::SUM, em[i].data().data(),
+                             em[i].data().size());
+  }
+  if (gv::Jsp) {
+    auto& Jsp = *gv::Jsp;
+    for (auto s : Jsp) {
+      for (int i = 0; i < 3; ++i)
+        bd.ens.reduce_to_chief(mpi::by::SUM, Jsp[s][i].data().data(),
+                               Jsp[s][i].data().size());
+    }
+    if (bd.cart_opt) {
+      for (auto s : Jsp) {
+        field::merge_sync_guard_cells(Jsp[s], *bd.cart_opt);
+      }
+    }
+  }
 
-  // {  // pair creation counter
-  //   auto& pc = RTD::data().pc_counter;
-  //   for (int i = 0; i < 4; ++i)
-  //     ens.reduce_to_chief(mpi::by::SUM, pc[i].data().data(),
-  //                         pc[i].data().size());
-  // }
-  // {  // photon emission counter
-  //   auto& em = RTD::data().em_counter;
-  //   for (int i = 0; i < 4; ++i)
-  //     ens.reduce_to_chief(mpi::by::SUM, em[i].data().data(),
-  //                         em[i].data().size());
-  // }
-  // if (RTD::data().Jsp) {
-  //   auto& Jsp = *RTD::data().Jsp;
-  //   for (auto s : Jsp) {
-  //     for (int i = 0; i < 3; ++i)
-  //       ens.reduce_to_chief(mpi::by::SUM, Jsp[s][i].data().data(),
-  //                           Jsp[s][i].data().size());
-  //   }
-  //   if (cart_opt) {
-  //     for (auto s : Jsp) {
-  //       field::merge_sync_guard_cells(Jsp[s], *cart_opt);
-  //     }
-  //   }
-  // }
+  if (gv::skin_depth) {  // skin depth
+    auto& skd = *gv::skin_depth;
+    skd = {bd.J.mesh()};
+    skd.reset();
 
-  // if (RTD::data().skin_depth) {  // skin depth
-  //   auto& skd = *(RTD::data().skin_depth);
-  //   skd = {J.mesh()};
-  //   skd.reset();
-
-  //   for (auto sp : particles) {
-  //     auto q2m = properties[sp].charge_x * properties[sp].charge_x /
-  //                properties[sp].mass_x;
-  //     for (const auto& ptc : particles[sp]) {
-  //       if (!ptc.is(flag::exist)) continue;
-  //       Index I;
-  //       for (int i = 0; i < DGrid; ++i) I[i] = grid[i].csba(ptc.q(i));
-  //       skd[0](I) += q2m * ptc.frac();
-  //     }
-  //   }
-  //   ens.reduce_to_chief(mpi::by::SUM, skd[0].data().data(),
-  //                       skd[0].data().size());
-  //   if (ens.is_chief()) {
-  //     for (const auto& I : apt::Block(apt::range::begin(skd.mesh().range()),
-  //                                     apt::range::end(skd.mesh().range()))) {
-  //       real_t r = grid[0].absc(I[0], 0.5);
-  //       real_t theta = grid[1].absc(I[1], 0.5);
-  //       real_t h = Metric::h<2>(r, theta) /
-  //                  (wpic2 * grid[0].delta() * grid[0].delta());
-  //       auto& v = skd[0](I);
-  //       v = std::sqrt(h / v);
-  //     }
-  //   }
-  // }
+    for (auto sp : bd.particles) {
+      auto q2m = bd.properties[sp].charge_x * bd.properties[sp].charge_x /
+                 bd.properties[sp].mass_x;
+      for (const auto& ptc : bd.particles[sp]) {
+        if (!ptc.is(particle::flag::exist)) continue;
+        pgn::Index_t I;
+        for (int i = 0; i < DGrid; ++i) I[i] = bd.grid[i].csba(ptc.q(i));
+        skd[0](I) += q2m * ptc.frac();
+      }
+    }
+    bd.ens.reduce_to_chief(mpi::by::SUM, skd[0].data().data(),
+                           skd[0].data().size());
+    if (bd.ens.is_chief()) {
+      for (const auto& I : apt::Block(apt::range::begin(skd.mesh().range()),
+                                      apt::range::end(skd.mesh().range()))) {
+        real_t r = bd.grid[0].absc(I[0], 0.5);
+        real_t theta = bd.grid[1].absc(I[1], 0.5);
+        real_t h = Metric::h<2>(r, theta) /
+                   (gv::wpic2 * bd.grid[0].delta() * bd.grid[0].delta());
+        auto& v = skd[0](I);
+        v = std::sqrt(h / v);
+      }
+    }
+  }
 }
 
-void do_post_export(const pgn::ExportBundle_t& bundle) {
-  // TODO RTD
-
-  // auto& pc = RTD::data().pc_counter;
-  // for (int i = 0; i < 4; ++i)
-  //   std::fill(pc[i].data().begin(), pc[i].data().end(), 0);
-  // auto& em = RTD::data().em_counter;
-  // for (int i = 0; i < 4; ++i)
-  //   std::fill(em[i].data().begin(), em[i].data().end(), 0);
-  // RTD::data().cumulative_time = 0;
-  // if (RTD::data().Jsp) {
-  //   // clear Jsp to save some space
-  //   for (auto sp : *(RTD::data().Jsp)) (*RTD::data().Jsp)[sp] = {};
-  // }
-  // if (RTD::data().skin_depth) *(RTD::data().skin_depth) = {};
+void do_post_export(const pgn::ExportBundle_t&) {
+  auto& pc = gv::pc_counter;
+  for (int i = 0; i < 4; ++i)
+    std::fill(pc[i].data().begin(), pc[i].data().end(), 0);
+  auto& em = gv::em_counter;
+  for (int i = 0; i < 4; ++i)
+    std::fill(em[i].data().begin(), em[i].data().end(), 0);
+  gv::cumulative_time = 0;
+  if (gv::Jsp) {
+    // clear Jsp to save some space
+    for (auto sp : *gv::Jsp) (*gv::Jsp)[sp] = {};
+  }
+  if (gv::skin_depth) *gv::skin_depth = {};
 }
 
 constexpr auto I2std(const pgn::Index_t& I) {
@@ -859,19 +887,17 @@ apt::array<real_t, 3> pair_creation_rate(pgn::Index_t I,
                                          const pgn::Field<3>&,
                                          const pgn::Field<3>&,
                                          const pgn::JField&) {
-  // TODO RTD
-  // auto x = RTD::data().pc_counter[0](I);
-  // return {x / RTD::data().cumulative_time, 0, 0};
+  auto x = gv::pc_counter[0](I);
+  return {x / gv::cumulative_time, 0, 0};
 }
 apt::array<real_t, 3> Pdot_photon_pair_creation(pgn::Index_t I,
                                                 const pgn::Grid_t& grid,
                                                 const pgn::Field<3>&,
                                                 const pgn::Field<3>&,
                                                 const pgn::JField&) {
-  // TODO RTD
-  // const auto& pc = RTD::data().pc_counter;
-  // const auto& dt = RTD::data().cumulative_time;
-  // return {pc[1](I) / dt, pc[2](I) / dt, pc[3](I) / dt};
+  const auto& pc = gv::pc_counter;
+  const auto& dt = gv::cumulative_time;
+  return {pc[1](I) / dt, pc[2](I) / dt, pc[3](I) / dt};
 }
 
 apt::array<real_t, 3> photon_emission_rate(pgn::Index_t I,
@@ -879,38 +905,32 @@ apt::array<real_t, 3> photon_emission_rate(pgn::Index_t I,
                                            const pgn::Field<3>&,
                                            const pgn::Field<3>&,
                                            const pgn::JField&) {
-  // TODO RTD
-  // auto x = RTD::data().em_counter[0](I);
-  // return {x / RTD::data().cumulative_time, 0, 0};
+  auto x = gv::em_counter[0](I);
+  return {x / gv::cumulative_time, 0, 0};
 }
 apt::array<real_t, 3> Pdot_photon_emission(pgn::Index_t I,
                                            const pgn::Grid_t& grid,
                                            const pgn::Field<3>&,
                                            const pgn::Field<3>&,
                                            const pgn::JField&) {
-  // TODO RTD
-  // const auto& em = RTD::data().em_counter;
-  // const auto& dt = RTD::data().cumulative_time;
-  // return {em[1](I) / dt, em[2](I) / dt, em[3](I) / dt};
+  const auto& em = gv::em_counter;
+  const auto& dt = gv::cumulative_time;
+  return {em[1](I) / dt, em[2](I) / dt, em[3](I) / dt};
 }
 
 template <particle::species SP>
 apt::array<real_t, 3> J_by_species(pgn::Index_t I, const pgn::Grid_t& grid,
                                    const pgn::Field<3>&, const pgn::Field<3>&,
                                    const pgn::JField&) {
-  // TODO RTD
-  // // NOTE due to interpolation, the exported Jsp's don't sum up to J.
-  // const auto& Jsp = (*RTD::data().Jsp)[SP];
-  // return msh::interpolate(Jsp, I2std(I), ShapeF());
+  // NOTE due to interpolation, the exported Jsp's don't sum up to J.
+  const auto& Jsp = (*gv::Jsp)[SP];
+  return msh::interpolate(Jsp, I2std(I), ShapeF());
 }
 
 apt::array<real_t, 3> skin_depth(pgn::Index_t I, const pgn::Grid_t& grid,
                                  const pgn::Field<3>&, const pgn::Field<3>&,
                                  const pgn::JField&) {
-  // TODO RTD
-  // return {msh::interpolate(*(RTD::data().skin_depth), I2std(I), ShapeF())[0],
-  // 0,
-  //         0};
+  return {msh::interpolate(*(gv::skin_depth), I2std(I), ShapeF())[0], 0, 0};
 }
 
 apt::array<real_t, 3> ptc_num(
@@ -959,7 +979,7 @@ int main(int argc, char** argv) {
 
   const real_t dt = conf["dt"].as<real_t>();
   gv::mu = conf["gamma0"].as<real_t>() * std::pow(gv::Omega, -2.0);
-  const real_t wpic2 = 2 * gv::Omega * gv::mu / conf["Np"].as<real_t>();
+  gv::wpic2 = 2 * gv::Omega * gv::mu / conf["Np"].as<real_t>();
 
   const real_t gamma_fd = conf["pairs"]["gamma_fd"].as<real_t>();
   const real_t E_ph = conf["pairs"]["E_ph"].as<real_t>();
@@ -978,10 +998,20 @@ int main(int argc, char** argv) {
   const real_t damping_rate = conf["damping"]["rate"].as<real_t>();
   gv::spinup_time = conf["spinup_time"].as<real_t>();
 
-  const real_t r_e = wpic2 * apt::dV(gv::supergrid) / (4.0 * M_PI);
+  const real_t r_e = gv::wpic2 * apt::dV(gv::supergrid) / (4.0 * M_PI);
 
   const int downsample_ratio =
       conf["schedules"]["export"]["downsample_ratio"].as_or<int>(1);
+
+  const pgn::ExportSchedule sch_export = [&] {
+    pgn::ExportSchedule res;
+    const auto& cf = conf["schedules"]["export"];
+    res.on = cf["on"].as_or<bool>(true);
+    res.start = cf["start"].as_or<int>(0);
+    res.interval, cf["interval"].as<int>();
+    res.num_files = cf["num_files"].as_or<int>(1);
+    return res;
+  }();
 
   pgn::SimulationBuilder_t builder(args);
 
@@ -1076,12 +1106,13 @@ int main(int argc, char** argv) {
     }
 
     builder.add_particle_action<particle::MainUpdater>()
+        .set_name("MainUpdate")  // TODO set range??
         .set_update_q(
             Metric::geodesic_move<apt::vVec<real_t, 3>, apt::vVec<real_t, 3>>)
-        .set_name("MainUpdate");  // TODO set range??
+        .set_export_schedule(sch_export);
 
     {
-      real_t N_atm_floor = std::exp(1.0) * 2.0 * gv::Omega * gv::mu / wpic2;
+      real_t N_atm_floor = std::exp(1.0) * 2.0 * gv::Omega * gv::mu / gv::wpic2;
       builder.add_particle_action<particle::Atmosphere>()
           .set_name("Atmosphere")
           .set_range(0, {gv::star_interior - 1, gv::star_interior})
@@ -1130,33 +1161,31 @@ int main(int argc, char** argv) {
         .add_exportee("PhotonEmissionRate", 1, io::photon_emission_rate)
         .add_exportee("PdotEmission", 3, io::Pdot_photon_emission);
 
-    // TODO RTD
-    // if (RTD::data().skin_depth) {
-    //   exporter.add_exportee("SkinDepth", 1, skin_depth,
-    //                         average_when_downsampled);
-    // }
+    if (gv::skin_depth) {
+      exporter.add_exportee("SkinDepth", 1, io::skin_depth,
+                            io::average_when_downsampled);
+    }
 
-    // TODO RTD
-    // if (RTD::data().Jsp) {
-    //   using namespace particle;
-    //   for (auto sp : *(RTD::data().Jsp)) {
-    //     switch (sp) {
-    //       case species::electron:
-    //         exporter.add_exportee("Je", 3, J_by_species<species::electron>,
-    //                               average_and_divide_flux_by_area);
-    //         break;
-    //       case species::positron:
-    //         exporter.add_exportee("Jp", 3, J_by_species<species::positron>,
-    //                               average_and_divide_flux_by_area);
-    //         break;
-    //       case species::ion:
-    //         exporter.add_exportee("Ji", 3, J_by_species<species::ion>,
-    //                               average_and_divide_flux_by_area);
-    //         break;
-    //       default:;
-    //     }
-    //   }
-    // }
+    if (gv::Jsp) {
+      using namespace particle;
+      for (auto sp : *gv::Jsp) {
+        switch (sp) {
+          case species::electron:
+            exporter.add_exportee("Je", 3, io::J_by_species<species::electron>,
+                                  io::average_and_divide_flux_by_area);
+            break;
+          case species::positron:
+            exporter.add_exportee("Jp", 3, io::J_by_species<species::positron>,
+                                  io::average_and_divide_flux_by_area);
+            break;
+          case species::ion:
+            exporter.add_exportee("Ji", 3, io::J_by_species<species::ion>,
+                                  io::average_and_divide_flux_by_area);
+            break;
+          default:;
+        }
+      }
+    }
     exporter.add_exportee("Num", 1, io::ptc_num)
         .add_exportee("E", 1, io::ptc_energy)
         .add_exportee("P", 3, io::ptc_momentum);
@@ -1208,11 +1237,7 @@ int main(int argc, char** argv) {
 
   {
     auto& sch = builder.export_schedule();
-    const auto& cf = conf["schedules"]["export"];
-    sch.on = cf["on"].as_or<bool>(true);
-    sch.start = cf["start"].as_or<int>(0);
-    sch.interval, cf["interval"].as<int>();
-    sch.num_files = cf["num_files"].as_or<int>(1);
+    sch = sch_export;
   }
 
   {

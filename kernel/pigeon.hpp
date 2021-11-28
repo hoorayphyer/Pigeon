@@ -51,6 +51,10 @@ struct PIGEON {
   using IOGrid = apt::Grid<RD, DGrid>;  // TODO can we just use same grid???
 
   using Schedule = pic::Schedule;
+  using ExportSchedule = pic::ExportSchedule;
+  using CheckpointSchedule = pic::CheckpointSchedule;
+  using DynamicLoadBalanceSchedule = pic::DynamicLoadBalanceSchedule;
+  using ProfilingSchedule = pic::ProfilingSchedule;
 };
 
 using particle::species;
