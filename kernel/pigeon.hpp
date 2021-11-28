@@ -49,6 +49,8 @@ struct PIGEON {
 
   using IOField = field::Field<RD, 3, DGrid>;
   using IOGrid = apt::Grid<RD, DGrid>;  // TODO can we just use same grid???
+
+  using Schedule = pic::Schedule;
 };
 
 using particle::species;

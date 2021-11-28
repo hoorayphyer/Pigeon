@@ -606,11 +606,7 @@ class Annihilator : public pgn::ParticleAction_t<Annihilator> {
     auto dt = bundle.dt;
     auto timestep = bundle.timestep;
 
-    // TODO annih_plan
-    // if (annih_plan.is_do(timestep)) {
-    if (false) {
-      assert(m_policy != nullptr);
-
+    if (m_sch.is_do(timestep)) {
       apt::array<apt::array<real_t, 2>, DGrid> bounds;
       for (int i = 0; i < DGrid; ++i) {
         // NOTE guard cells or margins of range not included.
@@ -626,7 +622,11 @@ class Annihilator : public pgn::ParticleAction_t<Annihilator> {
     }
   }
 
+  auto& schedule() { return m_sch; }
+
  private:
+  pgn::Schedule m_sch;
+
   // policy returns number of pairs to be annihilated
   static real_t m_policy(real_t num_e, real_t num_p) noexcept {
     return std::min(num_e, num_p) / 2;
@@ -1053,7 +1053,14 @@ int main(int argc, char** argv) {
           .set_name("Annihilation")
           .set_range(0, {gv::supergrid[0].csba(std::log(18.0)),
                          gv::supergrid[0].dim() + gv::guard})
-          .set_range(1, {i_equator - half_width, i_equator + half_width});
+          .set_range(1, {i_equator - half_width, i_equator + half_width})
+          .apply([&](auto& act) {
+            auto& sch = act.schedule();
+            const auto& cf = conf["schedules"]["annihilation"];
+            sch.on = cf["on"].as_or<bool>(false);
+            sch.start = cf["start"].as_or<int>(0);
+            sch.interval = cf["interval"].as<int>();
+          });
     }
 
     {

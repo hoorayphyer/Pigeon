@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <string>
 #include <type_traits>
 
@@ -88,6 +89,12 @@ struct ActionWithSetters : public AbstractAction {
     // TODO use .at(i) once we get rid of apt::array
     ActionBase<DGrid>::m_ranges[i] = std::move(range);
     return static_cast<ConcreteAction&>(*this);
+  }
+
+  ConcreteAction& apply(std::function<void(ConcreteAction&)> f) {
+    auto& act = static_cast<ConcreteAction&>(*this);
+    f(act);
+    return act;
   }
 };
 }  // namespace pic
