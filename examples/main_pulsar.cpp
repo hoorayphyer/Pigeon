@@ -1191,29 +1191,26 @@ int main(int argc, char** argv) {
         .add_exportee("P", 3, io::ptc_momentum);
   };
 
-  add_common_exportees(builder.add_exporter()
-                           .set_is_collinear_mesh(false)
-                           .set_downsample_ratio(downsample_ratio)
-                           .set_data_dir("")
-                           .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
-                                        {0, gv::supergrid[1].dim() + 1}}})
-
-  );
+  builder.add_exporter()
+      .set_is_collinear_mesh(false)
+      .set_downsample_ratio(downsample_ratio)
+      .set_data_dir("")
+      .set_range({{{0, gv::supergrid[0].dim() + gv::guard},
+                   {0, gv::supergrid[1].dim() + 1}}})
+      .apply(add_common_exportees);
 
   {
     int i_equator = gv::supergrid[1].dim() / 2 +
                     1;  // pick the cell whose lb is at equator.
     int half_width = (30.0_deg) / gv::supergrid[1].delta();
-    add_common_exportees(
-        builder.add_exporter()
-            .set_is_collinear_mesh(false)
-            .set_downsample_ratio(1)
-            .set_data_dir("current_sheet")
-            .set_range({{{gv::supergrid[0].csba(std::log(4.5)),
-                          gv::supergrid[0].dim() + gv::guard},
-                         {i_equator - half_width, i_equator + half_width}}})
-
-    );
+    builder.add_exporter()
+        .set_is_collinear_mesh(false)
+        .set_downsample_ratio(1)
+        .set_data_dir("current_sheet")
+        .set_range({{{gv::supergrid[0].csba(std::log(4.5)),
+                      gv::supergrid[0].dim() + gv::guard},
+                     {i_equator - half_width, i_equator + half_width}}})
+        .apply(add_common_exportees);
   }
 
   builder.add_exporter()

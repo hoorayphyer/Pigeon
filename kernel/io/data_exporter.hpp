@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -47,19 +48,6 @@ class DataExporter {
     return *this;
   }
 
-  const auto &get_range() const { return m_range; }
-
-  void export_data(
-      int timestep, Real dt, int num_files,
-      const std::optional<mpi::CartComm> &cart_opt,
-      const dye::Ensemble<DGrid> &ens,
-      const apt::Grid<Real, DGrid> &grid,  // local grid
-      const field::Field<Real, 3, DGrid> &E,
-      const field::Field<Real, 3, DGrid> &B,
-      const field::Field<RealJ, 3, DGrid> &J,  // J is Jmesh on a replica
-      const particle::map<particle::array<Real, S>> &particles,
-      const particle::map<particle::Properties> &properties) const;
-
   auto &add_exportee(FieldExportee<RealDS, DGrid, Real, RealJ> *exportee) {
     m_fexps.emplace_back(exportee);
     return *this;
@@ -94,6 +82,24 @@ class DataExporter {
                                                     action, post_hook));
     return *this;
   }
+
+  auto &apply(std::function<void(DataExporter &)> f) {
+    f(*this);
+    return *this;
+  }
+
+  const auto &get_range() const { return m_range; }
+
+  void export_data(
+      int timestep, Real dt, int num_files,
+      const std::optional<mpi::CartComm> &cart_opt,
+      const dye::Ensemble<DGrid> &ens,
+      const apt::Grid<Real, DGrid> &grid,  // local grid
+      const field::Field<Real, 3, DGrid> &E,
+      const field::Field<Real, 3, DGrid> &B,
+      const field::Field<RealJ, 3, DGrid> &J,  // J is Jmesh on a replica
+      const particle::map<particle::array<Real, S>> &particles,
+      const particle::map<particle::Properties> &properties) const;
 
  private:
   bool m_is_collinear_mesh = false;
