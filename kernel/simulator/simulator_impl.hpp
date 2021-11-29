@@ -71,7 +71,16 @@ void Simulator<DGrid, R, S, RJ, RD>::update_parts() {
 
   retaylor_ranges(m_fld_action_orig_ranges, m_fld_actions);
   retaylor_ranges(m_ptc_action_orig_ranges, m_ptc_actions);
-  // TODO also taylor exporters
+  {  // rataylor ranges for exporters
+    const auto& ranges_orig = m_exporters_orig_ranges;
+    auto& actions = m_exporters;
+    assert(actions.size() == ranges_orig.size());
+    for (auto i = 0u; i < actions.size(); ++i) {
+      auto& ranges = actions[i].get_range();
+      ranges = ranges_orig[i];
+      taylor(ranges);
+    }
+  }
 
   if (m_f_extra_init) {
     (*m_f_extra_init)(m_properties, m_grid);
@@ -266,22 +275,19 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
     if (m_sch_export.is_do(timestep)) {
       TIMING(
           "ExportData", START {
-            ExportBundle_t bundle{m_particles, m_properties, m_E,        m_B,
-                                  m_J,         m_grid,       m_cart_opt, ens,
-                                  dt,          timestep};
-            if (m_f_prior_export) (*m_f_prior_export)(bundle);
+            ExportBundle_t bd{m_particles, m_properties, m_E, m_B, m_J,
+                              m_grid,      m_cart_opt,   ens, dt,  timestep};
+            if (m_f_prior_export) (*m_f_prior_export)(bd);
 
-            // TODO sort out exporter vs action
-            // for (auto& exporter : set_up_data_exporters()) {
-            //   auto range = exporter.get_range();
-            //   taylor(range);
-            //   if (apt::range::is_empty(range)) continue;
-            //   exporter.export_data(timestep, dt, export_plan.num_files,
-            //                        _cart_opt, ens, _grid, _E, _B, _J,
-            //                        _particles, _properties);
-            // }
+            for (const auto& exporter : m_exporters) {
+              const auto& range = exporter.get_range();
+              if (apt::range::is_empty(range)) continue;
+              exporter.export_data(bd.timestep, bd.dt, m_sch_export.num_files,
+                                   bd.cart_opt, bd.ens, bd.grid, bd.E, bd.B,
+                                   bd.J, bd.particles, bd.properties);
+            }
 
-            if (m_f_post_export) (*m_f_post_export)(bundle);
+            if (m_f_post_export) (*m_f_post_export)(bd);
           });
     }
 

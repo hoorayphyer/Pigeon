@@ -190,10 +190,9 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
   if (mpi::world.rank() == 0)
     std::cout << "Loading initial condition..." << std::endl;
   int init_ts = 0;
-  // TODO profiling_plan
-  // if (profiling_plan.on and profiling_plan.is_qualified()) {
-  //   lgr::file << "--- Loading Initial Condition..." << std::endl;
-  // }
+  if (sim.m_sch_prof.on and sim.m_sch_prof.is_qualified()) {
+    lgr::file << "--- Loading Initial Condition..." << std::endl;
+  }
 
   if (m_args.resume_dir) {
     init_ts = ckpt::load_checkpoint(*m_args.resume_dir, sim.m_ens_opt,
@@ -241,15 +240,9 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
   // broadcast to ensure uniformity
   mpi::world.broadcast(0, &init_ts, 1);
 
-  // TODO the following can be made into a separate action
-  // // initialize trace_counters to ensure unique trace serial numbers across
-  // // runs
-  // pic::Traman::init(mpi::world.rank(), _particles);
-
-  // TODO profiling plan
-  // if (profiling_plan.on and profiling_plan.is_qualified()) {
-  //   lgr::file << "--- Done." << std::endl;
-  // }
+  if (sim.m_sch_prof.on and sim.m_sch_prof.is_qualified()) {
+    lgr::file << "--- Done." << std::endl;
+  }
 
   return init_ts;
 }
@@ -265,7 +258,6 @@ void SimulationBuilder<DGrid, R, S, RJ, RD>::set_up_journal() const {
       // a journal file is specified
       res = fs::absolute(*m_args.journal_file);
       if (!fs::exists(res)) {
-        // TODO std cout?
         std::cout << "Specified journal doesn't exist. Using default journal "
                      "instead."
                   << std::endl;
@@ -336,19 +328,22 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
       .set_name("MigrateParticles")
       .set_supergrid(*m_supergrid);
 
-  auto copy_ranges = [](const auto& actions, auto& ranges) {
+  auto copy_ranges = [](const auto& actions, auto& ranges, auto get_range) {
     const auto size = actions.size();
     ranges.resize(size);
     for (int i = 0; i < size; ++i) {
-      assert(actions[i]);
-      ranges[i] = actions[i]->ranges();
+      ranges[i] = get_range(actions[i]);
     }
   };
 
-  copy_ranges(sim.m_fld_actions, sim.m_fld_action_orig_ranges);
-  copy_ranges(sim.m_ptc_actions, sim.m_ptc_action_orig_ranges);
-
-  // TODO sim also has m_exporters_orig_ranges
+  auto get_range_ptr = [](const auto& act) {
+    assert(act);
+    return act->ranges();
+  };
+  copy_ranges(sim.m_fld_actions, sim.m_fld_action_orig_ranges, get_range_ptr);
+  copy_ranges(sim.m_ptc_actions, sim.m_ptc_action_orig_ranges, get_range_ptr);
+  copy_ranges(sim.m_exporters, sim.m_exporters_orig_ranges,
+              [](const auto& act) { return act.get_range(); });
 
   sim.m_fld_guard = *m_fld_guard;
   sim.m_this_run_dir = *m_this_run_dir;

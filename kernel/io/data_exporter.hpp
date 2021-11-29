@@ -89,6 +89,7 @@ class DataExporter {
   }
 
   const auto &get_range() const { return m_range; }
+  auto &get_range() { return m_range; }
 
   void export_data(
       int timestep, Real dt, int num_files,
