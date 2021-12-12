@@ -168,6 +168,98 @@ void Simulator<DGrid, R, S, RJ, RD>::initialize(
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
+void Simulator<DGrid, R, S, RJ, RD>::print_vitals(const std::string& filename,
+                                                  R t_phys) const {
+  static int counter = 0;
+  constexpr int interval = 40;  // how often to print the table description row
+  static tmr::Timestamp stopwatch;
+
+  const auto& ens = *m_ens_opt;
+
+  std::vector<double> buffer;
+  {
+    for (auto sp : m_particles) {
+      double num = 0.0;
+      for (const auto& ptc : m_particles[sp]) {
+        if (ptc.is(particle::flag::exist)) num += ptc.frac();
+      }
+      buffer.push_back(num);
+    }
+    if (m_N_scat) {
+      for (auto sp : *m_N_scat) buffer.push_back((*m_N_scat)[sp]);
+    }
+    ens.reduce_to_chief(mpi::by::SUM, buffer.data(), buffer.size());
+  }
+  if (!m_cart_opt) return;
+
+  buffer.push_back(ens.size());
+  m_cart_opt->template reduce<true>(mpi::by::SUM, 0, buffer.data(),
+                                    buffer.size());
+
+  if (m_cart_opt->rank() != 0) return;
+
+  // significant only on world rank 0
+  static double t_phys_prev = -1e-6;
+  static std::vector<double> num_ptcs_prev(m_particles.size(), 0);
+  static std::optional<std::vector<double>> num_scat_prev = [this] {
+    std::optional<std::vector<double>> res;
+    if (m_N_scat) {
+      res.emplace(std::vector<double>((*m_N_scat).size(), 0));
+    }
+    return res;
+  }();
+
+  {
+    std::ofstream out(filename, std::ios_base::app);
+    if (counter % interval == 0) {
+      out << "t_phys|\tnprocs|\tlapse/hr|\tTotal load(rate)";
+      if (m_N_scat) {
+        out << "|\tscattering creation rate";
+      }
+      out << std::endl;
+      out << "species ordering : ";
+      for (auto sp : m_particles) out << m_properties[sp].nickname << " ";
+      if (m_N_scat) {
+        // print separately in case it differs from above
+        out << "|\t";
+        for (auto sp : *m_N_scat) out << m_properties[sp].nickname << " ";
+      }
+      out << std::endl;
+      counter = 0;
+    }
+    ++counter;
+    out << apt::fmt("%.2f", t_phys) << "|\t" << buffer.back() << "|\t"
+        << apt::fmt("%8.2f", stopwatch.lapse().in_units_of("s").val() / 3600.0)
+        << "|\t";
+    auto* p1 = buffer.data();
+    for (int i = 0; i < m_particles.size(); ++i) {
+      out << apt::fmt("%.2e", p1[i]) << "("
+          << apt::fmt("%.2e",
+                      (p1[i] - num_ptcs_prev[i]) / (t_phys - t_phys_prev))
+          << ") ";
+      num_ptcs_prev[i] = p1[i];
+    }
+    if (m_N_scat) {
+      out << "|\t";
+      auto* p2 = buffer.data() + m_particles.size();
+      for (int i = 0; i < m_N_scat->size(); ++i) {
+        out << apt::fmt("%.2e",
+                        (p2[i] - (*num_scat_prev)[i]) / (t_phys - t_phys_prev))
+            << " ";
+        (*num_scat_prev)[i] = p2[i];
+      }
+    }
+    out << std::endl;
+    out.close();
+
+    t_phys_prev = t_phys;
+  }
+
+  return;
+}
+
+template <int DGrid, typename R, template <typename> class S, typename RJ,
+          typename RD>
 void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
   // NOTE we choose to do particle update before field update so that in
   // saving snapshots we don't need to save _J
@@ -291,9 +383,11 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
           });
     }
 
-    if (m_f_custom_step) {
-      // TODO what should its bundle be
-      (*m_f_custom_step)();
+    if (m_sch_vitals.is_do(timestep)) {
+      TIMING(
+          "PrintVitals", START {
+            print_vitals(m_this_run_dir + "/vitals.txt", timestep * dt);
+          });
     }
 
     if (m_cart_opt) {

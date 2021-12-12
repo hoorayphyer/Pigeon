@@ -1224,6 +1224,8 @@ int main(int argc, char** argv) {
   builder.set_print_timestep_to_stdout_interval(
       conf["schedules"]["print_timestep_to_stdout_interval"].as_or<int>(100));
 
+  builder.set_scattering_data_in_vitals(&gv::N_scat);
+
   {
     auto& sch = builder.sort_ptcs_schedule();
     const auto& cf = conf["schedules"]["sort"];
@@ -1263,6 +1265,14 @@ int main(int argc, char** argv) {
     sch.start = cf["start"].as_or<int>(0);
     sch.interval = cf["interval"].as<int>();
     sch.max_entries = cf["max_entries"].optional<int>();
+  }
+
+  {
+    auto& sch = builder.vitals_schedule();
+    const auto& cf = conf["schedules"]["vitals"];
+    sch.on = cf["on"].as_or<bool>(true);
+    sch.start = cf["start"].as_or<int>(0);
+    sch.interval = cf["interval"].as<int>();
   }
 
   builder.set_extra_init([](const auto& properties, const auto& localgrid) {

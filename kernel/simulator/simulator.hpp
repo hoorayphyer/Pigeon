@@ -69,7 +69,7 @@ struct Simulator {
       std::function<void(const particle::map<particle::Properties>& properties,
                          const apt::Grid<R, DGrid>& localgrid)>>
       m_f_extra_init;
-  std::optional<std::function<void()>> m_f_custom_step;
+  const particle::map<R>* m_N_scat = nullptr;
 
   Schedule m_sch_sort_ptcs;
   ExportSchedule m_sch_export;
@@ -77,6 +77,7 @@ struct Simulator {
   DynamicLoadBalanceSchedule m_sch_dlb;
   ProfilingSchedule m_sch_prof;
   int m_print_timestep_to_stdout_interval = 100;
+  Schedule m_sch_vitals;
 
   void taylor(apt::array<apt::Range, DGrid>& a) const;
 
@@ -89,6 +90,8 @@ struct Simulator {
                   particle::map<particle::Properties>&& props,
                   apt::array<bool, DGrid>&& periodic,
                   const apt::array<int, DGrid>& dims);
+
+  void print_vitals(const std::string& filename, R t_phys) const;
 
  public:
   friend class SimulationBuilder<DGrid, R, S, RJ, RD>;

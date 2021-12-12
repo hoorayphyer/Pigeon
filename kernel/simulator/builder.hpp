@@ -100,8 +100,8 @@ class SimulationBuilder {
     return *this;
   }
 
-  SimulationBuilder& add_custom_step(std::function<void()> f) {
-    m_sim->m_f_custom_step.emplace(std::move(f));
+  SimulationBuilder& set_scattering_data_in_vitals( const particle::map<R>* N_scat) {
+    m_sim->m_N_scat = N_scat;
     return *this;
   }
 
@@ -137,6 +137,8 @@ class SimulationBuilder {
   auto& load_balancing_schedule() { return m_sim->m_sch_dlb; }
 
   auto& profiling_schedule() { return m_sim->m_sch_prof; }
+
+  auto& vitals_schedule() { return m_sim->m_sch_vitals; }
 
   SimulationBuilder& set_print_timestep_to_stdout_interval(int interval) {
     m_sim->m_print_timestep_to_stdout_interval = interval;
