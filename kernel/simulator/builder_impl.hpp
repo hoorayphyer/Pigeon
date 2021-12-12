@@ -181,6 +181,20 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   if (!m_is_mpi_particle_committed) {
     msg += "- must commit a particle type for MPI\n";
   }
+  if (m_init_ens_size_map) {
+    const auto& ezm = *m_init_ens_size_map;
+    const int num_ens = std::accumulate(m_dims.begin(), m_dims.end(), 1,
+                                        std::multiplies<int>());
+    if (ezm.size() != num_ens) {
+      msg += fmt::format("- size of ensemble_size_map should be {}", num_ens);
+    }
+    for (auto val : ezm) {
+      if (val < 1) {
+        msg += "- elements of ensemble_size_map must be at least 1";
+        break;
+      }
+    }
+  }
   return msg;
 }
 
@@ -360,29 +374,28 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
     lgr::file << "--- Initializing Simulator..." << std::endl;
   }
 
-  // TODO maybe move this to builder. init_replica_deploy
-  if (false) {  // if (pic::init_replica_deploy) {
-    // std::optional<int> label{};
-    // if (m_cart_opt)
-    //   label.emplace(m_cart_opt->rank());
-    // else {
-    //   int num_ens = 1;
-    //   for (int i = 0; i < DGrid; ++i) num_ens *= dims[i];
+  if (m_init_ens_size_map) {
+    std::optional<int> label{};
+    if (sim.m_cart_opt)
+      label.emplace(sim.m_cart_opt->rank());
+    else {
+      const int num_ens = std::accumulate(m_dims.begin(), m_dims.end(), 1,
+                                          std::multiplies<int>());
 
-    //   int my_rank = mpi::world.rank();
-    //   int count = num_ens;
-    //   for (int i = 0; i < num_ens; ++i) {
-    //     int num_replicas = (*pic::init_replica_deploy)(i);
-    //     if (my_rank >= count && my_rank < count + num_replicas) {
-    //       label.emplace(i);
-    //       break;
-    //     } else
-    //       count += num_replicas;
-    //   }
-    // }
+      int my_rank = mpi::world.rank();
+      int count = num_ens;
+      for (int i = 0; i < num_ens; ++i) {
+        int num_replicas = (*m_init_ens_size_map)[i] - 1;
+        if (my_rank >= count && my_rank < count + num_replicas) {
+          label.emplace(i);
+          break;
+        } else
+          count += num_replicas;
+      }
+    }
 
-    // auto intra_opt = mpi::world.split(label);
-    // m_ens_opt = dye::create_ensemble<DGrid>(m_cart_opt, intra_opt);
+    auto intra_opt = mpi::world.split(label);
+    sim.m_ens_opt = dye::create_ensemble<DGrid>(sim.m_cart_opt, intra_opt);
   } else {
     sim.m_ens_opt = dye::create_ensemble<DGrid>(sim.m_cart_opt);
   }
@@ -412,7 +425,8 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
   // 1. detailed balance. Absence of some species may lead to deadlock to
   // transferring particles of that species.
   // 2. data export. PutMultivar requires every patch to output every species
-  for (auto sp : sim.m_properties) sim.m_particles.insert(sp, particle::array<R, S>());
+  for (auto sp : sim.m_properties)
+    sim.m_particles.insert(sp, particle::array<R, S>());
 
   if (sim.m_ens_opt) sim.update_parts();
 

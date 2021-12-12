@@ -26,6 +26,7 @@ struct array {
   constexpr T* begin() noexcept { return _data; }
   constexpr const T* begin() const noexcept { return _data; }
 
+  constexpr T* end() noexcept { return _data + D; }
   constexpr const T* end() const noexcept { return _data + D; }
 
   constexpr const T& back() const noexcept { return _data[D - 1]; }

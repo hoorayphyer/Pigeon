@@ -100,7 +100,8 @@ class SimulationBuilder {
     return *this;
   }
 
-  SimulationBuilder& set_scattering_data_in_vitals( const particle::map<R>* N_scat) {
+  SimulationBuilder& set_scattering_data_in_vitals(
+      const particle::map<R>* N_scat) {
     m_sim->m_N_scat = N_scat;
     return *this;
   }
@@ -145,6 +146,18 @@ class SimulationBuilder {
     return *this;
   }
 
+  /**
+     This function is rarely used. It's more useful in tests.
+
+     @param ensemble_size_map, index is the ensemble label and the value is the
+     intended number of processes (both primary and replicas) in that ensemble.
+   */
+  SimulationBuilder& set_initial_ensemble_size_map(
+      std::vector<int> ensemble_size_map) {
+    m_init_ens_size_map.emplace(std::move(ensemble_size_map));
+    return *this;
+  }
+
   Simulator_t& build();
 
   // TODO 1. maybe use concept 2. can we avoid having to have user call this
@@ -174,6 +187,8 @@ class SimulationBuilder {
 
   std::optional<int> m_total_timesteps;
   std::optional<int> m_fld_guard;
+
+  std::optional<std::vector<int>> m_init_ens_size_map;
 
   // use std::optional so as to destruct m_sim before mpi::finalize, see
   // destructor.
