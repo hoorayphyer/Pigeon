@@ -348,10 +348,78 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
   sim.m_fld_guard = *m_fld_guard;
   sim.m_this_run_dir = *m_this_run_dir;
 
-  // TODO weird to have sim.initiaize and the above together. There are some
-  // dependencies. Maybe move sim.initialize here??
-  sim.initialize(std::move(*m_supergrid), std::move(*m_cart),
-                 std::move(m_props), std::move(m_periodic), m_dims);
+  sim.m_supergrid = std::move(*m_supergrid);
+  sim.m_cart_opt = std::move(*m_cart);
+  sim.m_properties = std::move(m_props);
+  sim.m_periodic = std::move(m_periodic);
+
+  sim.m_grid = sim.m_supergrid;
+
+  if (sim.m_sch_prof.on and sim.m_sch_prof.is_qualified()) {
+    lgr::file.open(std::ios_base::app);
+    lgr::file << "--- Initializing Simulator..." << std::endl;
+  }
+
+  // TODO maybe move this to builder. init_replica_deploy
+  if (false) {  // if (pic::init_replica_deploy) {
+    // std::optional<int> label{};
+    // if (m_cart_opt)
+    //   label.emplace(m_cart_opt->rank());
+    // else {
+    //   int num_ens = 1;
+    //   for (int i = 0; i < DGrid; ++i) num_ens *= dims[i];
+
+    //   int my_rank = mpi::world.rank();
+    //   int count = num_ens;
+    //   for (int i = 0; i < num_ens; ++i) {
+    //     int num_replicas = (*pic::init_replica_deploy)(i);
+    //     if (my_rank >= count && my_rank < count + num_replicas) {
+    //       label.emplace(i);
+    //       break;
+    //     } else
+    //       count += num_replicas;
+    //   }
+    // }
+
+    // auto intra_opt = mpi::world.split(label);
+    // m_ens_opt = dye::create_ensemble<DGrid>(m_cart_opt, intra_opt);
+  } else {
+    sim.m_ens_opt = dye::create_ensemble<DGrid>(sim.m_cart_opt);
+  }
+
+  {  // initialize fields. Idles also do this for the sake of loading
+     // checkpoint, so dims is used instead of m_ens_opt or m_cart_opt
+    apt::Index<DGrid> bulk_dims;
+    for (int i = 0; i < DGrid; ++i) {
+      bulk_dims[i] = sim.m_supergrid[i].dim() / m_dims[i];
+    }
+    auto range = apt::make_range({}, bulk_dims, sim.m_fld_guard);
+    sim.m_E = {range};
+    sim.m_B = {range};
+    sim.m_J = {range};
+
+    for (int i = 0; i < 3; ++i) {
+      sim.m_E.set_offset(i, field::yee::ofs_gen<DGrid>(field::yee::Etype, i));
+      sim.m_B.set_offset(i, field::yee::ofs_gen<DGrid>(field::yee::Btype, i));
+      sim.m_J.set_offset(i, field::yee::ofs_gen<DGrid>(field::yee::Etype, i));
+    }
+    sim.m_E.reset();
+    sim.m_B.reset();
+    sim.m_J.reset();
+  }
+  // NOTE all species in the game should be created regardless of whether they
+  // appear on certain processes. This is to make the following work
+  // 1. detailed balance. Absence of some species may lead to deadlock to
+  // transferring particles of that species.
+  // 2. data export. PutMultivar requires every patch to output every species
+  for (auto sp : sim.m_properties) sim.m_particles.insert(sp, particle::array<R, S>());
+
+  if (sim.m_ens_opt) sim.update_parts();
+
+  if (sim.m_sch_prof.on and sim.m_sch_prof.is_qualified()) {
+    lgr::file << "--- Done." << std::endl;
+  }
+
   auto init_ts = load_init_cond(sim);
 
   sim.m_initial_timestep = init_ts;

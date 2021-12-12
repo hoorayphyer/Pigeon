@@ -79,17 +79,11 @@ struct Simulator {
   int m_print_timestep_to_stdout_interval = 100;
   Schedule m_sch_vitals;
 
+  Simulator() = default;
+
   void taylor(apt::array<apt::Range, DGrid>& a) const;
 
   void update_parts();
-
-  Simulator() = default;
-
-  void initialize(apt::Grid<R, DGrid>&& supergrid,
-                  std::optional<mpi::CartComm>&& cart_opt,
-                  particle::map<particle::Properties>&& props,
-                  apt::array<bool, DGrid>&& periodic,
-                  const apt::array<int, DGrid>& dims);
 
   void print_vitals(const std::string& filename, R t_phys) const;
 
