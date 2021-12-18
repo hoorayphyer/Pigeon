@@ -6,7 +6,11 @@
 #include "metric/log_spherical.hpp"
 #include "msh/mesh_shape_interplay.hpp"
 #include "particle/annihilation.hpp"
+#include "particle/forces.hpp"
+#include "particle/scattering.hpp"
 #include "particle/updater.hpp"
+#include "pic/forces/gravity.hpp"
+#include "pic/forces/landau0.hpp"
 #include "pigeon.hpp"
 
 // TODOL users may forget to sync value and state. Add another layer then
@@ -300,8 +304,114 @@ struct Axisymmetric : public pgn::FieldAction_t<Axisymmetric> {
 };
 }  // namespace field
 
-auto set_up_particle_properties() {
-  particle::map<particle::Properties> properties;
+auto set_up_particle_properties(real_t gravity_strength, real_t landau0_B_thr,
+                                real_t gamma_fd, real_t gamma_off,
+                                real_t Ndot_fd, real_t E_ph,
+                                real_t magnetic_convert_B_thr,
+                                const std::array<real_t, 2>& mfp) {
+  using namespace particle;
+  map<Properties> properties;
+  {
+    properties.insert(species::electron, {1.0, -1.0, "electron", "el"});
+    properties.insert(species::positron, {1.0, 1.0, "positron", "po"});
+    properties.insert(species::ion, {5.0, 1.0, "ion", "io"});
+    properties.insert(species::photon, {0, 0, "photon", "ph"});
+  }
+
+  {
+    using Force = Force<real_t, Specs>;
+    constexpr auto* lorentz = force::template lorentz<real_t, Specs, vParticle>;
+    constexpr auto* landau0 = force::landau0<real_t, Specs, vParticle>;
+    constexpr auto* gravity = force::gravity<real_t, Specs, vParticle>;
+
+    if (properties.has(species::electron)) {
+      auto sp = species::electron;
+      Force force;
+      const auto& prop = properties[sp];
+
+      force.add(lorentz, prop.charge_x / prop.mass_x);
+      force.add(gravity, gravity_strength);
+      force.add(landau0, landau0_B_thr);
+
+      force.Register(sp);
+    }
+    if (properties.has(species::positron)) {
+      auto sp = species::positron;
+      Force force;
+      const auto& prop = properties[sp];
+
+      force.add(lorentz, prop.charge_x / prop.mass_x);
+      force.add(gravity, gravity_strength);
+      force.add(landau0, landau0_B_thr);
+
+      force.Register(sp);
+    }
+    if (properties.has(species::ion)) {
+      auto sp = species::ion;
+      Force force;
+      const auto& prop = properties[sp];
+
+      force.add(lorentz, prop.charge_x / prop.mass_x);
+      force.add(gravity, gravity_strength);
+      // force.add( landau0, landau0_B_thr );
+
+      force.Register(sp);
+    }
+  }
+
+  using Ptc_t = typename pgn::ParticleArray_t::particle_type;
+
+  static auto flagger = [](flagbits parent_bits, species) noexcept {
+    parent_bits[flag::secondary] = true;
+    return parent_bits;
+  };
+
+  {
+    Scat<real_t, Specs> ep_scat;
+
+    ep_scat.eligs.push_back(
+        [](const Ptc_t& ptc) { return ptc.q(0) < std::log(9.0_r); });
+
+    scat::CurvatureRadiation<real_t, Specs>::gamma_fd = gamma_fd;
+    scat::CurvatureRadiation<real_t, Specs>::gamma_off = gamma_off;
+    scat::CurvatureRadiation<real_t, Specs>::Ndot_fd = Ndot_fd;
+    scat::CurvatureRadiation<real_t, Specs>::E_ph = E_ph;
+    ep_scat.channels.push_back(scat::CurvatureRadiation<real_t, Specs>::test);
+
+    if (properties.has(species::photon))
+      ep_scat.impl = [](auto itr, auto& p, real_t t) {
+        return scat::RadiationFromCharges<false, real_t, Specs>(itr, p, t,
+                                                                flagger);
+      };
+    else
+      ep_scat.impl = [](auto itr, auto& p, real_t t) {
+        return scat::RadiationFromCharges<true, real_t, Specs>(itr, p, t,
+                                                               flagger);
+      };
+
+    if (properties.has(species::electron) &&
+        properties.has(species::positron)) {
+      ep_scat.Register(species::electron);
+      ep_scat.Register(species::positron);
+    }
+  }
+
+  if (properties.has(species::photon)) {
+    ::particle::Scat<real_t, Specs> photon_scat;
+    photon_scat.eligs.push_back([](const Ptc_t& ptc) { return true; });
+    scat::MagneticConvert<real_t, Specs>::B_thr = magnetic_convert_B_thr;
+    scat::MagneticConvert<real_t, Specs>::mfp = mfp[0];
+    photon_scat.channels.push_back(scat::MagneticConvert<real_t, Specs>::test);
+
+    scat::TwoPhotonCollide<real_t, Specs>::mfp = mfp[1];
+    photon_scat.channels.push_back(scat::TwoPhotonCollide<real_t, Specs>::test);
+
+    photon_scat.impl = [](auto itr, auto& p, real_t t) {
+      return scat::PhotonPairProduction<real_t, Specs>(itr, p, t, flagger);
+    };
+
+    photon_scat.Register(species::photon);
+  }
   return properties;
 }
 
@@ -986,6 +1096,8 @@ int main(int argc, char** argv) {
   const real_t gravity_strength = conf["forces"]["gravity"].as<real_t>();
   const real_t landau0_B_thr =
       conf["forces"]["landau0_ratio"].as<real_t>() * gv::mu;
+  const real_t magnetic_convert_B_thr =
+      conf["pairs"]["photon"]["magnetic_convert_ratio"].as<real_t>() * gv::mu;
   const std::array<real_t, 2> mfp = {
       conf["pairs"]["photon"]["mfp"][0].as<real_t>(),
       conf["pairs"]["photon"]["mfp"][1]
@@ -1016,7 +1128,10 @@ int main(int argc, char** argv) {
   pgn::SimulationBuilder_t builder(args);
 
   builder.initialize_this_run_dir(datadir_prefix, project_name)
-      .create_cartesian_topology(dims, periodic);
+      .set_supergrid(gv::supergrid)
+      .set_field_guard(gv::guard)
+      .create_cartesian_topology(dims, periodic)
+      .commit_particle_type_for_mpi<pgn::Particle>();
 
   {  // set up field actions
     builder
@@ -1063,8 +1178,15 @@ int main(int argc, char** argv) {
   }
 
   // TODO
-  auto properties = set_up_particle_properties();
-  builder.set_particle_properties(properties);
+  {
+    constexpr real_t gamma_off = 15.0;
+    constexpr real_t Ndot_fd = 0.25;
+
+    auto properties = set_up_particle_properties(
+        gravity_strength, landau0_B_thr, gamma_fd, gamma_off, Ndot_fd, E_ph,
+        magnetic_convert_B_thr, mfp);
+    builder.set_particle_properties(properties);
+  }
 
   {  // set up particle actions
 

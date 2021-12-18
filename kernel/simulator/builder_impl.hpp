@@ -164,7 +164,7 @@ template <int DGrid, typename R, template <typename> class S, typename RJ,
 std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   std::string msg = "";
   if (!m_supergrid) {
-    msg += "- must set supergrid\n";
+    msg += "- must set supergrid. To fix, call `set_supergrid`.\n";
   }
   if (!m_cart) {
     msg += "- must initialize cartesian topology\n";
@@ -176,10 +176,12 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
     msg += "- no initial condition is given\n";
   }
   if (!m_fld_guard) {
-    msg += "- must set the field guard\n";
+    msg += "- must set the field guard. To fix, call `set_field_guard`.\n";
   }
   if (!m_is_mpi_particle_committed) {
-    msg += "- must commit a particle type for MPI\n";
+    msg +=
+        "- must commit a particle type for MPI. To fix, call "
+        "`commit_particle_type_for_mpi`.\n";
   }
   if (m_init_ens_size_map) {
     const auto& ezm = *m_init_ens_size_map;
@@ -311,8 +313,7 @@ void SimulationBuilder<DGrid, R, S, RJ, RD>::populate_this_run_dir() const {
     fs::create_directories(this_run_dir + "/logs");
     fs::create_directories(this_run_dir + "/pigeon");
     fs::copy_file("CMakeLists.txt", this_run_dir + "/pigeon/CMakeLists.txt");
-    fs::copy_file("pic.hpp", this_run_dir + "/pigeon/pic.hpp");
-    fs::copy_file("pic_impl.hpp", this_run_dir + "/pigeon/pic_impl.hpp");
+    fs::copy_file("main.cpp", this_run_dir + "/pigeon/main.cpp");
     if (m_args.config_file) {
       fs::copy_file(*m_args.config_file, this_run_dir + "/pigeon/conf.toml");
     }
