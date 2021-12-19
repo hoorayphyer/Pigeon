@@ -1130,7 +1130,7 @@ int main(int argc, char** argv) {
   builder.initialize_this_run_dir(datadir_prefix, project_name)
       .set_supergrid(gv::supergrid)
       .set_field_guard(gv::guard)
-      .create_cartesian_topology(dims, periodic);
+      .set_cartesian_topology(dims, periodic);
 
   {  // set up field actions
     builder

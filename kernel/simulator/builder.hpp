@@ -114,9 +114,11 @@ class SimulationBuilder {
     return *this;
   }
 
-  SimulationBuilder& create_cartesian_topology(
-      const apt::array<int, DGrid>& dims,
-      const apt::array<bool, DGrid>& periodic);
+  SimulationBuilder& set_cartesian_topology(const apt::array<int, DGrid>& dims,
+                                            const apt::array<bool, DGrid>& periodic) {
+    m_dims_periodic.emplace(std::make_pair(dims, periodic));
+    return *this;
+  }
 
   SimulationBuilder& set_particle_properties(
       particle::map<particle::Properties> props) {
@@ -171,9 +173,7 @@ class SimulationBuilder {
   std::optional<std::string> m_this_run_dir;
 
   std::optional<apt::Grid<R, DGrid>> m_supergrid;
-  std::optional<std::optional<mpi::CartComm>> m_cart;
-  apt::array<int, DGrid> m_dims;
-  apt::array<bool, DGrid> m_periodic;
+  std::optional<std::pair<apt::array<int, DGrid>, apt::array<bool, DGrid>>> m_dims_periodic;
   particle::map<particle::Properties> m_props;
 
   std::optional<int> m_total_timesteps;
@@ -212,6 +212,8 @@ class SimulationBuilder {
 
   std::string precondition() const;
 
+  void create_cartesian_topology(const apt::array<int, DGrid>& dims,
+    const apt::array<bool, DGrid>& periodic);
   int load_init_cond(Simulator_t& sim);
 
   void set_up_journal() const;

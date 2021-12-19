@@ -129,11 +129,10 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::initialize_this_run_dir(
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
           typename RD>
-SimulationBuilder<DGrid, R, S, RJ, RD>&
-SimulationBuilder<DGrid, R, S, RJ, RD>::create_cartesian_topology(
+void SimulationBuilder<DGrid, R, S, RJ, RD>::create_cartesian_topology(
     const apt::array<int, DGrid>& dims,
     const apt::array<bool, DGrid>& periodic) {
-  m_cart.emplace();
+  auto& cart = m_sim->m_cart_opt;
   const int nprmy =
       std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
 
@@ -151,13 +150,8 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::create_cartesian_topology(
       d[i] = dims[i];
       p[i] = periodic[i];
     }
-    m_cart->emplace(*comm_tmp, d, p);
+    cart.emplace(*comm_tmp, d, p);
   }
-
-  m_dims = dims;
-  m_periodic = periodic;
-
-  return *this;
 }
 
 template <int DGrid, typename R, template <typename> class S, typename RJ,
@@ -165,24 +159,27 @@ template <int DGrid, typename R, template <typename> class S, typename RJ,
 std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   std::string msg = "";
   if (!m_supergrid) {
-    msg += "- must set supergrid. To fix, call `set_supergrid`.\n";
+    msg += "- missing a call to `set_supergrid`.\n";
   }
-  if (!m_cart) {
-    msg += "- must initialize cartesian topology\n";
+  if (!m_dims_periodic) {
+    msg += "- missing a call to `set_cartesian_topology`.\n";
   }
   if (!m_this_run_dir) {
-    msg += "- must set this_run_dir\n";
+    msg += "- missing a call to `initialize_this_run_dir`\n";
   }
   if (m_ic_actions.size() == 0) {
-    msg += "- no initial condition is given\n";
+    msg +=
+        "- no initial condition is given. Make at least one call to "
+        "`add_init_cond_action`\n";
   }
   if (!m_fld_guard) {
-    msg += "- must set the field guard. To fix, call `set_field_guard`.\n";
+    msg += "- missing a call to `set_field_guard`.\n";
   }
   if (m_init_ens_size_map) {
     const auto& ezm = *m_init_ens_size_map;
-    const int num_ens = std::accumulate(m_dims.begin(), m_dims.end(), 1,
-                                        std::multiplies<int>());
+    const auto& dims = (*m_dims_periodic).first;
+    const int num_ens =
+        std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
     if (ezm.size() != num_ens) {
       msg += fmt::format("- size of ensemble_size_map should be {}", num_ens);
     }
@@ -358,16 +355,26 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
   copy_ranges(sim.m_ptc_actions, sim.m_ptc_action_orig_ranges, get_range_ptr);
   copy_ranges(sim.m_exporters, sim.m_exporters_orig_ranges,
               [](const auto& act) { return act.get_range(); });
+  {
+    // adjust exporters' data dirs to be with respect to this_run_dir
+    for (auto& exp : sim.m_exporters) {
+      auto data_dir = exp.get_data_dir();
+      exp.set_data_dir(*m_this_run_dir + "/" + data_dir);
+    }
+  }
+
+  const auto& [dims, periodic] = (*m_dims_periodic);
 
   sim.m_fld_guard = *m_fld_guard;
   sim.m_this_run_dir = *m_this_run_dir;
 
   sim.m_supergrid = std::move(*m_supergrid);
-  sim.m_cart_opt = std::move(*m_cart);
   sim.m_properties = std::move(m_props);
-  sim.m_periodic = std::move(m_periodic);
+  sim.m_periodic = periodic;
 
   sim.m_grid = sim.m_supergrid;
+
+  create_cartesian_topology(dims, periodic);
 
   if (sim.m_sch_prof.on and sim.m_sch_prof.is_qualified()) {
     lgr::file.open(std::ios_base::app);
@@ -379,8 +386,8 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
     if (sim.m_cart_opt)
       label.emplace(sim.m_cart_opt->rank());
     else {
-      const int num_ens = std::accumulate(m_dims.begin(), m_dims.end(), 1,
-                                          std::multiplies<int>());
+      const int num_ens =
+          std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
 
       int my_rank = mpi::world.rank();
       int count = num_ens;
@@ -404,7 +411,7 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
      // checkpoint, so dims is used instead of m_ens_opt or m_cart_opt
     apt::Index<DGrid> bulk_dims;
     for (int i = 0; i < DGrid; ++i) {
-      bulk_dims[i] = sim.m_supergrid[i].dim() / m_dims[i];
+      bulk_dims[i] = sim.m_supergrid[i].dim() / dims[i];
     }
     auto range = apt::make_range({}, bulk_dims, sim.m_fld_guard);
     sim.m_E = {range};
