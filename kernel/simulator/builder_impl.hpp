@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "filesys/filesys.hpp"
+#include "particle/mpi_particle.hpp"
 #include "simulator/action_predefined.hpp"
 #include "simulator/argparser.hpp"
 #include "simulator/builder.hpp"
@@ -178,11 +179,6 @@ std::string SimulationBuilder<DGrid, R, S, RJ, RD>::precondition() const {
   if (!m_fld_guard) {
     msg += "- must set the field guard. To fix, call `set_field_guard`.\n";
   }
-  if (!m_is_mpi_particle_committed) {
-    msg +=
-        "- must commit a particle type for MPI. To fix, call "
-        "`commit_particle_type_for_mpi`.\n";
-  }
   if (m_init_ens_size_map) {
     const auto& ezm = *m_init_ens_size_map;
     const int num_ens = std::accumulate(m_dims.begin(), m_dims.end(), 1,
@@ -337,6 +333,9 @@ SimulationBuilder<DGrid, R, S, RJ, RD>::build() {
       throw std::runtime_error(msg);
     }
   }
+
+  // commit particle type for mpi communication.
+  mpi::commit(mpi::Datatype<particle::Particle<R, S>>{});
 
   // append a particle migrator to particle actions
   add_particle_action<particle::Migrator<DGrid, R, S, RJ>>()

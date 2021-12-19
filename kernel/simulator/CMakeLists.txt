@@ -10,7 +10,7 @@ target_link_libraries(predefinedAction PRIVATE pic_rc particle_array particle_mi
 add_library(simulationBuilder SHARED "builder.cpp")
 target_include_directories(simulationBuilder BEFORE PRIVATE ${KERNEL_DIR})
 # TODO pic_rc for pic.hpp
-target_link_libraries(simulationBuilder PRIVATE mpi io logger filesys ckpt pic_rc particle_array)
+target_link_libraries(simulationBuilder PRIVATE mpi io logger filesys ckpt pic_rc particle_array mpi_particle)
 
 
 add_library(simulator SHARED "simulator.cpp")
