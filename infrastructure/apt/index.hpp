@@ -146,6 +146,7 @@ struct Longidx {  // longitudianl index
 };
 }  // namespace apt
 
+namespace apt {
 template <int D>
 constexpr apt::Index<D> operator+(apt::Index<D> ind,
                                   const apt::Longidx& l) noexcept {
@@ -174,3 +175,4 @@ constexpr apt::Longidx operator-(int a, apt::Longidx l) noexcept {
   l = a - l.val();
   return l;
 }
+}  // namespace apt

@@ -49,24 +49,6 @@ constexpr real_t operator"" _deg(long double x) noexcept {
   return static_cast<real_t>(x * M_PI / 180);
 }
 
-namespace {
-// TODO already defined in apt/index.hpp, which is already included. But somehow
-// these are not visible. Instead, vec_expression ops defineded in
-// apt/numeric.hpp (in metric/log_spherical.hpp) is picked up and causing
-// compile error.
-template <int D>
-constexpr apt::Index<D> operator+(apt::Index<D> ind,
-                                  const apt::Longidx& l) noexcept {
-  ind[l.dir()] += l.val();
-  return ind;
-}
-
-constexpr apt::Longidx operator-(int a, apt::Longidx l) noexcept {
-  l = a - l.val();
-  return l;
-}
-}  // namespace
-
 // TODO one issue with this is how to ensure that these values are set
 struct global_variables {
   inline static real_t mu;

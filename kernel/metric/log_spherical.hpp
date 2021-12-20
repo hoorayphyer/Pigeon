@@ -2,6 +2,14 @@
 
 #include <cmath>
 
+#include "apt/grid.hpp"
+#include "apt/index.hpp"
+#include "apt/numeric.hpp"
+#include "apt/vec.hpp"
+#include "apt/virtual_vec.hpp"
+#include "field/field.hpp"
+#include "field/yee.hpp"
+
 namespace metric {
 template <typename T>
 struct LogSpherical {
@@ -34,9 +42,6 @@ struct LogSpherical {
 };
 }  // namespace metric
 
-#include "apt/grid.hpp"
-#include "apt/index.hpp"
-
 namespace field {
 template <int DGrid, typename T>
 constexpr T diff_zero(const T& f, T lnr, T theta, const apt::Grid<T, DGrid>& g,
@@ -49,9 +54,6 @@ constexpr T diff_one(T, T, T) noexcept {
   return 1.0;
 }
 }  // namespace field
-
-#include "field/field.hpp"
-#include "field/yee.hpp"
 
 namespace field {
 template <int DGrid, typename T, int Fcomp, int I>
@@ -148,10 +150,6 @@ constexpr T diff_axis_Ephi_theta(const T& f, T lnr, T theta,
 }
 
 }  // namespace field
-
-#include "apt/numeric.hpp"
-#include "apt/vec.hpp"
-#include "apt/virtual_vec.hpp"
 
 namespace metric {
 template <typename T>
