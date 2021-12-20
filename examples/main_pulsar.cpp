@@ -109,7 +109,7 @@ real_t E_phi_star(real_t lnr, real_t theta, real_t, real_t time) noexcept {
 }
 
 template <typename T, typename F>
-void axissymmetrize(
+void axisymmetrize(
     field::Component<T, DGrid, false> comp,  // TODOL semantics on comp
     const F&
         f,  // has interface: void (*f)( real_t& val_guard, real_t& val_bulk ),
@@ -274,14 +274,14 @@ struct Axisymmetric : public pgn::FieldAction_t<Axisymmetric> {
     const auto ends = apt::range::end(ranges);
 
     // MIDWAY in AxisDir
-    axissymmetrize(bundle.E[0], assign, begins, ends, m_is_upper_axis);
-    axissymmetrize(bundle.E[2], neg_assign, begins, ends, m_is_upper_axis);
-    axissymmetrize(bundle.B[1], neg_assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.E[0], assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.E[2], neg_assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.B[1], neg_assign, begins, ends, m_is_upper_axis);
 
     // INSITU in AxisDir
-    axissymmetrize(bundle.E[1], neg_assign, begins, ends, m_is_upper_axis);
-    axissymmetrize(bundle.B[0], assign, begins, ends, m_is_upper_axis);
-    axissymmetrize(bundle.B[2], neg_assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.E[1], neg_assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.B[0], assign, begins, ends, m_is_upper_axis);
+    axisymmetrize(bundle.B[2], neg_assign, begins, ends, m_is_upper_axis);
   }
 };
 }  // namespace field
@@ -636,10 +636,10 @@ struct Axisymmetric : public pgn::ParticleAction_t<Axisymmetric> {
     const auto begins = apt::range::begin(ranges);
     const auto ends = apt::range::end(ranges);
     // MIDWAY in AxisDir
-    axissymmetrize(J[0], add_assign, begins, ends, _is_upper_axis);
-    axissymmetrize(J[2], sub_assign, begins, ends, _is_upper_axis);
+    axisymmetrize(J[0], add_assign, begins, ends, _is_upper_axis);
+    axisymmetrize(J[2], sub_assign, begins, ends, _is_upper_axis);
     // INSITU in AxisDir
-    axissymmetrize(J[1], sub_assign, begins, ends, _is_upper_axis);
+    axisymmetrize(J[1], sub_assign, begins, ends, _is_upper_axis);
   }
 };
 
@@ -1145,14 +1145,14 @@ int main(int argc, char** argv) {
 
     builder.add_field_action<field::Axisymmetric>()
         .is_upper_axis(false)
-        .set_name("AxissymmetrizeEBLower")
+        .set_name("AxisymmetrizeEBLower")
         .set_range(0, {0, gv::supergrid[0].dim()})
         .set_range(
             1, {-gv::guard, 1});  // NOTE 1 so as to set values right on axis
 
     builder.add_field_action<field::Axisymmetric>()
         .is_upper_axis(true)
-        .set_name("AxissymmetrizeEBHigher")
+        .set_name("AxisymmetrizeEBHigher")
         .set_range(0, {0, gv::supergrid[0].dim()})
         .set_range(
             1, {gv::supergrid[1].dim(), gv::supergrid[1].dim() + gv::guard});
@@ -1229,13 +1229,13 @@ int main(int argc, char** argv) {
     }
 
     builder.add_particle_action<particle::Axisymmetric>()
-        .set_name("AxissymmetrizeJLower")
+        .set_name("AxisymmetrizeJLower")
         .set_range(0, {0, gv::supergrid[0].dim()})
         .set_range(1, {-gv::guard, 0})  // NOTE must not use 1 in place of 0
         .is_upper_axis(false);
 
     builder.add_particle_action<particle::Axisymmetric>()
-        .set_name("AxissymmetrizeJHigher")
+        .set_name("AxisymmetrizeJHigher")
         .set_range(0, {0, gv::supergrid[0].dim()})
         .set_range(1,
                    {gv::supergrid[1].dim(), gv::supergrid[1].dim() + gv::guard})
