@@ -215,9 +215,10 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
           sim.m_grid, sim.m_ens_opt, init_ts, *m_this_run_dir};
 
       for (auto& act : m_post_resume_actions) {
-        // TODO also check range emptiness
         if (!act) continue;
-        sim.taylor(act->ranges());
+        auto& ranges = act->ranges();
+        sim.taylor(ranges);
+        if (apt::range::is_empty(ranges)) continue;
         (*act)(bundle);
       }
     }
@@ -230,9 +231,10 @@ int SimulationBuilder<DGrid, R, S, RJ, RD>::load_init_cond(Simulator_t& sim) {
           sim.m_E,         sim.m_B,          sim.m_J,
           sim.m_particles, sim.m_properties, sim.m_grid};
       for (auto& act : m_ic_actions) {
-        // TODO also check range emptiness
         if (!act) continue;
-        sim.taylor(act->ranges());
+        auto& ranges = act->ranges();
+        sim.taylor(ranges);
+        if (apt::range::is_empty(ranges)) continue;
         (*act)(bundle);
       }
 

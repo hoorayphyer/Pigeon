@@ -261,8 +261,7 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
           m_particles, m_J, m_ptc_buffer, m_properties, m_E,  m_B,
           m_grid,      ens, dt,           timestep,     m_rng};
       for (const auto& act : m_ptc_actions) {
-        if (!act) continue;
-        // TODO check act.range not empty?
+        if (!act or apt::range::is_empty(act->ranges())) continue;
         TIMING(
             " -- " + act->name(), START { (*act)(bundle); });
       }
@@ -320,8 +319,7 @@ void Simulator<DGrid, R, S, RJ, RD>::evolve(int timestep, R dt) {
       }
 
       for (const auto& act : m_fld_actions) {
-        // TODO check range empty
-        if (!act) continue;
+        if (!act or apt::range::is_empty(act->ranges())) continue;
         TIMING(
             " -- " + act->name(), START { (*act)(bundle); });
       }

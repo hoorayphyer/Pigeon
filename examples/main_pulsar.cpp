@@ -502,8 +502,6 @@ struct Atmosphere : public pgn::ParticleAction_t<Atmosphere> {
     const auto begins = apt::range::begin(ranges);
     const auto ends = apt::range::end(ranges);
 
-    if (ranges[m_n].end() <= ranges[m_n].begin()) return;
-
     m_count_n.resize({apt::make_range(begins, ends, 0)});
     m_count_p.resize({apt::make_range(begins, ends, 0)});
 
@@ -688,7 +686,6 @@ struct Escaping : public pgn::ParticleAction_t<Escaping> {
  public:
   void operator()(const Bundle_t& bundle) const override {
     const auto& ranges = this->ranges();
-    if (apt::range::is_empty(ranges)) return;
 
     auto& particles = bundle.particles;
     const auto& grid = bundle.grid;
@@ -720,7 +717,6 @@ class Annihilator : public pgn::ParticleAction_t<Annihilator> {
  public:
   void operator()(const Bundle_t& bundle) const override {
     const auto& ranges = this->ranges();
-    if (apt::range::is_empty(ranges)) return;
 
     const auto& grid = bundle.grid;
     const auto& ens = bundle.ens;
@@ -773,7 +769,7 @@ class NoPhotonZone : public pgn::ParticleAction_t<NoPhotonZone> {
     const auto& grid = bundle.grid;
     auto& particles = bundle.particles;
 
-    if ((timestep % m_interval != 0) or apt::range::is_empty(ranges)) return;
+    if ((timestep % m_interval != 0)) return;
 
     apt::array<apt::array<real_t, 2>, DGrid> bounds;
     for (int i = 0; i < DGrid; ++i) {
@@ -1209,7 +1205,9 @@ int main(int argc, char** argv) {
     }
 
     builder.add_particle_action<particle::MainUpdater>()
-        .set_name("MainUpdate")  // TODO set range??
+        .set_name("MainUpdate")
+        .set_range(0, {0, gv::supergrid[0].dim(), gv::guard})
+        .set_range(1, {0, gv::supergrid[1].dim() + 1, gv::guard})
         .set_update_q(
             Metric::geodesic_move<apt::vVec<real_t, 3>, apt::vVec<real_t, 3>>)
         .set_export_schedule(sch_export);
@@ -1241,8 +1239,10 @@ int main(int argc, char** argv) {
                    {gv::supergrid[1].dim(), gv::supergrid[1].dim() + gv::guard})
         .is_upper_axis(true);
 
-    builder.add_particle_action<particle::NewPtcAnalyzer>().set_name(
-        "NewParticleAnalysis");  // TODO set range?
+    builder.add_particle_action<particle::NewPtcAnalyzer>()
+        .set_name("NewParticleAnalysis")
+        .set_range(0, {0, gv::supergrid[0].dim(), gv::guard})
+        .set_range(1, {0, gv::supergrid[1].dim() + 1, gv::guard});
   }
 
   builder.add_init_cond_action<InitialCondition>()
