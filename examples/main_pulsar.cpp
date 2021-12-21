@@ -1401,11 +1401,9 @@ int main(int argc, char** argv) {
 
   auto& sim = builder.build();
 
-  // TODO having to have user call this is a bit error_prone
-  const auto init_ts = sim.initial_timestep();
   if (mpi::world.rank() == 0) std::cout << "Launch" << std::endl;
-  for (int ts = init_ts; ts < init_ts + n_timesteps; ++ts) {
-    sim.evolve(ts, dt);
+  for (const auto& step : sim.steps(n_timesteps, dt)) {
+    step.evolve(sim);
   }
 
   return 0;

@@ -87,11 +87,69 @@ struct Simulator {
 
   void print_vitals(const std::string& filename, R t_phys) const;
 
+  // called through the Step class
+  void evolve(int timestep, R dt);
+
+  struct Step {
+   public:
+    Step(int ts, R dt) : m_ts(ts), m_dt(dt) {}
+
+    int timestep() const { return m_ts; }
+
+    operator int() const { return m_ts; }
+
+    void evolve(Simulator& sim) const { sim.evolve(m_ts, m_dt); }
+
+   private:
+    const int m_ts;
+    const R m_dt;
+  };
+
+  struct StepsGenerator {
+    const int m_ts_init;
+    const int m_ts_final;
+    const R m_dt;
+
+    class iterator {
+     public:
+      iterator(int ts, R dt) : m_ts(ts), m_dt(dt) {}
+
+      bool operator!=(const iterator& other) const {
+        // dt should be the same;
+        return m_ts != other.m_ts;
+      }
+
+      iterator& operator++() {
+        ++m_ts;
+        return *this;
+      }
+
+      iterator operator++(int) {
+        auto res = *this;
+        ++(*this);
+        return res;
+      }
+
+      Step operator*() const { return Step{m_ts, m_dt}; }
+
+     private:
+      int m_ts;
+      const R m_dt;
+    };
+
+    iterator begin() const { return {m_ts_init, m_dt}; }
+
+    iterator end() const { return {m_ts_final, m_dt}; }
+  };
+
+  friend class Step;
+
  public:
   friend class SimulationBuilder<DGrid, R, S, RJ, RD>;
 
-  int initial_timestep() const noexcept { return m_initial_timestep; }
-
-  void evolve(int timestep, R dt);
+  StepsGenerator steps(int number_total_timesteps, R dt) const {
+    return {m_initial_timestep, m_initial_timestep + number_total_timesteps,
+            dt};
+  }
 };
 }  // namespace pic
