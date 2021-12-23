@@ -9,8 +9,6 @@
 #include "particle/forces.hpp"
 #include "particle/scattering.hpp"
 #include "particle/updater.hpp"
-#include "pic/forces/gravity.hpp"
-#include "pic/forces/landau0.hpp"
 #include "pigeon.hpp"
 
 // TODOL users may forget to sync value and state. Add another layer then
@@ -286,6 +284,34 @@ struct Axisymmetric : public pgn::FieldAction_t<Axisymmetric> {
 };
 }  // namespace field
 
+namespace particle::force {
+
+void gravity(pgn::vParticle& ptc, real_t dt, const pgn::Vec3&, const pgn::Vec3&,
+             real_t g) noexcept {
+  ptc.p(0) -= g * std::exp(-2 * ptc.q(0)) * dt;
+}
+
+void landau0(pgn::vParticle& ptc, real_t dt, const pgn::Vec3& E,
+             const pgn::Vec3& B, real_t B_thr) noexcept {
+  using Vec = pgn::Vec3;
+  if (apt::sqabs(B) < B_thr * B_thr) return;
+
+  auto EB2 = apt::dot(E, B);
+  EB2 = EB2 * EB2;
+  auto B2_E2 = apt::sqabs(B) - apt::sqabs(E);
+  // calculate E'^2
+  auto Ep2 = 2 * EB2 / (std::sqrt(B2_E2 * B2_E2 + 4 * EB2) + B2_E2);
+  Vec beta_ExB = apt::cross(E, B) / (apt::sqabs(B) + Ep2);
+  // find B' modulo gamma_ExB
+  Vec Bp = B - apt::cross(beta_ExB, E);
+  // obtain the momentum with perpendicular components damped
+  ptc.p() = Bp * (apt::dot(ptc.p(), Bp) / apt::sqabs(Bp));
+  ptc.p() += beta_ExB * std::sqrt((1.0 + apt::sqabs(ptc.p())) /
+                                  (1.0 - apt::sqabs(beta_ExB)));
+}
+
+}  // namespace particle::force
+
 auto set_up_particle_properties(real_t gravity_strength, real_t landau0_B_thr,
                                 real_t gamma_fd, real_t gamma_off,
                                 real_t Ndot_fd, real_t E_ph,
@@ -303,8 +329,8 @@ auto set_up_particle_properties(real_t gravity_strength, real_t landau0_B_thr,
   {
     using Force = Force<real_t, Specs>;
     constexpr auto* lorentz = force::template lorentz<real_t, Specs, vParticle>;
-    constexpr auto* landau0 = force::landau0<real_t, Specs, vParticle>;
-    constexpr auto* gravity = force::gravity<real_t, Specs, vParticle>;
+    constexpr auto* landau0 = force::landau0;
+    constexpr auto* gravity = force::gravity;
 
     if (properties.has(species::electron)) {
       auto sp = species::electron;

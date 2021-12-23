@@ -39,6 +39,7 @@ struct PIGEON {
   using Index_t = apt::Index<DGrid>;
   using Vec3 = apt::Vec<R, 3>;
   using Particle = particle::Particle<R, S>;
+  using vParticle = particle::vParticle<R, S>;
 
   using ParticleArray_t = particle::array<R, S>;
 
