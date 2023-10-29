@@ -25,7 +25,7 @@ endif()
 ExternalProject_Add(silo-llnl
   PREFIX "${SILO_ROOT}"
   INSTALL_DIR "${SILO_ROOT}"
-  URL https://wci.llnl.gov/sites/wci/files/2021-01/silo-4.10.2.tgz
+  URL https://github.com/LLNL/Silo/archive/refs/tags/4.11.1.tar.gz
   CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=yes --enable-fortran=no --enable-static=no --enable-optimization=yes --enable-browser=no --with-hdf5=${HDF5_INC},${HDF5_INC}/../lib
   STEP_TARGETS install
   )
