@@ -5,5 +5,7 @@ target_link_libraries( io PRIVATE silopp dye filesys field_sync mpi )
 
 if (${ENABLE_TESTS})
   test_gen(io io mpi filesys silopp) # DONE
-  target_link_libraries( test_io_io PRIVATE stdc++fs) #TODO this is only for gnu. In GCC 9.1 this is not necessary
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_libraries( test_io_io PRIVATE stdc++fs)
+  endif()
 endif()
